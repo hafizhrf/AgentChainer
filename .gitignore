@@ -19,3 +19,6 @@ apps/desktop/src-tauri/gen/schemas/
 
 # Bootstrap backups (see docs/CATALOG.md §7)
 .agentchainer/backups/
+
+# Personal Claude Code settings (permissions, local overrides)
+.claude/settings.local.json

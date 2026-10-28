@@ -1,6 +1,7 @@
 {
   "name": "agentchainer",
   "private": true,
+  "license": "Apache-2.0",
   "type": "module",
   "packageManager": "pnpm@11.11.0",
   "engines": {
@@ -10,6 +11,13 @@
     "dev": "pnpm --filter @agentchainer/desktop tauri dev",
     "build": "pnpm --filter @agentchainer/desktop tauri build",
     "typecheck": "pnpm -r typecheck",
-    "test": "pnpm -r --if-present test"
+    "test": "pnpm -r --if-present test",
+    "lint": "biome ci .",
+    "format": "biome check --write .",
+    "test:coverage": "pnpm -r --if-present test:coverage",
+    "hooks:install": "git config core.hooksPath .githooks"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.6.3"
   }
 }

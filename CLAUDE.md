@@ -41,22 +41,26 @@ Prerequisites:
 
 | Task | Command |
 |---|---|
-| Install | `pnpm install` |
+| Install | `pnpm install` (once per clone: `pnpm hooks:install` for the pre-commit hook) |
 | Run the desktop app (dev, hot reload) | `pnpm dev` |
+| Lint + format check (Biome, what CI runs) / auto-fix | `pnpm lint` / `pnpm format` |
 | Build the desktop app (installers) | `pnpm build` |
 | Fast debug build, no installers | `pnpm --filter @agentchainer/desktop tauri build --debug --no-bundle` |
 | Typecheck all TS packages | `pnpm typecheck` |
 | Rust check / lint / format | `cargo check --workspace` · `cargo clippy --workspace` · `cargo fmt --all` |
 | Sidecar one-shot check (JSON-RPC over stdio) | `echo '{"jsonrpc":"2.0","id":1,"method":"system.hello","params":{"protocolVersion":1}}' \| node packages/sidecar/src/main.ts` |
-| Unit tests, all packages (Node's built-in runner) | `pnpm test` |
+| Unit tests, all packages (Node's built-in runner) / with coverage | `pnpm test` / `pnpm test:coverage` |
+| Rust tests | `cargo test --workspace` |
 | Spike harness: real model calls with your own `claude` login (haiku, a few cents) | `node packages/sidecar/scripts/spike-host.ts --cwd <empty scratch dir> [--scenario basic\|mode\|interrupt\|guard\|auto\|subagents\|all] [--record raw.jsonl]` |
 | Turn a raw recording into a committable fixture (fails if anything identifying survives) | `node packages/sidecar/scripts/make-fixture.ts raw.jsonl packages/sidecar/test/fixtures/<name>.jsonl --cwd <recording workspace>` |
 | Plugin/MCP install spike (installs and removes again, in a throwaway project) | `node packages/sidecar/scripts/spike-install.ts --cwd <empty scratch dir>` |
 | Launch smoke test (after a debug build) | `node scripts/smoke-launch.mjs target/debug/agentchainer [--seconds N]` |
+| Streaming latency + CPU self-test (after a debug build; one real haiku turn, opens a window briefly) | `node scripts/selftest-latency.mjs --cwd <empty scratch dir>` |
 
 CI (`.github/workflows/ci.yml`) runs on every PR and on pushes to `main`. Actions are pinned by commit SHA, so keep the
 `# vX.Y.Z` comment next to each SHA when bumping.
 
-TS lint and format commands arrive with M0-08. Tests use `node:test` for now; M0-09 decides the long-term runner.
+Edits made by Claude in this repo are auto-formatted by the PostToolUse hook in `.claude/settings.json` (format only, no
+lint fixes). `pnpm lint` is the gate. Tests use `node:test`; add Vitest only for DOM component tests.
 Never commit a raw SDK recording: it contains local paths and account details. Only `make-fixture.ts` output goes into
-`test/fixtures/`.
+`test/fixtures/`. PR titles must be Conventional Commits with checklist IDs; see `CONTRIBUTING.md`.

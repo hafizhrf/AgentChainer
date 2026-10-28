@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import type { AgentEvent } from "@agentchainer/protocol";
-import { applyEvent, type AgentItem, type Item } from "./transcript.ts";
+import { type AgentItem, applyEvent, type Item } from "./transcript.ts";
 
 const run = (events: AgentEvent[]) => events.reduce<Item[]>(applyEvent, []);
 
@@ -9,22 +9,43 @@ describe("transcript reducer", () => {
   it("nests a subagent's tool calls and text inside its card", () => {
     const items = run([
       { type: "text.delta", text: "Launching two agents." },
-      { type: "tool.started", toolUseId: "A", name: "Agent", input: { description: "List files", subagent_type: "general-purpose" }, parentToolUseId: null },
+      {
+        type: "tool.started",
+        toolUseId: "A",
+        name: "Agent",
+        input: { description: "List files", subagent_type: "general-purpose" },
+        parentToolUseId: null,
+      },
       { type: "agent.started", toolUseId: "A", taskId: "t1", description: "List files", agentType: "general-purpose" },
       { type: "tool.started", toolUseId: "A1", name: "Bash", input: { command: "ls" }, parentToolUseId: "A" },
       { type: "agent.text", parentToolUseId: "A", text: "Found 0 files." },
       { type: "tool.completed", toolUseId: "A1", isError: false, output: "", parentToolUseId: "A" },
       { type: "tool.completed", toolUseId: "A", isError: false, output: "hand-back", parentToolUseId: null },
-      { type: "agent.completed", toolUseId: "A", taskId: "t1", status: "completed", summary: "Listed files", totalTokens: 1200, durationMs: 3400 },
+      {
+        type: "agent.completed",
+        toolUseId: "A",
+        taskId: "t1",
+        status: "completed",
+        summary: "Listed files",
+        totalTokens: 1200,
+        durationMs: 3400,
+      },
       { type: "turn.completed", subtype: "success", isError: false, costUsd: 0.01, durationMs: 5000, numTurns: 2 },
     ]);
 
-    assert.deepEqual(items.map((i) => i.kind), ["assistant", "agent"], "no stray top-level tool cards");
+    assert.deepEqual(
+      items.map((i) => i.kind),
+      ["assistant", "agent"],
+      "no stray top-level tool cards",
+    );
     const agent = items[1] as AgentItem;
     assert.equal(agent.status, "done");
     assert.equal(agent.summary, "Listed files");
     assert.equal(agent.tokens, 1200);
-    assert.deepEqual(agent.children.map((c) => c.kind), ["tool", "text"]);
+    assert.deepEqual(
+      agent.children.map((c) => c.kind),
+      ["tool", "text"],
+    );
     assert.equal(agent.children[0]?.kind === "tool" && agent.children[0].status, "done");
   });
 
@@ -32,10 +53,19 @@ describe("transcript reducer", () => {
     const items = run([
       { type: "text.delta", text: "a" },
       { type: "tool.started", toolUseId: "T", name: "Read", input: { file_path: "x" }, parentToolUseId: null },
-      { type: "tool.completed", toolUseId: "T", isError: true, output: "Blocked by AgentChainer guard: …", parentToolUseId: null },
+      {
+        type: "tool.completed",
+        toolUseId: "T",
+        isError: true,
+        output: "Blocked by AgentChainer guard: …",
+        parentToolUseId: null,
+      },
       { type: "text.delta", text: "b" },
     ]);
-    assert.deepEqual(items.map((i) => i.kind), ["assistant", "tool", "assistant"]);
+    assert.deepEqual(
+      items.map((i) => i.kind),
+      ["assistant", "tool", "assistant"],
+    );
     assert.equal(items[1]?.kind === "tool" && items[1].status, "error");
   });
 

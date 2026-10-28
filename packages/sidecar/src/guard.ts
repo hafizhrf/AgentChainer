@@ -9,9 +9,24 @@ import { isAbsolute, relative, resolve } from "node:path";
  * a determined command can be written in ways these patterns don't catch.
  */
 
-const SECRET_DIRS = [".ssh", ".aws", ".gnupg", ".azure", ".kube", ".config/gcloud", ".docker/config.json", ".netrc", ".claude/.credentials.json"];
+const SECRET_DIRS = [
+  ".ssh",
+  ".aws",
+  ".gnupg",
+  ".azure",
+  ".kube",
+  ".config/gcloud",
+  ".docker/config.json",
+  ".netrc",
+  ".claude/.credentials.json",
+];
 
-const FILE_TOOLS: Record<string, string> = { Read: "file_path", Write: "file_path", Edit: "file_path", NotebookEdit: "notebook_path" };
+const FILE_TOOLS: Record<string, string> = {
+  Read: "file_path",
+  Write: "file_path",
+  Edit: "file_path",
+  NotebookEdit: "notebook_path",
+};
 
 export function checkToolCall(toolName: string, input: unknown, cwd: string, home = homedir()): string | null {
   const args = (input && typeof input === "object" ? input : {}) as Record<string, unknown>;
@@ -62,7 +77,10 @@ export function checkBash(command: string, cwd: string, home = homedir()): strin
 function recursiveRmTargets(command: string): string[] {
   const targets: string[] = [];
   for (const match of command.matchAll(/(?:^|[;&|(]\s*|\s)rm\s+([^;&|]*)/g)) {
-    const tokens = (match[1] ?? "").trim().split(/\s+/).map((t) => t.replace(/^["']|["']$/g, ""));
+    const tokens = (match[1] ?? "")
+      .trim()
+      .split(/\s+/)
+      .map((t) => t.replace(/^["']|["']$/g, ""));
     const recursive = tokens.some((t) => /^-[a-zA-Z]*[rR]/.test(t) || t === "--recursive");
     if (recursive) targets.push(...tokens.filter((t) => t && !t.startsWith("-")));
   }
@@ -83,6 +101,7 @@ function isSecretPath(path: string, home: string): boolean {
 }
 
 function secretPathMentioned(command: string, home: string): boolean {
+  // biome-ignore lint/suspicious/noTemplateCurlyInString: matches the literal shell text `${HOME}/` in a command.
   const prefixes = ["~/", "$HOME/", "${HOME}/", `${home}/`];
   return SECRET_DIRS.some((dir) => prefixes.some((p) => command.includes(`${p}${dir}`)));
 }

@@ -38,17 +38,20 @@ jobs:
         run: rustup toolchain install && rustc --version
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
       - run: pnpm install --frozen-lockfile
+      - name: Lint and format (Biome)
+        run: pnpm lint
       - run: pnpm typecheck
       - name: Sidecar smoke (system.hello over stdio)
         run: |
           echo '{"jsonrpc":"2.0","id":1,"method":"system.hello","params":{"protocolVersion":1}}' \
             | node packages/sidecar/src/main.ts | tee /dev/stderr | grep -q '"protocolVersion":1'
-      - name: Unit tests (all packages)
-        run: pnpm test
+      - name: Unit tests with coverage (all packages)
+        run: pnpm test:coverage
       - name: Build frontend (tauri::generate_context! embeds it)
         run: pnpm --filter @agentchainer/desktop build
       - run: cargo fmt --all --check
       - run: cargo clippy --workspace --all-targets -- -D warnings
+      - run: cargo test --workspace
 
   build:
     name: Build & launch (${{ matrix.name }})

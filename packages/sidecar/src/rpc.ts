@@ -21,8 +21,10 @@ export function log(message: string): void {
   process.stderr.write(`${message}\n`);
 }
 
+const METRICS = process.env.AGENTCHAINER_METRICS === "1";
+
 export function notify<N extends keyof Notifications>(method: N, params: Notifications[N]): void {
-  write({ jsonrpc: "2.0", method, params });
+  write({ jsonrpc: "2.0", method, params, ...(METRICS ? { ts: Date.now() } : {}) });
 }
 
 /**

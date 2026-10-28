@@ -1,12 +1,14 @@
 {
   "name": "@agentchainer/sidecar",
   "version": "0.0.0",
+  "license": "Apache-2.0",
   "private": true,
   "type": "module",
   "scripts": {
     "start": "node src/main.ts",
     "test": "node --test \"src/**/*.test.ts\"",
-    "typecheck": "tsc"
+    "typecheck": "tsc",
+    "test:coverage": "node --test --experimental-test-coverage \"src/**/*.test.ts\""
   },
   "dependencies": {
     "@agentchainer/protocol": "workspace:*",

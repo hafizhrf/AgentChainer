@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { encodePath, leaks, sanitizeForFixture, type Identity } from "./fixtures.ts";
+import { encodePath, type Identity, leaks, sanitizeForFixture } from "./fixtures.ts";
 
 const id: Identity = { cwd: "/tmp/scratch/ws", home: "/Users/jane.doe", username: "jane.doe" };
 
@@ -28,7 +28,13 @@ describe("sanitizeForFixture", () => {
 
   it("empties the init message's machine inventory", () => {
     const out = sanitizeForFixture(
-      { type: "system", subtype: "init", model: "m", mcp_servers: [{ name: "private-server" }], memory_paths: { auto: "/x" } },
+      {
+        type: "system",
+        subtype: "init",
+        model: "m",
+        mcp_servers: [{ name: "private-server" }],
+        memory_paths: { auto: "/x" },
+      },
       id,
     );
     assert.deepEqual(out?.mcp_servers, []);

@@ -41,8 +41,14 @@ describe("parseAuthStatus", () => {
       method: "none",
       provider: "firstParty",
     });
-    assert.equal(parseAuthStatus('{"loggedIn":true,"authMethod":"api_key","apiProvider":"firstParty"}')?.method, "api_key");
-    assert.equal(parseAuthStatus('{"loggedIn":true,"authMethod":"third_party","apiProvider":"bedrock"}')?.provider, "bedrock");
+    assert.equal(
+      parseAuthStatus('{"loggedIn":true,"authMethod":"api_key","apiProvider":"firstParty"}')?.method,
+      "api_key",
+    );
+    assert.equal(
+      parseAuthStatus('{"loggedIn":true,"authMethod":"third_party","apiProvider":"bedrock"}')?.provider,
+      "bedrock",
+    );
   });
 
   it("rejects output it doesn't understand", () => {

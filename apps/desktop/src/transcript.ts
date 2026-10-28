@@ -41,7 +41,8 @@ export function applyEvent(items: Item[], e: AgentEvent): Item[] {
   switch (e.type) {
     case "text.delta": {
       const last = items.at(-1);
-      if (last?.kind === "assistant" && last.open) return [...items.slice(0, -1), { ...last, text: last.text + e.text }];
+      if (last?.kind === "assistant" && last.open)
+        return [...items.slice(0, -1), { ...last, text: last.text + e.text }];
       return [...items, { kind: "assistant", id: nextId(), text: e.text, open: true }];
     }
 
@@ -70,7 +71,9 @@ export function applyEvent(items: Item[], e: AgentEvent): Item[] {
       if (e.parentToolUseId !== null && hasAgent(items, e.parentToolUseId)) {
         return updateAgent(items, e.parentToolUseId, (a) => ({
           ...a,
-          children: a.children.map((c) => (c.kind === "tool" && c.id === e.toolUseId ? { ...c, status, output: e.output } : c)),
+          children: a.children.map((c) =>
+            c.kind === "tool" && c.id === e.toolUseId ? { ...c, status, output: e.output } : c,
+          ),
         }));
       }
       return items.map((it) => {
@@ -83,7 +86,10 @@ export function applyEvent(items: Item[], e: AgentEvent): Item[] {
 
     case "agent.started":
       if (!hasAgent(items, e.toolUseId)) {
-        return [...items, { kind: "agent", id: e.toolUseId, description: e.description, status: "running", children: [] }];
+        return [
+          ...items,
+          { kind: "agent", id: e.toolUseId, description: e.description, status: "running", children: [] },
+        ];
       }
       return updateAgent(items, e.toolUseId, (a) => ({
         ...a,

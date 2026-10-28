@@ -8,10 +8,27 @@ import { homedir, userInfo } from "node:os";
 
 /** Message kinds the normalizer cares about. Everything else is dropped: hook output, rate limits, status… */
 const KEEP_TYPES = new Set(["assistant", "user", "result", "stream_event"]);
-const KEEP_SYSTEM = new Set(["init", "task_started", "task_progress", "task_updated", "task_notification", "compact_boundary"]);
+const KEEP_SYSTEM = new Set([
+  "init",
+  "task_started",
+  "task_progress",
+  "task_updated",
+  "task_notification",
+  "compact_boundary",
+]);
 
 /** Fields of the init message that describe the recording machine rather than the session. */
-const INIT_INVENTORY = ["tools", "mcp_servers", "slash_commands", "terminal_slash_commands", "skills", "plugins", "agents", "plugin_errors", "betas"];
+const INIT_INVENTORY = [
+  "tools",
+  "mcp_servers",
+  "slash_commands",
+  "terminal_slash_commands",
+  "skills",
+  "plugins",
+  "agents",
+  "plugin_errors",
+  "betas",
+];
 const INIT_LOCAL_PATHS = ["memory_paths", "scratchpad_path"];
 
 /** Claude Code encodes a path into a directory name by replacing every non-alphanumeric character with "-". */
@@ -49,5 +66,7 @@ export function sanitizeForFixture(message: unknown, id: Identity): Record<strin
 
 /** Returns the identity strings still present in `text`; a committed fixture must return []. */
 export function leaks(text: string, id: Identity): string[] {
-  return [id.home, encodePath(id.home), id.username, encodePath(id.username)].filter((s) => s.length > 2 && text.includes(s));
+  return [id.home, encodePath(id.home), id.username, encodePath(id.username)].filter(
+    (s) => s.length > 2 && text.includes(s),
+  );
 }

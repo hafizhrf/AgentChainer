@@ -41,7 +41,9 @@
   - Rust stays thin and generic, and mostly relays frames.
 - **Negative:**
   - A sidecar crash interrupts all running turns. SDK sessions are persisted, so they can be resumed, but in-flight tool calls are lost.
-  - Backpressure: text deltas must be coalesced (~16 ms frames) before crossing to the UI.
+  - Backpressure: text deltas may need coalescing (~16 ms frames) before crossing to the UI. Spike S2 measured
+    p95 2–3 ms relay latency and ~1–2% CPU at haiku streaming rates, so coalescing is deferred until a measurement
+    shows it is needed.
 - **SDK distribution (M0-03, resolved 2026-10-28): do not bundle the Agent SDK.**
   - Its `LICENSE.md` reads: *"© Anthropic PBC. All rights reserved. Use is subject to the Legal Agreements outlined
     here: https://code.claude.com/docs/en/legal-and-compliance."*

@@ -2,10 +2,10 @@
 
 - **Date:** 2026-10-28
 - **Checklist:** M0-16 (S2), M0-17 (S3); touches M0-15 (S1: CLI resolution only)
-- **Status:** S3 complete; S2 latency measurement still open.
+- **Status:** Complete (S2 and S3).
   - S3 behaviours are verified against the real CLI by an automated harness (11/11 checks, including `auto` mode), and
     the owner checked the dialog and mode switcher in the app.
-  - Still open: UI-side delta latency and CPU measurement (S2).
+  - S2 latency and CPU were measured with the app's self-test mode (see Results).
 
 ## Question
 
@@ -74,6 +74,8 @@ broker tool approvals through `canUseTool`? It must do this while using the **us
 | In-app check by the owner on a real repo (Opus) | The approval dialog shows the tool description and full input, and the mode switcher works. Session cost ≈ $1.03 (estimate) |
 | Estimated cost of a full harness run (≈ 9 turns, haiku) | **≈ $0.05** (SDK `total_cost_usd`, an estimate) |
 | App: UI → Rust → sidecar → CLI handshake | Works; the top bar renders CLI, SDK and Node versions |
+| **S2: sidecar → Rust → UI delta latency** (self-test, haiku; 300- and 1000-word replies) | **p50 1 ms, p95 2–3 ms, max 4–16 ms** over 72 and 196 deltas. Measured from the sidecar's send time to JS receipt in the WebView |
+| **S2: CPU / memory while streaming** (`ps`, 250 ms samples) | App ~2–3% avg (startup spikes to ~57–74%), sidecar ~1.4–1.9% avg, `claude` ~6–9% avg. RSS: app ~59 MB, sidecar ~86 MB, `claude` ~210–290 MB |
 
 ## Findings
 
@@ -104,7 +106,8 @@ broker tool approvals through `canUseTool`? It must do this while using the **us
 
 ## Not covered yet
 
-- [ ] End-to-end delta latency and CPU in the UI (instrument timestamps in the Rust relay and UI) — S2.
+- [x] End-to-end delta latency and CPU (S2): measured with the self-test above. WebView render cost is not included,
+      because on macOS the WebView's processes aren't children of the app.
 - [x] In-app check by a human: approval dialog and mode switcher (owner, 2026-10-28). The Stop button wasn't clicked;
       the harness covers the RPC behind it.
 - [ ] Sidecar as a single executable; app launched from Finder (PATH and env resolution) — S1 / M1-03.

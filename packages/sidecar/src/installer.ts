@@ -29,7 +29,8 @@ export function parseJsonOutput(stdout: string): unknown {
   return null;
 }
 
-export const listMarketplaces = (claude: string, cwd: string) => run(claude, ["plugin", "marketplace", "list", "--json"], cwd);
+export const listMarketplaces = (claude: string, cwd: string) =>
+  run(claude, ["plugin", "marketplace", "list", "--json"], cwd);
 
 export const listPlugins = (claude: string, cwd: string) => run(claude, ["plugin", "list", "--json"], cwd);
 
@@ -41,8 +42,14 @@ export const uninstallPlugin = (claude: string, id: string, scope: Scope, cwd: s
   run(claude, ["plugin", "uninstall", id, "--scope", scope, "--json"], cwd);
 
 /** Registers a stdio MCP server. `local` scope is private to this user and project; `project` writes `.mcp.json`. */
-export const addMcpServer = (claude: string, name: string, scope: Scope, command: string, args: string[], cwd: string) =>
-  run(claude, ["mcp", "add", "--scope", scope, name, "--", command, ...args], cwd);
+export const addMcpServer = (
+  claude: string,
+  name: string,
+  scope: Scope,
+  command: string,
+  args: string[],
+  cwd: string,
+) => run(claude, ["mcp", "add", "--scope", scope, name, "--", command, ...args], cwd);
 
 export const getMcpServer = (claude: string, name: string, cwd: string) => run(claude, ["mcp", "get", name], cwd);
 

@@ -14,12 +14,11 @@ const exe = process.platform === "win32" ? "claude.exe" : "claude";
  * Login-shell env resolution for GUI launches is M1-03; in dev the app inherits the terminal's PATH.
  */
 export function findClaude(): string | null {
-  const fromPath = (process.env.PATH ?? "").split(delimiter).filter(Boolean).map((dir) => join(dir, exe));
-  const known = [
-    join(homedir(), ".local", "bin", exe),
-    "/opt/homebrew/bin/claude",
-    "/usr/local/bin/claude",
-  ];
+  const fromPath = (process.env.PATH ?? "")
+    .split(delimiter)
+    .filter(Boolean)
+    .map((dir) => join(dir, exe));
+  const known = [join(homedir(), ".local", "bin", exe), "/opt/homebrew/bin/claude", "/usr/local/bin/claude"];
   return [...fromPath, ...known].find((candidate) => existsSync(candidate)) ?? null;
 }
 
@@ -39,10 +38,11 @@ export function isAtLeast(version: string, min: string): boolean {
   const a = parseVersion(version);
   const b = parseVersion(min);
   if (!a || !b) return false;
-  for (let i = 0; i < 3; i++) {
-    if (a[i]! !== b[i]!) return a[i]! > b[i]!;
-  }
-  return true;
+  const [aMajor, aMinor, aPatch] = a;
+  const [bMajor, bMinor, bPatch] = b;
+  if (aMajor !== bMajor) return aMajor > bMajor;
+  if (aMinor !== bMinor) return aMinor > bMinor;
+  return aPatch >= bPatch;
 }
 
 /**
@@ -92,7 +92,11 @@ export function checkEnvironment(): EnvCheck {
 }
 
 /** Runs the user's CLI non-interactively (used by the installer, spike S6). */
-export function runClaude(path: string, args: string[], cwd: string): { status: number | null; stdout: string; stderr: string } {
+export function runClaude(
+  path: string,
+  args: string[],
+  cwd: string,
+): { status: number | null; stdout: string; stderr: string } {
   const r = spawnSync(path, args, { cwd, encoding: "utf8", timeout: 120_000, stdio: ["ignore", "pipe", "pipe"] });
   return { status: r.status, stdout: r.stdout ?? "", stderr: r.stderr ?? "" };
 }

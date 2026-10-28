@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type KeyboardEvent } from "react";
-import type { AgentEvent, Methods, PermissionRequest } from "@agentchainer/protocol";
+import { PERMISSION_MODES, type AgentEvent, type Methods, type PermissionMode, type PermissionRequest } from "@agentchainer/protocol";
 import { connect, onExit, request, subscribe } from "./sidecar.ts";
 import "./App.css";
 
@@ -19,6 +19,12 @@ const MODELS = [
   { value: "opus", label: "Opus" },
 ];
 
+const MODE_LABELS: Record<PermissionMode, string> = {
+  default: "Ask before edits and commands",
+  acceptEdits: "Auto-accept file edits",
+  plan: "Plan only (no changes)",
+};
+
 let seq = 0;
 
 export function App() {
@@ -30,6 +36,7 @@ export function App() {
   const [items, setItems] = useState<Item[]>([]);
   const [draft, setDraft] = useState("");
   const [running, setRunning] = useState(false);
+  const [mode, setMode] = useState<PermissionMode>("default");
   const [permissions, setPermissions] = useState<PermissionRequest[]>([]);
   const [cost, setCost] = useState({ lastUsd: 0, totalUsd: 0, lastMs: 0 });
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -58,9 +65,13 @@ export function App() {
 
   function applyEvent(e: AgentEvent) {
     switch (e.type) {
-      case "session.started":
+      case "session.started": {
+        // Arrives at the start of every turn (spike S2 finding), so this must stay idempotent.
         setSession({ model: e.model, claudeCodeVersion: e.claudeCodeVersion });
+        const reported = PERMISSION_MODES.find((m) => m === e.permissionMode);
+        if (reported) setMode(reported);
         break;
+      }
       case "text.delta":
         setItems((prev) => {
           const last = prev.at(-1);
@@ -117,6 +128,15 @@ export function App() {
       await request("session.send", { text });
     } catch (err) {
       setRunning(false);
+      setItems((prev) => [...prev, { kind: "notice", id: ++seq, text: String(err) }]);
+    }
+  }
+
+  async function changeMode(next: PermissionMode) {
+    try {
+      await request("session.setMode", { mode: next });
+      setMode(next);
+    } catch (err) {
       setItems((prev) => [...prev, { kind: "notice", id: ++seq, text: String(err) }]);
     }
   }
@@ -191,7 +211,18 @@ export function App() {
               rows={3}
             />
             <div className="composer-actions">
-              <span className="muted">
+              <select
+                value={mode}
+                onChange={(e) => void changeMode(e.target.value as PermissionMode)}
+                aria-label="Permission mode"
+              >
+                {PERMISSION_MODES.map((m) => (
+                  <option key={m} value={m}>
+                    {MODE_LABELS[m]}
+                  </option>
+                ))}
+              </select>
+              <span className="muted grow">
                 {session.model ?? "…"} · last turn ≈${cost.lastUsd.toFixed(4)} ({(cost.lastMs / 1000).toFixed(1)} s) ·
                 session ≈${cost.totalUsd.toFixed(4)} (estimate)
               </span>
@@ -242,17 +273,20 @@ function ItemView({ item }: { item: Item }) {
       return <div className="msg assistant">{item.text}</div>;
     case "notice":
       return <div className="notice">{item.text}</div>;
-    case "tool":
+    case "tool": {
+      const blocked = item.output?.includes("Blocked by AgentChainer guard") ?? false;
       return (
-        <details className={`tool ${item.status}`}>
+        <details className={`tool ${item.status}`} open={blocked}>
           <summary>
             <span className="tool-status">{item.status === "running" ? "⋯" : item.status === "done" ? "✓" : "✕"}</span>
             {item.name} <code>{toolSummary(item.input)}</code>
+            {blocked && <span className="badge">blocked by guard</span>}
           </summary>
           <pre>{JSON.stringify(item.input, null, 2)}</pre>
           {item.output !== undefined && <pre className="tool-output">{item.output}</pre>}
         </details>
       );
+    }
   }
 }
 

@@ -2,7 +2,9 @@
 
 - **Date:** 2026-10-28
 - **Checklist:** M0-16 (S2), M0-17 (S3); touches M0-15 (S1: CLI resolution only)
-- **Status:** In progress. The sidecar-level flow is verified; UI-level measurements and the remaining S3 items are open.
+- **Status:** In progress.
+  - S3 behaviours are verified against the real CLI by an automated harness (9/9 checks).
+  - Still open: UI-side latency measurement (S2) and an in-app check of the dialog and Stop button.
 
 ## Question
 
@@ -33,17 +35,23 @@ broker tool approvals through `canUseTool`? It must do this while using the **us
   - spawns `node packages/sidecar/src/main.ts` (dev only);
   - forwards valid JSON lines to the UI as `sidecar://frame` events;
   - accepts frames through the `sidecar_send` command.
-- `apps/desktop/src`: a minimal chat UI with streaming text, tool cards, an approval dialog, Stop, and a cost estimate.
-- `packages/sidecar/scripts/spike-host.ts`: drives the sidecar exactly as the Rust core does, for repeatable measurements.
+- `apps/desktop/src`: a minimal chat UI with streaming text, tool cards, an approval dialog, a permission-mode switcher,
+  Stop, and a cost estimate.
+- `packages/sidecar/src/guard.ts`: the hard denylist, run as a `PreToolUse` hook in every mode, with unit tests in
+  `guard.test.ts`.
+- `packages/sidecar/scripts/spike-host.ts`: drives the sidecar exactly as the Rust core does, and checks each scenario's
+  outcome automatically.
 
 ## Method
 
-1. `node packages/sidecar/scripts/spike-host.ts --cwd <scratch dir> --model haiku`. It sends:
-   - `system.hello`, then `session.start`;
-   - a text-only turn;
-   - a turn that requires a `Write` approval.
-2. Ran the same harness with `--deny`.
-3. Launched the debug app and captured only its window. The top bar shows the `system.hello` result, which covers
+1. `node packages/sidecar/scripts/spike-host.ts --cwd <scratch dir> --scenario all` (haiku) runs four scenarios in one
+   session:
+   - **basic:** a text turn, then two `Write` turns with approval allowed and denied;
+   - **mode:** `setPermissionMode("acceptEdits")`, a write, then back to `default` and another write;
+   - **interrupt:** a 30-second Bash command interrupted after 1.5 s; a follow-up turn; then an interrupt sent while idle,
+     followed by another turn;
+   - **guard:** `rm -rf` on a sibling folder that doesn't exist (outside the workspace).
+2. Launched the debug app and captured only its window. The top bar shows the `system.hello` result, which covers
    the UI → Rust → sidecar → `claude --version` round trip.
 
 ## Results
@@ -55,7 +63,13 @@ broker tool approvals through `canUseTool`? It must do this while using the **us
 | Approval → allow | `permission.request` arrives before the tool runs. After allow, the file is created with the expected content |
 | Approval → deny | The tool result is an error ("The user denied this action."). The model acknowledges it and doesn't retry. No file is created |
 | Sidecar-side permission round trip (host sends `permission.respond` → ack) | **0.4–0.8 ms** |
-| Estimated cost per harness run (2 turns, haiku) | **$0.006–0.011** (SDK `total_cost_usd`, an estimate) |
+| `setPermissionMode("acceptEdits")` mid-session | The next write runs with **no prompt**. Switching back to `default` prompts again |
+| `interrupt()` during a running Bash tool | The turn ends **20–35 ms** after the interrupt (`result` subtype `error_during_execution`). The next turn works normally |
+| `interrupt()` while idle | Before the fix it aborted the **next** turn. Now the sidecar ignores it (`interrupted: false`) and the next turn succeeds |
+| `PreToolUse` guard (`rm -rf ../…` outside the workspace) | Blocked **before any approval prompt**. The tool result reads `PreToolUse:Bash hook error: Blocked by AgentChainer guard: …` |
+| Guard unit tests | 10/10 pass: everyday commands allowed, destructive and exfiltrating ones blocked |
+| Full harness run | **9/9 checks pass** in one session |
+| Estimated cost of a full harness run (≈ 9 turns, haiku) | **≈ $0.05** (SDK `total_cost_usd`, an estimate) |
 | App: UI → Rust → sidecar → CLI handshake | Works; the top bar renders CLI, SDK and Node versions |
 
 ## Findings
@@ -72,12 +86,21 @@ broker tool approvals through `canUseTool`? It must do this while using the **us
 5. **Short replies arrive as a single delta.** Perceived latency is dominated by the model's time to first token, not by
    our relay. UI-side delta latency still needs instrumenting to confirm this.
 6. **Running nested inside a Claude Code session** (`CLAUDECODE=1` set) did not block the SDK-spawned CLI.
+7. **An interrupt sent while idle aborts the next turn.** The SDK doesn't drop it, so a Stop click that races the end of
+   a reply would kill the user's next message. The sidecar now counts open turns and ignores an interrupt when idle.
+8. **Claude Code has its own command guards.** It rejected `sleep 30 && echo …` with a message suggesting a
+   different waiting pattern. Our guard adds to these and doesn't replace them. Tests that need a long-running command
+   should use something like a Node timer.
+9. **Models often refuse obviously destructive commands themselves** (e.g. `git push --force`), so live tests of the
+   guard need a command the model will attempt. The unit tests are the real coverage for each rule.
+10. **A hook denial reaches the model as a "hook error" tool result.** The model sees our reason and stops. The UI marks
+    these tool cards "blocked by guard".
 
 ## Not covered yet
 
 - [ ] End-to-end delta latency and CPU in the UI (instrument timestamps in the Rust relay and UI) — S2.
-- [ ] Manual test of the approval dialog and the Stop button (`interrupt()`) in the app — S3.
-- [ ] `PreToolUse` guard (denylist) and a mid-session `setPermissionMode()` — S3.
+- [ ] In-app check by a human: approval dialog, mode switcher and Stop button — S3. The behaviour behind them is covered
+      by the harness.
 - [ ] Sidecar as a single executable; app launched from Finder (PATH and env resolution) — S1 / M1-03.
 
 ## Decision so far

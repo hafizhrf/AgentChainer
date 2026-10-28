@@ -48,10 +48,11 @@ Prerequisites:
 | Typecheck all TS packages | `pnpm typecheck` |
 | Rust check / lint / format | `cargo check --workspace` · `cargo clippy --workspace` · `cargo fmt --all` |
 | Sidecar one-shot check (JSON-RPC over stdio) | `echo '{"jsonrpc":"2.0","id":1,"method":"system.hello","params":{"protocolVersion":1}}' \| node packages/sidecar/src/main.ts` |
-| Spike harness: real model calls with your own `claude` login (haiku, ~$0.01) | `node packages/sidecar/scripts/spike-host.ts --cwd <scratch dir> [--deny]` |
+| Sidecar unit tests (Node's built-in runner) | `pnpm --filter @agentchainer/sidecar test` |
+| Spike harness: real model calls with your own `claude` login (haiku, a few cents) | `node packages/sidecar/scripts/spike-host.ts --cwd <empty scratch dir> [--scenario basic\|mode\|interrupt\|guard\|all]` |
 | Launch smoke test (after a debug build) | `node scripts/smoke-launch.mjs target/debug/agentchainer [--seconds N]` |
 
 CI (`.github/workflows/ci.yml`) runs on every PR and on pushes to `main`. Actions are pinned by commit SHA, so keep the
 `# vX.Y.Z` comment next to each SHA when bumping.
 
-TS lint, format and test commands arrive with M0-08 / M0-09.
+TS lint and format commands arrive with M0-08. The sidecar uses `node:test` for now; M0-09 decides the long-term runner.

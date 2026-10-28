@@ -1,13 +1,29 @@
 import {
   query,
+  type HookCallback,
   type PermissionResult,
   type Query,
   type SDKMessage,
   type SDKUserMessage,
 } from "@anthropic-ai/claude-agent-sdk";
-import type { AgentEvent, PermissionRequest } from "@agentchainer/protocol";
+import type { AgentEvent, PermissionMode, PermissionRequest } from "@agentchainer/protocol";
+import { checkToolCall } from "./guard.ts";
 
-export type SessionOptions = { cwd: string; model?: string; claudePath: string };
+export type SessionOptions = { cwd: string; model?: string; permissionMode?: PermissionMode; claudePath: string };
+
+/** Runs the hard denylist on every tool call, including ones `canUseTool` never sees (ARCHITECTURE §6). */
+const guardHook: HookCallback = async (input) => {
+  if (input.hook_event_name !== "PreToolUse") return {};
+  const reason = checkToolCall(input.tool_name, input.tool_input, input.cwd);
+  if (!reason) return {};
+  return {
+    hookSpecificOutput: {
+      hookEventName: "PreToolUse",
+      permissionDecision: "deny",
+      permissionDecisionReason: `Blocked by AgentChainer guard: ${reason}`,
+    },
+  };
+};
 
 type SessionCallbacks = {
   emit: (event: AgentEvent) => void;
@@ -23,6 +39,8 @@ export class Session {
   private readonly pendingPermissions = new Map<string, (result: PermissionResult) => void>();
   private readonly callbacks: SessionCallbacks;
   private readonly q: Query;
+  /** User messages sent but not yet answered by a `result`. */
+  private openTurns = 0;
 
   constructor(options: SessionOptions, callbacks: SessionCallbacks) {
     this.callbacks = callbacks;
@@ -33,7 +51,8 @@ export class Session {
         ...(options.model ? { model: options.model } : {}),
         pathToClaudeCodeExecutable: options.claudePath,
         includePartialMessages: true,
-        permissionMode: "default",
+        permissionMode: options.permissionMode ?? "default",
+        hooks: { PreToolUse: [{ hooks: [guardHook] }] },
         canUseTool: (toolName, input, ctx) =>
           new Promise<PermissionResult>((resolve) => {
             this.pendingPermissions.set(ctx.requestId, resolve);
@@ -57,11 +76,23 @@ export class Session {
   }
 
   send(text: string): void {
+    this.openTurns++;
     this.input.push({ type: "user", message: { role: "user", content: text }, parent_tool_use_id: null });
   }
 
-  async interrupt(): Promise<void> {
+  /**
+   * Interrupts the running turn. Does nothing when idle: spike S3 showed an interrupt sent
+   * between turns aborts the *next* turn, e.g. a Stop click racing the end of a reply.
+   */
+  async interrupt(): Promise<boolean> {
+    if (this.openTurns === 0) return false;
     await this.q.interrupt();
+    return true;
+  }
+
+  /** Takes effect for the next tool call (streaming-input mode only). */
+  async setMode(mode: PermissionMode): Promise<void> {
+    await this.q.setPermissionMode(mode);
   }
 
   respond(requestId: string, allow: boolean, message?: string): boolean {
@@ -96,6 +127,7 @@ export class Session {
             model: m.model,
             cwd: m.cwd,
             claudeCodeVersion: m.claude_code_version,
+            permissionMode: m.permissionMode,
           });
         }
         break;
@@ -138,6 +170,7 @@ export class Session {
         break;
       }
       case "result":
+        this.openTurns = Math.max(0, this.openTurns - 1);
         emit({
           type: "turn.completed",
           subtype: m.subtype,

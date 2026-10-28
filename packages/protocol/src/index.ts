@@ -101,6 +101,57 @@ export const RewindResultSchema = z.object({
 });
 export type RewindResult = z.infer<typeof RewindResultSchema>;
 
+/** Git status of a file, simplified from `git status --porcelain` (M1-25). */
+export const FileStatusSchema = z.enum(["modified", "added", "deleted", "renamed", "untracked", "conflicted"]);
+export type FileStatus = z.infer<typeof FileStatusSchema>;
+
+/** `path` is relative to the workspace, with `/` separators. Files without changes have no `status`. */
+export const WorkspaceFileSchema = z.object({
+  path: z.string(),
+  status: FileStatusSchema.optional(),
+  /** Some of the change is staged. */
+  staged: z.boolean().optional(),
+  /** The old path of a rename. */
+  origPath: z.string().optional(),
+});
+export type WorkspaceFile = z.infer<typeof WorkspaceFileSchema>;
+
+export const WorkspaceFilesSchema = z.object({
+  isGitRepo: z.boolean(),
+  /** Current branch; "detached at <sha>"; null outside git or before the first commit on a detached HEAD. */
+  branch: z.string().nullable(),
+  files: z.array(WorkspaceFileSchema),
+  /** The listing hit its cap. */
+  truncated: z.boolean(),
+});
+export type WorkspaceFiles = z.infer<typeof WorkspaceFilesSchema>;
+
+export const HunkSchema = z.object({
+  header: z.string(),
+  oldStart: z.number().int(),
+  oldLines: z.number().int(),
+  newStart: z.number().int(),
+  newLines: z.number().int(),
+});
+export type Hunk = z.infer<typeof HunkSchema>;
+
+/** HEAD vs working tree. Contents are null when absent on that side, binary, or too large to diff. */
+export const FileDiffSchema = z.object({
+  path: z.string(),
+  status: FileStatusSchema.optional(),
+  original: z.string().nullable(),
+  modified: z.string().nullable(),
+  binary: z.boolean(),
+  tooLarge: z.boolean(),
+  /** In the order of `git diff -U0`; `workspace.revert` takes an index into this list. */
+  hunks: z.array(HunkSchema),
+});
+export type FileDiff = z.infer<typeof FileDiffSchema>;
+
+const WorkspaceRef = z.object({ cwd: z.string().min(1) });
+/** A file inside the workspace; the sidecar rejects absolute paths and `..`. */
+const WorkspacePath = WorkspaceRef.extend({ path: z.string().min(1) });
+
 /** Normalized agent activity, independent of raw SDK message shapes (ARCHITECTURE §5.2). */
 export const AgentEventSchema = z.discriminatedUnion("type", [
   z.object({
@@ -268,6 +319,14 @@ export const methodSchemas = {
     params: z.object({ cwd: z.string().min(1) }),
     result: z.object({ days: z.number(), source: z.string() }),
   },
+
+  /* Workspace files and git (M1-25…M1-27), through the system git CLI. */
+  "workspace.files": { params: WorkspaceRef, result: WorkspaceFilesSchema },
+  "workspace.diff": { params: WorkspacePath, result: FileDiffSchema },
+  /** Reverts a file to HEAD (a new file is deleted), or only hunk `hunk` of `workspace.diff`. */
+  "workspace.revert": { params: WorkspacePath.extend({ hunk: z.number().int().min(0).optional() }), result: Ok },
+  /** Offered when the workspace isn't a git repository (M1-06). */
+  "workspace.gitInit": { params: WorkspaceRef, result: Ok },
 } as const;
 
 export type MethodName = keyof typeof methodSchemas;

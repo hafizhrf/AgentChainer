@@ -11,6 +11,8 @@ import {
 import { invoke } from "@tauri-apps/api/core";
 import { useEffect, useRef, useState } from "react";
 import { useConfirm } from "./Dialog.tsx";
+import { joinPath } from "./files.ts";
+import { GitInitOffer } from "./GitInitOffer.tsx";
 import { Readiness } from "./Readiness.tsx";
 import { SessionList } from "./SessionList.tsx";
 import { SessionView } from "./SessionView.tsx";
@@ -316,6 +318,16 @@ export function App() {
     }
   }
 
+  /** "Open in editor" (M1-28) with the editor from settings; relative paths are inside the tab's workspace. */
+  async function openInEditor(sessionId: string, dir: string, file: string, line?: number) {
+    const abs = file.startsWith("/") || /^[A-Za-z]:[\\/]/.test(file) ? file : joinPath(dir, file);
+    try {
+      await invoke("open_in_editor", { file: abs, line: line ?? null, editor: settings?.editor ?? "system" });
+    } catch (err) {
+      addNotice(sessionId, `Couldn't open ${file}: ${err}`);
+    }
+  }
+
   function closeTab(sessionId: string) {
     const tab = tabs.find((t) => t.sessionId === sessionId);
     if (tab && !tab.ended) void request("session.close", { sessionId }).catch(() => undefined);
@@ -384,6 +396,7 @@ export function App() {
             recent={settings?.recentWorkspaces ?? []}
             homeDir={hello?.homeDir ?? null}
           />
+          {hello && workspace && <GitInitOffer cwd={workspace} />}
           <label>
             Model
             <select value={model} onChange={(e) => setModel(e.target.value)}>
@@ -423,6 +436,8 @@ export function App() {
           onModeChange={(mode) => void changeMode(t.sessionId, mode)}
           onRewind={(messageId) => void rewind(t.sessionId, messageId)}
           onResume={() => void resume(t.sessionId, t.cwd, t.title)}
+          onOpenFile={(file, line) => void openInEditor(t.sessionId, t.cwd, file, line)}
+          confirm={confirm}
         />
       ))}
 

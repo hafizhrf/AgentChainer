@@ -5,8 +5,16 @@
 //! shell once and pass that environment to the sidecar (and through it to `claude`). Values are never logged.
 
 use std::collections::HashMap;
+use std::sync::OnceLock;
 
 const MARKER: &str = "__AGENTCHAINER_ENV__";
+
+/// The login-shell environment, resolved once per app run, for the integrated terminal and editor launches. Empty when
+/// it can't be resolved. The sidecar resolves its own on every (re)start instead, so it sees changes after a restart.
+pub fn cached() -> &'static HashMap<String, String> {
+    static ENV: OnceLock<HashMap<String, String>> = OnceLock::new();
+    ENV.get_or_init(|| login_shell_env().unwrap_or_default())
+}
 
 /// Returns the login shell's environment, or `None` on Windows, on timeout, or on any failure (the sidecar then
 /// runs with the app's own environment).

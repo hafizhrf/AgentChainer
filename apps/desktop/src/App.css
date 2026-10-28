@@ -476,7 +476,6 @@ button.small {
   flex: 1;
   min-height: 0;
   display: flex;
-  flex-direction: column;
 }
 
 .session[hidden] {
@@ -554,4 +553,197 @@ button.danger {
   max-height: 12rem;
   overflow-y: auto;
   padding-left: 1.2rem;
+}
+
+/* Workspace panels (M1-25…M1-29) */
+
+.chat {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.sidebar {
+  width: 260px;
+  flex-shrink: 0;
+  border-right: 1px solid var(--border);
+  overflow-y: auto;
+  background: var(--surface);
+}
+
+.workspace-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  padding: 0.5rem;
+  font-size: 0.9rem;
+}
+
+.panel-tabs {
+  display: flex;
+  gap: 0.25rem;
+}
+
+.panel-tabs button {
+  padding: 0.2rem 0.6rem;
+  background: transparent;
+  color: var(--fg);
+  border: 1px solid transparent;
+}
+
+.panel-tabs button[aria-selected="true"] {
+  border-color: var(--border);
+  background: var(--bg);
+}
+
+.panel-tabs .refresh {
+  margin-left: auto;
+}
+
+.workspace-panel ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.workspace-panel li {
+  display: flex;
+  align-items: center;
+}
+
+.workspace-panel h3 {
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+  margin: 0.6rem 0 0.2rem;
+}
+
+.tree-row {
+  flex: 1;
+  min-width: 0;
+  text-align: left;
+  background: transparent;
+  color: var(--fg);
+  border: none;
+  border-radius: 4px;
+  padding: 0.12rem 0.3rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tree-row:hover {
+  background: var(--bg);
+}
+
+.tree-row.selected {
+  background: var(--user);
+}
+
+.status {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.75rem;
+  padding: 0 0.3rem;
+  color: var(--accent);
+}
+
+.status.untracked,
+.status.added {
+  color: var(--ok);
+}
+
+.status.deleted,
+.status.conflicted {
+  color: var(--err);
+}
+
+.turn-prompt {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.8rem;
+  margin-top: 0.3rem;
+}
+
+button.toggle {
+  padding: 0.3rem 0.7rem;
+}
+
+button.toggle[aria-pressed="true"] {
+  background: var(--user);
+}
+
+.diff-pane {
+  width: 50%;
+  min-width: 360px;
+  border-left: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+}
+
+.diff-view {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.diff-header {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.diff-path {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.diff-view > p {
+  margin: 0.5rem 0.75rem;
+}
+
+.hunks {
+  list-style: none;
+  margin: 0;
+  padding: 0.3rem 0.75rem;
+  max-height: 8rem;
+  overflow-y: auto;
+  border-bottom: 1px solid var(--border);
+  font-size: 0.85rem;
+}
+
+.hunks li {
+  display: flex;
+  gap: 0.6rem;
+  align-items: center;
+}
+
+.diff-editor {
+  flex: 1;
+  min-height: 0;
+}
+
+.diff-editor[hidden] {
+  display: none;
+}
+
+.terminal {
+  height: 240px;
+  flex-shrink: 0;
+  border-top: 1px solid var(--border);
+  padding: 0.25rem 0.5rem;
+  background: var(--surface);
+}
+
+.tool .open-file {
+  display: block;
+  margin: 0.4rem 0 0;
+  font-size: 0.8rem;
 }

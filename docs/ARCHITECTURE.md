@@ -102,10 +102,23 @@ Planned surface (v0.1):
 | request | `session.list` / `session.history` / `session.rename` / `session.tag` / `session.delete` / `session.fork` | SDK session APIs on stored sessions `{cwd, sessionId}` |
 | request | `session.retention` | `cleanupPeriodDays` only, from the user's effective settings |
 | request | `permission.respond` | Answer a pending permission request |
+| request | `workspace.files` | Files under the workspace (tracked + untracked, minus ignored) with git status and branch |
+| request | `workspace.diff` | HEAD vs working tree for one file, with its `-U0` hunks |
+| request | `workspace.revert` | Revert a file to HEAD (new files are deleted) or one hunk (`git apply -R`), worktree only |
+| request | `workspace.gitInit` | `git init`, offered when the workspace isn't a repository |
 | request | `workspace.scan` | Detect stack, commands, and audit the setup → `WorkspaceProfile` + findings |
 | request | `bootstrap.plan` / `bootstrap.apply` / `bootstrap.rollback` | Bootstrap engine |
 | notification | `agent.event` | `{sessionId, event}`: a normalized `AgentEvent` (see §5.2) |
 | notification | `permission.request` | `{sessionId, …}`: ask the user to approve a tool call |
+
+Workspace paths are relative to `cwd`; the sidecar rejects absolute paths and `..` segments. Git runs as the system
+`git` CLI. The Rust core adds its own Tauri commands (not sidecar methods) for OS work:
+
+| Command | Purpose |
+|---|---|
+| `workspace_watch` / `workspace_unwatch` | `notify` watcher; emits `workspace://changed {cwd}` debounced to 300 ms. Ignores `node_modules`, `target`, `.git/objects` and similar; on Linux those folders aren't watched at all (inotify needs one watch per folder) |
+| `pty_open` / `pty_write` / `pty_resize` / `pty_close` | Integrated terminal: the user's login shell (PowerShell on Windows) in a `portable-pty` PTY; output as `pty://data {id, data}`, `pty://exit {id}` |
+| `open_in_editor` | `code`/`cursor --goto file:line`, `zed file:line`, `idea --line N file`, or the OS default app |
 
 **Multi-session (protocol v2, M1-08):** live-session methods and both notifications carry the SDK session id, so one
 sidecar runs every tab's session. The sidecar picks the id of a new session itself (the SDK's `sessionId` option), so

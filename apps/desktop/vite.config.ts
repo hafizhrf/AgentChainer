@@ -8,6 +8,9 @@ const host = process.env.TAURI_DEV_HOST;
 // https://vite.dev/config/
 export default defineConfig(() => ({
   plugins: [react()],
+  // Monaco (the diff viewer) is one ~2.7 MB chunk, loaded lazily from disk in a desktop app, so the web-oriented
+  // 500 kB warning doesn't apply.
+  build: { chunkSizeWarningLimit: 3000 },
 
   // Vite options tailored for Tauri development and only applied in `tauri dev` or `tauri build`
   //

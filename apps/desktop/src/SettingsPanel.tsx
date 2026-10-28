@@ -9,6 +9,15 @@ export const MODELS = [
   { value: "opus", label: "Opus" },
 ];
 
+/** "Open in editor" targets (M1-28); each needs its command-line launcher on PATH, except the system default. */
+export const EDITORS = [
+  { value: "system", label: "System default app" },
+  { value: "vscode", label: "VS Code (code)" },
+  { value: "cursor", label: "Cursor (cursor)" },
+  { value: "zed", label: "Zed (zed)" },
+  { value: "idea", label: "IntelliJ IDEA (idea)" },
+];
+
 export const MODE_LABELS: Record<(typeof PERMISSION_MODES)[number], string> = {
   default: "Ask before edits and commands",
   acceptEdits: "Auto-accept file edits (commands still ask)",
@@ -65,6 +74,16 @@ export function SettingsPanel({ settings, onSave }: { settings: Settings; onSave
           {PERMISSION_MODES.map((m) => (
             <option key={m} value={m}>
               {MODE_LABELS[m]}
+            </option>
+          ))}
+        </select>
+      </label>
+      <label>
+        Open files in
+        <select value={draft.editor ?? "system"} onChange={(e) => setDraft({ ...draft, editor: e.target.value })}>
+          {EDITORS.map((ed) => (
+            <option key={ed.value} value={ed.value}>
+              {ed.label}
             </option>
           ))}
         </select>

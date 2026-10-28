@@ -6,6 +6,7 @@ import { log, notify, RpcFailure, serve } from "./rpc.ts";
 import { loadSdk } from "./sdk-loader.ts";
 import { Session } from "./session.ts";
 import { historyEvents, retention, toSessionInfo } from "./stored-sessions.ts";
+import { fileDiff, gitInit, listFiles, revert } from "./workspace.ts";
 
 /** Live sessions by SDK session id, one per workspace tab (M1-08). */
 const sessions = new Map<string, Session>();
@@ -164,6 +165,20 @@ serve(
     "session.retention": async ({ cwd }) => {
       const { sdk } = await prepareSdk();
       return retention(sdk, cwd);
+    },
+
+    "workspace.files": ({ cwd }) => listFiles(cwd),
+
+    "workspace.diff": ({ cwd, path }) => fileDiff(cwd, path),
+
+    "workspace.revert": ({ cwd, path, hunk }) => {
+      revert(cwd, path, hunk);
+      return { ok: true };
+    },
+
+    "workspace.gitInit": ({ cwd }) => {
+      gitInit(cwd);
+      return { ok: true };
     },
   },
   () => {

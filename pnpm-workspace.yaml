@@ -1,0 +1,8 @@
+packages:
+  - apps/*
+  - packages/*
+
+# Shared versions; packages reference them as "catalog:".
+catalog:
+  typescript: ~6.0.3
+  "@types/node": ^24.0.0

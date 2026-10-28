@@ -3,6 +3,19 @@
 Thumbs.db
 .idea/
 *.swp
+.vscode/*
+!.vscode/extensions.json
+
+# Node / Vite
+node_modules/
+dist/
+dist-ssr/
+*.local
+*.log
+
+# Rust / Tauri
+/target/
+apps/desktop/src-tauri/gen/schemas/
 
 # Bootstrap backups (see docs/CATALOG.md §7)
 .agentchainer/backups/

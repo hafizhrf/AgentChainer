@@ -19,7 +19,8 @@ workspace and keeps the agent's work transparent and verifiable:
   - deterministic quality gates;
   - an evidence report for every task.
 
-> **Status: planning (pre-alpha).** Only design documents exist so far. See the [checklist](docs/CHECKLIST.md) for progress.
+> **Status: pre-alpha (M0, foundations).** The design docs and a bare monorepo scaffold exist; there are no agent features yet.
+> See the [checklist](docs/CHECKLIST.md) for progress.
 
 ## Principles
 

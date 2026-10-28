@@ -70,7 +70,8 @@ source:
   marketplace: claude-plugins-official
   repo: anthropics/claude-plugins-official
   plugin: code-review
-  version: "<pinned version or commit>"   # (verify) how far the CLI supports pinning
+  version: "<version reviewed, e.g. 1.0.1>"   # the CLI can't pin (spike S6): install takes the current entry,
+                                              # and the lockfile records `plugin list --json` → version
 install:
   scope: project
   steps:
@@ -209,3 +210,6 @@ Sources: [cloudflare/security-audit-skill](https://github.com/cloudflare/securit
   preview, apply, verify, record.
 - **Rollback:** per item or per bootstrap run. It uses `uninstall` steps and backups, and is verified by comparing hashes
   of touched files.
+  - Scope is **project files** plus the CLI entries we added (plugins, MCP servers).
+  - Caches the CLI manages itself stay behind and are reported, not deleted. Example: `plugin uninstall` keeps
+    `~/.claude/plugins/cache/…` (spike S6).

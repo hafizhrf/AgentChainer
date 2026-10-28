@@ -7,8 +7,9 @@
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview",
-    "typecheck": "tsc",
-    "tauri": "tauri"
+    "typecheck": "tsc && tsc -p tsconfig.test.json",
+    "tauri": "tauri",
+    "test": "node --test \"src/**/*.test.ts\""
   },
   "dependencies": {
     "@agentchainer/protocol": "workspace:*",
@@ -19,6 +20,7 @@
   },
   "devDependencies": {
     "@tauri-apps/cli": "^2",
+    "@types/node": "catalog:",
     "@types/react": "^19.1.8",
     "@types/react-dom": "^19.1.6",
     "@vitejs/plugin-react": "^6.0.2",

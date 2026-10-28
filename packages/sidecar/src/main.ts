@@ -1,7 +1,7 @@
 import { homedir } from "node:os";
 import { PERMISSION_MODES, PROTOCOL_VERSION, type PermissionMode } from "@agentchainer/protocol";
 import pkg from "../package.json" with { type: "json" };
-import { claudeVersion, findClaude } from "./claude.ts";
+import { checkEnvironment, claudeVersion, findClaude } from "./claude.ts";
 import { log, notify, requireString, RpcFailure, serve } from "./rpc.ts";
 import { Session } from "./session.ts";
 
@@ -31,6 +31,8 @@ serve({
       claudeVersion: claudePath ? claudeVersion(claudePath) : null,
     };
   },
+
+  "env.check": () => checkEnvironment(),
 
   "session.start": (params) => {
     const cwd = requireString(params, "cwd");

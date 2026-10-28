@@ -119,19 +119,33 @@
     - The owner exercised the approval dialog and mode switcher in the app on a real repo (2026-10-28).
   - Not separately exercised in the app: the Stop button. The `session.interrupt` RPC behind it is covered by the harness.
   - Read-only commands such as `echo` bypass `canUseTool`.
-- [ ] **M0-18** **S4 Subagent attribution.**
+- [x] **M0-18** **S4 Subagent attribution.**
   - Capture `parent_tool_use_id`, `agent_id`, the `SubagentStart/Stop` hooks and `forwardSubagentText`.
   - Build an agent tree for a prompt that spawns 2 parallel subagents.
   - Save the stream as the first recorded fixture.
-- [ ] **M0-19** **S5 Install & auth detection.**
+  - — evidence: [S4 spike](spikes/S4-S5-S6.md#s4--subagent-attribution-and-agent-tree), fixture
+    `packages/sidecar/test/fixtures/subagents-parallel.jsonl` (sanitized, with a leak check), 3 replay tests in CI.
+  - The tree is built from `system/task_*` messages; the `SubagentStart/Stop` hooks aren't needed.
+- [x] **M0-19** **S5 Install & auth detection.**
   - Run `claude --version` and `claude auth status --json` across these states: not installed, too old, logged out,
     subscription, Console, `ANTHROPIC_API_KEY`, Bedrock/Vertex env.
   - Confirm no secret values appear in the output.
   - Set `MIN_CLAUDE_VERSION`.
+  - — evidence: [S5 spike](spikes/S4-S5-S6.md#s5--install-and-auth-detection), `env.check` RPC with readiness UI,
+    6 unit tests (the email never survives parsing). `MIN_CLAUDE_VERSION` = 2.1.293.
+  - States covered:
+    - real runs: subscription, logged out, API key, Bedrock, not installed;
+    - unit test: too old.
+  - Not tested: Console (no account); Vertex (same `third_party` path as Bedrock).
 - [ ] **M0-20** **S6 Plugin & MCP install.**
   - From the sidecar on 3 OS, run non-interactively: `claude plugin marketplace add`, `claude plugin install … --scope project -y --json`,
     `claude plugin uninstall`, `claude mcp add --scope local`.
   - Find out whether plugin versions can be pinned.
+  - Progress: 6/6 on macOS ([S6 spike](spikes/S4-S5-S6.md#s6--plugin-and-mcp-installs-non-interactive)):
+    - project-scope plugin install and uninstall with no TTY and no `-y`;
+    - MCP add/remove at local and project scope.
+  - Versions **can't be pinned**; the installed version is read from `plugin list --json` for the lockfile.
+  - Remaining: Windows and Ubuntu, which need a CI job with the CLI installed.
 - [ ] **M0-21** Update [ADR-0003](adr/0003-agent-runtime-and-ipc.md) with the spike results: Accept, or switch to the fallback
       (Electron, or CLI `stream-json`).
 
@@ -158,6 +172,7 @@
 - [ ] **M1-05** Onboarding tutorial that renders [AUTH_SETUP](guides/AUTH_SETUP.md) for the user's OS. Copy buttons,
       "Open terminal", "Re-check". The app never handles credentials.
 - [ ] **M1-06** Workspace picker: open folder, recent list, multiple workspaces as tabs. If the folder isn't a git repo, offer `git init`.
+      Never default to, and warn on, the home folder: in owner testing the agent then roamed the whole home directory.
 - [ ] **M1-07** Settings stored in the app DB (no secrets): Claude CLI path, default model, effort, permission profile, budget cap, theme.
 
 ### Chat & streaming

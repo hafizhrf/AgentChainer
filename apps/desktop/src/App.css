@@ -330,3 +330,85 @@ textarea {
   font-size: 0.9rem;
   color: var(--muted);
 }
+
+.row {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.row input {
+  flex: 1;
+  min-width: 16rem;
+}
+
+.banner {
+  padding: 0.5rem 1rem;
+  background: var(--warn-bg);
+  border-bottom: 1px solid var(--border);
+  font-size: 0.9rem;
+}
+
+.workspace-picker,
+.settings label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.workspace-picker .label {
+  font-weight: 500;
+}
+
+.recent {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 0.75rem;
+  align-items: baseline;
+}
+
+button.link {
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--accent);
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+button.small {
+  padding: 0.15rem 0.6rem;
+  font-size: 0.8rem;
+}
+
+.command-line {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  margin-top: 0.3rem;
+}
+
+.command-line .command {
+  margin-top: 0;
+}
+
+.settings {
+  border-top: 1px solid var(--border);
+  padding-top: 0.75rem;
+}
+
+.settings summary {
+  cursor: pointer;
+  color: var(--muted);
+}
+
+.settings[open] {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.settings button {
+  align-self: flex-start;
+}

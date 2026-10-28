@@ -5,41 +5,40 @@ import {
   PERMISSION_MODES,
   type PermissionMode,
   type PermissionRequest,
+  PROTOCOL_VERSION,
 } from "@agentchainer/protocol";
+import { invoke } from "@tauri-apps/api/core";
 import { type KeyboardEvent, useEffect, useRef, useState } from "react";
+import { Readiness } from "./Readiness.tsx";
+import { MODE_LABELS, MODELS, SettingsPanel } from "./SettingsPanel.tsx";
 import { quitApp, readSelftestConfig } from "./selftest.ts";
-import { connect, onExit, request, subscribe, takeDeltaLatencies } from "./sidecar.ts";
+import { loadSettings, type Settings, saveSettings, withRecent } from "./settings.ts";
+import { connect, onExit, onReady, request, requestWithTimeout, subscribe, takeDeltaLatencies } from "./sidecar.ts";
 import { latencyStats } from "./stats.ts";
 import { type AgentItem, applyEvent, closeAssistant, type Item, nextId, type ToolItem } from "./transcript.ts";
+import { WorkspacePicker } from "./WorkspacePicker.tsx";
 import "./App.css";
 
 /** Guards against React StrictMode running the mount effect twice in dev. */
 let selftestStarted = false;
 
-// Spike UI (S2–S5): readiness check, one session, streaming text, tool and subagent cards, approvals.
-// The real session core is M1 and the visual design pass is the UX track.
+const PING_EVERY_MS = 20_000;
+const PING_TIMEOUT_MS = 5_000;
+
+// App shell (M1-01…M1-07) around the spike session UI (S2–S5). The full session core is the rest of M1, and the
+// visual design pass is the UX track.
 
 type Hello = Methods["system.hello"]["result"];
 
-const MODELS = [
-  { value: "", label: "Default (from your Claude settings)" },
-  { value: "haiku", label: "Haiku (fast, cheap)" },
-  { value: "sonnet", label: "Sonnet" },
-  { value: "opus", label: "Opus" },
-];
-
-const MODE_LABELS: Record<PermissionMode, string> = {
-  default: "Ask before edits and commands",
-  acceptEdits: "Auto-accept file edits (commands still ask)",
-  auto: "Auto: Claude decides, asks when unsure",
-  plan: "Plan only (no changes)",
-};
+const asMode = (value: string | null | undefined): PermissionMode =>
+  PERMISSION_MODES.find((m) => m === value) ?? "default";
 
 export function App() {
   const [hello, setHello] = useState<Hello | null>(null);
   const [env, setEnv] = useState<EnvCheck | null>(null);
   const [checking, setChecking] = useState(false);
-  const [fatal, setFatal] = useState<string | null>(null);
+  const [runtimeNotice, setRuntimeNotice] = useState<string | null>(null);
+  const [settings, setSettings] = useState<Settings | null>(null);
   const [cwd, setCwd] = useState("");
   const [model, setModel] = useState("");
   const [session, setSession] = useState<{ model?: string; claudeCodeVersion?: string } | null>(null);
@@ -51,40 +50,77 @@ export function App() {
   const [cost, setCost] = useState({ lastUsd: 0, totalUsd: 0, lastMs: 0 });
   const bottomRef = useRef<HTMLDivElement>(null);
   const selftestActive = useRef(false);
+  /** True while the sidecar answers; the health ping only runs then, so a starting sidecar isn't restarted. */
+  const alive = useRef(false);
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: subscribe once on mount; the handlers only call state setters, which are stable.
   useEffect(() => {
     connect()
-      .then(() => request("system.hello", { protocolVersion: 1 }))
-      .then((h) => {
-        setHello(h);
-        return recheck();
-      })
-      .then(async (checked) => {
+      .then(() => Promise.all([loadSettings(), handshake()]))
+      .then(async ([loaded, checked]) => {
+        applySettings(loaded);
         const cfg = await readSelftestConfig();
         if (!cfg || !checked.ready || selftestStarted) return;
         selftestStarted = true;
         selftestActive.current = true;
         setCwd(cfg.cwd);
         takeDeltaLatencies();
-        await startSession(cfg.cwd, cfg.model ?? "");
+        await startSession(cfg.cwd, cfg.model ?? "", "default");
         await sendText(cfg.prompt);
       })
-      .catch((err: unknown) => setFatal(String(err)));
+      .catch((err: unknown) => setRuntimeNotice(String(err)));
 
-    const offExit = onExit((status) => setFatal(`Sidecar exited: ${status}`));
+    // Supervisor events (M1-01): the session dies with the process; a restarted sidecar needs a new handshake.
+    const offExit = onExit((exit) => {
+      alive.current = false;
+      setRunning(false);
+      setPermissions([]);
+      setSession((s) => {
+        if (s) setItems((prev) => [...prev, { kind: "notice", id: nextId(), text: "The agent runtime stopped." }]);
+        return null;
+      });
+      setRuntimeNotice(
+        `The agent runtime stopped (${exit.status})${exit.restarting ? " and is restarting…" : "."} Any running session ended.`,
+      );
+    });
+    const offReady = onReady(() => {
+      void handshake()
+        .then(() => setRuntimeNotice((n) => (n ? "The agent runtime restarted. Start a new session." : null)))
+        .catch(() => undefined);
+    });
     const offEvents = subscribe((n) => {
       if (n.method === "permission.request") setPermissions((q) => [...q, n.params]);
       else onAgentEvent(n.params);
     });
+    const ping = setInterval(() => {
+      if (!alive.current) return;
+      requestWithTimeout("system.ping", {}, PING_TIMEOUT_MS).catch(() => {
+        alive.current = false;
+        void invoke("sidecar_restart");
+      });
+    }, PING_EVERY_MS);
     return () => {
       offExit();
+      offReady();
       offEvents();
+      clearInterval(ping);
     };
   }, []);
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: scroll to the bottom whenever the transcript changes.
   useEffect(() => bottomRef.current?.scrollIntoView({ block: "end" }), [items]);
+
+  async function handshake(): Promise<EnvCheck> {
+    const h = await request("system.hello", { protocolVersion: PROTOCOL_VERSION });
+    if (h.protocolVersion !== PROTOCOL_VERSION) {
+      throw new Error(
+        `Protocol mismatch: app v${PROTOCOL_VERSION}, agent runtime v${h.protocolVersion}. Reinstall AgentChainer.`,
+      );
+    }
+    setHello(h);
+    alive.current = true;
+    return recheck();
+  }
 
   async function recheck(): Promise<EnvCheck> {
     setChecking(true);
@@ -94,6 +130,22 @@ export function App() {
       return checked;
     } finally {
       setChecking(false);
+    }
+  }
+
+  function applySettings(next: Settings) {
+    setSettings(next);
+    setModel(next.defaultModel ?? "");
+  }
+
+  async function onSaveSettings(next: Settings) {
+    const saved = await saveSettings(next);
+    const claudePathChanged = saved.claudePath !== settings?.claudePath;
+    applySettings(saved);
+    // The CLI path reaches the sidecar as an env var at spawn, so a change needs a restart (ready → re-check).
+    if (claudePathChanged) {
+      alive.current = false;
+      await invoke("sidecar_restart");
     }
   }
 
@@ -110,8 +162,7 @@ export function App() {
     if (e.type === "session.started") {
       // Arrives at the start of every turn (spike S2 finding), so this must stay idempotent.
       setSession({ model: e.model, claudeCodeVersion: e.claudeCodeVersion });
-      const reported = PERMISSION_MODES.find((m) => m === e.permissionMode);
-      if (reported) setMode(reported);
+      setMode(asMode(e.permissionMode));
       return;
     }
     if (e.type === "turn.completed") {
@@ -126,11 +177,14 @@ export function App() {
     setItems((prev) => applyEvent(prev, e));
   }
 
-  async function startSession(dir: string, modelAlias: string) {
+  async function startSession(dir: string, modelAlias: string, permissionMode: PermissionMode) {
     try {
-      await request("session.start", { cwd: dir, ...(modelAlias ? { model: modelAlias } : {}) });
+      await request("session.start", { cwd: dir, permissionMode, ...(modelAlias ? { model: modelAlias } : {}) });
       setSession({});
+      setMode(permissionMode);
+      setRuntimeNotice(null);
       setItems([{ kind: "notice", id: nextId(), text: `Session started in ${dir}` }]);
+      if (settings) setSettings(await saveSettings(withRecent(settings, dir)));
     } catch (err) {
       setItems((prev) => [...prev, { kind: "notice", id: nextId(), text: String(err) }]);
     }
@@ -182,33 +236,23 @@ export function App() {
       <header className="topbar">
         <strong>AgentChainer</strong>
         <span className="muted">
-          {fatal
-            ? fatal
-            : hello
-              ? `${hello.claudeVersion ?? "claude not found"} · SDK ${hello.sdkVersion} · Node ${hello.nodeVersion}`
-              : "Connecting to sidecar…"}
+          {hello
+            ? `${hello.claudeVersion ?? "claude not found"} · SDK ${hello.sdkVersion} · Node ${hello.nodeVersion}`
+            : "Starting the agent runtime…"}
         </span>
       </header>
+      {runtimeNotice && <div className="banner">{runtimeNotice}</div>}
 
       {!session ? (
         <section className="setup">
           <h1>Start a session</h1>
           <Readiness env={env} checking={checking} onRecheck={() => void recheck()} />
-          <label>
-            Workspace folder
-            {/* No default: owner testing showed a home-folder workspace lets the agent roam the whole home directory. */}
-            <input
-              value={cwd}
-              onChange={(e) => setCwd(e.target.value)}
-              placeholder={hello ? `e.g. ${hello.homeDir}/projects/my-app` : "Path to a project folder"}
-              spellCheck={false}
-            />
-          </label>
-          {hello && cwd.trim().replace(/\/+$/, "") === hello.homeDir && (
-            <p className="warn">
-              That's your whole home folder. Pick a single project folder so the agent stays inside it.
-            </p>
-          )}
+          <WorkspacePicker
+            value={cwd}
+            onChange={setCwd}
+            recent={settings?.recentWorkspaces ?? []}
+            homeDir={hello?.homeDir ?? null}
+          />
           <label>
             Model
             <select value={model} onChange={(e) => setModel(e.target.value)}>
@@ -219,9 +263,14 @@ export function App() {
               ))}
             </select>
           </label>
-          <button type="button" disabled={!env?.ready || !cwd} onClick={() => void startSession(cwd, model)}>
+          <button
+            type="button"
+            disabled={!env?.ready || !cwd.trim()}
+            onClick={() => void startSession(cwd.trim(), model, asMode(settings?.defaultMode))}
+          >
             Start session
           </button>
+          {settings && <SettingsPanel key={JSON.stringify(settings)} settings={settings} onSave={onSaveSettings} />}
         </section>
       ) : (
         <>
@@ -244,7 +293,7 @@ export function App() {
             <div className="composer-actions">
               <select
                 value={mode}
-                onChange={(e) => void changeMode(e.target.value as PermissionMode)}
+                onChange={(e) => void changeMode(asMode(e.target.value))}
                 aria-label="Permission mode"
               >
                 {PERMISSION_MODES.map((m) => (
@@ -291,86 +340,6 @@ export function App() {
       )}
     </div>
   );
-}
-
-/** Onboarding readiness (spike S5). The app never signs in for the user; it shows the terminal command (ADR-0002). */
-function Readiness({ env, checking, onRecheck }: { env: EnvCheck | null; checking: boolean; onRecheck: () => void }) {
-  if (!env) return <p className="muted">{checking ? "Checking your setup…" : "Waiting for the sidecar…"}</p>;
-  const install =
-    env.platform === "win32"
-      ? "irm https://claude.ai/install.ps1 | iex"
-      : "curl -fsSL https://claude.ai/install.sh | bash";
-  const rows: { ok: boolean; label: string; fix?: string; command?: string }[] = [
-    env.claude.path
-      ? { ok: true, label: `Claude Code CLI found (${env.claude.version ?? "version unknown"})` }
-      : {
-          ok: false,
-          label: "Claude Code CLI not found",
-          fix: "Install it in your terminal, then open a new terminal:",
-          command: install,
-        },
-  ];
-  if (env.claude.path) {
-    rows.push(
-      env.claude.versionOk
-        ? { ok: true, label: `Version ${env.claude.minVersion} or newer` }
-        : {
-            ok: false,
-            label: `Version older than ${env.claude.minVersion}`,
-            fix: "Update it in your terminal:",
-            command: "claude update",
-          },
-    );
-    rows.push(
-      env.auth?.loggedIn
-        ? { ok: true, label: `Signed in (${authLabel(env)})` }
-        : {
-            ok: false,
-            label: "Not signed in",
-            fix: "Sign in yourself in your terminal (AgentChainer never handles your login):",
-            command: "claude auth login",
-          },
-    );
-  }
-  rows.push(
-    env.git.version
-      ? { ok: true, label: env.git.version }
-      : { ok: false, label: "git not found", fix: "Install git from https://git-scm.com/downloads." },
-  );
-
-  return (
-    <div className="readiness">
-      <ul>
-        {rows.map((r) => (
-          <li key={r.label} className={r.ok ? "ok" : "fail"}>
-            <span>{r.ok ? "✓" : "✕"}</span>
-            <div>
-              {r.label}
-              {r.fix && <div className="muted">{r.fix}</div>}
-              {r.command && <code className="command">{r.command}</code>}
-            </div>
-          </li>
-        ))}
-      </ul>
-      {!env.ready && (
-        <p className="muted">
-          Step-by-step guide: <code>docs/guides/AUTH_SETUP.md</code>
-        </p>
-      )}
-      <button type="button" className="secondary" disabled={checking} onClick={onRecheck}>
-        {checking ? "Checking…" : "Re-check"}
-      </button>
-    </div>
-  );
-}
-
-function authLabel(env: EnvCheck): string {
-  const a = env.auth;
-  if (!a) return "unknown";
-  if (a.method === "claude.ai") return "Claude subscription";
-  if (a.method === "api_key") return "API key";
-  if (a.method === "third_party") return `cloud provider: ${a.provider}`;
-  return a.method;
 }
 
 function ItemView({ item }: { item: Item }) {

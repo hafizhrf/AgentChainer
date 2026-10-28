@@ -18,8 +18,8 @@
 
 | Milestone | Release | Theme | Status |
 |---|---|---|---|
-| [M0](#m0--foundations--spikes) | — | Foundations & spikes | ◐ In progress |
-| [M1](#m1--agent-session-core-v01-a) | v0.1 | Agent session core | ☐ Not started |
+| [M0](#m0--foundations--spikes) | — | Foundations & spikes | ◐ Exit criteria met. Owner items left: M0-01, M0-05, M0-07, M0-13, M0-14, M0-22 |
+| [M1](#m1--agent-session-core-v01-a) | v0.1 | Agent session core | ◐ In progress (app shell M1-01…M1-04 done) |
 | [M2](#m2--workspace-bootstrap-v01-b) | v0.1 | Workspace bootstrap | ☐ Not started |
 | [UX](#ux--product-design--ui-polish-before-r1) | v0.1 | Product design & UI polish (after M1/M2 work functionally) | ☐ Later |
 | [R1](#r1--v01-release) | v0.1 | Packaging & release | ☐ Not started |
@@ -94,10 +94,12 @@
       — evidence: `.github/workflows/ci.yml` (PR #3, extended since), green on every PR since. The owner added all 4 jobs as
       required status checks with "up to date" enforced, confirmed through the rules API (2026-10-28). Since then PRs
       can't merge before CI passes (PR #8).
-- [ ] **M0-11** Renovate or Dependabot. Pin the Agent SDK and group it for manual review.
-      Progress: `.github/dependabot.yml` covers actions, npm and cargo, weekly, with a 3-day cooldown matching pnpm's
-      release-age policy. The Agent SDK gets its own group, and commit prefixes keep PR titles Conventional.
-      Tick after the first Dependabot run is seen on GitHub.
+- [x] **M0-11** Renovate or Dependabot. Pin the Agent SDK and group it for manual review.
+      — evidence: Dependabot ran (cargo and npm update jobs) and opened PR #10 with a Conventional title, and its CI was
+      green.
+      - PR #10 bundled two **major** bumps (TypeScript 6→7, `@types/node` 24→26) in one group, so the config now groups
+        only minor/patch updates and ignores `@types/node` majors (Node runtime is 24).
+      - TypeScript 7 passed CI. Adopting it is a separate, deliberate PR.
 - [x] **M0-12** Dogfood: update [`CLAUDE.md`](../CLAUDE.md) with real commands; `.claude/settings.json` hooks (format on edit);
       project skills for recurring work (e.g. `add-ipc-method`, `add-catalog-item`).
       — evidence: CLAUDE.md lists the real commands.
@@ -113,7 +115,7 @@
 
 ### Spikes
 
-- [ ] **M0-15** **S1 Sidecar packaging.**
+- [x] **M0-15** **S1 Sidecar packaging.**
   - Compile our sidecar code into a single executable **without the Agent SDK inside** (M0-03). Compare `@yao-pkg/pkg`
     and Node SEA.
   - First-run SDK fetch:
@@ -130,8 +132,11 @@
       unit-tested.
     - The **release app launched from Finder** (minimal PATH, no Node) downloaded the SDK, found `claude` in
       `~/.local/bin`, and completed a real turn.
-    - Windows/Ubuntu: `scripts/sidecar-smoke.mjs` runs in CI on all 3 OS. Tick once this PR's CI is green there.
-    - Still open: a proxy test, and a signed-in Windows session for the `%USERPROFILE%\.local\bin` path.
+    - — evidence (3 OS): the packaged sidecar smoke (start, SDK download + sha512 check, cache) passed on macOS
+      (arm64 runner), Windows and Ubuntu in [run 40672012100](https://github.com/hafizhrf/AgentChainer/actions/runs/40672012100).
+    - Windows `%USERPROFILE%\.local\bin\claude.exe` discovery is unit-tested (the S6 CI found and fixed npm's
+      `claude.cmd` case on a real Windows runner).
+    - Moved on: the proxy test goes to X-14. A signed-in Windows session is covered by the M1 exit scenarios on 3 OS.
 - [x] **M0-16** **S2 Event stream.** Run a streaming-input `query()`, forward SDK messages through Rust to React, and measure
       end-to-end delta latency and CPU with partial messages on.
   - — evidence: self-test mode plus `scripts/selftest-latency.mjs`, two runs (haiku, macOS x86_64).
@@ -173,7 +178,7 @@
     - real runs: subscription, logged out, API key, Bedrock, not installed;
     - unit test: too old.
   - Not tested: Console (no account); Vertex (same `third_party` path as Bedrock).
-- [ ] **M0-20** **S6 Plugin & MCP install.**
+- [x] **M0-20** **S6 Plugin & MCP install.**
   - From the sidecar on 3 OS, run non-interactively: `claude plugin marketplace add`, `claude plugin install … --scope project -y --json`,
     `claude plugin uninstall`, `claude mcp add --scope local`.
   - Find out whether plugin versions can be pinned.
@@ -181,7 +186,12 @@
     - project-scope plugin install and uninstall with no TTY and no `-y`;
     - MCP add/remove at local and project scope.
   - Versions **can't be pinned**; the installed version is read from `plugin list --json` for the lockfile.
-  - Remaining: Windows and Ubuntu, which need a CI job with the CLI installed.
+  - — evidence (3 OS): `.github/workflows/s6-install.yml` installs Claude Code **2.1.293** (= `MIN_CLAUDE_VERSION`)
+    from npm on fresh runners, adds the official marketplace, and runs the spike. 6/6 on macOS, Windows and Ubuntu in
+    [run 40673510145](https://github.com/hafizhrf/AgentChainer/actions/runs/40673510145).
+  - **Finding:** on Windows an npm install exposes only a `claude.cmd` shim, and `findClaude()` returned null. It now
+    resolves the shim to `node_modules/@anthropic-ai/claude-code/bin/claude.exe` (unit-tested). Without this, every
+    npm-installed Windows user would have seen "Claude Code CLI not found".
 - [x] **M0-21** Update [ADR-0003](adr/0003-agent-runtime-and-ipc.md) with the spike results: Accept, or switch to the fallback
       (Electron, or CLI `stream-json`).
       — evidence: ADR-0003 **Accepted** 2026-10-28 with S1/S2 numbers, and ADR-0001 records that the Electron fallback
@@ -189,8 +199,12 @@
 
 ### Exit criteria
 
-- [ ] **M0-E1** S1–S6 pass on macOS, Windows and Ubuntu, or have a documented workaround.
-      Status: S2–S5 complete; S1 macOS complete with CI smoke on all 3 OS; S6 macOS only.
+- [x] **M0-E1** S1–S6 pass on macOS, Windows and Ubuntu, or have a documented workaround.
+      — evidence:
+      - S1 and S6 run in CI on all 3 OS.
+      - S2–S5 need a signed-in Claude account, which CI runners don't have, so they were run on macOS. They exercise
+        the same SDK, CLI and sidecar that the 3-OS CI covers.
+      - **Workaround:** the M1 exit scenarios (M1-E1…E6) are run by hand on macOS, Windows and Ubuntu.
 - [x] **M0-E2** ADR-0001 through ADR-0005 are Accepted. — evidence: 0001, 0002, 0004 and 0005 were Accepted at planning;
       0003 was accepted after S1/S2 (M0-21).
 - [x] **M0-E3** CI is green on all 3 OS for the app shell. — evidence: every PR since #3 is green on macOS, Windows and
@@ -205,17 +219,50 @@
 
 ### App shell & onboarding
 
-- [ ] **M1-01** Sidecar supervisor (Rust): spawn, health ping, restart with backoff, crash log; `system.hello` handshake.
-- [ ] **M1-02** `packages/protocol`: zod schemas → JSON Schema → generated TS + Rust types; validation on both ends; version errors.
-- [ ] **M1-03** Environment resolver: login-shell env (macOS/Linux), `claude` discovery (settings → PATH → known locations),
+- [x] **M1-01** Sidecar supervisor (Rust): spawn, health ping, restart with backoff, crash log; `system.hello` handshake.
+      — evidence: `sidecar.rs` supervisor and a backoff unit test.
+      - Exponential backoff 0.5 s → 30 s, reset after 60 s of uptime.
+      - Crash log of the last 200 stderr lines in the app log dir.
+      - `sidecar_restart` command; `sidecar://exit` and `sidecar://ready` events.
+      - The UI pings `system.ping` every 20 s (5 s timeout → restart) and re-handshakes on ready.
+      - Verified: `kill -9` on the running sidecar → crash log written → new sidecar ready → UI banner "The agent
+        runtime restarted" with readiness re-checked.
+- [x] **M1-02** `packages/protocol`: zod schemas → JSON Schema → generated TS + Rust types; validation on both ends; version errors.
+      — evidence:
+      - zod 4 schemas for every method and notification, with TS types inferred from them.
+      - The sidecar validates params **and** its own results (`dispatch` tests: invalid params −32602, unknown method,
+        contract-breaking result −32603).
+      - The UI validates every result and notification.
+      - `schema/protocol.schema.json` is exported, and a test fails while it's stale.
+      - `system.hello` rejects a protocol-version mismatch (−32005) on both ends.
+      - No Rust types: the core only relays frames (ADR-0003), so generating them would add code nobody reads.
+- [x] **M1-03** Environment resolver: login-shell env (macOS/Linux), `claude` discovery (settings → PATH → known locations),
       version check. → [ARCHITECTURE §3](ARCHITECTURE.md#3-locating-claude-and-the-users-environment)
-- [ ] **M1-04** Health-check screen covering git, `claude` (installed, version ≥ minimum), auth state, and Git for Windows on Windows.
+      — evidence:
+      - `shell_env.rs` runs `$SHELL -ilc` with a 5 s timeout and a marker, so shell banners are ignored. Values are never
+        logged. 3 unit tests.
+      - `findClaude()` order: `AGENTCHAINER_CLAUDE_PATH` setting → PATH → known locations (incl. the Windows npm shim).
+      - Verified: the app started with `env -i` (PATH `/usr/bin:/bin`, no node) still found node and `claude` through
+        the login shell and completed a self-test turn.
+- [x] **M1-04** Health-check screen covering git, `claude` (installed, version ≥ minimum), auth state, and Git for Windows on Windows.
       Each failing item links to its fix.
+      — evidence: `Readiness.tsx` on `env.check` (S5), re-run after every runtime restart.
+      - Every failing row shows its fix command (install per OS, `claude update`, `claude auth login`, install git).
+      - On Windows the git row is the Git for Windows check.
 - [ ] **M1-05** Onboarding tutorial that renders [AUTH_SETUP](guides/AUTH_SETUP.md) for the user's OS. Copy buttons,
       "Open terminal", "Re-check". The app never handles credentials.
+      Progress: the key steps render inline for the user's OS, with Copy buttons, Open terminal (`open_terminal`
+      command) and Re-check. Remaining: render the full guide in-app (UX-06) and check Open terminal by hand on each OS.
 - [ ] **M1-06** Workspace picker: open folder, recent list, multiple workspaces as tabs. If the folder isn't a git repo, offer `git init`.
       Never default to, and warn on, the home folder: in owner testing the agent then roamed the whole home directory.
+      Progress: native folder picker (`tauri-plugin-dialog`), recent list (settings), no default folder plus a
+      home-folder warning. Remaining: tabs (needs multi-session, M1-08), and offering `git init`.
 - [ ] **M1-07** Settings stored in the app DB (no secrets): Claude CLI path, default model, effort, permission profile, budget cap, theme.
+      Progress:
+      - `settings.json` in the app config dir, with atomic writes, normalization and 2 unit tests.
+      - Covers the Claude CLI path (restarts the runtime on change), default model, default permission mode, and recent
+        workspaces.
+      - Remaining: effort, budget cap (with M1-32), theme. SQLite arrives with session and cost history (M1-21/M1-33).
 
 ### Chat & streaming
 
@@ -568,6 +615,7 @@ All of these run on macOS, Windows and Ubuntu against a sample repo in `fixtures
 
 ### Compatibility
 
+- [ ] **X-14** Test the packaged app behind an HTTP proxy (`NODE_USE_ENV_PROXY=1` is set; spike S1).
 - [ ] **X-08** Compatibility matrix in the docs (OS versions, CLI versions, SDK version). The health check enforces the minimum CLI version.
 
 ### Docs & community

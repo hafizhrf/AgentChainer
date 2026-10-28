@@ -21,6 +21,7 @@
 | [M0](#m0--foundations--spikes) | — | Foundations & spikes | ◐ In progress |
 | [M1](#m1--agent-session-core-v01-a) | v0.1 | Agent session core | ☐ Not started |
 | [M2](#m2--workspace-bootstrap-v01-b) | v0.1 | Workspace bootstrap | ☐ Not started |
+| [UX](#ux--product-design--ui-polish-before-r1) | v0.1 | Product design & UI polish (after M1/M2 work functionally) | ☐ Later |
 | [R1](#r1--v01-release) | v0.1 | Packaging & release | ☐ Not started |
 | [M3](#m3--adaptive-planner--task-contracts-v02) | v0.2 | Adaptive planner, contracts, evidence | ☐ Not started |
 | [M4](#m4--agent-observability-v02v03) | v0.2–0.3 | Agent observability graph | ☐ Not started |
@@ -104,19 +105,20 @@
       end-to-end delta latency and CPU with partial messages on.
   - Progress: streaming works end to end (sidecar → Rust → React chat UI). Time to first delta is 2.1–3.4 s and dominated
     by the model. UI-side latency and CPU are not measured yet. See [S2/S3 spike](spikes/S2-S3-chat-slice.md).
-- [ ] **M0-17** **S3 Permissions.**
+- [x] **M0-17** **S3 Permissions.**
   - Round-trip `canUseTool` and a `PreToolUse` hook to a UI modal.
   - Exercise `interrupt()` and a mid-session `setPermissionMode()`.
   - Document which calls bypass `canUseTool`.
-  - Progress: all behaviours are verified against the real CLI by the spike harness (9/9 checks):
-    - `canUseTool` allow and deny;
-    - mid-session `setPermissionMode()`;
-    - `interrupt()`, which stops a tool in 20–35 ms; an interrupt while idle is now ignored, because it used to abort
-      the next turn;
-    - the `PreToolUse` guard, which blocks before any prompt; 10 unit tests cover it, and it runs in CI.
+  - — evidence: [S2/S3 spike](spikes/S2-S3-chat-slice.md), PR #5.
+    - The spike harness passes 11/11 checks against the real CLI:
+      - `canUseTool` allow and deny;
+      - mid-session `setPermissionMode()`, including `auto`;
+      - `interrupt()` stops a tool in 20–35 ms; an interrupt while idle is ignored;
+      - the `PreToolUse` guard blocks before any prompt, in every mode.
+    - 10 guard unit tests run in CI.
+    - The owner exercised the approval dialog and mode switcher in the app on a real repo (2026-10-28).
+  - Not separately exercised in the app: the Stop button. The `session.interrupt` RPC behind it is covered by the harness.
   - Read-only commands such as `echo` bypass `canUseTool`.
-  - Remaining before ticking: a human checks the approval dialog, mode switcher and Stop in the app.
-    See [S2/S3 spike](spikes/S2-S3-chat-slice.md).
 - [ ] **M0-18** **S4 Subagent attribution.**
   - Capture `parent_tool_use_id`, `agent_id`, the `SubagentStart/Stop` hooks and `forwardSubagentText`.
   - Build an agent tree for a prompt that spawns 2 parallel subagents.
@@ -183,7 +185,9 @@
   - shows the tool, the agent (main or subagent) and the input, which is editable;
   - options: allow once, always for this project, deny with a message to the agent.
 - [ ] **M1-18** Permission profiles Safe / Standard / Autonomous ([ARCHITECTURE §6](ARCHITECTURE.md#6-permissions)).
-      Check auto-mode availability per account type.
+      Check auto-mode availability per account type. `auto` works on the owner's account (spike S3).
+      Explain each mode in the UI, because owner testing showed "auto-accept edits" being read as "auto mode" (Bash
+      still asks in `acceptEdits`).
 - [ ] **M1-19** `PreToolUse` guard: a hard denylist that applies in every profile and shows the reason for each block.
 - [ ] **M1-20** "Always allow" rules go to `.claude/settings.local.json` and can be viewed and removed in a Permissions panel.
 
@@ -325,6 +329,38 @@ All of these run on macOS, Windows and Ubuntu against a sample repo in `fixtures
 - [ ] **M2-E2** For each tier-1 stack, the generated CI runs green on a real GitHub test repo.
 - [ ] **M2-E3** A full rollback leaves `git status` clean and every file byte-identical.
 - [ ] **M2-E4** No action is applied without a preview, unless the user opted into auto-apply.
+
+---
+
+## UX — Product design & UI polish (before R1)
+
+**Goal:** turn the functional M1/M2 screens into a polished, trustworthy product before the first public release.
+**Scheduled later by the owner:** start once M1 and M2 work functionally; the spike UI stays deliberately plain until then.
+
+- [ ] **UX-01** Pattern research: review Claude Code Desktop, Cursor, Zed and Conductor for layout, chat, tool, diff and
+      approval patterns; write down principles and anti-patterns in `docs/design/ux-principles.md`.
+- [ ] **UX-02** Design system: tokens (color, type, spacing, radius, motion) for light and dark. Pick a component approach
+      (e.g. Radix/shadcn + Tailwind) and record it in an ADR.
+- [ ] **UX-03** Information architecture and wireframes:
+  - left sidebar with workspaces and sessions;
+  - the main transcript;
+  - a right panel for changes/diff and agents;
+  - a status bar showing model, mode and cost.
+- [ ] **UX-04** Transcript polish: markdown and code highlighting, grouped and collapsible tool runs, a streaming cursor,
+      copy buttons, timestamps, long-session performance.
+- [ ] **UX-05** Approval and mode UX:
+  - richer approval dialog: diff preview for edits, plain-language command explanation, risk level, "always allow" with scope;
+  - explain each permission mode in the UI, and show why the guard blocked a call.
+- [ ] **UX-06** Onboarding and empty states: native folder picker instead of a typed path, first-run checklist,
+      helpful errors.
+- [ ] **UX-07** Keyboard shortcuts and a command palette.
+- [ ] **UX-08** App icon and visual identity, after naming and branding are settled (M0-01).
+- [ ] **UX-09** Usability test with 3–5 target users on macOS, Windows and Ubuntu; fix the top issues.
+
+### Exit criteria
+
+- [ ] **UX-E1** All M1/M2 screens use the design system, in light and dark themes.
+- [ ] **UX-E2** Usability test participants complete the M1 exit scenarios without help.
 
 ---
 

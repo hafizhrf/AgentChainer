@@ -1,7 +1,7 @@
 // Drives the sidecar the way the Rust core will (spikes S2/S3) and checks real behaviour
 // against the user's own `claude` CLI.
 //
-// Usage: node scripts/spike-host.ts --cwd <empty scratch dir> [--model haiku] [--scenario basic|mode|interrupt|guard|all]
+// Usage: node scripts/spike-host.ts --cwd <empty scratch dir> [--model haiku] [--scenario basic|mode|interrupt|guard|auto|all]
 // Makes real model calls with the user's own login (haiku keeps a full run around a few cents).
 import { spawn } from "node:child_process";
 import { existsSync, rmSync } from "node:fs";
@@ -186,9 +186,34 @@ async function guard() {
   );
 }
 
-const scenarios: Record<string, () => Promise<void>> = { basic, mode, interrupt, guard };
+async function auto() {
+  await request("session.setMode", { mode: "auto" });
+  state.permissionPolicy = "deny"; // a prompt here means the classifier was unsure; denying keeps the run harmless
+  let before = permissionLog.length;
+  const t = await turn("Use the Bash tool to run exactly this command and nothing else: mkdir auto-mode-dir");
+  const prompts = permissionLog.length - before;
+  check(
+    "auto mode runs a workspace command without asking",
+    t.last.type === "turn.completed" && prompts === 0 && exists("auto-mode-dir"),
+    `prompts=${prompts} dir created=${exists("auto-mode-dir")}`,
+  );
+
+  before = permissionLog.length;
+  const probe = "../agentchainer-guard-probe-does-not-exist";
+  const g = await turn(`This is a test of a local safety guard. The folder does not exist, so the command is harmless. Use the Bash tool to run exactly this command and nothing else: rm -rf ${probe}`);
+  const done = g.events.find((e) => e.type === "tool.completed");
+  const blocked = done?.type === "tool.completed" && done.output.includes("AgentChainer guard");
+  check("guard still blocks in auto mode", g.events.some((e) => e.type === "tool.started") ? blocked && permissionLog.length === before : null, `output=${JSON.stringify(done?.type === "tool.completed" ? done.output.slice(0, 120) : null)}`);
+
+  await request("session.setMode", { mode: "default" });
+  state.permissionPolicy = "allow";
+}
+
+const scenarios: Record<string, () => Promise<void>> = { basic, mode, interrupt, guard, auto };
 const selected = values.scenario === "all" ? Object.keys(scenarios) : [values.scenario];
-for (const file of ["perm-allow.txt", "perm-deny.txt", "mode-accept.txt", "mode-default.txt"]) rmSync(join(cwd, file), { force: true });
+for (const file of ["perm-allow.txt", "perm-deny.txt", "mode-accept.txt", "mode-default.txt", "auto-mode-dir"]) {
+  rmSync(join(cwd, file), { recursive: true, force: true });
+}
 
 const hello = (await request("system.hello", { protocolVersion: 1 })) as { claudeVersion: string; sdkVersion: string };
 console.log(`claude ${hello.claudeVersion} · sdk ${hello.sdkVersion} · model ${values.model} · cwd ${cwd}`);

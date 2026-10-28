@@ -1,7 +1,7 @@
 // Drives the sidecar the way the Rust core will (spikes S2/S3) and checks real behaviour
 // against the user's own `claude` CLI.
 //
-// Usage: node scripts/spike-host.ts --cwd <empty scratch dir> [--model haiku] [--scenario basic|mode|interrupt|guard|auto|all]
+// Usage: node scripts/spike-host.ts --cwd <empty scratch dir> [--model haiku] [--scenario basic|mode|interrupt|guard|auto|subagents|all] [--record out.jsonl]
 // Makes real model calls with the user's own login (haiku keeps a full run around a few cents).
 import { spawn } from "node:child_process";
 import { existsSync, rmSync } from "node:fs";
@@ -18,6 +18,8 @@ const { values } = parseArgs({
     cwd: { type: "string" },
     model: { type: "string", default: "haiku" },
     scenario: { type: "string", default: "all" },
+    // Writes the sanitized raw SDK stream to this JSONL file (for test fixtures).
+    record: { type: "string" },
   },
 });
 if (!values.cwd) {
@@ -29,6 +31,7 @@ const cwd: string = values.cwd;
 
 const sidecar = spawn(process.execPath, [fileURLToPath(new URL("../src/main.ts", import.meta.url))], {
   stdio: ["pipe", "pipe", "inherit"],
+  env: values.record ? { ...process.env, AGENTCHAINER_RECORD_SDK: values.record } : process.env,
 });
 
 type Frame = Record<string, unknown>;
@@ -209,7 +212,31 @@ async function auto() {
   state.permissionPolicy = "allow";
 }
 
-const scenarios: Record<string, () => Promise<void>> = { basic, mode, interrupt, guard, auto };
+async function subagents() {
+  const t = await turn(
+    "Use the Agent tool to launch two subagents in parallel in a single message. " +
+      "Subagent A: run `ls` with the Bash tool and report the file names. " +
+      "Subagent B: run `date` with the Bash tool and report the date. " +
+      "Then summarize both results in one sentence.",
+  );
+  const started = t.events.filter((e) => e.type === "agent.started");
+  const completed = t.events.filter((e) => e.type === "agent.completed");
+  const agentIds = new Set(started.map((e) => (e.type === "agent.started" ? e.toolUseId : "")));
+  const nestedTools = t.events.filter((e) => e.type === "tool.started" && e.parentToolUseId !== null && agentIds.has(e.parentToolUseId));
+  const nestedText = t.events.filter((e) => e.type === "agent.text" && agentIds.has(e.parentToolUseId));
+  check(
+    "two subagents start and complete",
+    started.length >= 2 && completed.length >= started.length,
+    `started=${started.length} completed=${completed.length} types=${started.map((e) => (e.type === "agent.started" ? e.agentType ?? "?" : "")).join(",")}`,
+  );
+  check(
+    "subagent tool calls and text attach to their agent",
+    nestedTools.length >= 2,
+    `nested tool calls=${nestedTools.length} nested text messages=${nestedText.length} final reply=${JSON.stringify(t.reply.slice(0, 100))}`,
+  );
+}
+
+const scenarios: Record<string, () => Promise<void>> = { basic, mode, interrupt, guard, auto, subagents };
 const selected = values.scenario === "all" ? Object.keys(scenarios) : [values.scenario];
 for (const file of ["perm-allow.txt", "perm-deny.txt", "mode-accept.txt", "mode-default.txt", "auto-mode-dir"]) {
   rmSync(join(cwd, file), { recursive: true, force: true });

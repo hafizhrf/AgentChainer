@@ -1,16 +1,20 @@
 import { useEffect, useRef, useState, type KeyboardEvent } from "react";
-import { PERMISSION_MODES, type AgentEvent, type Methods, type PermissionMode, type PermissionRequest } from "@agentchainer/protocol";
+import {
+  PERMISSION_MODES,
+  type AgentEvent,
+  type EnvCheck,
+  type Methods,
+  type PermissionMode,
+  type PermissionRequest,
+} from "@agentchainer/protocol";
 import { connect, onExit, request, subscribe } from "./sidecar.ts";
+import { applyEvent, closeAssistant, nextId, type AgentItem, type Item, type ToolItem } from "./transcript.ts";
 import "./App.css";
 
-// Spike S2/S3 UI: one session, streaming text, tool cards, approvals. The real session core is M1.
+// Spike UI (S2–S5): readiness check, one session, streaming text, tool and subagent cards, approvals.
+// The real session core is M1 and the visual design pass is the UX track.
 
 type Hello = Methods["system.hello"]["result"];
-type Item =
-  | { kind: "user"; id: number; text: string }
-  | { kind: "assistant"; id: number; text: string; open: boolean }
-  | { kind: "tool"; id: string; name: string; input: unknown; status: "running" | "done" | "error"; output?: string }
-  | { kind: "notice"; id: number; text: string };
 
 const MODELS = [
   { value: "", label: "Default (from your Claude settings)" },
@@ -26,10 +30,10 @@ const MODE_LABELS: Record<PermissionMode, string> = {
   plan: "Plan only (no changes)",
 };
 
-let seq = 0;
-
 export function App() {
   const [hello, setHello] = useState<Hello | null>(null);
+  const [env, setEnv] = useState<EnvCheck | null>(null);
+  const [checking, setChecking] = useState(false);
   const [fatal, setFatal] = useState<string | null>(null);
   const [cwd, setCwd] = useState("");
   const [model, setModel] = useState("");
@@ -47,14 +51,14 @@ export function App() {
       .then(() => request("system.hello", { protocolVersion: 1 }))
       .then((h) => {
         setHello(h);
-        setCwd((current) => current || h.homeDir);
+        return recheck();
       })
       .catch((err: unknown) => setFatal(String(err)));
 
     const offExit = onExit((status) => setFatal(`Sidecar exited: ${status}`));
     const offEvents = subscribe((n) => {
       if (n.method === "permission.request") setPermissions((q) => [...q, n.params]);
-      else applyEvent(n.params);
+      else onAgentEvent(n.params);
     });
     return () => {
       offExit();
@@ -64,58 +68,38 @@ export function App() {
 
   useEffect(() => bottomRef.current?.scrollIntoView({ block: "end" }), [items]);
 
-  function applyEvent(e: AgentEvent) {
-    switch (e.type) {
-      case "session.started": {
-        // Arrives at the start of every turn (spike S2 finding), so this must stay idempotent.
-        setSession({ model: e.model, claudeCodeVersion: e.claudeCodeVersion });
-        const reported = PERMISSION_MODES.find((m) => m === e.permissionMode);
-        if (reported) setMode(reported);
-        break;
-      }
-      case "text.delta":
-        setItems((prev) => {
-          const last = prev.at(-1);
-          if (last?.kind === "assistant" && last.open) {
-            return [...prev.slice(0, -1), { ...last, text: last.text + e.text }];
-          }
-          return [...prev, { kind: "assistant", id: ++seq, text: e.text, open: true }];
-        });
-        break;
-      case "tool.started":
-        setItems((prev) => [
-          ...closeAssistant(prev),
-          { kind: "tool", id: e.toolUseId, name: e.name, input: e.input, status: "running" },
-        ]);
-        break;
-      case "tool.completed":
-        setItems((prev) =>
-          prev.map((it) =>
-            it.kind === "tool" && it.id === e.toolUseId
-              ? { ...it, status: e.isError ? "error" : "done", output: e.output }
-              : it,
-          ),
-        );
-        break;
-      case "turn.completed":
-        setItems(closeAssistant);
-        setRunning(false);
-        setCost((c) => ({ lastUsd: e.costUsd, totalUsd: c.totalUsd + e.costUsd, lastMs: e.durationMs }));
-        break;
-      case "error":
-        setItems((prev) => [...closeAssistant(prev), { kind: "notice", id: ++seq, text: e.message }]);
-        setRunning(false);
-        break;
+  async function recheck() {
+    setChecking(true);
+    try {
+      setEnv(await request("env.check", {}));
+    } finally {
+      setChecking(false);
     }
+  }
+
+  function onAgentEvent(e: AgentEvent) {
+    if (e.type === "session.started") {
+      // Arrives at the start of every turn (spike S2 finding), so this must stay idempotent.
+      setSession({ model: e.model, claudeCodeVersion: e.claudeCodeVersion });
+      const reported = PERMISSION_MODES.find((m) => m === e.permissionMode);
+      if (reported) setMode(reported);
+      return;
+    }
+    if (e.type === "turn.completed") {
+      setRunning(false);
+      setCost((c) => ({ lastUsd: e.costUsd, totalUsd: c.totalUsd + e.costUsd, lastMs: e.durationMs }));
+    }
+    if (e.type === "error") setRunning(false);
+    setItems((prev) => applyEvent(prev, e));
   }
 
   async function startSession() {
     try {
       await request("session.start", { cwd, ...(model ? { model } : {}) });
       setSession({});
-      setItems([{ kind: "notice", id: ++seq, text: `Session started in ${cwd}` }]);
+      setItems([{ kind: "notice", id: nextId(), text: `Session started in ${cwd}` }]);
     } catch (err) {
-      setItems((prev) => [...prev, { kind: "notice", id: ++seq, text: String(err) }]);
+      setItems((prev) => [...prev, { kind: "notice", id: nextId(), text: String(err) }]);
     }
   }
 
@@ -124,12 +108,12 @@ export function App() {
     if (!text || running) return;
     setDraft("");
     setRunning(true);
-    setItems((prev) => [...closeAssistant(prev), { kind: "user", id: ++seq, text }]);
+    setItems((prev) => [...closeAssistant(prev), { kind: "user", id: nextId(), text }]);
     try {
       await request("session.send", { text });
     } catch (err) {
       setRunning(false);
-      setItems((prev) => [...prev, { kind: "notice", id: ++seq, text: String(err) }]);
+      setItems((prev) => [...prev, { kind: "notice", id: nextId(), text: String(err) }]);
     }
   }
 
@@ -138,7 +122,7 @@ export function App() {
       await request("session.setMode", { mode: next });
       setMode(next);
     } catch (err) {
-      setItems((prev) => [...prev, { kind: "notice", id: ++seq, text: String(err) }]);
+      setItems((prev) => [...prev, { kind: "notice", id: nextId(), text: String(err) }]);
     }
   }
 
@@ -172,13 +156,20 @@ export function App() {
       {!session ? (
         <section className="setup">
           <h1>Start a session</h1>
-          {hello && !hello.claudePath && (
-            <p className="warn">Claude Code CLI not found. Install it and sign in first (see docs/guides/AUTH_SETUP.md).</p>
-          )}
+          <Readiness env={env} checking={checking} onRecheck={() => void recheck()} />
           <label>
             Workspace folder
-            <input value={cwd} onChange={(e) => setCwd(e.target.value)} spellCheck={false} />
+            {/* No default: owner testing showed a home-folder workspace lets the agent roam the whole home directory. */}
+            <input
+              value={cwd}
+              onChange={(e) => setCwd(e.target.value)}
+              placeholder={hello ? `e.g. ${hello.homeDir}/projects/my-app` : "Path to a project folder"}
+              spellCheck={false}
+            />
           </label>
+          {hello && cwd.trim().replace(/\/+$/, "") === hello.homeDir && (
+            <p className="warn">That's your whole home folder. Pick a single project folder so the agent stays inside it.</p>
+          )}
           <label>
             Model
             <select value={model} onChange={(e) => setModel(e.target.value)}>
@@ -189,7 +180,7 @@ export function App() {
               ))}
             </select>
           </label>
-          <button disabled={!hello?.claudePath || !cwd} onClick={() => void startSession()}>
+          <button disabled={!env?.ready || !cwd} onClick={() => void startSession()}>
             Start session
           </button>
         </section>
@@ -261,9 +252,67 @@ export function App() {
   );
 }
 
-function closeAssistant(prev: Item[]): Item[] {
-  const last = prev.at(-1);
-  return last?.kind === "assistant" && last.open ? [...prev.slice(0, -1), { ...last, open: false }] : prev;
+/** Onboarding readiness (spike S5). The app never signs in for the user; it shows the terminal command (ADR-0002). */
+function Readiness({ env, checking, onRecheck }: { env: EnvCheck | null; checking: boolean; onRecheck: () => void }) {
+  if (!env) return <p className="muted">{checking ? "Checking your setup…" : "Waiting for the sidecar…"}</p>;
+  const install =
+    env.platform === "win32" ? "irm https://claude.ai/install.ps1 | iex" : "curl -fsSL https://claude.ai/install.sh | bash";
+  const rows: { ok: boolean; label: string; fix?: string; command?: string }[] = [
+    env.claude.path
+      ? { ok: true, label: `Claude Code CLI found (${env.claude.version ?? "version unknown"})` }
+      : { ok: false, label: "Claude Code CLI not found", fix: "Install it in your terminal, then open a new terminal:", command: install },
+  ];
+  if (env.claude.path) {
+    rows.push(
+      env.claude.versionOk
+        ? { ok: true, label: `Version ${env.claude.minVersion} or newer` }
+        : { ok: false, label: `Version older than ${env.claude.minVersion}`, fix: "Update it in your terminal:", command: "claude update" },
+    );
+    rows.push(
+      env.auth?.loggedIn
+        ? { ok: true, label: `Signed in (${authLabel(env)})` }
+        : { ok: false, label: "Not signed in", fix: "Sign in yourself in your terminal (AgentChainer never handles your login):", command: "claude auth login" },
+    );
+  }
+  rows.push(
+    env.git.version
+      ? { ok: true, label: env.git.version }
+      : { ok: false, label: "git not found", fix: "Install git from https://git-scm.com/downloads." },
+  );
+
+  return (
+    <div className="readiness">
+      <ul>
+        {rows.map((r) => (
+          <li key={r.label} className={r.ok ? "ok" : "fail"}>
+            <span>{r.ok ? "✓" : "✕"}</span>
+            <div>
+              {r.label}
+              {r.fix && <div className="muted">{r.fix}</div>}
+              {r.command && <code className="command">{r.command}</code>}
+            </div>
+          </li>
+        ))}
+      </ul>
+      {!env.ready && (
+        <p className="muted">
+          Step-by-step guide: <code>docs/guides/AUTH_SETUP.md</code>
+        </p>
+      )}
+      <button className="secondary" disabled={checking} onClick={onRecheck}>
+        {checking ? "Checking…" : "Re-check"}
+      </button>
+    </div>
+  );
+}
+
+function authLabel(env: EnvCheck): string {
+  const a = env.auth;
+  if (!a) return "unknown";
+  if (a.method === "claude.ai") return "Claude subscription";
+  if (a.method === "api_key") return "API key";
+  if (a.method === "third_party") return `cloud provider: ${a.provider}`;
+  return a.method;
 }
 
 function ItemView({ item }: { item: Item }) {
@@ -274,21 +323,53 @@ function ItemView({ item }: { item: Item }) {
       return <div className="msg assistant">{item.text}</div>;
     case "notice":
       return <div className="notice">{item.text}</div>;
-    case "tool": {
-      const blocked = item.output?.includes("Blocked by AgentChainer guard") ?? false;
-      return (
-        <details className={`tool ${item.status}`} open={blocked}>
-          <summary>
-            <span className="tool-status">{item.status === "running" ? "⋯" : item.status === "done" ? "✓" : "✕"}</span>
-            {item.name} <code>{toolSummary(item.input)}</code>
-            {blocked && <span className="badge">blocked by guard</span>}
-          </summary>
-          <pre>{JSON.stringify(item.input, null, 2)}</pre>
-          {item.output !== undefined && <pre className="tool-output">{item.output}</pre>}
-        </details>
-      );
-    }
+    case "tool":
+      return <ToolView tool={item} />;
+    case "agent":
+      return <AgentView agent={item} />;
   }
+}
+
+function ToolView({ tool }: { tool: ToolItem }) {
+  const blocked = tool.output?.includes("Blocked by AgentChainer guard") ?? false;
+  return (
+    <details className={`tool ${tool.status}`} open={blocked}>
+      <summary>
+        <StatusIcon status={tool.status} />
+        {tool.name} <code>{toolSummary(tool.input)}</code>
+        {blocked && <span className="badge">blocked by guard</span>}
+      </summary>
+      <pre>{JSON.stringify(tool.input, null, 2)}</pre>
+      {tool.output !== undefined && <pre className="tool-output">{tool.output}</pre>}
+    </details>
+  );
+}
+
+function AgentView({ agent }: { agent: AgentItem }) {
+  const meta = [
+    agent.agentType,
+    agent.durationMs !== undefined ? `${(agent.durationMs / 1000).toFixed(1)} s` : null,
+    agent.tokens !== undefined ? `${agent.tokens.toLocaleString()} tokens` : null,
+  ].filter(Boolean);
+  return (
+    <details className={`agent ${agent.status}`} open={agent.status === "running"}>
+      <summary>
+        <StatusIcon status={agent.status} />
+        <strong>Subagent</strong> {agent.description}
+        {meta.length > 0 && <span className="muted">{meta.join(" · ")}</span>}
+      </summary>
+      <div className="agent-children">
+        {agent.children.map((c) =>
+          c.kind === "tool" ? <ToolView key={`tool-${c.id}`} tool={c} /> : <div key={`text-${c.id}`} className="msg agent-text">{c.text}</div>,
+        )}
+        {agent.summary && <div className="agent-summary">{agent.summary}</div>}
+      </div>
+    </details>
+  );
+}
+
+function StatusIcon({ status }: { status: "running" | "done" | "error" }) {
+  return <span className="tool-status">{status === "running" ? "⋯" : status === "done" ? "✓" : "✕"}</span>;
 }
 
 function toolSummary(input: unknown): string {

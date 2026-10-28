@@ -9,6 +9,7 @@
   "scripts": {
     "dev": "pnpm --filter @agentchainer/desktop tauri dev",
     "build": "pnpm --filter @agentchainer/desktop tauri build",
-    "typecheck": "pnpm -r typecheck"
+    "typecheck": "pnpm -r typecheck",
+    "test": "pnpm -r --if-present test"
   }
 }

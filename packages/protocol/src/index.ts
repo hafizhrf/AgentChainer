@@ -26,6 +26,8 @@ export type Methods = {
       claudeVersion: string | null;
     };
   };
+  /** Readiness of the user's machine (spike S5). Never includes account identity (email, org). */
+  "env.check": { params: Record<string, never>; result: EnvCheck };
   "session.start": {
     params: { cwd: string; model?: string; permissionMode?: PermissionMode };
     result: { ok: true };
@@ -40,6 +42,24 @@ export type Methods = {
   };
 };
 export type MethodName = keyof Methods;
+
+/**
+ * Only the fields ADR-0002 allows us to read from `claude auth status --json`:
+ * - `method`: "claude.ai" | "api_key" | "third_party" | "none" | …
+ * - `provider`: "firstParty" | "bedrock" | "vertex" | "foundry" | …
+ */
+export type AuthState = { loggedIn: boolean; method: string; provider: string };
+
+export type EnvCheck = {
+  platform: "darwin" | "win32" | "linux" | string;
+  node: string;
+  claude: { path: string | null; version: string | null; minVersion: string; versionOk: boolean };
+  /** null when the CLI is missing or its status can't be read. */
+  auth: AuthState | null;
+  git: { version: string | null };
+  /** True when a session can start: CLI found, version OK, signed in, git present. */
+  ready: boolean;
+};
 
 /**
  * Permission modes the app offers. `bypassPermissions` is deliberately excluded. `auto` lets Claude's
@@ -60,8 +80,40 @@ export type AgentEvent =
       permissionMode: string;
     }
   | { type: "text.delta"; text: string }
-  | { type: "tool.started"; toolUseId: string; name: string; input: unknown; parentToolUseId: string | null }
-  | { type: "tool.completed"; toolUseId: string; isError: boolean; output: string }
+  /**
+   * `parentToolUseId` is null for the main agent; otherwise it is the `toolUseId` of the Agent tool call that
+   * spawned the subagent doing this work (the key of the agent tree, ARCHITECTURE §5.2).
+   */
+  | {
+      type: "tool.started";
+      toolUseId: string;
+      name: string;
+      input: unknown;
+      parentToolUseId: string | null;
+      agentId?: string;
+    }
+  | { type: "tool.completed"; toolUseId: string; isError: boolean; output: string; parentToolUseId: string | null }
+  /** A subagent was spawned by the Agent tool call `toolUseId` (spike S4). */
+  | {
+      type: "agent.started";
+      toolUseId: string;
+      taskId: string;
+      description: string;
+      agentType?: string;
+      depth?: number;
+      background?: boolean;
+    }
+  | { type: "agent.text"; parentToolUseId: string; agentId?: string; text: string }
+  | {
+      type: "agent.completed";
+      toolUseId: string;
+      taskId: string;
+      status: string;
+      summary: string;
+      totalTokens?: number;
+      toolUses?: number;
+      durationMs?: number;
+    }
   | {
       type: "turn.completed";
       subtype: string;

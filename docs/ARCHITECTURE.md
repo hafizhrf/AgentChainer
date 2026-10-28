@@ -110,7 +110,7 @@ enables follow-ups, `interrupt()` and `setPermissionMode()`. Key options:
 | `forwardSubagentText` | `true` | Subagent text and thinking for observability |
 | `enableFileCheckpointing` | `true` | Rewind (M1-23) |
 | `canUseTool` | broker → UI | Approvals (§6) |
-| `hooks` | `PreToolUse` guard; `SubagentStart/Stop`; `PostToolUse` (file change tracking) | Safety and observability |
+| `hooks` | `PreToolUse` guard; `PostToolUse` (file change tracking, M1) | Safety and observability |
 | `permissionMode` | from profile | §6 |
 | `model`, `effort`, `maxBudgetUsd` | from settings / session | Cost control |
 
@@ -125,7 +125,7 @@ mapped into a stable internal `AgentEvent` union so the UI never depends on raw 
 | `text.delta`, `thinking.delta` | `stream_event` (main agent only); subagent text via forwarded messages |
 | `message.completed` | `assistant` |
 | `tool.started {toolUseId, name, input, agentId}` / `tool.completed {toolUseId, ok, output, durationMs}` | `assistant` tool_use / `user` tool_result |
-| `agent.spawned {agentId, parentToolUseId, type, description}` / `agent.completed` | `SubagentStart` / `SubagentStop` hooks + Task tool calls |
+| `agent.started {toolUseId, taskId, description, agentType, depth}` / `agent.text` / `agent.completed {status, summary, tokens, durationMs}` | `system/task_started` / subagent `assistant` messages / `system/task_notification` (spike S4) |
 | `permission.requested` / `permission.resolved` | `canUseTool` broker |
 | `turn.completed {costUsd, modelUsage, durationMs, numTurns, stopReason, denials}` | `result` |
 | `context.compacted` | `system/compact_boundary` |
@@ -137,12 +137,17 @@ consumers must treat `session.started` as idempotent.
 
 **Agent tree:**
 
-- Nodes are agents.
+- Nodes are agents, keyed by the `tool_use_id` of the Agent tool call that spawned them.
 - A message belongs to the main agent when `parent_tool_use_id` is null. Otherwise it belongs to the subagent spawned by
-  that tool use. `agent_id` is used when present.
-- Subagent lifecycle and transcripts come from the `SubagentStart/Stop` hooks (`agent_id`, `agent_transcript_path`).
+  that tool use. Subagent messages also carry `agent_id`.
+- Lifecycle comes from `system/task_started` and `system/task_notification`, which carry the same `tool_use_id`, a
+  description, a type, depth, status, summary and usage. Spike S4 showed these are enough; the `SubagentStart/Stop`
+  hooks aren't registered.
 
 Every mapping is covered by **recorded fixtures**: real SDK output saved as JSONL in `packages/sidecar/test/fixtures/`.
+- Record with `AGENTCHAINER_RECORD_SDK` (or `spike-host --record`), then run `scripts/make-fixture.ts`.
+- `make-fixture.ts` drops non-session messages, replaces plain and encoded paths and the username, and refuses to write
+  if anything identifying survives.
 
 ### 5.3 Cost
 

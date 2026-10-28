@@ -3,7 +3,7 @@
 Open-source desktop app (Tauri v2 + React/TS + Node sidecar on the Claude Agent SDK) that makes repos agent-ready and
 keeps agent work transparent and verified. **Current phase: M0 (foundations).**
 
-A spike-level chat slice exists (S2/S3, see `docs/spikes/S2-S3-chat-slice.md`): one session, streaming text, tool approvals.
+A spike-level app exists (S2–S6, see `docs/spikes/`): readiness check, one session, streaming text, tool approvals, subagent cards.
 The sidecar runs from source with `node`, so it works in dev builds only. Production session features come in M1.
 
 Layout:
@@ -48,11 +48,15 @@ Prerequisites:
 | Typecheck all TS packages | `pnpm typecheck` |
 | Rust check / lint / format | `cargo check --workspace` · `cargo clippy --workspace` · `cargo fmt --all` |
 | Sidecar one-shot check (JSON-RPC over stdio) | `echo '{"jsonrpc":"2.0","id":1,"method":"system.hello","params":{"protocolVersion":1}}' \| node packages/sidecar/src/main.ts` |
-| Sidecar unit tests (Node's built-in runner) | `pnpm --filter @agentchainer/sidecar test` |
-| Spike harness: real model calls with your own `claude` login (haiku, a few cents) | `node packages/sidecar/scripts/spike-host.ts --cwd <empty scratch dir> [--scenario basic\|mode\|interrupt\|guard\|all]` |
+| Unit tests, all packages (Node's built-in runner) | `pnpm test` |
+| Spike harness: real model calls with your own `claude` login (haiku, a few cents) | `node packages/sidecar/scripts/spike-host.ts --cwd <empty scratch dir> [--scenario basic\|mode\|interrupt\|guard\|auto\|subagents\|all] [--record raw.jsonl]` |
+| Turn a raw recording into a committable fixture (fails if anything identifying survives) | `node packages/sidecar/scripts/make-fixture.ts raw.jsonl packages/sidecar/test/fixtures/<name>.jsonl --cwd <recording workspace>` |
+| Plugin/MCP install spike (installs and removes again, in a throwaway project) | `node packages/sidecar/scripts/spike-install.ts --cwd <empty scratch dir>` |
 | Launch smoke test (after a debug build) | `node scripts/smoke-launch.mjs target/debug/agentchainer [--seconds N]` |
 
 CI (`.github/workflows/ci.yml`) runs on every PR and on pushes to `main`. Actions are pinned by commit SHA, so keep the
 `# vX.Y.Z` comment next to each SHA when bumping.
 
-TS lint and format commands arrive with M0-08. The sidecar uses `node:test` for now; M0-09 decides the long-term runner.
+TS lint and format commands arrive with M0-08. Tests use `node:test` for now; M0-09 decides the long-term runner.
+Never commit a raw SDK recording: it contains local paths and account details. Only `make-fixture.ts` output goes into
+`test/fixtures/`.

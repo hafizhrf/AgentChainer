@@ -43,8 +43,8 @@ jobs:
         run: |
           echo '{"jsonrpc":"2.0","id":1,"method":"system.hello","params":{"protocolVersion":1}}' \
             | node packages/sidecar/src/main.ts | tee /dev/stderr | grep -q '"protocolVersion":1'
-      - name: Sidecar unit tests
-        run: pnpm --filter @agentchainer/sidecar test
+      - name: Unit tests (all packages)
+        run: pnpm test
       - name: Build frontend (tauri::generate_context! embeds it)
         run: pnpm --filter @agentchainer/desktop build
       - run: cargo fmt --all --check

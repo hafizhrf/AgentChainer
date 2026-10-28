@@ -7,5 +7,5 @@
     "types": ["node"],
     "erasableSyntaxOnly": true
   },
-  "include": ["src"]
+  "include": ["src", "scripts"]
 }

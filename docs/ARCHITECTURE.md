@@ -132,6 +132,9 @@ mapped into a stable internal `AgentEvent` union so the UI never depends on raw 
 | `api.retry` | `system/api_retry` |
 | `error` | SDK errors / `is_error` results |
 
+In streaming-input mode, `system/init` arrives at the start of **every turn**, not once per session (spike S2), so
+consumers must treat `session.started` as idempotent.
+
 **Agent tree:**
 
 - Nodes are agents.

@@ -39,8 +39,10 @@ jobs:
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
       - run: pnpm install --frozen-lockfile
       - run: pnpm typecheck
-      - name: Sidecar smoke
-        run: pnpm --filter @agentchainer/sidecar start
+      - name: Sidecar smoke (system.hello over stdio)
+        run: |
+          echo '{"jsonrpc":"2.0","id":1,"method":"system.hello","params":{"protocolVersion":1}}' \
+            | node packages/sidecar/src/main.ts | tee /dev/stderr | grep -q '"protocolVersion":1'
       - name: Build frontend (tauri::generate_context! embeds it)
         run: pnpm --filter @agentchainer/desktop build
       - run: cargo fmt --all --check

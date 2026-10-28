@@ -1,7 +1,10 @@
 # AgentChainer — agent context
 
 Open-source desktop app (Tauri v2 + React/TS + Node sidecar on the Claude Agent SDK) that makes repos agent-ready and
-keeps agent work transparent and verified. **Current phase: M0 (foundations).** The monorepo scaffold exists; there are no agent features yet.
+keeps agent work transparent and verified. **Current phase: M0 (foundations).**
+
+A spike-level chat slice exists (S2/S3, see `docs/spikes/S2-S3-chat-slice.md`): one session, streaming text, tool approvals.
+The sidecar runs from source with `node`, so it works in dev builds only. Production session features come in M1.
 
 Layout:
 - `apps/desktop`: Tauri app. `src/` is the React UI, `src-tauri/` is the Rust core.
@@ -44,7 +47,8 @@ Prerequisites:
 | Fast debug build, no installers | `pnpm --filter @agentchainer/desktop tauri build --debug --no-bundle` |
 | Typecheck all TS packages | `pnpm typecheck` |
 | Rust check / lint / format | `cargo check --workspace` · `cargo clippy --workspace` · `cargo fmt --all` |
-| Run the sidecar placeholder | `pnpm --filter @agentchainer/sidecar start` |
+| Sidecar one-shot check (JSON-RPC over stdio) | `echo '{"jsonrpc":"2.0","id":1,"method":"system.hello","params":{"protocolVersion":1}}' \| node packages/sidecar/src/main.ts` |
+| Spike harness: real model calls with your own `claude` login (haiku, ~$0.01) | `node packages/sidecar/scripts/spike-host.ts --cwd <scratch dir> [--deny]` |
 | Launch smoke test (after a debug build) | `node scripts/smoke-launch.mjs target/debug/agentchainer [--seconds N]` |
 
 CI (`.github/workflows/ci.yml`) runs on every PR and on pushes to `main`. Actions are pinned by commit SHA, so keep the

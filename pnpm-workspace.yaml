@@ -6,3 +6,8 @@ packages:
 catalog:
   typescript: ~6.0.3
   "@types/node": ^24.0.0
+
+# The Agent SDK ships a bundled Claude binary per platform. We use the user's own
+# installed `claude` instead (ADR-0002), so skip those packages.
+ignoredOptionalDependencies:
+  - "@anthropic-ai/claude-agent-sdk-*"

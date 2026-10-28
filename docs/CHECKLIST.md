@@ -55,14 +55,19 @@
       sidecar runs on Node 24 type stripping, `cargo fmt --check`, `cargo clippy -D warnings`, `tauri build --debug`.
 - [ ] **M0-07** Tauri v2 + React + Vite + TS (strict) app shell that opens a window on macOS, Windows and Ubuntu.
       Progress: on macOS x86_64 the debug build opens a 1280×800 window that shows "v0.1.0 · app shell", which comes from
-      the `app_info` Rust command, so the UI ⇄ Rust IPC path works (confirmed visually by the owner). Windows and
-      Ubuntu are pending CI builds (M0-10).
+      the `app_info` Rust command, so the UI ⇄ Rust IPC path works (confirmed visually by the owner). CI launch smoke
+      (app alive after 15 s) passed on macOS, Windows and Ubuntu in
+      [run 40645248278](https://github.com/hafizhrf/AgentChainer/actions/runs/40645248278). Tick once the uploaded
+      screenshots confirm the window renders on all three.
 - [ ] **M0-08** Lint and format: decide Biome vs ESLint+Prettier; rustfmt; clippy with warnings denied; lefthook pre-commit;
       conventional commits (commitlint).
 - [ ] **M0-09** Test runners: Vitest (TS), `cargo test` (Rust), coverage reports.
 - [ ] **M0-10** CI (GitHub Actions): lint + typecheck + test on ubuntu/macos/windows; Tauri build with unsigned artifacts per OS
       on PRs; least-privilege `permissions:`; actions pinned by SHA. Then add the CI jobs as required status checks in
       the `protect-main` ruleset, with "require branches to be up to date".
+      Progress: `.github/workflows/ci.yml` is merged (PR #3) and green on all 4 jobs
+      ([run 40645248278](https://github.com/hafizhrf/AgentChainer/actions/runs/40645248278)). Remaining: required status
+      checks in the ruleset. Lint and tests join CI with M0-08 / M0-09.
 - [ ] **M0-11** Renovate or Dependabot. Pin the Agent SDK and group it for manual review.
 - [ ] **M0-12** Dogfood: update [`CLAUDE.md`](../CLAUDE.md) with real commands; `.claude/settings.json` hooks (format on edit);
       project skills for recurring work (e.g. `add-ipc-method`, `add-catalog-item`).
@@ -77,12 +82,20 @@
   - Run it as a Tauri `externalBin` on 3 OS, driving the user's installed `claude` via `pathToClaudeCodeExecutable`.
   - Record binary size and cold start.
   - Check PATH resolution: a macOS app started from Finder, and `%USERPROFILE%\.local\bin` on Windows.
+  - Progress: the SDK runs against the user's CLI with the bundled binaries excluded (pnpm `ignoredOptionalDependencies`),
+    and the sidecar finds the CLI on PATH or in known locations. Single-exe packaging is not started yet.
+    See [S2/S3 spike](spikes/S2-S3-chat-slice.md).
 - [ ] **M0-16** **S2 Event stream.** Run a streaming-input `query()`, forward SDK messages through Rust to React, and measure
       end-to-end delta latency and CPU with partial messages on.
+  - Progress: streaming works end to end (sidecar → Rust → React chat UI). Time to first delta is 2.1–3.4 s and dominated
+    by the model. UI-side latency and CPU are not measured yet. See [S2/S3 spike](spikes/S2-S3-chat-slice.md).
 - [ ] **M0-17** **S3 Permissions.**
   - Round-trip `canUseTool` and a `PreToolUse` hook to a UI modal.
   - Exercise `interrupt()` and a mid-session `setPermissionMode()`.
   - Document which calls bypass `canUseTool`.
+  - Progress: `canUseTool` allow and deny verified at the sidecar level (round trip < 1 ms), and the approval dialog is in
+    the UI. Read-only commands such as `echo` bypass `canUseTool`. Still open: `PreToolUse`, `setPermissionMode()`, and a
+    manual test of Stop / `interrupt()`. See [S2/S3 spike](spikes/S2-S3-chat-slice.md).
 - [ ] **M0-18** **S4 Subagent attribution.**
   - Capture `parent_tool_use_id`, `agent_id`, the `SubagentStart/Stop` hooks and `forwardSubagentText`.
   - Build an agent tree for a prompt that spawns 2 parallel subagents.

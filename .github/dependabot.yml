@@ -1,7 +1,11 @@
 # Dependency updates (checklist M0-11).
 # - A 3-day cooldown mirrors pnpm 11's minimum-release-age policy, so brand-new releases aren't proposed.
-# - The Claude Agent SDK gets its own PR for manual review: it's exact-pinned and its event shapes are covered by
-#   recorded fixtures (packages/sidecar/test/fixtures).
+# - Groups bundle minor and patch updates only. Every major update gets its own PR, so a breaking bump never hides in
+#   a group. PR #10 bundled TypeScript 6→7 and @types/node 24→26 under "runtime" (catalog entries count as
+#   production dependencies).
+# - @types/node majors follow the Node runtime (24, see .node-version), so they're ignored here.
+# - The Claude Agent SDK gets its own PR for manual review: it's exact-pinned, sdk-pin.json must be regenerated
+#   (node packages/sidecar/scripts/pin-sdk.ts), and its event shapes are covered by recorded fixtures.
 # - Commit prefixes keep Dependabot's PR titles Conventional (pr-title.yml).
 version: 2
 updates:
@@ -13,23 +17,25 @@ updates:
     groups:
       actions:
         patterns: ["*"]
+        update-types: [minor, patch]
 
   - package-ecosystem: npm
     directory: /
     schedule: { interval: weekly }
     cooldown: { default-days: 3 }
     commit-message: { prefix: "chore(deps)" }
+    ignore:
+      - dependency-name: "@types/node"
+        update-types: ["version-update:semver-major"]
     groups:
       claude-agent-sdk:
         patterns: ["@anthropic-ai/*"]
       tauri-js:
         patterns: ["@tauri-apps/*"]
-      dev-tooling:
-        dependency-type: development
+        update-types: [minor, patch]
+      npm-minor-patch:
         patterns: ["*"]
-      runtime:
-        dependency-type: production
-        patterns: ["*"]
+        update-types: [minor, patch]
 
   - package-ecosystem: cargo
     directory: /
@@ -39,3 +45,4 @@ updates:
     groups:
       cargo:
         patterns: ["*"]
+        update-types: [minor, patch]

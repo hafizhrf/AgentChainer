@@ -2,9 +2,10 @@
 
 - **Date:** 2026-10-28
 - **Checklist:** M0-16 (S2), M0-17 (S3); touches M0-15 (S1: CLI resolution only)
-- **Status:** In progress.
-  - S3 behaviours are verified against the real CLI by an automated harness (9/9 checks).
-  - Still open: UI-side latency measurement (S2) and an in-app check of the dialog and Stop button.
+- **Status:** S3 complete; S2 latency measurement still open.
+  - S3 behaviours are verified against the real CLI by an automated harness (11/11 checks, including `auto` mode), and
+    the owner checked the dialog and mode switcher in the app.
+  - Still open: UI-side delta latency and CPU measurement (S2).
 
 ## Question
 
@@ -69,6 +70,8 @@ broker tool approvals through `canUseTool`? It must do this while using the **us
 | `PreToolUse` guard (`rm -rf ../…` outside the workspace) | Blocked **before any approval prompt**. The tool result reads `PreToolUse:Bash hook error: Blocked by AgentChainer guard: …` |
 | Guard unit tests | 10/10 pass: everyday commands allowed, destructive and exfiltrating ones blocked |
 | Full harness run | **9/9 checks pass** in one session |
+| `setPermissionMode("auto")` (owner's account) | `mkdir` in the workspace runs with **no prompt**. The guard still blocks `rm -rf` outside the workspace (2/2) |
+| In-app check by the owner on a real repo (Opus) | The approval dialog shows the tool description and full input, and the mode switcher works. Session cost ≈ $1.03 (estimate) |
 | Estimated cost of a full harness run (≈ 9 turns, haiku) | **≈ $0.05** (SDK `total_cost_usd`, an estimate) |
 | App: UI → Rust → sidecar → CLI handshake | Works; the top bar renders CLI, SDK and Node versions |
 
@@ -95,12 +98,15 @@ broker tool approvals through `canUseTool`? It must do this while using the **us
    guard need a command the model will attempt. The unit tests are the real coverage for each rule.
 10. **A hook denial reaches the model as a "hook error" tool result.** The model sees our reason and stops. The UI marks
     these tool cards "blocked by guard".
+11. **"Auto-accept edits" was read as "auto mode".** In the owner's test, Bash still asked in `acceptEdits`, which is
+    correct but unexpected. The app now also offers `auto`, Claude's classifier mode, and labels `acceptEdits` as
+    "commands still ask". Mode explanations are tracked in M1-18 and UX-05.
 
 ## Not covered yet
 
 - [ ] End-to-end delta latency and CPU in the UI (instrument timestamps in the Rust relay and UI) — S2.
-- [ ] In-app check by a human: approval dialog, mode switcher and Stop button — S3. The behaviour behind them is covered
-      by the harness.
+- [x] In-app check by a human: approval dialog and mode switcher (owner, 2026-10-28). The Stop button wasn't clicked;
+      the harness covers the RPC behind it.
 - [ ] Sidecar as a single executable; app launched from Finder (PATH and env resolution) — S1 / M1-03.
 
 ## Decision so far

@@ -21,7 +21,8 @@ const MODELS = [
 
 const MODE_LABELS: Record<PermissionMode, string> = {
   default: "Ask before edits and commands",
-  acceptEdits: "Auto-accept file edits",
+  acceptEdits: "Auto-accept file edits (commands still ask)",
+  auto: "Auto: Claude decides, asks when unsure",
   plan: "Plan only (no changes)",
 };
 

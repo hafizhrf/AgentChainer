@@ -42,10 +42,11 @@ export type Methods = {
 export type MethodName = keyof Methods;
 
 /**
- * Permission modes the app offers. `bypassPermissions` is deliberately excluded; profiles
- * (Safe/Standard/Autonomous, ARCHITECTURE §6) arrive in M1-18.
+ * Permission modes the app offers. `bypassPermissions` is deliberately excluded. `auto` lets Claude's
+ * classifier approve or deny each call and only asks when unsure; our PreToolUse guard still applies.
+ * Profiles (Safe/Standard/Autonomous, ARCHITECTURE §6) arrive in M1-18.
  */
-export const PERMISSION_MODES = ["default", "acceptEdits", "plan"] as const;
+export const PERMISSION_MODES = ["default", "acceptEdits", "auto", "plan"] as const;
 export type PermissionMode = (typeof PERMISSION_MODES)[number];
 
 /** Normalized agent activity, independent of raw SDK message shapes (ARCHITECTURE §5.2). */

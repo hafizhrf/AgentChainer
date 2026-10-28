@@ -1,0 +1,8 @@
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+*.swp
+
+# Bootstrap backups (see docs/CATALOG.md §7)
+.agentchainer/backups/

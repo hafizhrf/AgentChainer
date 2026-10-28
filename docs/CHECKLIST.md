@@ -18,7 +18,7 @@
 
 | Milestone | Release | Theme | Status |
 |---|---|---|---|
-| [M0](#m0--foundations--spikes) | — | Foundations & spikes | ☐ Not started |
+| [M0](#m0--foundations--spikes) | — | Foundations & spikes | ◐ In progress |
 | [M1](#m1--agent-session-core-v01-a) | v0.1 | Agent session core | ☐ Not started |
 | [M2](#m2--workspace-bootstrap-v01-b) | v0.1 | Workspace bootstrap | ☐ Not started |
 | [R1](#r1--v01-release) | v0.1 | Packaging & release | ☐ Not started |
@@ -45,7 +45,9 @@
 
 ### Repository & tooling
 
-- [ ] **M0-04** Create the GitHub repo, push these docs, and protect `main` (PR + green CI required).
+- [x] **M0-04** Create the GitHub repo, push these docs, and protect `main` (PR required, no force push or deletion,
+      linear history). The "green CI required" part moves to M0-10, because there is no CI to require yet.
+      — evidence: [repo](https://github.com/hafizhrf/AgentChainer), [ruleset `protect-main`](https://github.com/hafizhrf/AgentChainer/rules/26015160), initial commit `53421cf`
 - [ ] **M0-05** Add issue/PR templates; labels `area/*`, `milestone/*`, `type/*`, `good first issue`; a GitHub Project board mirroring this checklist.
 - [ ] **M0-06** Monorepo scaffold: pnpm workspaces (`apps/desktop`, `packages/sidecar`, `packages/protocol`) + Cargo workspace
       (`apps/desktop/src-tauri`). Layout per [ARCHITECTURE §11](ARCHITECTURE.md#11-planned-repository-layout).
@@ -54,7 +56,8 @@
       conventional commits (commitlint).
 - [ ] **M0-09** Test runners: Vitest (TS), `cargo test` (Rust), coverage reports.
 - [ ] **M0-10** CI (GitHub Actions): lint + typecheck + test on ubuntu/macos/windows; Tauri build with unsigned artifacts per OS
-      on PRs; least-privilege `permissions:`; actions pinned by SHA.
+      on PRs; least-privilege `permissions:`; actions pinned by SHA. Then add the CI jobs as required status checks in
+      the `protect-main` ruleset, with "require branches to be up to date".
 - [ ] **M0-11** Renovate or Dependabot. Pin the Agent SDK and group it for manual review.
 - [ ] **M0-12** Dogfood: update [`CLAUDE.md`](../CLAUDE.md) with real commands; `.claude/settings.json` hooks (format on edit);
       project skills for recurring work (e.g. `add-ipc-method`, `add-catalog-item`).

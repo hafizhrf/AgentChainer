@@ -7,6 +7,10 @@ export type Settings = {
   defaultMode: string | null;
   /** "Open in editor" target: system, vscode, cursor, zed, idea (M1-28). */
   editor: string | null;
+  /** Effort for new sessions, or null for the model's default (M1-15). */
+  defaultEffort: string | null;
+  /** Spend cap per session in USD (M1-32); the Autonomous profile requires one. */
+  budgetUsd: number | null;
   recentWorkspaces: string[];
 };
 

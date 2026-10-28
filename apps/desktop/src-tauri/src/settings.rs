@@ -19,6 +19,10 @@ pub struct Settings {
     pub default_mode: Option<String>,
     /// External editor for "Open in editor" (M1-28): `system`, `vscode`, `cursor`, `zed` or `idea`.
     pub editor: Option<String>,
+    /// Effort for new sessions (`low` … `max`), or `None` for the model's default (M1-15).
+    pub default_effort: Option<String>,
+    /// Spend cap per session in USD (`maxBudgetUsd`, M1-32). Required for the Autonomous profile.
+    pub budget_usd: Option<f64>,
     /// Most recent first.
     pub recent_workspaces: Vec<String>,
 }
@@ -31,6 +35,8 @@ impl Settings {
         self.default_model = clean(self.default_model);
         self.default_mode = clean(self.default_mode);
         self.editor = clean(self.editor);
+        self.default_effort = clean(self.default_effort);
+        self.budget_usd = self.budget_usd.filter(|b| b.is_finite() && *b > 0.0);
         let mut seen = Vec::new();
         for dir in self.recent_workspaces {
             let dir = dir.trim().to_string();
@@ -87,6 +93,8 @@ mod tests {
             default_model: Some(" haiku ".into()),
             default_mode: None,
             editor: Some(" vscode ".into()),
+            default_effort: None,
+            budget_usd: Some(-1.0),
             recent_workspaces: (0..12)
                 .map(|i| format!("/p/{}", i % 10))
                 .chain([" ".into()])
@@ -96,6 +104,7 @@ mod tests {
         assert_eq!(s.claude_path, None);
         assert_eq!(s.default_model.as_deref(), Some("haiku"));
         assert_eq!(s.editor.as_deref(), Some("vscode"));
+        assert_eq!(s.budget_usd, None, "a non-positive budget means no cap");
         assert_eq!(s.recent_workspaces.len(), MAX_RECENT_WORKSPACES);
         assert_eq!(s.recent_workspaces[0], "/p/0");
     }

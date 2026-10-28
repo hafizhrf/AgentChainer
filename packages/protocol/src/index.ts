@@ -46,6 +46,11 @@ export const PermissionModeSchema = z.enum(["default", "acceptEdits", "auto", "p
 export const PERMISSION_MODES = PermissionModeSchema.options;
 export type PermissionMode = z.infer<typeof PermissionModeSchema>;
 
+/** How hard Claude thinks (the SDK's `effort`, M1-15). Unset means the CLI's default for the model. */
+export const EffortSchema = z.enum(["low", "medium", "high", "xhigh", "max"]);
+export const EFFORTS = EffortSchema.options;
+export type Effort = z.infer<typeof EffortSchema>;
+
 /**
  * Only the fields ADR-0002 allows us to read from `claude auth status --json`:
  * - `method`: "claude.ai" | "api_key" | "third_party" | "none" | …
@@ -161,8 +166,12 @@ export const AgentEventSchema = z.discriminatedUnion("type", [
     cwd: z.string(),
     claudeCodeVersion: z.string(),
     permissionMode: z.string(),
+    /** Slash commands and skills the session offers, for the composer's `/` palette (M1-13). */
+    slashCommands: z.array(z.string()).optional(),
   }),
   z.object({ type: z.literal("text.delta"), text: z.string() }),
+  /** The main agent's visible thinking, when the model streams it (M1-10). */
+  z.object({ type: z.literal("thinking.delta"), text: z.string() }),
   /** Only in `session.history`: live user messages are added by the UI when it sends them. */
   z.object({ type: z.literal("user.message"), messageId: z.string(), text: z.string() }),
   /**
@@ -221,6 +230,15 @@ export const AgentEventSchema = z.discriminatedUnion("type", [
     totalCostUsd: z.number(),
     durationMs: z.number(),
     numTurns: z.number(),
+    /** Token totals for the session so far, summed over models (cumulative like `totalCostUsd`). */
+    usage: z
+      .object({
+        inputTokens: z.number(),
+        outputTokens: z.number(),
+        cacheReadTokens: z.number(),
+        cacheCreationTokens: z.number(),
+      })
+      .optional(),
   }),
   z.object({ type: z.literal("error"), message: z.string() }),
 ]);
@@ -263,6 +281,9 @@ export const methodSchemas = {
       cwd: z.string().min(1),
       model: z.string().optional(),
       permissionMode: PermissionModeSchema.optional(),
+      effort: EffortSchema.optional(),
+      /** The SDK stops the session's turns once this much is spent since start (M1-32). */
+      maxBudgetUsd: z.number().positive().optional(),
       resume: SessionIdSchema.optional(),
     }),
     result: z.object({ sessionId: SessionIdSchema }),
@@ -278,6 +299,13 @@ export const methodSchemas = {
     result: z.object({ ok: z.literal(true), interrupted: z.boolean() }),
   },
   "session.setMode": { params: z.object({ sessionId: SessionIdSchema, mode: PermissionModeSchema }), result: Ok },
+  /** Switches the model for the next turn (M1-15); an empty string goes back to the default model. */
+  "session.setModel": { params: z.object({ sessionId: SessionIdSchema, model: z.string() }), result: Ok },
+  /** `null` goes back to the model's default effort. */
+  "session.setEffort": {
+    params: z.object({ sessionId: SessionIdSchema, effort: EffortSchema.nullable() }),
+    result: Ok,
+  },
   /** Ends the live session (its tab closed). The transcript stays on disk and can be resumed. */
   "session.close": { params: SessionRef, result: Ok },
   /**
@@ -288,13 +316,32 @@ export const methodSchemas = {
     params: z.object({ sessionId: SessionIdSchema, messageId: z.string().min(1), dryRun: z.boolean().optional() }),
     result: RewindResultSchema,
   },
+  /**
+   * Answers a `permission.request` (M1-17):
+   * - `always` also saves the request's `alwaysRules` to `.claude/settings.local.json`;
+   * - `updatedInput` runs the tool with the user's edited input;
+   * - `message` tells the agent why it was denied;
+   * - `mode` (ExitPlanMode only) is the permission mode to execute an approved plan in (M1-16).
+   */
   "permission.respond": {
     params: z.object({
       sessionId: SessionIdSchema,
       requestId: z.string().min(1),
       allow: z.boolean(),
+      always: z.boolean().optional(),
+      updatedInput: z.record(z.string(), z.unknown()).optional(),
       message: z.string().optional(),
+      mode: PermissionModeSchema.optional(),
     }),
+    result: Ok,
+  },
+  /** Permission rules in the workspace's `.claude/settings.local.json` (M1-20). Other settings never leave the sidecar. */
+  "permissions.list": {
+    params: z.object({ cwd: z.string().min(1) }),
+    result: z.object({ allow: z.array(z.string()), ask: z.array(z.string()), deny: z.array(z.string()) }),
+  },
+  "permissions.remove": {
+    params: z.object({ cwd: z.string().min(1), behavior: z.enum(["allow", "ask", "deny"]), rule: z.string().min(1) }),
     result: Ok,
   },
 
@@ -348,6 +395,16 @@ export const PermissionRequestSchema = z.object({
   input: z.record(z.string(), z.unknown()),
   title: z.string().optional(),
   description: z.string().optional(),
+  /** Why the CLI asks, e.g. a path outside the allowed folders. */
+  decisionReason: z.string().optional(),
+  blockedPath: z.string().optional(),
+  /**
+   * Rules "Always allow" would save to `.claude/settings.local.json`, e.g. `Bash(npm test:*)`. Empty when the CLI
+   * offers none, or when such a rule would grant more than this request (`suppressAlwaysAllowRule`).
+   */
+  alwaysRules: z.array(z.string()),
+  /** Open the prompt on Deny, with no one-key approve. */
+  defaultToNo: z.boolean().optional(),
 });
 export type PermissionRequest = z.infer<typeof PermissionRequestSchema>;
 

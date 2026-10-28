@@ -1,3 +1,4 @@
+import { editPairs, lineDiff } from "./textdiff.ts";
 import type { AgentItem, Item, ToolItem } from "./transcript.ts";
 
 /**
@@ -54,6 +55,13 @@ function ItemView({
     }
     case "assistant":
       return <div className="msg assistant">{item.text}</div>;
+    case "thinking":
+      return (
+        <details className="thinking-block">
+          <summary className="muted">{item.open ? "Thinking…" : "Thought"}</summary>
+          <div className="muted">{item.text}</div>
+        </details>
+      );
     case "notice":
       return <div className="notice">{item.text}</div>;
     case "tool":
@@ -63,22 +71,53 @@ function ItemView({
   }
 }
 
+const GUARD = "Blocked by AgentChainer guard: ";
+
 function ToolView({ tool, onOpenFile }: { tool: ToolItem; onOpenFile: OpenFile }) {
-  const blocked = tool.output?.includes("Blocked by AgentChainer guard") ?? false;
+  const guardAt = tool.output?.indexOf(GUARD) ?? -1;
+  const blocked = guardAt >= 0;
+  const reason = blocked ? tool.output?.slice(guardAt + GUARD.length).split("\n")[0] : undefined;
   const file = (tool.input as { file_path?: unknown } | null)?.file_path;
+  const pairs = editPairs(tool.name, tool.input);
+  const diffs = pairs?.map((p) => lineDiff(p.before, p.after));
+  const added = diffs?.flat().filter((l) => l.op === "+").length ?? 0;
+  const removed = diffs?.flat().filter((l) => l.op === "-").length ?? 0;
   return (
     <details className={`tool ${tool.status}`} open={blocked}>
       <summary>
         <StatusIcon status={tool.status} />
         {tool.name} <code>{toolSummary(tool.input)}</code>
+        {diffs && (
+          <span className="diffstat">
+            <span className="add">+{added}</span> <span className="del">−{removed}</span>
+          </span>
+        )}
         {blocked && <span className="badge">blocked by guard</span>}
+        {tool.durationMs !== undefined && <span className="muted">{(tool.durationMs / 1000).toFixed(1)} s</span>}
       </summary>
+      {reason && <p className="warn guard-reason">Blocked by AgentChainer's guard: {reason}</p>}
       {onOpenFile && typeof file === "string" && (
         <button type="button" className="link open-file" onClick={() => onOpenFile(file)}>
           Open in editor
         </button>
       )}
-      <pre>{JSON.stringify(tool.input, null, 2)}</pre>
+      {diffs ? (
+        diffs.map((lines, i) => (
+          // Edits of one call have no ids; their order is fixed.
+          // biome-ignore lint/suspicious/noArrayIndexKey: see above.
+          <pre key={i} className="inline-diff">
+            {lines.map((l, j) => (
+              // biome-ignore lint/suspicious/noArrayIndexKey: lines of a fixed diff.
+              <span key={j} className={l.op === "+" ? "add" : l.op === "-" ? "del" : ""}>
+                {l.op} {l.text}
+                {"\n"}
+              </span>
+            ))}
+          </pre>
+        ))
+      ) : (
+        <pre>{JSON.stringify(tool.input, null, 2)}</pre>
+      )}
       {tool.output !== undefined && <pre className="tool-output">{tool.output}</pre>}
     </details>
   );

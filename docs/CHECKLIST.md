@@ -270,39 +270,74 @@
 
 ### Chat & streaming
 
-- [ ] **M1-08** Session runtime: one streaming-input `query()` per session with the options in
+- [x] **M1-08** Session runtime: one streaming-input `query()` per session with the options in
       [ARCHITECTURE §5.1](ARCHITECTURE.md#51-session-runtime).
-      Progress:
+      — evidence:
       - Protocol v2: one sidecar runs many sessions, keyed by SDK session id; notifications carry it.
-      - The sidecar picks a new session's id up front (`sessionId` option); `enableFileCheckpointing` is on.
-      - Verified: two sessions answer in parallel without mixing replies (`spike-host --scenario sessions`).
-      - Remaining options: `settingSources`, effort, `maxBudgetUsd` (M1-32), the `PostToolUse` change tracker (M1-26).
+      - The sidecar picks a new session's id up front (`sessionId` option).
+      - Options set: `enableFileCheckpointing`, explicit `settingSources` (user, project, local), effort and
+        `maxBudgetUsd` from settings.
+      - Verified live with `spike-host`:
+        - `--scenario sessions`: two sessions answer in parallel without mixing replies.
+        - `--scenario plan`: a $0.0001 cap ends the turn with `error_max_budget_usd`; `setModel` and `setEffort`
+          apply mid-session.
+      - Design change: no `PostToolUse` change tracker. The changes panel derives agent edits from the transcript and
+        adds git status, which also catches Bash edits (M1-26).
 - [ ] **M1-09** Event normalizer: SDK messages → `AgentEvent` ([§5.2](ARCHITECTURE.md#52-normalized-events)), with a recorded
       fixture for every event type.
 - [ ] **M1-10** Message list: streaming markdown, collapsible thinking, virtualized for long sessions.
+      Progress: the main agent's thinking streams into a collapsed "Thinking" block (`thinking.delta`).
+      Remaining: markdown rendering and virtualization.
 - [ ] **M1-11** Tool-call cards (Read, Edit, Write, Bash, Grep, Glob, WebFetch, MCP):
   - status, duration, collapsible input and output;
   - Edit and Write show an inline diff.
+      Progress: live calls show their duration; Edit, MultiEdit and Write show an inline line diff with +/− counts
+      (`textdiff.test.ts`); "Open in editor" on file tools. Remaining: look at them in the app.
 - [ ] **M1-12** Subagent calls shown inline as nested cards. The full graph comes in M4.
 - [ ] **M1-13** Composer:
   - multiline input; @file mention with fuzzy search; image paste;
   - `/` palette for skills and commands (from session init);
   - queued follow-ups while a turn is running.
+      Progress: messages sent during a turn queue and go out one by one after each successful turn (removable,
+      "Clear queue"); `@` suggests workspace files and `/` the session's slash commands, fuzzy-matched
+      (`fuzzy.test.ts`). Remaining: image paste; click through in the app.
 - [ ] **M1-14** Interrupt (Esc or Stop button) and "stop after this turn".
+      Progress: Esc and Stop interrupt (live-verified in spike S3); Esc in a dialog or the `@`/`/` picker doesn't.
+      "Stop after this turn" is "Clear queue": nothing more goes out after the running turn. Remaining: try in the app.
 - [ ] **M1-15** Switcher for model, effort and permission mode; mid-session mode switch via `setPermissionMode()`.
+      Progress: profile, model and effort selects in the composer. `session.setModel` (verified live: the next turn
+      runs on Sonnet), `session.setEffort` (`applyFlagSettings`), defaults in Settings. Remaining: try in the app.
 - [ ] **M1-16** Plan-mode UX: render the proposed plan with "Approve & execute", "Revise" and "Reject".
+      Progress: ExitPlanMode opens a plan review with the plan text (`input.plan`), the mode to execute in, and
+      Approve & execute / Revise (with feedback) / Reject. Verified live (`spike-host --scenario plan`): one prompt,
+      then the plan runs in the chosen mode without further edit prompts. Remaining: click through in the app.
 
 ### Permissions
 
 - [ ] **M1-17** Approval modal driven by `canUseTool`:
   - shows the tool, the agent (main or subagent) and the input, which is editable;
   - options: allow once, always for this project, deny with a message to the agent.
+      Progress: the dialog shows title, reason, path, the asking agent and the input (editable as JSON); "Always
+      allow" lists the rule it saves. Verified live (`spike-host --scenario approvals`, 5/5): always-allow saves a
+      rule and the next call doesn't ask, edited input is what runs, deny blocks and the agent sees the message.
+      Remaining: click through in the app.
 - [ ] **M1-18** Permission profiles Safe / Standard / Autonomous ([ARCHITECTURE §6](ARCHITECTURE.md#6-permissions)).
       Check auto-mode availability per account type. `auto` works on the owner's account (spike S3).
       Explain each mode in the UI, because owner testing showed "auto-accept edits" being read as "auto mode" (Bash
       still asks in `acceptEdits`).
-- [ ] **M1-19** `PreToolUse` guard: a hard denylist that applies in every profile and shows the reason for each block.
+      Progress: the mode select is now the profile select (Safe = `default`, Standard = `acceptEdits`, Autonomous =
+      `auto`, plus Plan first), with an explanation of each. Autonomous needs a budget cap. Remaining: auto-mode
+      availability on other account types; profile-specific allowlists come with the WorkspaceProfile (M2).
+- [x] **M1-19** `PreToolUse` guard: a hard denylist that applies in every profile and shows the reason for each block.
+      — evidence:
+      - Rules in `guard.ts`, covered by `guard.test.ts`.
+      - Live in spike S3 (`spike-host --scenario guard` and `auto`): blocked before any prompt, in the default and
+        auto modes.
+      - The tool card names the guard and shows its reason.
 - [ ] **M1-20** "Always allow" rules go to `.claude/settings.local.json` and can be viewed and removed in a Permissions panel.
+      Progress: "Always allow" saves the CLI's suggested rules with destination `localSettings`; the sidebar's Rules
+      tab lists and removes them (`permissions.list/remove`, which touch only the `permissions` lists). Verified live
+      (`--scenario approvals`). Remaining: click through in the app.
 
 ### Sessions & checkpoints
 
@@ -360,7 +395,12 @@
 
 - [ ] **M1-31** Cost, tokens and duration per turn and per session, taken from `result` (`total_cost_usd`, `modelUsage`)
       and labeled "estimate".
+      Progress: the status bar shows the last turn's cost, duration and tokens and the session total, all derived
+      from running totals (`tabs.test.ts`; usage verified live). Remaining: look at it in the app.
 - [ ] **M1-32** Budget cap (`maxBudgetUsd`) per session, with a warning at 80%.
+      Progress: per-session cap from Settings; verified live (`error_max_budget_usd`). The 80% warning and the
+      "cap reached" notice are unit-tested; resumed sessions only get the SDK's stop, since their earlier spend
+      isn't known. Remaining: see it in the app.
 - [ ] **M1-33** Local cost history per workspace.
 
 ### Quality

@@ -1,5 +1,5 @@
 import type { AgentEvent } from "@agentchainer/protocol";
-import type { SDKMessage } from "@anthropic-ai/claude-agent-sdk";
+import type { ModelUsage, SDKMessage } from "@anthropic-ai/claude-agent-sdk";
 
 /**
  * Maps one raw SDK message to zero or more normalized events (ARCHITECTURE §5.2).
@@ -17,6 +17,7 @@ export function normalize(m: SDKMessage): AgentEvent[] {
             cwd: m.cwd,
             claudeCodeVersion: m.claude_code_version,
             permissionMode: m.permissionMode,
+            slashCommands: m.slash_commands,
           },
         ];
       }
@@ -52,12 +53,11 @@ export function normalize(m: SDKMessage): AgentEvent[] {
 
     case "stream_event":
       // Only the main agent streams deltas; subagent text arrives as whole messages (forwardSubagentText).
-      if (
-        m.parent_tool_use_id === null &&
-        m.event.type === "content_block_delta" &&
-        m.event.delta.type === "text_delta"
-      ) {
-        return [{ type: "text.delta", text: m.event.delta.text }];
+      if (m.parent_tool_use_id === null && m.event.type === "content_block_delta") {
+        if (m.event.delta.type === "text_delta") return [{ type: "text.delta", text: m.event.delta.text }];
+        if (m.event.delta.type === "thinking_delta" && m.event.delta.thinking) {
+          return [{ type: "thinking.delta", text: m.event.delta.thinking }];
+        }
       }
       return [];
 
@@ -113,12 +113,25 @@ export function normalize(m: SDKMessage): AgentEvent[] {
           totalCostUsd: m.total_cost_usd,
           durationMs: m.duration_ms,
           numTurns: m.num_turns,
+          ...(m.modelUsage ? { usage: sumUsage(Object.values(m.modelUsage)) } : {}),
         },
       ];
 
     default:
       return [];
   }
+}
+
+/** Session token totals over every model used, subagents included. */
+export function sumUsage(models: ModelUsage[]) {
+  const usage = { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheCreationTokens: 0 };
+  for (const u of models) {
+    usage.inputTokens += u.inputTokens;
+    usage.outputTokens += u.outputTokens;
+    usage.cacheReadTokens += u.cacheReadInputTokens;
+    usage.cacheCreationTokens += u.cacheCreationInputTokens;
+  }
+  return usage;
 }
 
 /** TS SDK v0.3.292+ tags subagent messages with `agent_id`; older shapes don't have it. */

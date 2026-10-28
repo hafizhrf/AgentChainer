@@ -1,5 +1,7 @@
 import {
   type AgentEvent,
+  EFFORTS,
+  type Effort,
   type EnvCheck,
   type Methods,
   type PermissionMode,
@@ -13,6 +15,7 @@ import { useEffect, useRef, useState } from "react";
 import { useConfirm } from "./Dialog.tsx";
 import { joinPath } from "./files.ts";
 import { GitInitOffer } from "./GitInitOffer.tsx";
+import { type PermissionAnswer, PermissionDialog } from "./PermissionDialog.tsx";
 import { Readiness } from "./Readiness.tsx";
 import { SessionList } from "./SessionList.tsx";
 import { SessionView } from "./SessionView.tsx";
@@ -126,7 +129,7 @@ export function App() {
         turnWaiters.current.get(sessionId)?.(event);
         turnWaiters.current.delete(sessionId);
       }
-      patchTab(sessionId, (t) => tabEvent(t, event));
+      patchTab(sessionId, (t) => tabEvent(t, event, Date.now()));
     });
     const ping = setInterval(() => {
       if (!alive.current) return;
@@ -186,16 +189,30 @@ export function App() {
     if (settings) setSettings(await saveSettings(withRecent(settings, dir)));
   }
 
+  /** Effort and budget for a new or resumed session, from settings (M1-15/M1-32). */
+  function sessionOptions(mode: PermissionMode) {
+    const effort = EFFORTS.find((e) => e === settings?.defaultEffort) ?? null;
+    const budgetUsd = settings?.budgetUsd ?? null;
+    if (mode === "auto" && budgetUsd === null) {
+      throw new Error("The Autonomous profile needs a budget cap. Set one in Settings, or pick another profile.");
+    }
+    return { effort, budgetUsd };
+  }
+
   async function startSession(dir: string, modelAlias: string, mode: PermissionMode): Promise<string | null> {
     try {
+      const { effort, budgetUsd } = sessionOptions(mode);
       const { sessionId } = await request("session.start", {
         cwd: dir,
         permissionMode: mode,
         ...(modelAlias ? { model: modelAlias } : {}),
+        ...(effort ? { effort } : {}),
+        ...(budgetUsd ? { maxBudgetUsd: budgetUsd } : {}),
       });
+      const items = [notice(`Session started in ${dir}`)];
       setTabs((ts) => [
         ...ts,
-        newTab(sessionId, dir, { title: NEW_TITLE, mode, items: [notice(`Session started in ${dir}`)] }),
+        newTab(sessionId, dir, { title: NEW_TITLE, mode, items, modelAlias, effort, budgetUsd }),
       ]);
       setActive(sessionId);
       setRuntimeNotice(null);
@@ -211,15 +228,20 @@ export function App() {
   async function resume(sessionId: string, dir: string, title: string, modelAlias = model) {
     const mode = asMode(settings?.defaultMode);
     try {
+      const { effort, budgetUsd } = sessionOptions(mode);
       const { events } = await request("session.history", { cwd: dir, sessionId });
       await request("session.start", {
         cwd: dir,
         resume: sessionId,
         permissionMode: mode,
         ...(modelAlias ? { model: modelAlias } : {}),
+        ...(effort ? { effort } : {}),
+        ...(budgetUsd ? { maxBudgetUsd: budgetUsd } : {}),
       });
-      const items = closeAssistant(events.reduce(applyEvent, [notice(`Resumed “${title}” in ${dir}`)]));
-      const tab = newTab(sessionId, dir, { title, mode, items, resumed: true });
+      const items = closeAssistant(
+        events.reduce<Item[]>((acc, e) => applyEvent(acc, e), [notice(`Resumed “${title}” in ${dir}`)]),
+      );
+      const tab = newTab(sessionId, dir, { title, mode, items, resumed: true, modelAlias, effort, budgetUsd });
       setTabs((ts) => (ts.some((t) => t.sessionId === sessionId) ? updateTab(ts, sessionId, () => tab) : [...ts, tab]));
       setActive(sessionId);
       await rememberWorkspace(dir);
@@ -256,6 +278,10 @@ export function App() {
   }
 
   async function changeMode(sessionId: string, mode: PermissionMode) {
+    if (mode === "auto" && tabs.find((t) => t.sessionId === sessionId)?.budgetUsd === null) {
+      addNotice(sessionId, "Autonomous needs a budget cap: set one in Settings, then start or resume the session.");
+      return;
+    }
     try {
       await request("session.setMode", { sessionId, mode });
       patchTab(sessionId, (t) => ({ ...t, mode }));
@@ -264,9 +290,37 @@ export function App() {
     }
   }
 
-  async function answer(req: PermissionRequest, allow: boolean) {
-    patchTab(req.sessionId, (t) => ({ ...t, permissions: t.permissions.filter((p) => p.requestId !== req.requestId) }));
-    await request("permission.respond", { sessionId: req.sessionId, requestId: req.requestId, allow });
+  /** Model and effort switches (M1-15) apply from the next turn. */
+  async function changeModel(sessionId: string, alias: string) {
+    try {
+      await request("session.setModel", { sessionId, model: alias });
+      patchTab(sessionId, (t) => ({ ...t, modelAlias: alias }));
+    } catch (err) {
+      addNotice(sessionId, String(err));
+    }
+  }
+
+  async function changeEffort(sessionId: string, effort: Effort | null) {
+    try {
+      await request("session.setEffort", { sessionId, effort });
+      patchTab(sessionId, (t) => ({ ...t, effort }));
+    } catch (err) {
+      addNotice(sessionId, String(err));
+    }
+  }
+
+  async function answer(req: PermissionRequest, reply: PermissionAnswer) {
+    patchTab(req.sessionId, (t) => ({
+      ...t,
+      permissions: t.permissions.filter((p) => p.requestId !== req.requestId),
+      // An approved plan runs in the mode the user picked (M1-16).
+      ...(reply.allow && reply.mode && req.toolName === "ExitPlanMode" ? { mode: reply.mode } : {}),
+    }));
+    try {
+      await request("permission.respond", { sessionId: req.sessionId, requestId: req.requestId, ...reply });
+    } catch (err) {
+      addNotice(req.sessionId, String(err));
+    }
   }
 
   /** "Rewind files to here" (M1-23): preview, confirm with the documented limits, then restore. */
@@ -434,6 +488,8 @@ export function App() {
           onSend={(text) => void sendText(t.sessionId, text)}
           onInterrupt={() => void request("session.interrupt", { sessionId: t.sessionId })}
           onModeChange={(mode) => void changeMode(t.sessionId, mode)}
+          onModelChange={(alias) => void changeModel(t.sessionId, alias)}
+          onEffortChange={(effort) => void changeEffort(t.sessionId, effort)}
           onRewind={(messageId) => void rewind(t.sessionId, messageId)}
           onResume={() => void resume(t.sessionId, t.cwd, t.title)}
           onOpenFile={(file, line) => void openInEditor(t.sessionId, t.cwd, file, line)}
@@ -441,23 +497,13 @@ export function App() {
         />
       ))}
 
-      {permission && (
-        <div className="overlay">
-          <div className="dialog" role="dialog" aria-modal="true" aria-labelledby="perm-title">
-            <h2 id="perm-title">Allow {permission.toolName}?</h2>
-            {permission.description && <p>{permission.description}</p>}
-            {permission.agentId && <p className="muted">Requested by subagent {permission.agentId}</p>}
-            <pre>{JSON.stringify(permission.input, null, 2)}</pre>
-            <div className="dialog-actions">
-              <button type="button" className="secondary" onClick={() => void answer(permission, false)}>
-                Deny
-              </button>
-              <button type="button" onClick={() => void answer(permission, true)}>
-                Allow once
-              </button>
-            </div>
-          </div>
-        </div>
+      {permission && activeTab && (
+        <PermissionDialog
+          key={permission.requestId}
+          request={permission}
+          canAutonomous={activeTab.budgetUsd !== null}
+          onAnswer={(reply) => void answer(permission, reply)}
+        />
       )}
       {confirmDialog}
     </div>

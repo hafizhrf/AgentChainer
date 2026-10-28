@@ -77,3 +77,29 @@ describe("transcript reducer", () => {
     assert.equal((items[0] as AgentItem).status, "error");
   });
 });
+
+describe("transcript: thinking and tool timing", () => {
+  it("collapses thinking into its own block before the reply", () => {
+    const items = run([
+      { type: "thinking.delta", text: "Let me " },
+      { type: "thinking.delta", text: "check." },
+      { type: "text.delta", text: "Done." },
+    ]);
+    assert.deepEqual(
+      items.map((i) => [i.kind, "text" in i ? i.text : "", "open" in i ? i.open : null]),
+      [
+        ["thinking", "Let me check.", false],
+        ["assistant", "Done.", true],
+      ],
+    );
+  });
+
+  it("times live tool calls and leaves replayed ones untimed", () => {
+    const started = { type: "tool.started", toolUseId: "t", name: "Bash", input: {}, parentToolUseId: null } as const;
+    const done = { type: "tool.completed", toolUseId: "t", isError: false, output: "", parentToolUseId: null } as const;
+    const live = applyEvent(applyEvent([], started, 1000), done, 3500);
+    assert.equal(live[0]?.kind === "tool" && live[0].durationMs, 2500);
+    const replayed = applyEvent(applyEvent([], started), done);
+    assert.equal(replayed[0]?.kind === "tool" && replayed[0].durationMs, undefined);
+  });
+});

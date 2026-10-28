@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import type { AgentEvent } from "@agentchainer/protocol";
-import { folderName, newTab, type Tab, tabEvent, updateTab } from "./tabs.ts";
+import { budgetWarning, folderName, newTab, type Tab, tabEvent, updateTab } from "./tabs.ts";
 
 const done = (totalCostUsd: number): AgentEvent => ({
   type: "turn.completed",
@@ -16,7 +16,8 @@ describe("tabs", () => {
   it("derives each turn's cost from the session's running total", () => {
     let tab = newTab("s1", "/repo", { title: "t", mode: "default" });
     tab = tabEvent({ ...tab, running: true }, done(0.02));
-    assert.deepEqual(tab.cost, { totalUsd: 0.02, lastUsd: 0.02, lastMs: 1000 });
+    assert.equal(tab.cost.totalUsd, 0.02);
+    assert.equal(tab.cost.lastUsd, 0.02);
     assert.equal(tab.running, false);
     tab = tabEvent(tab, done(0.05));
     assert.equal(tab.cost.totalUsd, 0.05);
@@ -25,7 +26,8 @@ describe("tabs", () => {
 
   it("doesn't guess the first turn's cost after a resume", () => {
     const tab = tabEvent(newTab("s1", "/repo", { title: "t", mode: "default", resumed: true }), done(0.4));
-    assert.deepEqual(tab.cost, { totalUsd: 0.4, lastUsd: null, lastMs: 1000 });
+    assert.equal(tab.cost.totalUsd, 0.4);
+    assert.equal(tab.cost.lastUsd, null);
   });
 
   it("routes events to the tab with the matching session id", () => {
@@ -55,5 +57,35 @@ describe("tabs", () => {
   it("names tabs after the workspace folder", () => {
     assert.equal(folderName("/Users/me/projects/my-app/"), "my-app");
     assert.equal(folderName("C:\\code\\api"), "api");
+  });
+});
+
+describe("tabs: tokens and budget", () => {
+  const turn = (totalCostUsd: number, input: number, output: number, subtype = "success"): AgentEvent => ({
+    type: "turn.completed",
+    subtype,
+    isError: subtype !== "success",
+    totalCostUsd,
+    durationMs: 10,
+    numTurns: 1,
+    usage: { inputTokens: input, outputTokens: output, cacheReadTokens: 0, cacheCreationTokens: 0 },
+  });
+
+  it("reports each turn's tokens from running totals", () => {
+    let tab = newTab("s", "/r", { title: "t", mode: "default" });
+    tab = tabEvent(tab, turn(0.01, 100, 10));
+    tab = tabEvent(tab, turn(0.02, 250, 30));
+    assert.deepEqual(tab.cost.lastTokens, { input: 150, output: 20 });
+  });
+
+  it("warns at 80% of the budget and when the cap stops the session", () => {
+    let tab = newTab("s", "/r", { title: "t", mode: "default", budgetUsd: 1 });
+    assert.equal(budgetWarning(tabEvent(tab, turn(0.5, 1, 1))), null);
+    tab = tabEvent(tab, turn(0.85, 1, 1));
+    assert.match(budgetWarning(tab) ?? "", /85%/);
+    tab = tabEvent(tab, turn(1.01, 1, 1, "error_max_budget_usd"));
+    assert.match(budgetWarning(tab) ?? "", /reached/);
+    assert.equal(tab.lastSubtype, "error_max_budget_usd");
+    assert.equal(budgetWarning(newTab("s", "/r", { title: "t", mode: "default" })), null, "no cap, no warning");
   });
 });

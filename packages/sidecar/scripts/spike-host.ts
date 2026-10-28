@@ -1,7 +1,7 @@
 // Drives the sidecar the way the Rust core will (spikes S2/S3) and checks real behaviour
 // against the user's own `claude` CLI.
 //
-// Usage: node scripts/spike-host.ts --cwd <empty scratch dir> [--model haiku] [--scenario basic|mode|interrupt|guard|auto|subagents|sessions|all] [--record out.jsonl] [--sidecar <executable> --data-dir <dir>]
+// Usage: node scripts/spike-host.ts --cwd <empty scratch dir> [--model haiku] [--scenario basic|mode|interrupt|guard|auto|subagents|sessions|approvals|plan|all] [--record out.jsonl] [--sidecar <executable> --data-dir <dir>]
 // Makes real model calls with the user's own login (haiku keeps a full run around a few cents).
 import { spawn } from "node:child_process";
 import { existsSync, readFileSync, rmSync } from "node:fs";
@@ -58,6 +58,10 @@ const state = {
   onEvent: null as ((event: AgentEvent) => void) | null,
   others: new Map<string, (event: AgentEvent) => void>(),
   permissionPolicy: "allow" as "allow" | "deny",
+  /** Overrides the policy with a full answer (always, edited input, message, plan mode), see permission.respond. */
+  answer: null as
+    | ((req: PermissionRequest) => Omit<Methods["permission.respond"]["params"], "sessionId" | "requestId">)
+    | null,
 };
 const permissionLog: PermissionRequest[] = [];
 
@@ -76,18 +80,17 @@ createInterface({ input: sidecar.stdout }).on("line", (line) => {
     if (event.type === "tool.completed")
       console.log(`    [tool.completed] error=${event.isError} ${JSON.stringify(event.output.trim().slice(0, 200))}`);
     if (event.type === "turn.completed")
-      console.log(`    [turn.completed] ${event.subtype} session total≈$${event.totalCostUsd.toFixed(4)}`);
+      console.log(
+        `    [turn.completed] ${event.subtype} session total≈$${event.totalCostUsd.toFixed(4)} tokens=${JSON.stringify(event.usage ?? null)}`,
+      );
     if (event.type === "error") console.log(`    [error] ${event.message}`);
     state.onEvent?.(event);
   } else if (frame.method === "permission.request") {
     const req = frame.params as PermissionRequest;
     permissionLog.push(req);
-    console.log(`    [permission.request] ${req.toolName} → ${state.permissionPolicy}`);
-    void request("permission.respond", {
-      sessionId: req.sessionId,
-      requestId: req.requestId,
-      allow: state.permissionPolicy === "allow",
-    });
+    const answer = state.answer?.(req) ?? { allow: state.permissionPolicy === "allow" };
+    console.log(`    [permission.request] ${req.toolName} → ${JSON.stringify(answer).slice(0, 120)}`);
+    void request("permission.respond", { sessionId: req.sessionId, requestId: req.requestId, ...answer });
   }
 });
 
@@ -425,7 +428,130 @@ async function sessions() {
   state.sessionId = (await request("session.start", { cwd, model: values.model })).sessionId;
 }
 
-const scenarios: Record<string, () => Promise<void>> = { basic, mode, interrupt, guard, auto, subagents, sessions };
+const readText = (name: string) => (existsSync(join(cwd, name)) ? readFileSync(join(cwd, name), "utf8").trim() : null);
+
+async function approvals() {
+  const read = readText;
+
+  // Always allow (M1-17/M1-20): the rule lands in .claude/settings.local.json and the next call doesn't ask.
+  const command = "node -e \"console.log('always-ok')\"";
+  state.answer = (req) => ({ allow: true, always: req.alwaysRules.length > 0 });
+  let before = permissionLog.length;
+  await turn(`Use the Bash tool to run exactly this command and nothing else: ${command}`);
+  const offered = permissionLog.at(-1)?.alwaysRules ?? [];
+  const rules = await request("permissions.list", { cwd });
+  before = permissionLog.length;
+  state.answer = () => ({ allow: false, message: "should not be asked" });
+  await turn(`Use the Bash tool to run exactly this command again and nothing else: ${command}`);
+  // The CLI saves rule text with `(` and `)` escaped, so compare without backslashes.
+  const unescaped = rules.allow.map((r) => r.replace(/\\/g, ""));
+  check(
+    "always allow saves a rule and the next call doesn't ask",
+    offered.length > 0 && unescaped.some((r) => offered.includes(r)) && permissionLog.length === before,
+    `offered=${JSON.stringify(offered)} saved=${JSON.stringify(rules.allow)} later prompts=${permissionLog.length - before}`,
+  );
+  for (const rule of rules.allow) await request("permissions.remove", { cwd, behavior: "allow", rule });
+  check("rules can be removed", (await request("permissions.list", { cwd })).allow.length === 0, "allow list empty");
+
+  // Edited input and deny with a message.
+  state.answer = (req) =>
+    req.toolName === "Write"
+      ? { allow: true, updatedInput: { ...req.input, content: "edited by the user" } }
+      : { allow: true };
+  await turn("Use the Write tool to create a file named edited.txt containing exactly: original");
+  check(
+    "edited input is what runs",
+    read("edited.txt") === "edited by the user",
+    `content=${JSON.stringify(read("edited.txt"))}`,
+  );
+  // `echo` counts as read-only and never asks, so use a command that writes.
+  state.answer = () => ({ allow: false, message: "Denied. Reply with exactly the word: banana" });
+  before = permissionLog.length;
+  const denied = await turn("Use the Bash tool to run exactly this command and nothing else: touch deny-probe.txt");
+  check(
+    "deny blocks the call",
+    permissionLog.length > before && read("deny-probe.txt") === null,
+    `prompts=${permissionLog.length - before} file created=${read("deny-probe.txt") !== null}`,
+  );
+  check(
+    "the agent sees the deny message (finding, not a gate)",
+    /banana/i.test(denied.reply) ? true : null,
+    `reply=${JSON.stringify(denied.reply.slice(0, 80))}`,
+  );
+  state.answer = null;
+}
+
+async function plan() {
+  const read = readText;
+  const before = permissionLog.length;
+
+  // Plan mode (M1-16): ExitPlanMode asks; approving with acceptEdits runs the plan without edit prompts.
+  await request("session.setMode", { sessionId: state.sessionId, mode: "plan" });
+  let planInput: Record<string, unknown> | null = null;
+  state.answer = (req) => {
+    if (req.toolName === "ExitPlanMode") {
+      planInput = req.input;
+      return { allow: true, mode: "acceptEdits" };
+    }
+    return { allow: false, message: "Only the plan approval should ask." };
+  };
+  await turn(
+    "Plan how to create a file named planned.txt containing exactly: planned. Keep the plan to two short lines, then exit plan mode and carry it out.",
+  );
+  const asked = permissionLog.slice(before).map((r) => r.toolName);
+  check(
+    "plan approval asks once, then executes in the chosen mode",
+    asked.join(",") === "ExitPlanMode" && read("planned.txt") === "planned",
+    `prompts=${asked.join(",") || "none"} file=${JSON.stringify(read("planned.txt"))} plan keys=${Object.keys(planInput ?? {}).join(",")}`,
+  );
+  console.log(`    plan input: ${JSON.stringify(planInput).slice(0, 300)}`);
+  state.answer = null;
+  await request("session.setMode", { sessionId: state.sessionId, mode: "default" });
+
+  // Model and effort mid-session (M1-15).
+  await request("session.setModel", { sessionId: state.sessionId, model: "sonnet" });
+  await request("session.setEffort", { sessionId: state.sessionId, effort: "low" });
+  const switched = await turn("Reply with exactly one word: switched");
+  const started = switched.events.find((e) => e.type === "session.started");
+  check(
+    "setModel takes effect on the next turn",
+    started?.type === "session.started" && /sonnet/i.test(started.model),
+    `model=${started?.type === "session.started" ? started.model : "?"} reply=${JSON.stringify(switched.reply)}`,
+  );
+  await request("session.setModel", { sessionId: state.sessionId, model: values.model ?? "" });
+  await request("session.setEffort", { sessionId: state.sessionId, effort: null });
+  const usage = switched.last.type === "turn.completed" ? switched.last.usage : undefined;
+  check(
+    "turns report slash commands and token usage",
+    started?.type === "session.started" && (started.slashCommands?.length ?? 0) > 0 && (usage?.outputTokens ?? 0) > 0,
+    `slash commands=${started?.type === "session.started" ? started.slashCommands?.length : 0} usage=${JSON.stringify(usage)}`,
+  );
+
+  // Budget cap (M1-32): a tiny cap ends the turn with error_max_budget_usd.
+  const main = state.sessionId;
+  state.sessionId = (await request("session.start", { cwd, model: values.model, maxBudgetUsd: 0.0001 })).sessionId;
+  const capped = await turn("Reply with exactly one word: budget");
+  check(
+    "maxBudgetUsd stops the session's turns",
+    capped.last.type === "turn.completed" && capped.last.subtype === "error_max_budget_usd",
+    `subtype=${capped.last.type === "turn.completed" ? capped.last.subtype : capped.last.type}`,
+  );
+  await request("session.close", { sessionId: state.sessionId });
+  await request("session.delete", { cwd, sessionId: state.sessionId });
+  state.sessionId = main;
+}
+
+const scenarios: Record<string, () => Promise<void>> = {
+  basic,
+  mode,
+  interrupt,
+  guard,
+  auto,
+  subagents,
+  sessions,
+  approvals,
+  plan,
+};
 const selected = values.scenario === "all" ? Object.keys(scenarios) : [values.scenario];
 for (const file of [
   "perm-allow.txt",
@@ -434,6 +560,10 @@ for (const file of [
   "mode-default.txt",
   "auto-mode-dir",
   "checkpoint.txt",
+  "edited.txt",
+  "planned.txt",
+  "deny-probe.txt",
+  ".claude",
 ]) {
   rmSync(join(cwd, file), { recursive: true, force: true });
 }

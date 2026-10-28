@@ -6,7 +6,17 @@ import type { AgentEvent } from "@agentchainer/protocol";
  */
 
 export type Status = "running" | "done" | "error";
-export type ToolItem = { kind: "tool"; id: string; name: string; input: unknown; status: Status; output?: string };
+/** `startedAt`/`durationMs` are only set for live calls; replayed history has no timing. */
+export type ToolItem = {
+  kind: "tool";
+  id: string;
+  name: string;
+  input: unknown;
+  status: Status;
+  output?: string;
+  startedAt?: number;
+  durationMs?: number;
+};
 export type AgentTextItem = { kind: "text"; id: number; text: string };
 export type AgentItem = {
   kind: "agent";
@@ -23,6 +33,8 @@ export type Item =
   /** `messageId` is the SDK's uuid for the message: the anchor for rewinding files (M1-23). */
   | { kind: "user"; id: number; text: string; messageId?: string }
   | { kind: "assistant"; id: number; text: string; open: boolean }
+  /** The main agent's visible thinking, collapsed by default (M1-10). */
+  | { kind: "thinking"; id: number; text: string; open: boolean }
   | { kind: "notice"; id: number; text: string }
   | ToolItem
   | AgentItem;
@@ -33,25 +45,37 @@ const SPAWN_TOOLS = new Set(["Agent", "Task"]);
 let seq = 0;
 export const nextId = () => ++seq;
 
+/** Ends the streaming text or thinking block, so the next delta starts a new one. */
 export function closeAssistant(items: Item[]): Item[] {
   const last = items.at(-1);
-  return last?.kind === "assistant" && last.open ? [...items.slice(0, -1), { ...last, open: false }] : items;
+  return (last?.kind === "assistant" || last?.kind === "thinking") && last.open
+    ? [...items.slice(0, -1), { ...last, open: false }]
+    : items;
 }
 
-export function applyEvent(items: Item[], e: AgentEvent): Item[] {
+/** Applies one event. `now` (epoch ms) is passed for live events only, to time tool calls (M1-11). */
+export function applyEvent(items: Item[], e: AgentEvent, now?: number): Item[] {
   switch (e.type) {
-    case "text.delta": {
+    case "text.delta":
+    case "thinking.delta": {
+      const kind = e.type === "text.delta" ? "assistant" : "thinking";
       const last = items.at(-1);
-      if (last?.kind === "assistant" && last.open)
-        return [...items.slice(0, -1), { ...last, text: last.text + e.text }];
-      return [...items, { kind: "assistant", id: nextId(), text: e.text, open: true }];
+      if (last?.kind === kind && last.open) return [...items.slice(0, -1), { ...last, text: last.text + e.text }];
+      return [...closeAssistant(items), { kind, id: nextId(), text: e.text, open: true }];
     }
 
     case "user.message":
       return [...closeAssistant(items), { kind: "user", id: nextId(), text: e.text, messageId: e.messageId }];
 
     case "tool.started": {
-      const tool: ToolItem = { kind: "tool", id: e.toolUseId, name: e.name, input: e.input, status: "running" };
+      const tool: ToolItem = {
+        kind: "tool",
+        id: e.toolUseId,
+        name: e.name,
+        input: e.input,
+        status: "running",
+        ...(now !== undefined ? { startedAt: now } : {}),
+      };
       if (e.parentToolUseId !== null && hasAgent(items, e.parentToolUseId)) {
         return updateAgent(items, e.parentToolUseId, (a) => ({ ...a, children: [...a.children, tool] }));
       }
@@ -72,16 +96,20 @@ export function applyEvent(items: Item[], e: AgentEvent): Item[] {
 
     case "tool.completed": {
       const status: Status = e.isError ? "error" : "done";
+      const finish = (t: ToolItem): ToolItem => ({
+        ...t,
+        status,
+        output: e.output,
+        ...(now !== undefined && t.startedAt !== undefined ? { durationMs: now - t.startedAt } : {}),
+      });
       if (e.parentToolUseId !== null && hasAgent(items, e.parentToolUseId)) {
         return updateAgent(items, e.parentToolUseId, (a) => ({
           ...a,
-          children: a.children.map((c) =>
-            c.kind === "tool" && c.id === e.toolUseId ? { ...c, status, output: e.output } : c,
-          ),
+          children: a.children.map((c) => (c.kind === "tool" && c.id === e.toolUseId ? finish(c) : c)),
         }));
       }
       return items.map((it) => {
-        if (it.kind === "tool" && it.id === e.toolUseId) return { ...it, status, output: e.output };
+        if (it.kind === "tool" && it.id === e.toolUseId) return finish(it);
         // The Agent call's own result is the subagent's hand-back; agent.completed carries the summary.
         if (it.kind === "agent" && it.id === e.toolUseId && it.status === "running") return { ...it, status };
         return it;

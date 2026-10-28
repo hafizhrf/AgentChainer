@@ -97,11 +97,13 @@ Planned surface (v0.1):
 | request | `session.send` | Push a user message into the streaming input `{sessionId, text}` → `{messageId}`. Planned: @files, images |
 | request | `session.interrupt` | Interrupt the running turn |
 | request | `session.setMode` | `setPermissionMode()` mid-session |
+| request | `session.setModel` / `session.setEffort` | `setModel()` / `applyFlagSettings({effortLevel})` mid-session |
 | request | `session.close` | End a live session (tab closed); the transcript stays resumable |
 | request | `session.rewind` | `rewindFiles(messageId, {dryRun})` |
 | request | `session.list` / `session.history` / `session.rename` / `session.tag` / `session.delete` / `session.fork` | SDK session APIs on stored sessions `{cwd, sessionId}` |
 | request | `session.retention` | `cleanupPeriodDays` only, from the user's effective settings |
-| request | `permission.respond` | Answer a pending permission request |
+| request | `permission.respond` | Answer a pending permission request `{allow, always?, updatedInput?, message?, mode?}` |
+| request | `permissions.list` / `permissions.remove` | The `permissions` lists of `.claude/settings.local.json`; nothing else in that file leaves the sidecar |
 | request | `workspace.files` | Files under the workspace (tracked + untracked, minus ignored) with git status and branch |
 | request | `workspace.diff` | HEAD vs working tree for one file, with its `-U0` hunks |
 | request | `workspace.revert` | Revert a file to HEAD (new files are deleted) or one hunk (`git apply -R`), worktree only |
@@ -226,6 +228,15 @@ sequenceDiagram
   - credential file reads (`~/.ssh`, `~/.aws`, `.env*` outside the workspace);
   - production deploy commands.
 - **"Always allow"** writes a rule to `.claude/settings.local.json` (uncommitted), listed in the Permissions panel.
+  - It returns the CLI's `addRules` / `addDirectories` suggestions as `updatedPermissions`, with destination
+    `localSettings`. `setMode` suggestions are left out, so "always" never changes the mode.
+  - The CLI escapes `(` and `)` inside saved rule content, e.g. `Bash(node -e "console.log\('x'\)")`.
+- **Plan mode:** ExitPlanMode reaches `canUseTool` with `input.plan` (markdown) and `input.planFilePath`.
+  - The CLI writes the plan file under `~/.claude/plans/`.
+  - Approving returns a `setMode` update for the mode the user picked; in a live run the plan then executed without
+    further edit prompts.
+  - In one live run, a plan-mode turn cost about 30× a plain haiku turn ($0.17). Planning context is large, so the
+    UI's cost display matters there.
 - Subagents inherit the session's mode.
 
 ## 7. Sessions, checkpoints and persistence

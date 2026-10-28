@@ -1,9 +1,9 @@
-import { PERMISSION_MODES, type PermissionMode } from "@agentchainer/protocol";
-import { type KeyboardEvent, lazy, Suspense, useEffect, useRef, useState } from "react";
+import type { Effort, PermissionMode } from "@agentchainer/protocol";
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
+import { Composer } from "./Composer.tsx";
 import type { Confirm } from "./Dialog.tsx";
-import { MODE_LABELS } from "./SettingsPanel.tsx";
 import { TranscriptView } from "./TranscriptView.tsx";
-import { asMode, type Cost, type Tab } from "./tabs.ts";
+import { budgetWarning, type Cost, type Tab } from "./tabs.ts";
 import { useWorkspace } from "./useWorkspace.ts";
 import { WorkspacePanel } from "./WorkspacePanel.tsx";
 
@@ -12,9 +12,9 @@ const DiffView = lazy(() => import("./DiffView.tsx"));
 const TerminalPanel = lazy(() => import("./TerminalPanel.tsx"));
 
 /**
- * One session tab: workspace sidebar (files and changes), transcript and composer, an optional terminal, and a diff
- * pane for the selected file. Every open tab stays mounted (hidden when inactive), so drafts, scroll positions and
- * terminals survive tab switches.
+ * One session tab: workspace sidebar (changes, files, permission rules), transcript and composer, an optional
+ * terminal, and a diff pane for the selected file. Every open tab stays mounted (hidden when inactive), so drafts,
+ * queues, scroll positions and terminals survive tab switches.
  */
 export function SessionView({
   tab,
@@ -22,6 +22,8 @@ export function SessionView({
   onSend,
   onInterrupt,
   onModeChange,
+  onModelChange,
+  onEffortChange,
   onRewind,
   onResume,
   onOpenFile,
@@ -32,13 +34,14 @@ export function SessionView({
   onSend: (text: string) => void;
   onInterrupt: () => void;
   onModeChange: (mode: PermissionMode) => void;
+  onModelChange: (alias: string) => void;
+  onEffortChange: (effort: Effort | null) => void;
   onRewind: (messageId: string) => void;
   onResume: () => void;
   /** Opens a workspace-relative or absolute path in the user's editor (M1-28). */
   onOpenFile: (path: string, line?: number) => void;
   confirm: Confirm;
 }) {
-  const [draft, setDraft] = useState("");
   const [showFiles, setShowFiles] = useState(true);
   const [showTerminal, setShowTerminal] = useState(false);
   /** The file shown in the diff pane, relative to the workspace. */
@@ -46,6 +49,8 @@ export function SessionView({
   const bottomRef = useRef<HTMLDivElement>(null);
   const workspace = useWorkspace(tab.cwd, !hidden);
   const { refresh } = workspace;
+  const paths = useMemo(() => workspace.files?.files.map((f) => f.path) ?? [], [workspace.files]);
+  const warning = budgetWarning(tab);
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: scroll to the bottom whenever the transcript changes.
   useEffect(() => bottomRef.current?.scrollIntoView({ block: "end" }), [tab.items]);
@@ -55,19 +60,15 @@ export function SessionView({
     if (!tab.running && !hidden) void refresh();
   }, [tab.running, hidden, refresh]);
 
-  function send() {
-    const text = draft.trim();
-    if (!text || tab.running || tab.ended) return;
-    setDraft("");
-    onSend(text);
-  }
-
-  function onComposerKey(e: KeyboardEvent<HTMLTextAreaElement>) {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      send();
-    }
-  }
+  // Esc stops the running turn (M1-14), unless a dialog is open: there it closes or cancels the dialog instead.
+  useEffect(() => {
+    if (hidden || !tab.running) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && !e.defaultPrevented && !document.querySelector(".overlay")) onInterrupt();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [hidden, tab.running, onInterrupt]);
 
   return (
     <div className="session" hidden={hidden}>
@@ -79,6 +80,7 @@ export function SessionView({
             error={workspace.error}
             items={tab.items}
             selected={selected}
+            confirm={confirm}
             onSelect={setSelected}
             onRefresh={() => void refresh()}
           />
@@ -92,7 +94,7 @@ export function SessionView({
             onOpenFile={(file) => onOpenFile(file)}
             {...(tab.running || tab.ended ? {} : { onRewind })}
           />
-          {tab.running && <div className="muted thinking">Working…</div>}
+          {tab.running && <div className="muted thinking">Working… (Esc to stop)</div>}
           <div ref={bottomRef} />
         </main>
 
@@ -102,60 +104,40 @@ export function SessionView({
           </Suspense>
         )}
 
-        <footer className="composer">
-          <textarea
-            value={draft}
-            placeholder="Ask Claude to do something in this workspace… (Enter to send, Shift+Enter for a new line)"
-            onChange={(e) => setDraft(e.target.value)}
-            onKeyDown={onComposerKey}
-            rows={3}
-          />
-          <div className="composer-actions">
-            <button
-              type="button"
-              className="secondary toggle"
-              aria-pressed={showFiles}
-              onClick={() => setShowFiles((v) => !v)}
-            >
-              Files
-            </button>
-            <button
-              type="button"
-              className="secondary toggle"
-              aria-pressed={showTerminal}
-              onClick={() => setShowTerminal((v) => !v)}
-            >
-              Terminal
-            </button>
-            <select
-              value={tab.mode}
-              onChange={(e) => onModeChange(asMode(e.target.value))}
-              aria-label="Permission mode"
-            >
-              {PERMISSION_MODES.map((m) => (
-                <option key={m} value={m}>
-                  {MODE_LABELS[m]}
-                </option>
-              ))}
-            </select>
-            <span className="muted grow">
-              {tab.model ?? "…"} · {costLabel(tab.cost)}
-            </span>
-            {tab.ended ? (
-              <button type="button" onClick={onResume} title="Continue this conversation in a new live session">
-                Resume session
+        {warning && <div className="banner">{warning}</div>}
+        <div className="statusbar muted">
+          {tab.model ?? "…"} · {costLabel(tab.cost)}
+        </div>
+        <Composer
+          tab={tab}
+          files={paths}
+          onSend={onSend}
+          onInterrupt={onInterrupt}
+          onResume={onResume}
+          onModeChange={onModeChange}
+          onModelChange={onModelChange}
+          onEffortChange={onEffortChange}
+          actions={
+            <>
+              <button
+                type="button"
+                className="secondary toggle"
+                aria-pressed={showFiles}
+                onClick={() => setShowFiles((v) => !v)}
+              >
+                Files
               </button>
-            ) : tab.running ? (
-              <button type="button" className="secondary" onClick={onInterrupt}>
-                Stop
+              <button
+                type="button"
+                className="secondary toggle"
+                aria-pressed={showTerminal}
+                onClick={() => setShowTerminal((v) => !v)}
+              >
+                Terminal
               </button>
-            ) : (
-              <button type="button" disabled={!draft.trim()} onClick={send}>
-                Send
-              </button>
-            )}
-          </div>
-        </footer>
+            </>
+          }
+        />
       </div>
 
       {selected && (
@@ -177,8 +159,14 @@ export function SessionView({
 }
 
 const usd = (v: number) => `≈$${v.toFixed(4)}`;
+const kTokens = (n: number) => (n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(n));
 
+/** Per-turn and per-session cost, tokens and duration (M1-31), labeled as estimates. */
 function costLabel(cost: Cost): string {
-  const last = cost.lastUsd === null ? "" : `last turn ${usd(cost.lastUsd)} (${(cost.lastMs / 1000).toFixed(1)} s) · `;
-  return `${last}session ${cost.totalUsd === null ? "–" : usd(cost.totalUsd)} (estimate)`;
+  const parts: string[] = [];
+  if (cost.lastUsd !== null) parts.push(`last turn ${usd(cost.lastUsd)}, ${(cost.lastMs / 1000).toFixed(1)} s`);
+  if (cost.lastTokens)
+    parts.push(`${kTokens(cost.lastTokens.input)} in / ${kTokens(cost.lastTokens.output)} out tokens`);
+  parts.push(`session ${cost.totalUsd === null ? "–" : usd(cost.totalUsd)}`);
+  return `${parts.join(" · ")} (estimate)`;
 }

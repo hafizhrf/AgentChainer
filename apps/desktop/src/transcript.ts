@@ -1,7 +1,7 @@
 import type { AgentEvent } from "@agentchainer/protocol";
 
 /**
- * Transcript model for the spike UI. Subagents (spike S4) are cards keyed by the `toolUseId` of the Agent tool call
+ * Transcript model for a session tab. Subagents (spike S4) are cards keyed by the `toolUseId` of the Agent tool call
  * that spawned them; their tool calls and text nest inside (ARCHITECTURE §5.2, agent tree).
  */
 
@@ -20,7 +20,8 @@ export type AgentItem = {
   children: (ToolItem | AgentTextItem)[];
 };
 export type Item =
-  | { kind: "user"; id: number; text: string }
+  /** `messageId` is the SDK's uuid for the message: the anchor for rewinding files (M1-23). */
+  | { kind: "user"; id: number; text: string; messageId?: string }
   | { kind: "assistant"; id: number; text: string; open: boolean }
   | { kind: "notice"; id: number; text: string }
   | ToolItem
@@ -45,6 +46,9 @@ export function applyEvent(items: Item[], e: AgentEvent): Item[] {
         return [...items.slice(0, -1), { ...last, text: last.text + e.text }];
       return [...items, { kind: "assistant", id: nextId(), text: e.text, open: true }];
     }
+
+    case "user.message":
+      return [...closeAssistant(items), { kind: "user", id: nextId(), text: e.text, messageId: e.messageId }];
 
     case "tool.started": {
       const tool: ToolItem = { kind: "tool", id: e.toolUseId, name: e.name, input: e.input, status: "running" };
@@ -122,6 +126,11 @@ export function applyEvent(items: Item[], e: AgentEvent): Item[] {
     default:
       return items;
   }
+}
+
+/** Attaches the sidecar's message id to a user message the UI added before sending it. */
+export function setMessageId(items: Item[], id: number, messageId: string): Item[] {
+  return items.map((it) => (it.kind === "user" && it.id === id ? { ...it, messageId } : it));
 }
 
 function hasAgent(items: Item[], id: string): boolean {

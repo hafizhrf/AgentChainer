@@ -10,7 +10,7 @@ import { z } from "zod";
  *
  * `PROTOCOL_VERSION` is exchanged in `system.hello`; see docs/ARCHITECTURE.md §4.
  */
-export const PROTOCOL_VERSION = 1;
+export const PROTOCOL_VERSION = 2;
 
 /* ---------- JSON-RPC envelope ---------- */
 
@@ -31,6 +31,8 @@ export const RpcErrorCode = {
   noPendingPermission: -32003,
   sdkUnavailable: -32004,
   protocolMismatch: -32005,
+  /** The session is already open in another tab, or is open and can't be deleted. */
+  sessionOpen: -32006,
 } as const;
 
 /* ---------- Shared shapes ---------- */
@@ -72,61 +74,83 @@ export type EnvCheck = z.infer<typeof EnvCheckSchema>;
 const Empty = z.object({});
 const Ok = z.object({ ok: z.literal(true) });
 
-/* ---------- Requests: UI → sidecar ---------- */
+export const SessionIdSchema = z.uuid();
+/** A live session, open in a tab. */
+const SessionRef = z.object({ sessionId: SessionIdSchema });
+/** A session on disk; `cwd` lets the SDK look in that project only instead of scanning every project. */
+const StoredSessionRef = z.object({ cwd: z.string().min(1), sessionId: SessionIdSchema });
 
-export const methodSchemas = {
-  "system.hello": {
-    params: z.object({ protocolVersion: z.number().int() }),
-    result: z.object({
-      protocolVersion: z.number().int(),
-      sdkVersion: z.string(),
-      nodeVersion: z.string(),
-      homeDir: z.string(),
-      claudePath: z.string().nullable(),
-      claudeVersion: z.string().nullable(),
-    }),
-  },
-  /** Liveness check used by the UI's health ping (M1-01). */
-  "system.ping": { params: Empty, result: Ok },
-  /** Readiness of the user's machine (spike S5). Never includes account identity (email, org). */
-  "env.check": { params: Empty, result: EnvCheckSchema },
-  /**
-   * Makes the Claude Agent SDK ready. The packaged app downloads and verifies the pinned SDK on first use (ADR-0003);
-   * dev builds use node_modules.
-   */
-  "sdk.prepare": {
-    params: Empty,
-    result: z.object({ version: z.string(), source: z.enum(["node_modules", "download", "cache"]) }),
-  },
-  /** Dev-only: lets the UI write a line to the sidecar's log, e.g. self-test metrics (spike S2). */
-  "debug.log": { params: z.object({ message: z.string().max(10_000) }), result: Ok },
-  "session.start": {
-    params: z.object({
-      cwd: z.string().min(1),
-      model: z.string().optional(),
-      permissionMode: PermissionModeSchema.optional(),
-    }),
-    result: Ok,
-  },
-  "session.send": { params: z.object({ text: z.string().min(1) }), result: Ok },
-  /** `interrupted: false` means no turn was running, so nothing was sent to the CLI. */
-  "session.interrupt": { params: Empty, result: z.object({ ok: z.literal(true), interrupted: z.boolean() }) },
-  "session.setMode": { params: z.object({ mode: PermissionModeSchema }), result: Ok },
-  "permission.respond": {
-    params: z.object({ requestId: z.string().min(1), allow: z.boolean(), message: z.string().optional() }),
-    result: Ok,
-  },
-} as const;
+/** Metadata from the SDK's `listSessions` (ADR-0004: we never read the transcript files ourselves). */
+export const SessionInfoSchema = z.object({
+  sessionId: SessionIdSchema,
+  /** Custom title, the CLI's summary, or the first prompt. */
+  title: z.string(),
+  lastModified: z.number(),
+  createdAt: z.number().optional(),
+  gitBranch: z.string().optional(),
+  tag: z.string().optional(),
+});
+export type SessionInfo = z.infer<typeof SessionInfoSchema>;
 
-export type MethodName = keyof typeof methodSchemas;
-export type Methods = {
-  [M in MethodName]: {
-    params: z.input<(typeof methodSchemas)[M]["params"]>;
-    result: z.output<(typeof methodSchemas)[M]["result"]>;
-  };
-};
+export const RewindResultSchema = z.object({
+  canRewind: z.boolean(),
+  error: z.string().optional(),
+  filesChanged: z.array(z.string()),
+  insertions: z.number(),
+  deletions: z.number(),
+});
+export type RewindResult = z.infer<typeof RewindResultSchema>;
 
-/* ---------- Notifications: sidecar → UI ---------- */
+/** Git status of a file, simplified from `git status --porcelain` (M1-25). */
+export const FileStatusSchema = z.enum(["modified", "added", "deleted", "renamed", "untracked", "conflicted"]);
+export type FileStatus = z.infer<typeof FileStatusSchema>;
+
+/** `path` is relative to the workspace, with `/` separators. Files without changes have no `status`. */
+export const WorkspaceFileSchema = z.object({
+  path: z.string(),
+  status: FileStatusSchema.optional(),
+  /** Some of the change is staged. */
+  staged: z.boolean().optional(),
+  /** The old path of a rename. */
+  origPath: z.string().optional(),
+});
+export type WorkspaceFile = z.infer<typeof WorkspaceFileSchema>;
+
+export const WorkspaceFilesSchema = z.object({
+  isGitRepo: z.boolean(),
+  /** Current branch; "detached at <sha>"; null outside git or before the first commit on a detached HEAD. */
+  branch: z.string().nullable(),
+  files: z.array(WorkspaceFileSchema),
+  /** The listing hit its cap. */
+  truncated: z.boolean(),
+});
+export type WorkspaceFiles = z.infer<typeof WorkspaceFilesSchema>;
+
+export const HunkSchema = z.object({
+  header: z.string(),
+  oldStart: z.number().int(),
+  oldLines: z.number().int(),
+  newStart: z.number().int(),
+  newLines: z.number().int(),
+});
+export type Hunk = z.infer<typeof HunkSchema>;
+
+/** HEAD vs working tree. Contents are null when absent on that side, binary, or too large to diff. */
+export const FileDiffSchema = z.object({
+  path: z.string(),
+  status: FileStatusSchema.optional(),
+  original: z.string().nullable(),
+  modified: z.string().nullable(),
+  binary: z.boolean(),
+  tooLarge: z.boolean(),
+  /** In the order of `git diff -U0`; `workspace.revert` takes an index into this list. */
+  hunks: z.array(HunkSchema),
+});
+export type FileDiff = z.infer<typeof FileDiffSchema>;
+
+const WorkspaceRef = z.object({ cwd: z.string().min(1) });
+/** A file inside the workspace; the sidecar rejects absolute paths and `..`. */
+const WorkspacePath = WorkspaceRef.extend({ path: z.string().min(1) });
 
 /** Normalized agent activity, independent of raw SDK message shapes (ARCHITECTURE §5.2). */
 export const AgentEventSchema = z.discriminatedUnion("type", [
@@ -139,6 +163,8 @@ export const AgentEventSchema = z.discriminatedUnion("type", [
     permissionMode: z.string(),
   }),
   z.object({ type: z.literal("text.delta"), text: z.string() }),
+  /** Only in `session.history`: live user messages are added by the UI when it sends them. */
+  z.object({ type: z.literal("user.message"), messageId: z.string(), text: z.string() }),
   /**
    * `parentToolUseId` is null for the main agent; otherwise it is the `toolUseId` of the Agent tool call that
    * spawned the subagent doing this work (the key of the agent tree, ARCHITECTURE §5.2).
@@ -184,11 +210,15 @@ export const AgentEventSchema = z.discriminatedUnion("type", [
     toolUses: z.number().optional(),
     durationMs: z.number().optional(),
   }),
+  /**
+   * `totalCostUsd` is the session's running total, not this turn's cost: the SDK's `total_cost_usd` is cumulative in
+   * streaming-input sessions, and a resumed session starts from its saved total. An estimate (ARCHITECTURE §5.3).
+   */
   z.object({
     type: z.literal("turn.completed"),
     subtype: z.string(),
     isError: z.boolean(),
-    costUsd: z.number(),
+    totalCostUsd: z.number(),
     durationMs: z.number(),
     numTurns: z.number(),
   }),
@@ -196,7 +226,121 @@ export const AgentEventSchema = z.discriminatedUnion("type", [
 ]);
 export type AgentEvent = z.infer<typeof AgentEventSchema>;
 
+/* ---------- Requests: UI → sidecar ---------- */
+
+export const methodSchemas = {
+  "system.hello": {
+    params: z.object({ protocolVersion: z.number().int() }),
+    result: z.object({
+      protocolVersion: z.number().int(),
+      sdkVersion: z.string(),
+      nodeVersion: z.string(),
+      homeDir: z.string(),
+      claudePath: z.string().nullable(),
+      claudeVersion: z.string().nullable(),
+    }),
+  },
+  /** Liveness check used by the UI's health ping (M1-01). */
+  "system.ping": { params: Empty, result: Ok },
+  /** Readiness of the user's machine (spike S5). Never includes account identity (email, org). */
+  "env.check": { params: Empty, result: EnvCheckSchema },
+  /**
+   * Makes the Claude Agent SDK ready. The packaged app downloads and verifies the pinned SDK on first use (ADR-0003);
+   * dev builds use node_modules.
+   */
+  "sdk.prepare": {
+    params: Empty,
+    result: z.object({ version: z.string(), source: z.enum(["node_modules", "download", "cache"]) }),
+  },
+  /** Dev-only: lets the UI write a line to the sidecar's log, e.g. self-test metrics (spike S2). */
+  "debug.log": { params: z.object({ message: z.string().max(10_000) }), result: Ok },
+  /**
+   * Starts a session, or resumes one from `session.list` when `resume` is set. Returns its SDK session id, which every
+   * other session method and notification carries (multi-session, M1-08).
+   */
+  "session.start": {
+    params: z.object({
+      cwd: z.string().min(1),
+      model: z.string().optional(),
+      permissionMode: PermissionModeSchema.optional(),
+      resume: SessionIdSchema.optional(),
+    }),
+    result: z.object({ sessionId: SessionIdSchema }),
+  },
+  /** `messageId` is the user message's uuid: the anchor for "Rewind files to here" (M1-23). */
+  "session.send": {
+    params: z.object({ sessionId: SessionIdSchema, text: z.string().min(1) }),
+    result: z.object({ ok: z.literal(true), messageId: z.string() }),
+  },
+  /** `interrupted: false` means no turn was running, so nothing was sent to the CLI. */
+  "session.interrupt": {
+    params: SessionRef,
+    result: z.object({ ok: z.literal(true), interrupted: z.boolean() }),
+  },
+  "session.setMode": { params: z.object({ sessionId: SessionIdSchema, mode: PermissionModeSchema }), result: Ok },
+  /** Ends the live session (its tab closed). The transcript stays on disk and can be resumed. */
+  "session.close": { params: SessionRef, result: Ok },
+  /**
+   * Restores files edited by Edit/Write to their state before the user message `messageId` (SDK file checkpoints).
+   * `dryRun` previews the change. Bash-made changes are not tracked.
+   */
+  "session.rewind": {
+    params: z.object({ sessionId: SessionIdSchema, messageId: z.string().min(1), dryRun: z.boolean().optional() }),
+    result: RewindResultSchema,
+  },
+  "permission.respond": {
+    params: z.object({
+      sessionId: SessionIdSchema,
+      requestId: z.string().min(1),
+      allow: z.boolean(),
+      message: z.string().optional(),
+    }),
+    result: Ok,
+  },
+
+  /* Stored sessions (SDK session APIs, ADR-0004). Includes sessions started in the terminal CLI (M1-22). */
+  "session.list": {
+    params: z.object({ cwd: z.string().min(1), limit: z.number().int().positive().max(500).optional() }),
+    result: z.object({ sessions: z.array(SessionInfoSchema) }),
+  },
+  /** The main conversation of a stored session as events, to render before resuming it. */
+  "session.history": {
+    params: StoredSessionRef,
+    result: z.object({ events: z.array(AgentEventSchema) }),
+  },
+  "session.rename": { params: StoredSessionRef.extend({ title: z.string().trim().min(1).max(200) }), result: Ok },
+  /** `tag: null` clears the tag. */
+  "session.tag": { params: StoredSessionRef.extend({ tag: z.string().trim().max(50).nullable() }), result: Ok },
+  "session.delete": { params: StoredSessionRef, result: Ok },
+  /** Copies a stored session into a new one (without its file checkpoints) and returns the new id. */
+  "session.fork": { params: StoredSessionRef, result: z.object({ sessionId: SessionIdSchema }) },
+  /** How long Claude Code keeps session transcripts (`cleanupPeriodDays`, M1-24). No other settings leave the sidecar. */
+  "session.retention": {
+    params: z.object({ cwd: z.string().min(1) }),
+    result: z.object({ days: z.number(), source: z.string() }),
+  },
+
+  /* Workspace files and git (M1-25…M1-27), through the system git CLI. */
+  "workspace.files": { params: WorkspaceRef, result: WorkspaceFilesSchema },
+  "workspace.diff": { params: WorkspacePath, result: FileDiffSchema },
+  /** Reverts a file to HEAD (a new file is deleted), or only hunk `hunk` of `workspace.diff`. */
+  "workspace.revert": { params: WorkspacePath.extend({ hunk: z.number().int().min(0).optional() }), result: Ok },
+  /** Offered when the workspace isn't a git repository (M1-06). */
+  "workspace.gitInit": { params: WorkspaceRef, result: Ok },
+} as const;
+
+export type MethodName = keyof typeof methodSchemas;
+export type Methods = {
+  [M in MethodName]: {
+    params: z.input<(typeof methodSchemas)[M]["params"]>;
+    result: z.output<(typeof methodSchemas)[M]["result"]>;
+  };
+};
+
+/* ---------- Notifications: sidecar → UI ---------- */
+
 export const PermissionRequestSchema = z.object({
+  sessionId: z.string(),
   requestId: z.string(),
   toolName: z.string(),
   toolUseId: z.string(),
@@ -207,8 +351,10 @@ export const PermissionRequestSchema = z.object({
 });
 export type PermissionRequest = z.infer<typeof PermissionRequestSchema>;
 
+export const AgentEventNotificationSchema = z.object({ sessionId: z.string(), event: AgentEventSchema });
+
 export const notificationSchemas = {
-  "agent.event": AgentEventSchema,
+  "agent.event": AgentEventNotificationSchema,
   "permission.request": PermissionRequestSchema,
 } as const;
 

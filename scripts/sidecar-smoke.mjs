@@ -9,6 +9,7 @@ import { mkdtempSync, readdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { createInterface } from "node:readline";
+import { PROTOCOL_VERSION } from "../packages/protocol/src/index.ts";
 
 const binDir = resolve("apps/desktop/src-tauri/binaries");
 const bin =
@@ -27,7 +28,7 @@ function run(methods) {
     const next = () => {
       const method = methods[results.length];
       if (!method) return child.stdin.end();
-      const params = method === "system.hello" ? { protocolVersion: 1 } : {};
+      const params = method === "system.hello" ? { protocolVersion: PROTOCOL_VERSION } : {};
       child.stdin.write(`${JSON.stringify({ jsonrpc: "2.0", id: results.length + 1, method, params })}\n`);
     };
     createInterface({ input: child.stdout }).on("line", (line) => {
@@ -57,7 +58,7 @@ try {
     );
   }
   const ok =
-    first[0]?.result.protocolVersion === 1 &&
+    first[0]?.result.protocolVersion === PROTOCOL_VERSION &&
     first[1]?.result.source === "download" &&
     second[1]?.result.source === "cache";
   console.log(

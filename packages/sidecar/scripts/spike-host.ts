@@ -1,17 +1,24 @@
 // Drives the sidecar the way the Rust core will (spikes S2/S3) and checks real behaviour
 // against the user's own `claude` CLI.
 //
-// Usage: node scripts/spike-host.ts --cwd <empty scratch dir> [--model haiku] [--scenario basic|mode|interrupt|guard|auto|subagents|all] [--record out.jsonl] [--sidecar <executable> --data-dir <dir>]
+// Usage: node scripts/spike-host.ts --cwd <empty scratch dir> [--model haiku] [--scenario basic|mode|interrupt|guard|auto|subagents|sessions|all] [--record out.jsonl] [--sidecar <executable> --data-dir <dir>]
 // Makes real model calls with the user's own login (haiku keeps a full run around a few cents).
 import { spawn } from "node:child_process";
-import { existsSync, rmSync } from "node:fs";
+import { existsSync, readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { performance } from "node:perf_hooks";
 import { createInterface } from "node:readline";
 import { setTimeout as sleep } from "node:timers/promises";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
-import type { AgentEvent, PermissionRequest } from "@agentchainer/protocol";
+import {
+  type AgentEvent,
+  type MethodName,
+  type Methods,
+  type PermissionRequest,
+  PROTOCOL_VERSION,
+  type SessionInfo,
+} from "@agentchainer/protocol";
 
 const { values } = parseArgs({
   options: {
@@ -46,7 +53,10 @@ type Frame = Record<string, unknown>;
 let nextId = 1;
 const pending = new Map<number, (frame: Frame) => void>();
 const state = {
+  /** The session `turn()` talks to. Events from other sessions go to `others`. */
+  sessionId: "",
   onEvent: null as ((event: AgentEvent) => void) | null,
+  others: new Map<string, (event: AgentEvent) => void>(),
   permissionPolicy: "allow" as "allow" | "deny",
 };
 const permissionLog: PermissionRequest[] = [];
@@ -57,35 +67,44 @@ createInterface({ input: sidecar.stdout }).on("line", (line) => {
     pending.get(frame.id)?.(frame);
     pending.delete(frame.id);
   } else if (frame.method === "agent.event") {
-    const event = frame.params as AgentEvent;
+    const { sessionId, event } = frame.params as { sessionId: string; event: AgentEvent };
+    if (sessionId !== state.sessionId) {
+      state.others.get(sessionId)?.(event);
+      return;
+    }
     if (event.type === "tool.started") console.log(`    [tool.started] ${event.name} ${JSON.stringify(event.input)}`);
     if (event.type === "tool.completed")
       console.log(`    [tool.completed] error=${event.isError} ${JSON.stringify(event.output.trim().slice(0, 200))}`);
     if (event.type === "turn.completed")
-      console.log(`    [turn.completed] ${event.subtype} cost≈$${event.costUsd.toFixed(4)}`);
+      console.log(`    [turn.completed] ${event.subtype} session total≈$${event.totalCostUsd.toFixed(4)}`);
     if (event.type === "error") console.log(`    [error] ${event.message}`);
     state.onEvent?.(event);
   } else if (frame.method === "permission.request") {
     const req = frame.params as PermissionRequest;
     permissionLog.push(req);
     console.log(`    [permission.request] ${req.toolName} → ${state.permissionPolicy}`);
-    void request("permission.respond", { requestId: req.requestId, allow: state.permissionPolicy === "allow" });
+    void request("permission.respond", {
+      sessionId: req.sessionId,
+      requestId: req.requestId,
+      allow: state.permissionPolicy === "allow",
+    });
   }
 });
 
-function request(method: string, params: Record<string, unknown>): Promise<unknown> {
+function request<M extends MethodName>(method: M, params: Methods[M]["params"]): Promise<Methods[M]["result"]> {
   return new Promise((resolve, reject) => {
     const id = nextId++;
     pending.set(id, (frame) => {
-      const error = frame.error as { message: string } | undefined;
-      if (error) reject(new Error(`${method}: ${error.message}`));
-      else resolve(frame.result);
+      const error = frame.error as { code: number; message: string } | undefined;
+      if (error) reject(Object.assign(new Error(`${method}: ${error.message}`), { code: error.code }));
+      else resolve(frame.result as Methods[M]["result"]);
     });
     sidecar.stdin.write(`${JSON.stringify({ jsonrpc: "2.0", id, method, params })}\n`);
   });
 }
 
 type Turn = {
+  messageId: string;
   last: AgentEvent;
   reply: string;
   events: AgentEvent[];
@@ -109,11 +128,12 @@ async function turn(text: string, onEvent?: (event: AgentEvent) => void): Promis
       if (event.type === "turn.completed" || event.type === "error") resolve(event);
     };
   });
-  await request("session.send", { text });
+  const { messageId } = await request("session.send", { sessionId: state.sessionId, text });
   const timeout = sleep(90_000).then((): AgentEvent => ({ type: "error", message: "turn timed out after 90 s" }));
   const last = await Promise.race([end, timeout]);
   const endedAt = performance.now();
   return {
+    messageId,
     last,
     reply: acc.reply.trim(),
     events: acc.events,
@@ -154,7 +174,7 @@ async function basic() {
 }
 
 async function mode() {
-  await request("session.setMode", { mode: "acceptEdits" });
+  await request("session.setMode", { sessionId: state.sessionId, mode: "acceptEdits" });
   let before = permissionLog.length;
   await turn("Use the Write tool to create a file named mode-accept.txt containing exactly: a. Do nothing else.");
   check(
@@ -163,7 +183,7 @@ async function mode() {
     `prompts=${permissionLog.length - before} file created=${exists("mode-accept.txt")}`,
   );
 
-  await request("session.setMode", { mode: "default" });
+  await request("session.setMode", { sessionId: state.sessionId, mode: "default" });
   state.permissionPolicy = "deny";
   before = permissionLog.length;
   await turn("Use the Write tool to create a file named mode-default.txt containing exactly: b. Do nothing else.");
@@ -185,7 +205,7 @@ async function interrupt() {
       void sleep(1500).then(() => {
         if (marks.ended) return; // never let a late interrupt hit the next turn
         marks.interruptSentAt = performance.now();
-        return request("session.interrupt", {});
+        return request("session.interrupt", { sessionId: state.sessionId });
       });
     }
   });
@@ -202,7 +222,7 @@ async function interrupt() {
   check("session usable after interrupt", /alive/i.test(after.reply), `reply=${JSON.stringify(after.reply)}`);
 
   // A Stop click that races the end of a reply must not abort the next turn.
-  const idle = (await request("session.interrupt", {})) as { interrupted: boolean };
+  const idle = await request("session.interrupt", { sessionId: state.sessionId });
   const next = await turn("Reply with exactly one word: steady");
   check(
     "interrupt while idle is ignored",
@@ -242,7 +262,7 @@ async function guard() {
 }
 
 async function auto() {
-  await request("session.setMode", { mode: "auto" });
+  await request("session.setMode", { sessionId: state.sessionId, mode: "auto" });
   state.permissionPolicy = "deny"; // a prompt here means the classifier was unsure; denying keeps the run harmless
   let before = permissionLog.length;
   const t = await turn("Use the Bash tool to run exactly this command and nothing else: mkdir auto-mode-dir");
@@ -266,7 +286,7 @@ async function auto() {
     `output=${JSON.stringify(done?.type === "tool.completed" ? done.output.slice(0, 120) : null)}`,
   );
 
-  await request("session.setMode", { mode: "default" });
+  await request("session.setMode", { sessionId: state.sessionId, mode: "default" });
   state.permissionPolicy = "allow";
 }
 
@@ -296,15 +316,131 @@ async function subagents() {
   );
 }
 
-const scenarios: Record<string, () => Promise<void>> = { basic, mode, interrupt, guard, auto, subagents };
+async function sessions() {
+  // File checkpoints (M1-23): two edits in two turns, then rewind to before each.
+  const file = join(cwd, "checkpoint.txt");
+  const read = () => (existsSync(file) ? readFileSync(file, "utf8").trim() : null);
+  const first = await turn("Use the Write tool to create a file named checkpoint.txt containing exactly: one");
+  const second = await turn("Use the Write tool to overwrite checkpoint.txt so it contains exactly: two");
+  const preview = await request("session.rewind", {
+    sessionId: state.sessionId,
+    messageId: second.messageId,
+    dryRun: true,
+  });
+  check(
+    "rewind dry run lists the file without touching it",
+    preview.canRewind && preview.filesChanged.some((f) => f.endsWith("checkpoint.txt")) && read() === "two",
+    `canRewind=${preview.canRewind} files=${preview.filesChanged.length} +${preview.insertions}/-${preview.deletions} content=${read()}`,
+  );
+  const back = await request("session.rewind", { sessionId: state.sessionId, messageId: second.messageId });
+  check("rewind restores the file to before that message", back.canRewind && read() === "one", `content=${read()}`);
+  await request("session.rewind", { sessionId: state.sessionId, messageId: first.messageId });
+  check("rewind past the file's creation removes it", read() === null, `content=${read()}`);
+
+  // Stored sessions (M1-21): our session is listed and can be renamed and tagged.
+  const original = state.sessionId;
+  await request("session.rename", { cwd, sessionId: original, title: "spike sessions" });
+  await request("session.tag", { cwd, sessionId: original, tag: "spike" });
+  const listed = (await request("session.list", { cwd })).sessions.find((s) => s.sessionId === original);
+  check(
+    "list shows the session with its new title and tag",
+    listed?.title === "spike sessions" && listed.tag === "spike",
+    `title=${JSON.stringify(listed?.title)} tag=${JSON.stringify(listed?.tag)}`,
+  );
+
+  // Resume after close (M1-22, exit criterion M1-E2): history first, then the conversation continues.
+  await request("session.close", { sessionId: original });
+  const history = (await request("session.history", { cwd, sessionId: original })).events;
+  const users = history.filter((e) => e.type === "user.message");
+  check(
+    "history replays the user messages with their ids",
+    users.some((e) => e.type === "user.message" && e.messageId === first.messageId),
+    `events=${history.length} user messages=${users.length}`,
+  );
+  const resumed = await request("session.start", { cwd, model: values.model, resume: original });
+  state.sessionId = resumed.sessionId;
+  const recall = await turn("Which file did you create earlier in this conversation? Reply with the file name only.");
+  check(
+    "resumed session keeps its id and remembers the conversation",
+    resumed.sessionId === original && /checkpoint\.txt/.test(recall.reply),
+    `same id=${resumed.sessionId === original} reply=${JSON.stringify(recall.reply)}`,
+  );
+  const afterResume = await request("session.rewind", {
+    sessionId: state.sessionId,
+    messageId: second.messageId,
+    dryRun: true,
+  }).catch((err: Error) => ({ canRewind: false, error: err.message }));
+  check(
+    "checkpoints from before the resume can still be rewound (finding, not a gate)",
+    afterResume.canRewind ? true : null,
+    `canRewind=${afterResume.canRewind} error=${JSON.stringify(afterResume.error ?? null)}`,
+  );
+
+  // Two live sessions at once (M1-08): replies must not cross.
+  const other = (await request("session.start", { cwd, model: values.model })).sessionId;
+  let otherReply = "";
+  const otherDone = new Promise<void>((resolve) => {
+    state.others.set(other, (event) => {
+      if (event.type === "text.delta") otherReply += event.text;
+      if (event.type === "turn.completed" || event.type === "error") resolve();
+    });
+  });
+  const [mine] = await Promise.all([
+    turn("Reply with exactly one word: alpha"),
+    request("session.send", { sessionId: other, text: "Reply with exactly one word: beta" }).then(() => otherDone),
+  ]);
+  check(
+    "two sessions run in parallel without mixing replies",
+    /alpha/i.test(mine.reply) && !/beta/i.test(mine.reply) && /beta/i.test(otherReply) && !/alpha/i.test(otherReply),
+    `this=${JSON.stringify(mine.reply)} other=${JSON.stringify(otherReply.trim())}`,
+  );
+  await request("session.close", { sessionId: other });
+
+  // Fork (M1-22) and delete (M1-21).
+  const fork = await request("session.fork", { cwd, sessionId: original });
+  const forkHistory = (await request("session.history", { cwd, sessionId: fork.sessionId })).events;
+  check(
+    "fork copies the conversation under a new id",
+    fork.sessionId !== original && forkHistory.filter((e) => e.type === "user.message").length >= users.length,
+    `fork user messages=${forkHistory.filter((e) => e.type === "user.message").length}`,
+  );
+  const openDelete = await request("session.delete", { cwd, sessionId: original }).catch(
+    (err: { code?: number }) => err,
+  );
+  await request("session.delete", { cwd, sessionId: fork.sessionId });
+  await request("session.delete", { cwd, sessionId: other });
+  const left = (await request("session.list", { cwd })).sessions.map((s: SessionInfo) => s.sessionId);
+  check(
+    "delete removes closed sessions and refuses an open one",
+    (openDelete as { code?: number }).code === -32006 && !left.includes(fork.sessionId) && left.includes(original),
+    `open delete code=${(openDelete as { code?: number }).code} remaining=${left.length}`,
+  );
+
+  const kept = await request("session.retention", { cwd });
+  check("retention is reported", kept.days > 0, `${kept.days} days (${kept.source})`);
+
+  // Leave no spike sessions behind; later scenarios get a fresh one.
+  await request("session.close", { sessionId: original });
+  await request("session.delete", { cwd, sessionId: original });
+  state.sessionId = (await request("session.start", { cwd, model: values.model })).sessionId;
+}
+
+const scenarios: Record<string, () => Promise<void>> = { basic, mode, interrupt, guard, auto, subagents, sessions };
 const selected = values.scenario === "all" ? Object.keys(scenarios) : [values.scenario];
-for (const file of ["perm-allow.txt", "perm-deny.txt", "mode-accept.txt", "mode-default.txt", "auto-mode-dir"]) {
+for (const file of [
+  "perm-allow.txt",
+  "perm-deny.txt",
+  "mode-accept.txt",
+  "mode-default.txt",
+  "auto-mode-dir",
+  "checkpoint.txt",
+]) {
   rmSync(join(cwd, file), { recursive: true, force: true });
 }
 
-const hello = (await request("system.hello", { protocolVersion: 1 })) as { claudeVersion: string; sdkVersion: string };
+const hello = await request("system.hello", { protocolVersion: PROTOCOL_VERSION });
 console.log(`claude ${hello.claudeVersion} · sdk ${hello.sdkVersion} · model ${values.model} · cwd ${cwd}`);
-await request("session.start", { cwd, model: values.model });
+state.sessionId = (await request("session.start", { cwd, model: values.model })).sessionId;
 
 for (const name of selected) {
   const run = scenarios[name];

@@ -25,13 +25,26 @@ describe("protocol schemas", () => {
   });
 
   it("validates request params", () => {
+    const sessionId = "6f1c0b3e-8d2a-4c5b-9e7f-0a1b2c3d4e5f";
     assert.ok(methodSchemas["session.start"].params.safeParse({ cwd: "/repo", model: "haiku" }).success);
+    assert.ok(methodSchemas["session.start"].params.safeParse({ cwd: "/repo", resume: sessionId }).success);
     assert.equal(methodSchemas["session.start"].params.safeParse({ cwd: "" }).success, false);
-    assert.equal(methodSchemas["permission.respond"].params.safeParse({ requestId: "r", allow: "yes" }).success, false);
+    assert.equal(methodSchemas["session.start"].params.safeParse({ cwd: "/r", resume: "../x" }).success, false);
+    const respond = methodSchemas["permission.respond"].params;
+    assert.equal(respond.safeParse({ sessionId, requestId: "r", allow: "yes" }).success, false);
+    assert.equal(
+      methodSchemas["session.rename"].params.safeParse({ cwd: "/r", sessionId, title: "  " }).success,
+      false,
+    );
+    assert.equal(
+      methodSchemas["session.tag"].params.parse({ cwd: "/r", sessionId, tag: " wip " }).tag,
+      "wip",
+      "tags are trimmed",
+    );
   });
 
   it("requires a tool input object on permission requests", () => {
-    const base = { requestId: "r", toolName: "Write", toolUseId: "t" };
+    const base = { sessionId: "s", requestId: "r", toolName: "Write", toolUseId: "t" };
     assert.ok(PermissionRequestSchema.safeParse({ ...base, input: { file_path: "a" } }).success);
     assert.equal(PermissionRequestSchema.safeParse({ ...base, input: "a" }).success, false);
   });

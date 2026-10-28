@@ -5,6 +5,8 @@ export type Settings = {
   claudePath: string | null;
   defaultModel: string | null;
   defaultMode: string | null;
+  /** "Open in editor" target: system, vscode, cursor, zed, idea (M1-28). */
+  editor: string | null;
   recentWorkspaces: string[];
 };
 

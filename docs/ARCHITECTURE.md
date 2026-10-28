@@ -93,17 +93,36 @@ Planned surface (v0.1):
 | request | `env.check` | Return CLI path, version, auth state (no secrets) |
 | request | `sdk.prepare` | Make the Agent SDK ready: node_modules (dev), or download + verify + cache (packaged) |
 | request | `debug.log` | Dev only: write a UI line to the sidecar log (self-test metrics) |
-| request | `session.start` | Start a session `{workspace, model, effort, mode, profile, budgetUsd, resume?, fork?}` |
-| request | `session.send` | Push a user message (text, @files, images) into the streaming input |
+| request | `session.start` | Start or resume a session `{cwd, model?, permissionMode?, resume?}` → `{sessionId}`. Planned: effort, profile, budgetUsd |
+| request | `session.send` | Push a user message into the streaming input `{sessionId, text}` → `{messageId}`. Planned: @files, images |
 | request | `session.interrupt` | Interrupt the running turn |
 | request | `session.setMode` | `setPermissionMode()` mid-session |
-| request | `session.list` / `session.messages` / `session.rename` / `session.tag` / `session.delete` | SDK session APIs |
-| request | `session.rewind` | `rewindFiles(userMessageId)` |
+| request | `session.close` | End a live session (tab closed); the transcript stays resumable |
+| request | `session.rewind` | `rewindFiles(messageId, {dryRun})` |
+| request | `session.list` / `session.history` / `session.rename` / `session.tag` / `session.delete` / `session.fork` | SDK session APIs on stored sessions `{cwd, sessionId}` |
+| request | `session.retention` | `cleanupPeriodDays` only, from the user's effective settings |
 | request | `permission.respond` | Answer a pending permission request |
+| request | `workspace.files` | Files under the workspace (tracked + untracked, minus ignored) with git status and branch |
+| request | `workspace.diff` | HEAD vs working tree for one file, with its `-U0` hunks |
+| request | `workspace.revert` | Revert a file to HEAD (new files are deleted) or one hunk (`git apply -R`), worktree only |
+| request | `workspace.gitInit` | `git init`, offered when the workspace isn't a repository |
 | request | `workspace.scan` | Detect stack, commands, and audit the setup → `WorkspaceProfile` + findings |
 | request | `bootstrap.plan` / `bootstrap.apply` / `bootstrap.rollback` | Bootstrap engine |
-| notification | `agent.event` | Normalized `AgentEvent` (see §5.2) |
-| notification | `permission.request` | Ask the user to approve a tool call |
+| notification | `agent.event` | `{sessionId, event}`: a normalized `AgentEvent` (see §5.2) |
+| notification | `permission.request` | `{sessionId, …}`: ask the user to approve a tool call |
+
+Workspace paths are relative to `cwd`; the sidecar rejects absolute paths and `..` segments. Git runs as the system
+`git` CLI. The Rust core adds its own Tauri commands (not sidecar methods) for OS work:
+
+| Command | Purpose |
+|---|---|
+| `workspace_watch` / `workspace_unwatch` | `notify` watcher; emits `workspace://changed {cwd}` debounced to 300 ms. Ignores `node_modules`, `target`, `.git/objects` and similar; on Linux those folders aren't watched at all (inotify needs one watch per folder) |
+| `pty_open` / `pty_write` / `pty_resize` / `pty_close` | Integrated terminal: the user's login shell (PowerShell on Windows) in a `portable-pty` PTY; output as `pty://data {id, data}`, `pty://exit {id}` |
+| `open_in_editor` | `code`/`cursor --goto file:line`, `zed file:line`, `idea --line N file`, or the OS default app |
+
+**Multi-session (protocol v2, M1-08):** live-session methods and both notifications carry the SDK session id, so one
+sidecar runs every tab's session. The sidecar picks the id of a new session itself (the SDK's `sessionId` option), so
+it's known before the first turn; a resumed session keeps its id. Session ids must be UUIDs, so they can't form paths.
 | notification | `bootstrap.progress` | Per-action progress, logs and verification results |
 
 ## 5. Agent runtime and event model
@@ -163,9 +182,11 @@ Every mapping is covered by **recorded fixtures**: real SDK output saved as JSON
 
 ### 5.3 Cost
 
-- `turn.completed` carries `total_cost_usd` and `modelUsage`; `modelUsage` includes subagents.
+- `turn.completed` carries `totalCostUsd` (from `total_cost_usd`); `modelUsage` (includes subagents) is planned.
 - These are client-side **estimates**, and the UI labels them so.
-- In streaming mode, totals are cumulative per session, so the app stores per-turn deltas.
+- `total_cost_usd` is a **running total** in streaming-input sessions, and a resumed session continues from its saved
+  total (SDK 0.3.311 docs; seen live: $0.0071 → $0.0085 → $0.0089 after a resume). The UI derives each turn's cost
+  from consecutive totals and shows none for the first turn after a resume, whose earlier total it doesn't know.
 
 ## 6. Permissions
 
@@ -211,8 +232,13 @@ sequenceDiagram
 
 - Sessions use SDK APIs only ([ADR-0004](adr/0004-session-data.md)): `listSessions`, `getSessionMessages`, `resume`,
   `forkSession`, `renameSession`, `tagSession`, `deleteSession`. Sessions started in the terminal can be resumed in the app.
-- **Checkpoints:** `rewindFiles(userMessageId)`. Known limits are shown in the UI: changes made via Bash, by most
-  subagents, and to symlinks are not restored.
+- **Checkpoints:** `enableFileCheckpointing` + `rewindFiles(messageId)`, where `messageId` is the uuid the sidecar
+  gives each user message it sends (or the uuid from `getSessionMessages` for earlier ones). The UI previews with
+  `dryRun`, then confirms. Known limits are shown in the UI: changes made via Bash, by most subagents, and to symlinks
+  are not restored, and the conversation itself is not rewound.
+  - Verified live (`spike-host --scenario sessions`): rewinding restores the file to its state before that message,
+    rewinding past a file's creation deletes it, and checkpoints still rewind after the session is closed and resumed.
+  - `forkSession` copies the conversation but not its checkpoints (SDK docs).
 - **App DB** (SQLite, owned by the Rust core; migrations versioned):
 
 | Table | Contents |

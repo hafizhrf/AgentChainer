@@ -256,18 +256,27 @@
 - [ ] **M1-06** Workspace picker: open folder, recent list, multiple workspaces as tabs. If the folder isn't a git repo, offer `git init`.
       Never default to, and warn on, the home folder: in owner testing the agent then roamed the whole home directory.
       Progress: native folder picker (`tauri-plugin-dialog`), recent list (settings), no default folder plus a
-      home-folder warning. Remaining: tabs (needs multi-session, M1-08), and offering `git init`.
+      home-folder warning, one session per tab across any number of workspaces (background tabs keep streaming; a dot
+      marks a tab waiting for approval). `git init` is offered on the start screen and in the session sidebar when the
+      folder isn't a repository (`workspace.gitInit`, unit-tested). Remaining: click through tabs and `git init` in the
+      app.
 - [ ] **M1-07** Settings stored in the app DB (no secrets): Claude CLI path, default model, effort, permission profile, budget cap, theme.
       Progress:
       - `settings.json` in the app config dir, with atomic writes, normalization and 2 unit tests.
       - Covers the Claude CLI path (restarts the runtime on change), default model, default permission mode, and recent
         workspaces.
+      - Also the external editor for "Open in editor" (M1-28).
       - Remaining: effort, budget cap (with M1-32), theme. SQLite arrives with session and cost history (M1-21/M1-33).
 
 ### Chat & streaming
 
 - [ ] **M1-08** Session runtime: one streaming-input `query()` per session with the options in
       [ARCHITECTURE §5.1](ARCHITECTURE.md#51-session-runtime).
+      Progress:
+      - Protocol v2: one sidecar runs many sessions, keyed by SDK session id; notifications carry it.
+      - The sidecar picks a new session's id up front (`sessionId` option); `enableFileCheckpointing` is on.
+      - Verified: two sessions answer in parallel without mixing replies (`spike-host --scenario sessions`).
+      - Remaining options: `settingSources`, effort, `maxBudgetUsd` (M1-32), the `PostToolUse` change tracker (M1-26).
 - [ ] **M1-09** Event normalizer: SDK messages → `AgentEvent` ([§5.2](ARCHITECTURE.md#52-normalized-events)), with a recorded
       fixture for every event type.
 - [ ] **M1-10** Message list: streaming markdown, collapsible thinking, virtualized for long sessions.
@@ -298,17 +307,47 @@
 ### Sessions & checkpoints
 
 - [ ] **M1-21** Session list per workspace via the SDK, showing title, last activity and cost; rename, tag, delete.
-- [ ] **M1-22** Resume and fork. Sessions started in the terminal CLI appear in the list and can be resumed.
+      Progress: `session.list/rename/tag/delete` on the SDK session APIs, shown on the new-session screen with title,
+      last activity, git branch and tag. Deleting an open session is refused (−32006). Verified live by
+      `spike-host --scenario sessions`. Remaining: cost per session, which needs the local cost history (M1-33).
+- [x] **M1-22** Resume and fork. Sessions started in the terminal CLI appear in the list and can be resumed.
+      — evidence:
+      - `spike-host --scenario sessions`: a closed session resumes with the same id and remembers the conversation;
+        `session.fork` copies it under a new id.
+      - A session made with `claude -p` in a scratch folder is listed, its history replays, and it resumes with the
+        same id and remembers its earlier reply.
+      - `scripts/selftest-latency.mjs --resume` drives the app's own resume path: history renders, then a second turn
+        succeeds in the resumed tab.
+      - Ended tabs (runtime restart, CLI exit) keep their transcript and offer "Resume session".
 - [ ] **M1-23** File checkpoints: "Rewind files to here" on a user message, with the documented limits shown.
+      Progress: `session.rewind` with dry-run preview; the UI lists the files and the limits before restoring.
+      Verified live by `spike-host --scenario sessions`: restore to before a message, delete a file created after it,
+      and rewind after close + resume. Remaining: click through the dialog in the app.
 - [ ] **M1-24** Retention notice: show `cleanupPeriodDays` (default 30) and explain how to change it.
+      Progress: `session.retention` reads only `cleanupPeriodDays` through the SDK's `resolveSettings` (default 30
+      when unset; verified live). The session list shows it with how to change it. Remaining: see it in the app.
 
 ### Files, diff, terminal
 
 - [ ] **M1-25** File tree with git status badges, updated live by a file watcher.
+      Progress: `workspace.files` (git `ls-files` + `status --porcelain -z`, subfolder workspaces, non-git folders
+      walked with a cap) and the Rust `notify` watcher. Tested against real repos and folders (sidecar `workspace.test.ts`,
+      Rust `watcher` tests). Remaining: look at the tree in the app on each OS.
 - [ ] **M1-26** Changes panel: files changed per turn and per session.
+      Progress: "Edited by the agent" groups Edit/Write/MultiEdit/NotebookEdit calls by user turn (subagents
+      included; `files.test.ts`), next to everything git sees as changed (which also covers Bash edits). Remaining:
+      look at it in the app.
 - [ ] **M1-27** Monaco diff viewer; revert a file or a hunk (via git), with confirmation.
+      Progress: Monaco bundled locally and lazy-loaded; `workspace.diff` / `workspace.revert` tested on a real repo
+      (hunk revert leaves other hunks, new files deleted, staged renames undone, binary files flagged). Confirmation
+      dialogs before every revert. Remaining: click through in the app.
 - [ ] **M1-28** "Open in editor" at `file:line` (VS Code, Cursor, JetBrains, system default).
+      Progress: `open_in_editor` for VS Code, Cursor, Zed, IntelliJ (`idea`) and the system default, from the diff
+      pane and tool cards; editor chosen in Settings. Argument building is unit-tested. Remaining: try each editor.
 - [ ] **M1-29** Integrated terminal (xterm.js + portable-pty), scoped to the workspace.
+      Progress: one terminal per tab in the workspace folder, the user's login shell (PowerShell on Windows). A Rust
+      test runs a real shell through the PTY (command → output → resize → close). Remaining: use it in the app on
+      each OS.
 
 ### Git basics
 
@@ -445,6 +484,11 @@ All of these run on macOS, Windows and Ubuntu against a sample repo in `fixtures
       approval patterns; write down principles and anti-patterns in `docs/design/ux-principles.md`.
 - [ ] **UX-02** Design system: tokens (color, type, spacing, radius, motion) for light and dark. Pick a component approach
       (e.g. Radix/shadcn + Tailwind) and record it in an ADR.
+      Owner decisions (2026-10-28):
+      - Primary color: a dark pastel green. No orange: it would look like Claude's own apps (see the branding rules
+        in ADR-0002).
+      - Dark mode stays a first-class theme.
+      - The plain UI already uses green accent tokens (`--accent` in `App.css`) as a placeholder until this item.
 - [ ] **UX-03** Information architecture and wireframes:
   - left sidebar with workspaces and sessions;
   - the main transcript;

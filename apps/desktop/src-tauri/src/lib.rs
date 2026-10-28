@@ -1,12 +1,18 @@
+mod editor;
+mod pty;
 mod settings;
 mod shell_env;
 mod sidecar;
 mod terminal;
+mod watcher;
 
+use pty::{PtyEvent, Ptys};
 use serde::Serialize;
 use settings::Settings;
 use sidecar::Sidecar;
-use tauri::{AppHandle, Manager, RunEvent, State};
+use tauri::{AppHandle, Emitter, Manager, RunEvent, State};
+use tauri_plugin_opener::OpenerExt;
+use watcher::Watchers;
 
 #[derive(Serialize)]
 struct AppInfo {
@@ -52,6 +58,77 @@ fn open_terminal(dir: Option<String>) -> Result<(), String> {
     terminal::open(dir)
 }
 
+/// Emits `workspace://changed` while files in `cwd` change (M1-25).
+#[tauri::command]
+fn workspace_watch(
+    app: AppHandle,
+    cwd: String,
+    watchers: State<'_, Watchers>,
+) -> Result<(), String> {
+    watchers.watch(cwd, move |name| {
+        let _ = app.emit("workspace://changed", name);
+    })
+}
+
+#[tauri::command]
+fn workspace_unwatch(cwd: String, watchers: State<'_, Watchers>) {
+    watchers.unwatch(&cwd);
+}
+
+/// Opens `file` at `line` in the user's editor, or with the system default app (M1-28).
+#[tauri::command]
+fn open_in_editor(
+    app: AppHandle,
+    file: String,
+    line: Option<u32>,
+    editor: Option<String>,
+) -> Result<(), String> {
+    editor::check_file(&file)?;
+    let editor = editor.unwrap_or_else(|| "system".into());
+    match editor::command(&editor, &file, line.unwrap_or(1))? {
+        Some(mut cmd) => cmd.spawn().map(|_| ()).map_err(|e| {
+            format!("couldn't start {editor}: {e}. Is its command-line launcher installed?")
+        }),
+        None => app
+            .opener()
+            .open_path(&file, None::<&str>)
+            .map_err(|e| e.to_string()),
+    }
+}
+
+/// Starts the user's shell in `cwd` for the integrated terminal (M1-29) and returns its id.
+#[tauri::command]
+fn pty_open(
+    app: AppHandle,
+    cwd: String,
+    cols: u16,
+    rows: u16,
+    ptys: State<'_, Ptys>,
+) -> Result<u32, String> {
+    ptys.open(&cwd, cols, rows, move |event| {
+        let name = match event {
+            PtyEvent::Data { .. } => "pty://data",
+            PtyEvent::Exit { .. } => "pty://exit",
+        };
+        let _ = app.emit(name, event);
+    })
+}
+
+#[tauri::command]
+fn pty_write(id: u32, data: String, ptys: State<'_, Ptys>) -> Result<(), String> {
+    ptys.write(id, &data)
+}
+
+#[tauri::command]
+fn pty_resize(id: u32, cols: u16, rows: u16, ptys: State<'_, Ptys>) -> Result<(), String> {
+    ptys.resize(id, cols, rows)
+}
+
+#[tauri::command]
+fn pty_close(id: u32, ptys: State<'_, Ptys>) {
+    ptys.close(id);
+}
+
 /// Dev-only self-test (spike S2): `AGENTCHAINER_SELFTEST` holds JSON `{cwd, model, prompt}`. When set, the UI runs
 /// one turn on its own, reports latency through `debug.log`, and quits via `quit_app`.
 #[tauri::command]
@@ -72,6 +149,8 @@ pub fn run() {
         .setup(|app| {
             let sidecar = Sidecar::start(app.handle());
             app.manage(sidecar);
+            app.manage(Watchers::default());
+            app.manage(Ptys::default());
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -82,7 +161,14 @@ pub fn run() {
             settings_set,
             open_terminal,
             selftest_config,
-            quit_app
+            quit_app,
+            workspace_watch,
+            workspace_unwatch,
+            open_in_editor,
+            pty_open,
+            pty_write,
+            pty_resize,
+            pty_close
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application");
@@ -91,6 +177,7 @@ pub fn run() {
         // Stop supervising first, so the sidecar isn't restarted while the app shuts down.
         if let RunEvent::Exit = event {
             handle.state::<Sidecar>().stop();
+            handle.state::<Ptys>().close_all();
         }
     });
 }

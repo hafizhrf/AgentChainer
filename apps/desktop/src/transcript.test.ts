@@ -30,7 +30,7 @@ describe("transcript reducer", () => {
         totalTokens: 1200,
         durationMs: 3400,
       },
-      { type: "turn.completed", subtype: "success", isError: false, costUsd: 0.01, durationMs: 5000, numTurns: 2 },
+      { type: "turn.completed", subtype: "success", isError: false, totalCostUsd: 0.01, durationMs: 5000, numTurns: 2 },
     ]);
 
     assert.deepEqual(

@@ -3,7 +3,8 @@
 // Makes a real model call with your own `claude` login; keep the default haiku model.
 //
 // Usage: node scripts/selftest-latency.mjs --cwd <empty scratch dir> [--binary target/debug/agentchainer]
-//        [--model haiku] [--prompt "..."] [--timeout 180]
+//        [--model haiku] [--prompt "..."] [--timeout 180] [--resume]
+// --resume then closes the session, resumes it through the UI's resume path and runs a second turn (M1-22).
 // macOS/Linux only (uses `ps`). The WebView's own processes are not children of the app on macOS, so their CPU is
 // not included.
 import { execFileSync, spawn } from "node:child_process";
@@ -21,6 +22,7 @@ const { values } = parseArgs({
       default: "Write a 300-word story about a lighthouse keeper. Plain text only, no headings, no tools.",
     },
     timeout: { type: "string", default: "180" },
+    resume: { type: "boolean", default: false },
   },
 });
 if (!values.cwd) {
@@ -31,7 +33,12 @@ if (!values.cwd) {
 const env = {
   ...process.env,
   AGENTCHAINER_METRICS: "1",
-  AGENTCHAINER_SELFTEST: JSON.stringify({ cwd: resolve(values.cwd), model: values.model, prompt: values.prompt }),
+  AGENTCHAINER_SELFTEST: JSON.stringify({
+    cwd: resolve(values.cwd),
+    model: values.model,
+    prompt: values.prompt,
+    resume: values.resume,
+  }),
 };
 const app = spawn(resolve(values.binary), [], { env, stdio: ["ignore", "ignore", "pipe"] });
 const samples = [];
@@ -113,7 +120,12 @@ function summarize(code) {
       `${key.padEnd(8)} CPU avg ${cpu.avg}% max ${cpu.max}%  ·  RSS avg ${mem.avg} MB max ${mem.max} MB (ps pcpu is a decaying average)`,
     );
   }
-  const ok = report.deltaLatencyMs.count > 0 && report.subtype === "success";
+  const resumed =
+    !values.resume ||
+    (report.resume?.historyUserMessages >= 1 &&
+      report.resume.subtype === "success" &&
+      /resumed/i.test(report.resume.reply ?? ""));
+  const ok = report.deltaLatencyMs?.count > 0 && report.subtype === "success" && resumed;
   console.log(ok ? "OK: self-test completed" : "FAIL: no deltas measured or the turn failed");
   process.exit(ok ? 0 : 1);
 }

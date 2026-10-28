@@ -17,6 +17,8 @@ pub struct Settings {
     pub default_model: Option<String>,
     /// Permission mode for new sessions.
     pub default_mode: Option<String>,
+    /// External editor for "Open in editor" (M1-28): `system`, `vscode`, `cursor`, `zed` or `idea`.
+    pub editor: Option<String>,
     /// Most recent first.
     pub recent_workspaces: Vec<String>,
 }
@@ -28,6 +30,7 @@ impl Settings {
         self.claude_path = clean(self.claude_path);
         self.default_model = clean(self.default_model);
         self.default_mode = clean(self.default_mode);
+        self.editor = clean(self.editor);
         let mut seen = Vec::new();
         for dir in self.recent_workspaces {
             let dir = dir.trim().to_string();
@@ -83,6 +86,7 @@ mod tests {
             claude_path: Some("  ".into()),
             default_model: Some(" haiku ".into()),
             default_mode: None,
+            editor: Some(" vscode ".into()),
             recent_workspaces: (0..12)
                 .map(|i| format!("/p/{}", i % 10))
                 .chain([" ".into()])
@@ -91,6 +95,7 @@ mod tests {
         .normalized();
         assert_eq!(s.claude_path, None);
         assert_eq!(s.default_model.as_deref(), Some("haiku"));
+        assert_eq!(s.editor.as_deref(), Some("vscode"));
         assert_eq!(s.recent_workspaces.len(), MAX_RECENT_WORKSPACES);
         assert_eq!(s.recent_workspaces[0], "/p/0");
     }

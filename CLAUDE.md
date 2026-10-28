@@ -1,10 +1,14 @@
 # AgentChainer — agent context
 
 Open-source desktop app (Tauri v2 + React/TS + Node sidecar on the Claude Agent SDK) that makes repos agent-ready and
-keeps agent work transparent and verified. **Current phase: M0 (foundations).**
+keeps agent work transparent and verified. **Current phase: M1 (agent session core).**
 
-A spike-level app exists (S2–S6, see `docs/spikes/`): readiness check, one session, streaming text, tool approvals, subagent cards.
-The sidecar runs from source with `node`, so it works in dev builds only. Production session features come in M1.
+The app has a functional (deliberately plain) M1 UI:
+- readiness check, session tabs with resume, fork and file rewind, tool approvals, subagent cards;
+- workspace files, diff and revert, and a terminal.
+
+Packaged builds ship the sidecar as a Node single executable (spike S1). The visual design pass is the UX track in the
+checklist.
 
 Layout:
 - `apps/desktop`: Tauri app. `src/` is the React UI, `src-tauri/` is the Rust core.
@@ -52,14 +56,14 @@ Prerequisites:
 | Regenerate the protocol JSON Schema after changing `packages/protocol/src/index.ts` | `pnpm --filter @agentchainer/protocol export-schema` |
 | Typecheck all TS packages | `pnpm typecheck` |
 | Rust check / lint / format | `cargo check --workspace` · `cargo clippy --workspace` · `cargo fmt --all` |
-| Sidecar one-shot check (JSON-RPC over stdio) | `echo '{"jsonrpc":"2.0","id":1,"method":"system.hello","params":{"protocolVersion":1}}' \| node packages/sidecar/src/main.ts` |
+| Sidecar one-shot check (JSON-RPC over stdio) | `echo '{"jsonrpc":"2.0","id":1,"method":"system.hello","params":{"protocolVersion":2}}' \| node packages/sidecar/src/main.ts` |
 | Unit tests, all packages (Node's built-in runner) / with coverage | `pnpm test` / `pnpm test:coverage` |
 | Rust tests | `cargo test --workspace` |
-| Spike harness: real model calls with your own `claude` login (haiku, a few cents) | `node packages/sidecar/scripts/spike-host.ts --cwd <empty scratch dir> [--scenario basic\|mode\|interrupt\|guard\|auto\|subagents\|all] [--record raw.jsonl]` |
+| Spike harness: real model calls with your own `claude` login (haiku, a few cents) | `node packages/sidecar/scripts/spike-host.ts --cwd <empty scratch dir> [--scenario basic\|mode\|interrupt\|guard\|auto\|subagents\|sessions\|all] [--record raw.jsonl]` |
 | Turn a raw recording into a committable fixture (fails if anything identifying survives) | `node packages/sidecar/scripts/make-fixture.ts raw.jsonl packages/sidecar/test/fixtures/<name>.jsonl --cwd <recording workspace>` |
 | Plugin/MCP install spike (installs and removes again, in a throwaway project) | `node packages/sidecar/scripts/spike-install.ts --cwd <empty scratch dir>` |
 | Launch smoke test (after a debug build) | `node scripts/smoke-launch.mjs target/debug/agentchainer [--seconds N]` |
-| Streaming latency + CPU self-test (after a debug build; one real haiku turn, opens a window briefly) | `node scripts/selftest-latency.mjs --cwd <empty scratch dir>` |
+| Streaming latency + CPU self-test (after a debug build; one real haiku turn, opens a window briefly) | `node scripts/selftest-latency.mjs --cwd <empty scratch dir> [--resume]` |
 
 CI (`.github/workflows/ci.yml`) runs on every PR and on pushes to `main`. Actions are pinned by commit SHA, so keep the
 `# vX.Y.Z` comment next to each SHA when bumping.

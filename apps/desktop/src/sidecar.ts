@@ -23,6 +23,17 @@ export type Notification = {
 /** Emitted by the Rust supervisor (M1-01) when the sidecar process stops. */
 export type SidecarExit = { status: string; restarting: boolean };
 
+/** A JSON-RPC error from the sidecar, with its code (`RpcErrorCode`). */
+export class SidecarError extends Error {
+  readonly code: number;
+  constructor(code: number, message: string) {
+    super(message);
+    this.code = code;
+  }
+}
+
+export const isRpcError = (err: unknown, code: number): boolean => err instanceof SidecarError && err.code === code;
+
 type Pending = { method: MethodName; resolve: (result: unknown) => void; reject: (err: Error) => void };
 
 let nextId = 1;
@@ -59,7 +70,8 @@ function handleFrame(raw: string): void {
     error?: RpcError;
     ts?: number;
   };
-  if (typeof frame.ts === "number" && (frame.params as { type?: string } | undefined)?.type === "text.delta") {
+  const event = (frame.params as { event?: { type?: string } } | undefined)?.event;
+  if (typeof frame.ts === "number" && event?.type === "text.delta") {
     deltaLatencies.push(Date.now() - frame.ts);
   }
   if (typeof frame.id === "number" && frame.method === undefined) {
@@ -67,7 +79,7 @@ function handleFrame(raw: string): void {
     if (!p) return;
     pending.delete(frame.id);
     if (frame.error) {
-      p.reject(new Error(frame.error.message));
+      p.reject(new SidecarError(frame.error.code, frame.error.message));
       return;
     }
     const result = methodSchemas[p.method].result.safeParse(frame.result);

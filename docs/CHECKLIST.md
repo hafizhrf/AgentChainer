@@ -54,8 +54,9 @@
       — evidence: branch `chore/m0-06-monorepo-scaffold`. On macOS x86_64 these pass: `pnpm install`, `pnpm typecheck`,
       sidecar runs on Node 24 type stripping, `cargo fmt --check`, `cargo clippy -D warnings`, `tauri build --debug`.
 - [ ] **M0-07** Tauri v2 + React + Vite + TS (strict) app shell that opens a window on macOS, Windows and Ubuntu.
-      Progress: on macOS x86_64 the debug build opens a 1280×800 window (seen via the CoreGraphics window list), and the
-      UI calls the `app_info` Rust command. Windows and Ubuntu are pending CI builds (M0-10).
+      Progress: on macOS x86_64 the debug build opens a 1280×800 window that shows "v0.1.0 · app shell", which comes from
+      the `app_info` Rust command, so the UI ⇄ Rust IPC path works (confirmed visually by the owner). Windows and
+      Ubuntu are pending CI builds (M0-10).
 - [ ] **M0-08** Lint and format: decide Biome vs ESLint+Prettier; rustfmt; clippy with warnings denied; lefthook pre-commit;
       conventional commits (commitlint).
 - [ ] **M0-09** Test runners: Vitest (TS), `cargo test` (Rust), coverage reports.

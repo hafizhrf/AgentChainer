@@ -22,3 +22,6 @@ apps/desktop/src-tauri/gen/schemas/
 
 # Personal Claude Code settings (permissions, local overrides)
 .claude/settings.local.json
+
+# Generated sidecar executables (pnpm --filter @agentchainer/sidecar build:sea)
+apps/desktop/src-tauri/binaries/

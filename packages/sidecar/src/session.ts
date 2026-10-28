@@ -1,14 +1,10 @@
 import { appendFileSync } from "node:fs";
 import type { AgentEvent, PermissionMode, PermissionRequest } from "@agentchainer/protocol";
-import {
-  type HookCallback,
-  type PermissionResult,
-  type Query,
-  query,
-  type SDKUserMessage,
-} from "@anthropic-ai/claude-agent-sdk";
+// Types only: the SDK itself is loaded at runtime by sdk-loader.ts (node_modules in dev, verified download when packaged).
+import type { HookCallback, PermissionResult, Query, SDKUserMessage } from "@anthropic-ai/claude-agent-sdk";
 import { checkToolCall } from "./guard.ts";
 import { normalize } from "./normalize.ts";
+import type { AgentSdkModule } from "./sdk-loader.ts";
 
 /**
  * Dev-only: when set, every raw SDK message is appended to this local JSONL file. Raw recordings contain local
@@ -49,9 +45,9 @@ export class Session {
   /** User messages sent but not yet answered by a `result`. */
   private openTurns = 0;
 
-  constructor(options: SessionOptions, callbacks: SessionCallbacks) {
+  constructor(sdk: AgentSdkModule, options: SessionOptions, callbacks: SessionCallbacks) {
     this.callbacks = callbacks;
-    this.q = query({
+    this.q = sdk.query({
       prompt: this.input,
       options: {
         cwd: options.cwd,

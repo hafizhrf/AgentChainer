@@ -46,6 +46,9 @@ Prerequisites:
 | Lint + format check (Biome, what CI runs) / auto-fix | `pnpm lint` / `pnpm format` |
 | Build the desktop app (installers) | `pnpm build` |
 | Fast debug build, no installers | `pnpm --filter @agentchainer/desktop tauri build --debug --no-bundle` |
+| Build the sidecar single executable (Node SEA; needed before `cargo clippy/test`, done automatically by `pnpm dev/build`) | `pnpm --filter @agentchainer/sidecar build:sea [-- --force]` |
+| Packaged sidecar smoke: first-run SDK download + verify, then cache | `node scripts/sidecar-smoke.mjs` |
+| Re-pin the Agent SDK after bumping it (updates `sdk-pin.json` from the lockfile) | `node packages/sidecar/scripts/pin-sdk.ts` |
 | Typecheck all TS packages | `pnpm typecheck` |
 | Rust check / lint / format | `cargo check --workspace` · `cargo clippy --workspace` · `cargo fmt --all` |
 | Sidecar one-shot check (JSON-RPC over stdio) | `echo '{"jsonrpc":"2.0","id":1,"method":"system.hello","params":{"protocolVersion":1}}' \| node packages/sidecar/src/main.ts` |

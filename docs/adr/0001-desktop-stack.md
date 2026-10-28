@@ -42,7 +42,10 @@ AgentChainer is a desktop app for Windows, macOS and Linux. It needs:
   - We must package and sign a sidecar executable per OS.
   - Three different WebViews (WKWebView, WebView2, WebKitGTK) behave differently, so all three need early testing,
     especially WebKitGTK performance on Linux.
-- **Revisit when:** spike S1 (sidecar packaging) or S2 (event-stream latency) fails on any OS without a reasonable workaround.
+- **Spike outcome (2026-10-28):** S1 and S2 passed, so the Electron fallback isn't needed. The cost is the sidecar's
+  size: a Node SEA is ~117 MB per platform, versus a 4.3 MB app binary ([S1](../spikes/S1-sidecar-packaging.md)).
+- **Revisit when:** spike S1 (sidecar packaging) or S2 (event-stream latency) fails on any OS without a reasonable
+  workaround, or the sidecar's size becomes a distribution problem.
   In that case, switch to Electron and record the change in a new ADR.
 
 ## References

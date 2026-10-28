@@ -8,7 +8,8 @@
     "start": "node src/main.ts",
     "test": "node --test \"src/**/*.test.ts\"",
     "typecheck": "tsc",
-    "test:coverage": "node --test --experimental-test-coverage \"src/**/*.test.ts\""
+    "test:coverage": "node --test --experimental-test-coverage \"src/**/*.test.ts\"",
+    "build:sea": "node scripts/build-sea.ts"
   },
   "dependencies": {
     "@agentchainer/protocol": "workspace:*",
@@ -16,6 +17,8 @@
   },
   "devDependencies": {
     "@types/node": "catalog:",
+    "esbuild": "0.28.2",
+    "postject": "1.0.0-alpha.6",
     "typescript": "catalog:"
   }
 }

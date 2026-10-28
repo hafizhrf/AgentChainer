@@ -37,6 +37,14 @@ export type Methods = {
   /** `interrupted: false` means no turn was running, so nothing was sent to the CLI. */
   "session.interrupt": { params: Record<string, never>; result: { ok: true; interrupted: boolean } };
   "session.setMode": { params: { mode: PermissionMode }; result: { ok: true } };
+  /**
+   * Makes the Claude Agent SDK ready. The packaged app downloads and verifies the pinned SDK on first use (ADR-0003);
+   * dev builds use node_modules.
+   */
+  "sdk.prepare": {
+    params: Record<string, never>;
+    result: { version: string; source: "node_modules" | "download" | "cache" };
+  };
   /** Dev-only: lets the UI write a line to the sidecar's log, e.g. self-test metrics (spike S2). */
   "debug.log": { params: { message: string }; result: { ok: true } };
   "permission.respond": {

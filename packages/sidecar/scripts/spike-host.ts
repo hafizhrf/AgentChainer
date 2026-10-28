@@ -1,7 +1,7 @@
 // Drives the sidecar the way the Rust core will (spikes S2/S3) and checks real behaviour
 // against the user's own `claude` CLI.
 //
-// Usage: node scripts/spike-host.ts --cwd <empty scratch dir> [--model haiku] [--scenario basic|mode|interrupt|guard|auto|subagents|all] [--record out.jsonl]
+// Usage: node scripts/spike-host.ts --cwd <empty scratch dir> [--model haiku] [--scenario basic|mode|interrupt|guard|auto|subagents|all] [--record out.jsonl] [--sidecar <executable> --data-dir <dir>]
 // Makes real model calls with the user's own login (haiku keeps a full run around a few cents).
 import { spawn } from "node:child_process";
 import { existsSync, rmSync } from "node:fs";
@@ -20,6 +20,9 @@ const { values } = parseArgs({
     scenario: { type: "string", default: "all" },
     // Writes the sanitized raw SDK stream to this JSONL file (for test fixtures).
     record: { type: "string" },
+    // Run a packaged sidecar executable (build:sea) instead of the dev source, with this app data dir (spike S1).
+    sidecar: { type: "string" },
+    "data-dir": { type: "string" },
   },
 });
 if (!values.cwd) {
@@ -29,10 +32,15 @@ if (!values.cwd) {
 // Explicitly typed so the narrowing also holds inside the hoisted scenario functions below.
 const cwd: string = values.cwd;
 
-const sidecar = spawn(process.execPath, [fileURLToPath(new URL("../src/main.ts", import.meta.url))], {
-  stdio: ["pipe", "pipe", "inherit"],
-  env: values.record ? { ...process.env, AGENTCHAINER_RECORD_SDK: values.record } : process.env,
-});
+const env = {
+  ...process.env,
+  ...(values.record ? { AGENTCHAINER_RECORD_SDK: values.record } : {}),
+  ...(values["data-dir"] ? { AGENTCHAINER_DATA_DIR: values["data-dir"] } : {}),
+};
+const [command, args] = values.sidecar
+  ? [values.sidecar, []]
+  : [process.execPath, [fileURLToPath(new URL("../src/main.ts", import.meta.url))]];
+const sidecar = spawn(command, args, { stdio: ["pipe", "pipe", "inherit"], env });
 
 type Frame = Record<string, unknown>;
 let nextId = 1;

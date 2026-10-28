@@ -123,9 +123,15 @@
   - Run it as a Tauri `externalBin` on 3 OS, driving the user's installed `claude` via `pathToClaudeCodeExecutable`.
   - Record binary size and cold start.
   - Check PATH resolution: a macOS app started from Finder, and `%USERPROFILE%\.local\bin` on Windows.
-  - Progress: the SDK runs against the user's CLI with the bundled binaries excluded (pnpm `ignoredOptionalDependencies`),
-    and the sidecar finds the CLI on PATH or in known locations. Single-exe packaging is not started yet.
-    See [S2/S3 spike](spikes/S2-S3-chat-slice.md).
+  - Progress: see [S1 spike](spikes/S1-sidecar-packaging.md).
+    - **Node SEA** chosen. pkg wasn't tried: SEA met every requirement without a third-party Node binary source.
+    - Sidecar executable 117 MB; release `.app` 122 MB. Warm cold start 125–160 ms.
+    - First-run SDK download + sha512 check + extract ~1.5 s, then cached. Tampered, offline and HTTP-error paths are
+      unit-tested.
+    - The **release app launched from Finder** (minimal PATH, no Node) downloaded the SDK, found `claude` in
+      `~/.local/bin`, and completed a real turn.
+    - Windows/Ubuntu: `scripts/sidecar-smoke.mjs` runs in CI on all 3 OS. Tick once this PR's CI is green there.
+    - Still open: a proxy test, and a signed-in Windows session for the `%USERPROFILE%\.local\bin` path.
 - [x] **M0-16** **S2 Event stream.** Run a streaming-input `query()`, forward SDK messages through Rust to React, and measure
       end-to-end delta latency and CPU with partial messages on.
   - — evidence: self-test mode plus `scripts/selftest-latency.mjs`, two runs (haiku, macOS x86_64).
@@ -176,14 +182,20 @@
     - MCP add/remove at local and project scope.
   - Versions **can't be pinned**; the installed version is read from `plugin list --json` for the lockfile.
   - Remaining: Windows and Ubuntu, which need a CI job with the CLI installed.
-- [ ] **M0-21** Update [ADR-0003](adr/0003-agent-runtime-and-ipc.md) with the spike results: Accept, or switch to the fallback
+- [x] **M0-21** Update [ADR-0003](adr/0003-agent-runtime-and-ipc.md) with the spike results: Accept, or switch to the fallback
       (Electron, or CLI `stream-json`).
+      — evidence: ADR-0003 **Accepted** 2026-10-28 with S1/S2 numbers, and ADR-0001 records that the Electron fallback
+      isn't needed ([S1](spikes/S1-sidecar-packaging.md), [S2/S3](spikes/S2-S3-chat-slice.md)).
 
 ### Exit criteria
 
 - [ ] **M0-E1** S1–S6 pass on macOS, Windows and Ubuntu, or have a documented workaround.
-- [ ] **M0-E2** ADR-0001 through ADR-0005 are Accepted.
-- [ ] **M0-E3** CI is green on all 3 OS for the app shell.
+      Status: S2–S5 complete; S1 macOS complete with CI smoke on all 3 OS; S6 macOS only.
+- [x] **M0-E2** ADR-0001 through ADR-0005 are Accepted. — evidence: 0001, 0002, 0004 and 0005 were Accepted at planning;
+      0003 was accepted after S1/S2 (M0-21).
+- [x] **M0-E3** CI is green on all 3 OS for the app shell. — evidence: every PR since #3 is green on macOS, Windows and
+      Ubuntu (e.g. [run 40647229719](https://github.com/hafizhrf/AgentChainer/actions/runs/40647229719)), and CI checks
+      are required on `main`.
 
 ---
 

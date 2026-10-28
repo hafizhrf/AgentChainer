@@ -1,6 +1,7 @@
 # ADR-0003: Agent runtime and IPC — one supervised Agent SDK sidecar, JSON-RPC over stdio, Rust as hub
 
-- **Status:** Proposed (accept after spikes S1 and S2: checklist M0-15, M0-16, M0-21)
+- **Status:** Accepted (2026-10-28, after spikes S1 and S2: [S1](../spikes/S1-sidecar-packaging.md),
+  [S2/S3](../spikes/S2-S3-chat-slice.md); checklist M0-21)
 - **Date:** 2026-10-28
 - **Deciders:** project owner
 - **Related:** [ADR-0001](0001-desktop-stack.md), [ARCHITECTURE §2 and §4](../ARCHITECTURE.md), checklist M0-03, M1-01, M1-02
@@ -55,10 +56,17 @@
     - It checks the tarball against the lockfile's integrity hash (sha512) before loading it. A failed check means the
       SDK is not loaded.
   - Optional platform packages are skipped, as today ([ADR-0002](0002-auth-and-branding.md)).
-  - This adds a network step at first run, and S1 must cover offline and proxy failures.
+  - This adds a network step at first run. S1 measured ~1.5 s. Offline and HTTP failures show a clear error and retry
+    on the next session. Proxies are honoured via `NODE_USE_ENV_PROXY=1` (not yet tested behind a real proxy).
   - Revisit if Anthropic grants written permission to bundle (M0-22).
   - This is the project's reading of the published terms, not legal advice.
-- **Revisit when:** S1/S2 numbers are unacceptable, the SDK changes its process model, or a multi-window feature needs per-window isolation.
+- **Spike results:**
+  - Packaging: Node SEA, ~117 MB per platform.
+  - Cold start: ~125–160 ms warm.
+  - Sidecar → UI delta latency: p95 2–3 ms.
+  - The release app launched from Finder downloads the SDK and runs a session ([S1](../spikes/S1-sidecar-packaging.md)).
+- **Revisit when:** the sidecar size becomes a distribution problem, the SDK changes its process model, or a
+  multi-window feature needs per-window isolation.
 
 ## References
 

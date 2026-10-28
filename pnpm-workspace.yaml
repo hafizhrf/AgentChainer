@@ -2,6 +2,11 @@ packages:
   - apps/*
   - packages/*
 
+# Install scripts stay off. esbuild's postinstall only re-links the binary that its
+# platform package (@esbuild/<os>-<arch>) already provides.
+allowBuilds:
+  esbuild: false
+
 # Shared versions; packages reference them as "catalog:".
 catalog:
   typescript: ~6.0.3

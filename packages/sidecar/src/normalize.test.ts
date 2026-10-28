@@ -51,3 +51,38 @@ describe("normalize: subagents-parallel fixture", () => {
     assert.equal(turns[0]?.subtype, "success");
   });
 });
+
+describe("normalize: streamed thinking, slash commands and usage", () => {
+  const msg = (m: unknown) => normalize(m as SDKMessage);
+
+  it("streams the main agent's thinking but not a subagent's", () => {
+    const delta = (parent: string | null) => ({
+      type: "stream_event",
+      parent_tool_use_id: parent,
+      event: { type: "content_block_delta", index: 0, delta: { type: "thinking_delta", thinking: "hmm" } },
+    });
+    assert.deepEqual(msg(delta(null)), [{ type: "thinking.delta", text: "hmm" }]);
+    assert.deepEqual(msg(delta("A")), []);
+  });
+
+  it("sums token usage over models into turn.completed", () => {
+    const [done] = msg({
+      type: "result",
+      subtype: "success",
+      is_error: false,
+      total_cost_usd: 0.02,
+      duration_ms: 900,
+      num_turns: 1,
+      modelUsage: {
+        haiku: { inputTokens: 10, outputTokens: 5, cacheReadInputTokens: 100, cacheCreationInputTokens: 20 },
+        sonnet: { inputTokens: 1, outputTokens: 2, cacheReadInputTokens: 3, cacheCreationInputTokens: 4 },
+      },
+    });
+    assert.deepEqual(done?.type === "turn.completed" && done.usage, {
+      inputTokens: 11,
+      outputTokens: 7,
+      cacheReadTokens: 103,
+      cacheCreationTokens: 24,
+    });
+  });
+});

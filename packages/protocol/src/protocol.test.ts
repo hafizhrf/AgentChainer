@@ -44,7 +44,7 @@ describe("protocol schemas", () => {
   });
 
   it("requires a tool input object on permission requests", () => {
-    const base = { sessionId: "s", requestId: "r", toolName: "Write", toolUseId: "t" };
+    const base = { sessionId: "s", requestId: "r", toolName: "Write", toolUseId: "t", alwaysRules: [] };
     assert.ok(PermissionRequestSchema.safeParse({ ...base, input: { file_path: "a" } }).success);
     assert.equal(PermissionRequestSchema.safeParse({ ...base, input: "a" }).success, false);
   });

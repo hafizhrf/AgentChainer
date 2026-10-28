@@ -2,6 +2,7 @@ import { homedir } from "node:os";
 import { PROTOCOL_VERSION, RpcErrorCode } from "@agentchainer/protocol";
 import pkg from "../package.json" with { type: "json" };
 import { checkEnvironment, claudeVersion, findClaude } from "./claude.ts";
+import { listRules, removeRule } from "./permissions.ts";
 import { log, notify, RpcFailure, serve } from "./rpc.ts";
 import { loadSdk } from "./sdk-loader.ts";
 import { Session } from "./session.ts";
@@ -68,7 +69,7 @@ serve(
       return { ok: true };
     },
 
-    "session.start": async ({ cwd, model, permissionMode, resume }) => {
+    "session.start": async ({ cwd, model, permissionMode, effort, maxBudgetUsd, resume }) => {
       const claudePath = findClaude();
       if (!claudePath) {
         throw new RpcFailure(RpcErrorCode.claudeNotFound, "Claude Code CLI not found. See docs/guides/AUTH_SETUP.md.");
@@ -85,6 +86,8 @@ serve(
           claudePath,
           ...(model ? { model } : {}),
           ...(permissionMode ? { permissionMode } : {}),
+          ...(effort ? { effort } : {}),
+          ...(maxBudgetUsd ? { maxBudgetUsd } : {}),
           ...(resume ? { resume } : {}),
         },
         {
@@ -120,8 +123,18 @@ serve(
     "session.rewind": ({ sessionId, messageId, dryRun }) =>
       requireSession(sessionId).rewind(messageId, dryRun ?? false),
 
-    "permission.respond": ({ sessionId, requestId, allow, message }) => {
-      if (!requireSession(sessionId).respond(requestId, allow, message)) {
+    "session.setModel": async ({ sessionId, model }) => {
+      await requireSession(sessionId).setModel(model);
+      return { ok: true };
+    },
+
+    "session.setEffort": async ({ sessionId, effort }) => {
+      await requireSession(sessionId).setEffort(effort);
+      return { ok: true };
+    },
+
+    "permission.respond": ({ sessionId, requestId, ...answer }) => {
+      if (!requireSession(sessionId).respond(requestId, answer)) {
         throw new RpcFailure(RpcErrorCode.noPendingPermission, `No pending permission request ${requestId}`);
       }
       return { ok: true };
@@ -165,6 +178,13 @@ serve(
     "session.retention": async ({ cwd }) => {
       const { sdk } = await prepareSdk();
       return retention(sdk, cwd);
+    },
+
+    "permissions.list": ({ cwd }) => listRules(cwd),
+
+    "permissions.remove": ({ cwd, behavior, rule }) => {
+      removeRule(cwd, behavior, rule);
+      return { ok: true };
     },
 
     "workspace.files": ({ cwd }) => listFiles(cwd),

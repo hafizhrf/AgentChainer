@@ -1,5 +1,6 @@
 import type { WorkspaceFiles } from "@agentchainer/protocol";
-import { type CSSProperties, useMemo, useState } from "react";
+import { type CSSProperties, useCallback, useEffect, useMemo, useState } from "react";
+import type { Confirm } from "./Dialog.tsx";
 import { agentEdits, buildTree, STATUS_LETTER, type TreeNode } from "./files.ts";
 import { request } from "./sidecar.ts";
 import type { Item } from "./transcript.ts";
@@ -14,6 +15,7 @@ export function WorkspacePanel({
   error,
   items,
   selected,
+  confirm,
   onSelect,
   onRefresh,
 }: {
@@ -22,10 +24,11 @@ export function WorkspacePanel({
   error: string | null;
   items: Item[];
   selected: string | null;
+  confirm: Confirm;
   onSelect: (path: string) => void;
   onRefresh: () => void;
 }) {
-  const [view, setView] = useState<"files" | "changes">("changes");
+  const [view, setView] = useState<"files" | "changes" | "permissions">("changes");
   const [initError, setInitError] = useState<string | null>(null);
   const changed = files?.files.filter((f) => f.status) ?? [];
 
@@ -47,6 +50,9 @@ export function WorkspacePanel({
         <button type="button" role="tab" aria-selected={view === "files"} onClick={() => setView("files")}>
           Files
         </button>
+        <button type="button" role="tab" aria-selected={view === "permissions"} onClick={() => setView("permissions")}>
+          Rules
+        </button>
         <button type="button" className="refresh" title="Refresh" aria-label="Refresh files" onClick={onRefresh}>
           ↻
         </button>
@@ -61,11 +67,11 @@ export function WorkspacePanel({
           </button>
         </div>
       )}
-      {view === "changes" ? (
+      {view === "changes" && (
         <ChangesView files={changed} items={items} cwd={cwd} selected={selected} onSelect={onSelect} />
-      ) : (
-        <FileTree files={files} selected={selected} onSelect={onSelect} />
       )}
+      {view === "files" && <FileTree files={files} selected={selected} onSelect={onSelect} />}
+      {view === "permissions" && <PermissionRules cwd={cwd} confirm={confirm} />}
     </div>
   );
 }
@@ -211,5 +217,89 @@ function FileButton({
     >
       {label}
     </button>
+  );
+}
+
+type Behavior = "allow" | "ask" | "deny";
+const BEHAVIOR_LABEL: Record<Behavior, string> = { allow: "Always allowed", ask: "Always ask", deny: "Always denied" };
+
+/**
+ * Permission rules saved by "Always allow" (M1-20), from `.claude/settings.local.json`. Removing one asks first; a
+ * running session may keep using a rule it already loaded, so the change is certain from the next session on.
+ */
+function PermissionRules({ cwd, confirm }: { cwd: string; confirm: Confirm }) {
+  const [rules, setRules] = useState<Record<Behavior, string[]> | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    try {
+      setRules(await request("permissions.list", { cwd }));
+      setError(null);
+    } catch (err) {
+      setError(String(err));
+    }
+  }, [cwd]);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  async function remove(behavior: Behavior, rule: string) {
+    const ok = await confirm({
+      title: "Remove this rule?",
+      body: (
+        <p>
+          <code>{rule}</code> is removed from <code>.claude/settings.local.json</code>. Claude will ask again for it,
+          certainly in new sessions.
+        </p>
+      ),
+      confirmLabel: "Remove rule",
+    });
+    if (!ok) return;
+    try {
+      await request("permissions.remove", { cwd, behavior, rule });
+      await load();
+    } catch (err) {
+      setError(String(err));
+    }
+  }
+
+  if (error) return <p className="warn">{error}</p>;
+  if (!rules) return <p className="muted">Loading…</p>;
+  const behaviors = (["allow", "ask", "deny"] as const).filter((b) => rules[b].length > 0);
+  return (
+    <div className="rules">
+      {behaviors.length === 0 && (
+        <p className="muted">
+          No saved rules. "Always allow" on an approval saves one here, in <code>.claude/settings.local.json</code> (not
+          committed).
+        </p>
+      )}
+      {behaviors.map((b) => (
+        <div key={b}>
+          <h3>{BEHAVIOR_LABEL[b]}</h3>
+          <ul>
+            {rules[b].map((rule) => (
+              <li key={rule}>
+                <code className="grow rule-text" title={rule}>
+                  {rule}
+                </code>
+                <button
+                  type="button"
+                  className="link"
+                  aria-label={`Remove ${rule}`}
+                  onClick={() => void remove(b, rule)}
+                >
+                  Remove
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ))}
+      <button type="button" className="link" onClick={() => void load()}>
+        Reload
+      </button>
+    </div>
   );
 }

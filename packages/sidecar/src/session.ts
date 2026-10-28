@@ -1,10 +1,17 @@
 import { randomUUID } from "node:crypto";
 import { appendFileSync } from "node:fs";
-import type { AgentEvent, PermissionMode, PermissionRequest, RewindResult } from "@agentchainer/protocol";
+import type { AgentEvent, Effort, PermissionMode, PermissionRequest, RewindResult } from "@agentchainer/protocol";
 // Types only: the SDK itself is loaded at runtime by sdk-loader.ts (node_modules in dev, verified download when packaged).
-import type { HookCallback, PermissionResult, Query, SDKUserMessage } from "@anthropic-ai/claude-agent-sdk";
+import type {
+  HookCallback,
+  PermissionResult,
+  PermissionUpdate,
+  Query,
+  SDKUserMessage,
+} from "@anthropic-ai/claude-agent-sdk";
 import { checkToolCall } from "./guard.ts";
 import { normalize } from "./normalize.ts";
+import { alwaysUpdates, describeUpdates } from "./permissions.ts";
 import type { AgentSdkModule } from "./sdk-loader.ts";
 
 /**
@@ -17,6 +24,8 @@ export type SessionOptions = {
   cwd: string;
   model?: string;
   permissionMode?: PermissionMode;
+  effort?: Effort;
+  maxBudgetUsd?: number;
   claudePath: string;
   /** Session id from `listSessions` to continue. */
   resume?: string;
@@ -36,6 +45,17 @@ const guardHook: HookCallback = async (input) => {
   };
 };
 
+/** The user's answer to a permission request (M1-17), see `permission.respond`. */
+export type PermissionAnswer = {
+  allow: boolean;
+  always?: boolean;
+  updatedInput?: Record<string, unknown>;
+  message?: string;
+  mode?: PermissionMode;
+};
+
+type Pending = { resolve: (result: PermissionResult) => void; toolName: string; always: PermissionUpdate[] };
+
 type SessionCallbacks = {
   emit: (event: AgentEvent) => void;
   askPermission: (request: Omit<PermissionRequest, "sessionId">) => void;
@@ -51,7 +71,7 @@ export class Session {
   /** The SDK session id. We choose it for new sessions so it is known before the first turn. */
   readonly id: string;
   private readonly input = new InputQueue<SDKUserMessage>();
-  private readonly pendingPermissions = new Map<string, (result: PermissionResult) => void>();
+  private readonly pendingPermissions = new Map<string, Pending>();
   private readonly callbacks: SessionCallbacks;
   private readonly q: Query;
   /** User messages sent but not yet answered by a `result`. */
@@ -65,6 +85,10 @@ export class Session {
       options: {
         cwd: options.cwd,
         ...(options.resume ? { resume: options.resume } : { sessionId: this.id }),
+        // Like the CLI: the user's and the project's settings, CLAUDE.md, skills and hooks (ARCHITECTURE §5.1).
+        settingSources: ["user", "project", "local"],
+        ...(options.effort ? { effort: options.effort } : {}),
+        ...(options.maxBudgetUsd ? { maxBudgetUsd: options.maxBudgetUsd } : {}),
         // Backs up files before Edit/Write so they can be rewound (M1-23).
         enableFileCheckpointing: true,
         ...(options.model ? { model: options.model } : {}),
@@ -75,7 +99,8 @@ export class Session {
         hooks: { PreToolUse: [{ hooks: [guardHook] }] },
         canUseTool: (toolName, input, ctx) =>
           new Promise<PermissionResult>((resolve) => {
-            this.pendingPermissions.set(ctx.requestId, resolve);
+            const always = ctx.suppressAlwaysAllowRule ? [] : alwaysUpdates(ctx.suggestions);
+            this.pendingPermissions.set(ctx.requestId, { resolve, toolName, always });
             ctx.signal.addEventListener("abort", () => {
               this.pendingPermissions.delete(ctx.requestId);
               resolve({ behavior: "deny", message: "Request was cancelled." });
@@ -85,9 +110,13 @@ export class Session {
               toolName,
               toolUseId: ctx.toolUseID,
               input,
+              alwaysRules: describeUpdates(always),
               ...(ctx.agentID ? { agentId: ctx.agentID } : {}),
               ...(ctx.title ? { title: ctx.title } : {}),
               ...(ctx.description ? { description: ctx.description } : {}),
+              ...(ctx.decisionReason ? { decisionReason: ctx.decisionReason } : {}),
+              ...(ctx.blockedPath ? { blockedPath: ctx.blockedPath } : {}),
+              ...(ctx.defaultToNo ? { defaultToNo: true } : {}),
             });
           }),
       },
@@ -130,11 +159,20 @@ export class Session {
     await this.q.setPermissionMode(mode);
   }
 
-  respond(requestId: string, allow: boolean, message?: string): boolean {
-    const resolve = this.pendingPermissions.get(requestId);
-    if (!resolve) return false;
+  /** Takes effect from the next turn; an empty string restores the default model. */
+  async setModel(model: string): Promise<void> {
+    await this.q.setModel(model || undefined);
+  }
+
+  async setEffort(effort: Effort | null): Promise<void> {
+    await this.q.applyFlagSettings({ effortLevel: effort });
+  }
+
+  respond(requestId: string, answer: PermissionAnswer): boolean {
+    const pending = this.pendingPermissions.get(requestId);
+    if (!pending) return false;
     this.pendingPermissions.delete(requestId);
-    resolve(allow ? { behavior: "allow" } : { behavior: "deny", message: message || "The user denied this action." });
+    pending.resolve(permissionResult(pending, answer));
     return true;
   }
 
@@ -156,6 +194,25 @@ export class Session {
       this.callbacks.onEnd();
     }
   }
+}
+
+/** Turns the user's answer into the SDK's permission result. */
+export function permissionResult(pending: Omit<Pending, "resolve">, answer: PermissionAnswer): PermissionResult {
+  if (!answer.allow) {
+    return { behavior: "deny", message: answer.message?.trim() || "The user denied this action." };
+  }
+  const updatedPermissions: PermissionUpdate[] = [
+    ...(answer.always ? pending.always : []),
+    // Approving a plan (M1-16) leaves plan mode for the mode the user picked to execute it in.
+    ...(pending.toolName === "ExitPlanMode" && answer.mode
+      ? [{ type: "setMode" as const, mode: answer.mode, destination: "session" as const }]
+      : []),
+  ];
+  return {
+    behavior: "allow",
+    ...(answer.updatedInput ? { updatedInput: answer.updatedInput } : {}),
+    ...(updatedPermissions.length ? { updatedPermissions } : {}),
+  };
 }
 
 /** Minimal async queue used as the SDK's streaming prompt input. */

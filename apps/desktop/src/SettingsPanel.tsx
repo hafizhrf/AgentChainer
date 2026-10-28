@@ -1,4 +1,4 @@
-import { PERMISSION_MODES } from "@agentchainer/protocol";
+import { EFFORTS, PERMISSION_MODES } from "@agentchainer/protocol";
 import { useState } from "react";
 import type { Settings } from "./settings.ts";
 
@@ -18,12 +18,26 @@ export const EDITORS = [
   { value: "idea", label: "IntelliJ IDEA (idea)" },
 ];
 
+/**
+ * Permission profiles (M1-18, ARCHITECTURE §6), each one SDK permission mode. The guard's hard denylist applies in
+ * all of them. Owner testing showed "auto-accept edits" read as "auto mode", hence the names and explanations.
+ */
 export const MODE_LABELS: Record<(typeof PERMISSION_MODES)[number], string> = {
-  default: "Ask before edits and commands",
-  acceptEdits: "Auto-accept file edits (commands still ask)",
-  auto: "Auto: Claude decides, asks when unsure",
-  plan: "Plan only (no changes)",
+  default: "Safe: asks before edits and commands",
+  acceptEdits: "Standard: edits run, commands still ask",
+  auto: "Autonomous: Claude decides, asks when unsure",
+  plan: "Plan first: read-only until you approve a plan",
 };
+
+export const MODE_HELP: Record<(typeof PERMISSION_MODES)[number], string> = {
+  default: "Reading is allowed. Every file edit and shell command waits for your approval.",
+  acceptEdits:
+    "File edits inside the workspace run without asking. Shell commands, web access and MCP tools still ask.",
+  auto: "Claude's auto mode: a classifier approves or blocks each action and only asks when unsure. Needs a budget cap. AgentChainer's guard still blocks dangerous commands.",
+  plan: "Claude explores and writes a plan without changing anything. You approve the plan, then pick how to run it.",
+};
+
+const asModeOrDefault = (m: string | null) => PERMISSION_MODES.find((x) => x === m) ?? "default";
 
 /** App settings (checklist M1-07). Saving a new Claude CLI path restarts the agent runtime so it takes effect. */
 export function SettingsPanel({ settings, onSave }: { settings: Settings; onSave: (next: Settings) => Promise<void> }) {
@@ -77,6 +91,32 @@ export function SettingsPanel({ settings, onSave }: { settings: Settings; onSave
             </option>
           ))}
         </select>
+        <span className="muted">{MODE_HELP[asModeOrDefault(draft.defaultMode)]}</span>
+      </label>
+      <label>
+        Default effort
+        <select
+          value={draft.defaultEffort ?? ""}
+          onChange={(e) => setDraft({ ...draft, defaultEffort: e.target.value || null })}
+        >
+          <option value="">Model default</option>
+          {EFFORTS.map((ef) => (
+            <option key={ef} value={ef}>
+              {ef}
+            </option>
+          ))}
+        </select>
+      </label>
+      <label>
+        Budget cap per session, USD <span className="muted">(empty for none; required for Autonomous)</span>
+        <input
+          type="number"
+          min="0"
+          step="0.5"
+          value={draft.budgetUsd ?? ""}
+          onChange={(e) => setDraft({ ...draft, budgetUsd: e.target.value ? Number(e.target.value) : null })}
+          placeholder="e.g. 5"
+        />
       </label>
       <label>
         Open files in

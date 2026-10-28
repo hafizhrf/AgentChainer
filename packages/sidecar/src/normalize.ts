@@ -110,7 +110,7 @@ export function normalize(m: SDKMessage): AgentEvent[] {
           type: "turn.completed",
           subtype: m.subtype,
           isError: m.is_error,
-          costUsd: m.total_cost_usd,
+          totalCostUsd: m.total_cost_usd,
           durationMs: m.duration_ms,
           numTurns: m.num_turns,
         },

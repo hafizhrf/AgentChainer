@@ -1,5 +1,6 @@
+import { randomUUID } from "node:crypto";
 import { appendFileSync } from "node:fs";
-import type { AgentEvent, PermissionMode, PermissionRequest } from "@agentchainer/protocol";
+import type { AgentEvent, PermissionMode, PermissionRequest, RewindResult } from "@agentchainer/protocol";
 // Types only: the SDK itself is loaded at runtime by sdk-loader.ts (node_modules in dev, verified download when packaged).
 import type { HookCallback, PermissionResult, Query, SDKUserMessage } from "@anthropic-ai/claude-agent-sdk";
 import { checkToolCall } from "./guard.ts";
@@ -12,7 +13,14 @@ import type { AgentSdkModule } from "./sdk-loader.ts";
  */
 const RECORD_PATH = process.env.AGENTCHAINER_RECORD_SDK;
 
-export type SessionOptions = { cwd: string; model?: string; permissionMode?: PermissionMode; claudePath: string };
+export type SessionOptions = {
+  cwd: string;
+  model?: string;
+  permissionMode?: PermissionMode;
+  claudePath: string;
+  /** Session id from `listSessions` to continue. */
+  resume?: string;
+};
 
 /** Runs the hard denylist on every tool call, including ones `canUseTool` never sees (ARCHITECTURE §6). */
 const guardHook: HookCallback = async (input) => {
@@ -30,7 +38,9 @@ const guardHook: HookCallback = async (input) => {
 
 type SessionCallbacks = {
   emit: (event: AgentEvent) => void;
-  askPermission: (request: PermissionRequest) => void;
+  askPermission: (request: Omit<PermissionRequest, "sessionId">) => void;
+  /** The query ended: closed, or the CLI process exited. */
+  onEnd: () => void;
 };
 
 /**
@@ -38,6 +48,8 @@ type SessionCallbacks = {
  * follow-up messages and interrupt, with tool approvals brokered through `canUseTool`.
  */
 export class Session {
+  /** The SDK session id. We choose it for new sessions so it is known before the first turn. */
+  readonly id: string;
   private readonly input = new InputQueue<SDKUserMessage>();
   private readonly pendingPermissions = new Map<string, (result: PermissionResult) => void>();
   private readonly callbacks: SessionCallbacks;
@@ -47,10 +59,14 @@ export class Session {
 
   constructor(sdk: AgentSdkModule, options: SessionOptions, callbacks: SessionCallbacks) {
     this.callbacks = callbacks;
+    this.id = options.resume ?? randomUUID();
     this.q = sdk.query({
       prompt: this.input,
       options: {
         cwd: options.cwd,
+        ...(options.resume ? { resume: options.resume } : { sessionId: this.id }),
+        // Backs up files before Edit/Write so they can be rewound (M1-23).
+        enableFileCheckpointing: true,
         ...(options.model ? { model: options.model } : {}),
         pathToClaudeCodeExecutable: options.claudePath,
         includePartialMessages: true,
@@ -79,9 +95,24 @@ export class Session {
     void this.pump();
   }
 
-  send(text: string): void {
+  /** Returns the message's uuid, which `rewind()` takes. */
+  send(text: string): string {
+    const uuid = randomUUID();
     this.openTurns++;
-    this.input.push({ type: "user", message: { role: "user", content: text }, parent_tool_use_id: null });
+    this.input.push({ type: "user", message: { role: "user", content: text }, parent_tool_use_id: null, uuid });
+    return uuid;
+  }
+
+  /** Restores checkpointed files to their state before the user message `messageId`. */
+  async rewind(messageId: string, dryRun: boolean): Promise<RewindResult> {
+    const r = await this.q.rewindFiles(messageId, { dryRun });
+    return {
+      canRewind: r.canRewind,
+      ...(r.error ? { error: r.error } : {}),
+      filesChanged: r.filesChanged ?? [],
+      insertions: r.insertions ?? 0,
+      deletions: r.deletions ?? 0,
+    };
   }
 
   /**
@@ -121,6 +152,8 @@ export class Session {
       }
     } catch (err) {
       this.callbacks.emit({ type: "error", message: err instanceof Error ? err.message : String(err) });
+    } finally {
+      this.callbacks.onEnd();
     }
   }
 }

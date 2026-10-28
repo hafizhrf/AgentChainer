@@ -2,20 +2,24 @@ import {
   type AgentEvent,
   type EnvCheck,
   type Methods,
-  PERMISSION_MODES,
   type PermissionMode,
   type PermissionRequest,
   PROTOCOL_VERSION,
+  RpcErrorCode,
+  type SessionInfo,
 } from "@agentchainer/protocol";
 import { invoke } from "@tauri-apps/api/core";
-import { type KeyboardEvent, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { useConfirm } from "./Dialog.tsx";
 import { Readiness } from "./Readiness.tsx";
-import { MODE_LABELS, MODELS, SettingsPanel } from "./SettingsPanel.tsx";
-import { quitApp, readSelftestConfig } from "./selftest.ts";
+import { SessionList } from "./SessionList.tsx";
+import { SessionView } from "./SessionView.tsx";
+import { MODELS, SettingsPanel } from "./SettingsPanel.tsx";
+import { quitApp, readSelftestConfig, runSelftest } from "./selftest.ts";
 import { loadSettings, type Settings, saveSettings, withRecent } from "./settings.ts";
-import { connect, onExit, onReady, request, requestWithTimeout, subscribe, takeDeltaLatencies } from "./sidecar.ts";
-import { latencyStats } from "./stats.ts";
-import { type AgentItem, applyEvent, closeAssistant, type Item, nextId, type ToolItem } from "./transcript.ts";
+import { connect, isRpcError, onExit, onReady, request, requestWithTimeout, subscribe } from "./sidecar.ts";
+import { asMode, folderName, newTab, type Tab, tabEvent, updateTab } from "./tabs.ts";
+import { applyEvent, closeAssistant, type Item, nextId, setMessageId } from "./transcript.ts";
 import { WorkspacePicker } from "./WorkspacePicker.tsx";
 import "./App.css";
 
@@ -24,14 +28,15 @@ let selftestStarted = false;
 
 const PING_EVERY_MS = 20_000;
 const PING_TIMEOUT_MS = 5_000;
+const NEW_TITLE = "New session";
 
-// App shell (M1-01…M1-07) around the spike session UI (S2–S5). The full session core is the rest of M1, and the
-// visual design pass is the UX track.
+// App shell (M1-01…M1-07) with one session per tab (M1-06/M1-08) and stored sessions (M1-21…M1-24). The visual
+// design pass is the UX track.
 
 type Hello = Methods["system.hello"]["result"];
+type TurnCompleted = Extract<AgentEvent, { type: "turn.completed" }>;
 
-const asMode = (value: string | null | undefined): PermissionMode =>
-  PERMISSION_MODES.find((m) => m === value) ?? "default";
+const notice = (text: string): Item => ({ kind: "notice", id: nextId(), text });
 
 export function App() {
   const [hello, setHello] = useState<Hello | null>(null);
@@ -41,17 +46,21 @@ export function App() {
   const [settings, setSettings] = useState<Settings | null>(null);
   const [cwd, setCwd] = useState("");
   const [model, setModel] = useState("");
-  const [session, setSession] = useState<{ model?: string; claudeCodeVersion?: string } | null>(null);
-  const [items, setItems] = useState<Item[]>([]);
-  const [draft, setDraft] = useState("");
-  const [running, setRunning] = useState(false);
-  const [mode, setMode] = useState<PermissionMode>("default");
-  const [permissions, setPermissions] = useState<PermissionRequest[]>([]);
-  const [cost, setCost] = useState({ lastUsd: 0, totalUsd: 0, lastMs: 0 });
-  const bottomRef = useRef<HTMLDivElement>(null);
-  const selftestActive = useRef(false);
+  const [tabs, setTabs] = useState<Tab[]>([]);
+  /** The active tab's session id; null shows the new-session screen. */
+  const [active, setActive] = useState<string | null>(null);
+  const [confirm, confirmDialog] = useConfirm();
+  /** Mirrors `tabs` for async code that outlives a render (the self-test). */
+  const tabsRef = useRef(tabs);
+  tabsRef.current = tabs;
+  /** Self-test only: resolves when a session's turn completes. */
+  const turnWaiters = useRef(new Map<string, (e: TurnCompleted) => void>());
   /** True while the sidecar answers; the health ping only runs then, so a starting sidecar isn't restarted. */
   const alive = useRef(false);
+
+  const patchTab = (sessionId: string, fn: (tab: Tab) => Tab) => setTabs((ts) => updateTab(ts, sessionId, fn));
+  const addNotice = (sessionId: string, text: string) =>
+    patchTab(sessionId, (t) => ({ ...t, items: [...closeAssistant(t.items), notice(text)] }));
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: subscribe once on mount; the handlers only call state setters, which are stable.
   useEffect(() => {
@@ -62,35 +71,60 @@ export function App() {
         const cfg = await readSelftestConfig();
         if (!cfg || !checked.ready || selftestStarted) return;
         selftestStarted = true;
-        selftestActive.current = true;
         setCwd(cfg.cwd);
-        takeDeltaLatencies();
-        await startSession(cfg.cwd, cfg.model ?? "", "default");
-        await sendText(cfg.prompt);
+        const report = await runSelftest(cfg, {
+          start: (dir, modelAlias) => startSession(dir, modelAlias, "default"),
+          send: sendText,
+          nextTurn: (sessionId) => new Promise((resolve) => turnWaiters.current.set(sessionId, resolve)),
+          close: async (sessionId) => {
+            await request("session.close", { sessionId });
+          },
+          resume: (sessionId, dir, modelAlias) => resume(sessionId, dir, "Self-test", modelAlias),
+          tab: (sessionId) => tabsRef.current.find((t) => t.sessionId === sessionId),
+        }).catch((err: unknown) => ({ error: String(err) }));
+        await request("debug.log", { message: JSON.stringify({ selftest: report }) });
+        await quitApp();
       })
       .catch((err: unknown) => setRuntimeNotice(String(err)));
 
-    // Supervisor events (M1-01): the session dies with the process; a restarted sidecar needs a new handshake.
+    // Supervisor events (M1-01): sessions die with the process. Their tabs stay, marked ended, and can be resumed.
     const offExit = onExit((exit) => {
       alive.current = false;
-      setRunning(false);
-      setPermissions([]);
-      setSession((s) => {
-        if (s) setItems((prev) => [...prev, { kind: "notice", id: nextId(), text: "The agent runtime stopped." }]);
-        return null;
-      });
+      setTabs((ts) =>
+        ts.map((t) =>
+          t.ended
+            ? t
+            : {
+                ...t,
+                ended: true,
+                running: false,
+                permissions: [],
+                items: [...closeAssistant(t.items), notice("The agent runtime stopped.")],
+              },
+        ),
+      );
       setRuntimeNotice(
-        `The agent runtime stopped (${exit.status})${exit.restarting ? " and is restarting…" : "."} Any running session ended.`,
+        `The agent runtime stopped (${exit.status})${exit.restarting ? " and is restarting…" : "."} Running sessions ended; resume them from their tabs.`,
       );
     });
     const offReady = onReady(() => {
       void handshake()
-        .then(() => setRuntimeNotice((n) => (n ? "The agent runtime restarted. Start a new session." : null)))
+        .then(() =>
+          setRuntimeNotice((n) => (n ? "The agent runtime restarted. Resume your sessions from their tabs." : null)),
+        )
         .catch(() => undefined);
     });
     const offEvents = subscribe((n) => {
-      if (n.method === "permission.request") setPermissions((q) => [...q, n.params]);
-      else onAgentEvent(n.params);
+      if (n.method === "permission.request") {
+        patchTab(n.params.sessionId, (t) => ({ ...t, permissions: [...t.permissions, n.params] }));
+        return;
+      }
+      const { sessionId, event } = n.params;
+      if (event.type === "turn.completed") {
+        turnWaiters.current.get(sessionId)?.(event);
+        turnWaiters.current.delete(sessionId);
+      }
+      patchTab(sessionId, (t) => tabEvent(t, event));
     });
     const ping = setInterval(() => {
       if (!alive.current) return;
@@ -106,9 +140,6 @@ export function App() {
       clearInterval(ping);
     };
   }, []);
-
-  // biome-ignore lint/correctness/useExhaustiveDependencies: scroll to the bottom whenever the transcript changes.
-  useEffect(() => bottomRef.current?.scrollIntoView({ block: "end" }), [items]);
 
   async function handshake(): Promise<EnvCheck> {
     const h = await request("system.hello", { protocolVersion: PROTOCOL_VERSION });
@@ -149,87 +180,153 @@ export function App() {
     }
   }
 
-  async function reportSelftest(e: Extract<AgentEvent, { type: "turn.completed" }>) {
-    const stats = latencyStats(takeDeltaLatencies());
-    const report = {
-      selftest: { deltaLatencyMs: stats, turnMs: e.durationMs, costUsd: e.costUsd, subtype: e.subtype },
-    };
-    await request("debug.log", { message: JSON.stringify(report) });
-    await quitApp();
+  async function rememberWorkspace(dir: string) {
+    if (settings) setSettings(await saveSettings(withRecent(settings, dir)));
   }
 
-  function onAgentEvent(e: AgentEvent) {
-    if (e.type === "session.started") {
-      // Arrives at the start of every turn (spike S2 finding), so this must stay idempotent.
-      setSession({ model: e.model, claudeCodeVersion: e.claudeCodeVersion });
-      setMode(asMode(e.permissionMode));
-      return;
-    }
-    if (e.type === "turn.completed") {
-      setRunning(false);
-      setCost((c) => ({ lastUsd: e.costUsd, totalUsd: c.totalUsd + e.costUsd, lastMs: e.durationMs }));
-      if (selftestActive.current) {
-        selftestActive.current = false;
-        void reportSelftest(e);
-      }
-    }
-    if (e.type === "error") setRunning(false);
-    setItems((prev) => applyEvent(prev, e));
-  }
-
-  async function startSession(dir: string, modelAlias: string, permissionMode: PermissionMode) {
+  async function startSession(dir: string, modelAlias: string, mode: PermissionMode): Promise<string | null> {
     try {
-      await request("session.start", { cwd: dir, permissionMode, ...(modelAlias ? { model: modelAlias } : {}) });
-      setSession({});
-      setMode(permissionMode);
+      const { sessionId } = await request("session.start", {
+        cwd: dir,
+        permissionMode: mode,
+        ...(modelAlias ? { model: modelAlias } : {}),
+      });
+      setTabs((ts) => [
+        ...ts,
+        newTab(sessionId, dir, { title: NEW_TITLE, mode, items: [notice(`Session started in ${dir}`)] }),
+      ]);
+      setActive(sessionId);
       setRuntimeNotice(null);
-      setItems([{ kind: "notice", id: nextId(), text: `Session started in ${dir}` }]);
-      if (settings) setSettings(await saveSettings(withRecent(settings, dir)));
+      await rememberWorkspace(dir);
+      return sessionId;
     } catch (err) {
-      setItems((prev) => [...prev, { kind: "notice", id: nextId(), text: String(err) }]);
+      setRuntimeNotice(String(err));
+      return null;
     }
   }
 
-  async function send() {
-    const text = draft.trim();
-    if (!text || running) return;
-    setDraft("");
-    await sendText(text);
-  }
-
-  async function sendText(text: string) {
-    setRunning(true);
-    setItems((prev) => [...closeAssistant(prev), { kind: "user", id: nextId(), text }]);
+  /** Resumes a stored session into a tab: replaces its ended tab, or opens a new one (M1-22). */
+  async function resume(sessionId: string, dir: string, title: string, modelAlias = model) {
+    const mode = asMode(settings?.defaultMode);
     try {
-      await request("session.send", { text });
+      const { events } = await request("session.history", { cwd: dir, sessionId });
+      await request("session.start", {
+        cwd: dir,
+        resume: sessionId,
+        permissionMode: mode,
+        ...(modelAlias ? { model: modelAlias } : {}),
+      });
+      const items = closeAssistant(events.reduce(applyEvent, [notice(`Resumed “${title}” in ${dir}`)]));
+      const tab = newTab(sessionId, dir, { title, mode, items, resumed: true });
+      setTabs((ts) => (ts.some((t) => t.sessionId === sessionId) ? updateTab(ts, sessionId, () => tab) : [...ts, tab]));
+      setActive(sessionId);
+      await rememberWorkspace(dir);
     } catch (err) {
-      setRunning(false);
-      setItems((prev) => [...prev, { kind: "notice", id: nextId(), text: String(err) }]);
+      setRuntimeNotice(String(err));
     }
   }
 
-  async function changeMode(next: PermissionMode) {
+  function openStored(s: SessionInfo) {
+    const open = tabs.find((t) => t.sessionId === s.sessionId);
+    if (open && !open.ended) setActive(s.sessionId);
+    else void resume(s.sessionId, cwd.trim(), s.title);
+  }
+
+  async function sendText(sessionId: string, text: string) {
+    const itemId = nextId();
+    patchTab(sessionId, (t) => ({
+      ...t,
+      running: true,
+      title: t.title === NEW_TITLE ? text.slice(0, 60) : t.title,
+      items: [...closeAssistant(t.items), { kind: "user", id: itemId, text }],
+    }));
     try {
-      await request("session.setMode", { mode: next });
-      setMode(next);
+      const { messageId } = await request("session.send", { sessionId, text });
+      patchTab(sessionId, (t) => ({ ...t, items: setMessageId(t.items, itemId, messageId) }));
     } catch (err) {
-      setItems((prev) => [...prev, { kind: "notice", id: nextId(), text: String(err) }]);
+      patchTab(sessionId, (t) => ({
+        ...t,
+        running: false,
+        ended: t.ended || isRpcError(err, RpcErrorCode.noSession),
+        items: [...t.items, notice(String(err))],
+      }));
+    }
+  }
+
+  async function changeMode(sessionId: string, mode: PermissionMode) {
+    try {
+      await request("session.setMode", { sessionId, mode });
+      patchTab(sessionId, (t) => ({ ...t, mode }));
+    } catch (err) {
+      addNotice(sessionId, String(err));
     }
   }
 
   async function answer(req: PermissionRequest, allow: boolean) {
-    setPermissions((q) => q.filter((p) => p.requestId !== req.requestId));
-    await request("permission.respond", { requestId: req.requestId, allow });
+    patchTab(req.sessionId, (t) => ({ ...t, permissions: t.permissions.filter((p) => p.requestId !== req.requestId) }));
+    await request("permission.respond", { sessionId: req.sessionId, requestId: req.requestId, allow });
   }
 
-  function onComposerKey(e: KeyboardEvent<HTMLTextAreaElement>) {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      void send();
+  /** "Rewind files to here" (M1-23): preview, confirm with the documented limits, then restore. */
+  async function rewind(sessionId: string, messageId: string) {
+    try {
+      const preview = await request("session.rewind", { sessionId, messageId, dryRun: true });
+      if (!preview.canRewind) {
+        addNotice(sessionId, `Can't rewind files to this message: ${preview.error ?? "no checkpoint was saved."}`);
+        return;
+      }
+      if (preview.filesChanged.length === 0) {
+        addNotice(sessionId, "Nothing to rewind: the files the agent edited already match this point.");
+        return;
+      }
+      const ok = await confirm({
+        title: "Rewind files to before this message?",
+        body: (
+          <>
+            <p>
+              These files go back to how they were before this message (+{preview.insertions} / −{preview.deletions}{" "}
+              lines):
+            </p>
+            <ul className="file-list">
+              {preview.filesChanged.map((f) => (
+                <li key={f}>
+                  <code>{f}</code>
+                </li>
+              ))}
+            </ul>
+            <p className="muted">
+              Only edits made with Claude's file tools (Edit, Write) are restored. Changes made by shell commands, and
+              files behind symlinks, are not. The conversation itself is not rewound.
+            </p>
+          </>
+        ),
+        confirmLabel: "Rewind files",
+        danger: true,
+      });
+      if (!ok) return;
+      const done = await request("session.rewind", { sessionId, messageId });
+      addNotice(
+        sessionId,
+        done.canRewind
+          ? `Rewound ${done.filesChanged.length} file(s) to before that message.`
+          : `Rewind failed: ${done.error ?? "unknown error"}`,
+      );
+    } catch (err) {
+      addNotice(sessionId, String(err));
     }
   }
 
-  const permission = permissions[0];
+  function closeTab(sessionId: string) {
+    const tab = tabs.find((t) => t.sessionId === sessionId);
+    if (tab && !tab.ended) void request("session.close", { sessionId }).catch(() => undefined);
+    const rest = tabs.filter((t) => t.sessionId !== sessionId);
+    setTabs(rest);
+    if (active === sessionId) setActive(rest.at(-1)?.sessionId ?? null);
+  }
+
+  const activeTab = tabs.find((t) => t.sessionId === active);
+  const permission = activeTab?.permissions[0];
+  const workspace = cwd.trim();
 
   return (
     <div className="app">
@@ -243,7 +340,41 @@ export function App() {
       </header>
       {runtimeNotice && <div className="banner">{runtimeNotice}</div>}
 
-      {!session ? (
+      <nav className="tabs" aria-label="Sessions">
+        {tabs.map((t) => (
+          <div key={t.sessionId} className={`tab${t.sessionId === active ? " active" : ""}`}>
+            <button
+              type="button"
+              className="tab-label"
+              aria-current={t.sessionId === active}
+              title={`${t.title}\n${t.cwd}`}
+              onClick={() => setActive(t.sessionId)}
+            >
+              <span className="tab-folder">{folderName(t.cwd)}</span> {t.title}
+              {t.permissions.length > 0 && <span className="tab-dot" title="Waiting for your approval" />}
+              {t.running && <span className="muted"> ⋯</span>}
+            </button>
+            <button
+              type="button"
+              className="tab-close"
+              aria-label={`Close ${t.title}`}
+              onClick={() => closeTab(t.sessionId)}
+            >
+              ×
+            </button>
+          </div>
+        ))}
+        <button
+          type="button"
+          className={`tab new${active === null ? " active" : ""}`}
+          aria-current={active === null}
+          onClick={() => setActive(null)}
+        >
+          + New session
+        </button>
+      </nav>
+
+      {active === null && (
         <section className="setup">
           <h1>Start a session</h1>
           <Readiness env={env} checking={checking} onRecheck={() => void recheck()} />
@@ -265,60 +396,35 @@ export function App() {
           </label>
           <button
             type="button"
-            disabled={!env?.ready || !cwd.trim()}
-            onClick={() => void startSession(cwd.trim(), model, asMode(settings?.defaultMode))}
+            disabled={!env?.ready || !workspace}
+            onClick={() => void startSession(workspace, model, asMode(settings?.defaultMode))}
           >
             Start session
           </button>
+          {hello && workspace && (
+            <SessionList
+              cwd={workspace}
+              openIds={new Set(tabs.filter((t) => !t.ended).map((t) => t.sessionId))}
+              onOpen={openStored}
+              confirm={confirm}
+            />
+          )}
           {settings && <SettingsPanel key={JSON.stringify(settings)} settings={settings} onSave={onSaveSettings} />}
         </section>
-      ) : (
-        <>
-          <main className="transcript">
-            {items.map((it) => (
-              <ItemView key={`${it.kind}-${it.id}`} item={it} />
-            ))}
-            {running && <div className="muted thinking">Working…</div>}
-            <div ref={bottomRef} />
-          </main>
-
-          <footer className="composer">
-            <textarea
-              value={draft}
-              placeholder="Ask Claude to do something in this workspace… (Enter to send, Shift+Enter for a new line)"
-              onChange={(e) => setDraft(e.target.value)}
-              onKeyDown={onComposerKey}
-              rows={3}
-            />
-            <div className="composer-actions">
-              <select
-                value={mode}
-                onChange={(e) => void changeMode(asMode(e.target.value))}
-                aria-label="Permission mode"
-              >
-                {PERMISSION_MODES.map((m) => (
-                  <option key={m} value={m}>
-                    {MODE_LABELS[m]}
-                  </option>
-                ))}
-              </select>
-              <span className="muted grow">
-                {session.model ?? "…"} · last turn ≈${cost.lastUsd.toFixed(4)} ({(cost.lastMs / 1000).toFixed(1)} s) ·
-                session ≈${cost.totalUsd.toFixed(4)} (estimate)
-              </span>
-              {running ? (
-                <button type="button" className="secondary" onClick={() => void request("session.interrupt", {})}>
-                  Stop
-                </button>
-              ) : (
-                <button type="button" disabled={!draft.trim()} onClick={() => void send()}>
-                  Send
-                </button>
-              )}
-            </div>
-          </footer>
-        </>
       )}
+
+      {tabs.map((t) => (
+        <SessionView
+          key={t.sessionId}
+          tab={t}
+          hidden={t.sessionId !== active}
+          onSend={(text) => void sendText(t.sessionId, text)}
+          onInterrupt={() => void request("session.interrupt", { sessionId: t.sessionId })}
+          onModeChange={(mode) => void changeMode(t.sessionId, mode)}
+          onRewind={(messageId) => void rewind(t.sessionId, messageId)}
+          onResume={() => void resume(t.sessionId, t.cwd, t.title)}
+        />
+      ))}
 
       {permission && (
         <div className="overlay">
@@ -338,78 +444,7 @@ export function App() {
           </div>
         </div>
       )}
+      {confirmDialog}
     </div>
   );
-}
-
-function ItemView({ item }: { item: Item }) {
-  switch (item.kind) {
-    case "user":
-      return <div className="msg user">{item.text}</div>;
-    case "assistant":
-      return <div className="msg assistant">{item.text}</div>;
-    case "notice":
-      return <div className="notice">{item.text}</div>;
-    case "tool":
-      return <ToolView tool={item} />;
-    case "agent":
-      return <AgentView agent={item} />;
-  }
-}
-
-function ToolView({ tool }: { tool: ToolItem }) {
-  const blocked = tool.output?.includes("Blocked by AgentChainer guard") ?? false;
-  return (
-    <details className={`tool ${tool.status}`} open={blocked}>
-      <summary>
-        <StatusIcon status={tool.status} />
-        {tool.name} <code>{toolSummary(tool.input)}</code>
-        {blocked && <span className="badge">blocked by guard</span>}
-      </summary>
-      <pre>{JSON.stringify(tool.input, null, 2)}</pre>
-      {tool.output !== undefined && <pre className="tool-output">{tool.output}</pre>}
-    </details>
-  );
-}
-
-function AgentView({ agent }: { agent: AgentItem }) {
-  const meta = [
-    agent.agentType,
-    agent.durationMs !== undefined ? `${(agent.durationMs / 1000).toFixed(1)} s` : null,
-    agent.tokens !== undefined ? `${agent.tokens.toLocaleString()} tokens` : null,
-  ].filter(Boolean);
-  return (
-    <details className={`agent ${agent.status}`} open={agent.status === "running"}>
-      <summary>
-        <StatusIcon status={agent.status} />
-        <strong>Subagent</strong> {agent.description}
-        {meta.length > 0 && <span className="muted">{meta.join(" · ")}</span>}
-      </summary>
-      <div className="agent-children">
-        {agent.children.map((c) =>
-          c.kind === "tool" ? (
-            <ToolView key={`tool-${c.id}`} tool={c} />
-          ) : (
-            <div key={`text-${c.id}`} className="msg agent-text">
-              {c.text}
-            </div>
-          ),
-        )}
-        {agent.summary && <div className="agent-summary">{agent.summary}</div>}
-      </div>
-    </details>
-  );
-}
-
-function StatusIcon({ status }: { status: "running" | "done" | "error" }) {
-  return <span className="tool-status">{status === "running" ? "⋯" : status === "done" ? "✓" : "✕"}</span>;
-}
-
-function toolSummary(input: unknown): string {
-  if (input && typeof input === "object") {
-    const o = input as Record<string, unknown>;
-    const v = o.command ?? o.file_path ?? o.pattern ?? o.url ?? o.description;
-    if (typeof v === "string") return v.length > 80 ? `${v.slice(0, 80)}…` : v;
-  }
-  return "";
 }

@@ -1,26 +1,14 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import type { RpcFrame } from "@agentchainer/protocol";
+import { methodSchemas, type RpcFrame } from "@agentchainer/protocol";
 import { dispatch, type Handlers, RpcFailure } from "./rpc.ts";
 
 /** Handlers that should never be reached are typed loosely; each test overrides the one it exercises. */
 const unreachable = () => {
   throw new Error("not under test");
 };
-const base = Object.fromEntries(
-  [
-    "system.hello",
-    "system.ping",
-    "env.check",
-    "sdk.prepare",
-    "debug.log",
-    "session.start",
-    "session.send",
-    "session.interrupt",
-    "session.setMode",
-    "permission.respond",
-  ].map((m) => [m, unreachable]),
-) as unknown as Handlers;
+const base = Object.fromEntries(Object.keys(methodSchemas).map((m) => [m, unreachable])) as unknown as Handlers;
+const SID = "6f1c0b3e-8d2a-4c5b-9e7f-0a1b2c3d4e5f";
 
 async function call(line: string, handlers: Partial<Handlers>) {
   const frames: RpcFrame[] = [];
@@ -33,18 +21,22 @@ const req = (method: string, params?: unknown) => JSON.stringify({ jsonrpc: "2.0
 
 describe("dispatch", () => {
   it("passes validated params to the handler and returns its result", async () => {
-    const res = await call(req("session.send", { text: "hi" }), {
-      "session.send": ({ text }) => ({ ok: text === "hi" }) as never,
+    const res = await call(req("session.send", { sessionId: SID, text: "hi" }), {
+      "session.send": ({ sessionId, text }) => ({ ok: text === "hi", messageId: sessionId }) as never,
     });
-    assert.deepEqual(res.result, { ok: true });
+    assert.deepEqual(res.result, { ok: true, messageId: SID });
   });
 
   it("rejects params that don't match the schema, before the handler runs", async () => {
     const res = await call(req("session.start", { cwd: "" }), {});
     assert.equal(res.error?.code, -32602);
     assert.match(res.error?.message ?? "", /Invalid params for session.start/);
-    const mode = await call(req("session.setMode", { mode: "bypassPermissions" }), {});
+    const mode = await call(req("session.setMode", { sessionId: SID, mode: "bypassPermissions" }), {});
     assert.equal(mode.error?.code, -32602, "bypassPermissions is not an allowed mode");
+    const noId = await call(req("session.send", { text: "hi" }), {});
+    assert.equal(noId.error?.code, -32602, "session methods need a session id");
+    const badId = await call(req("session.delete", { cwd: "/repo", sessionId: "../../etc" }), {});
+    assert.equal(badId.error?.code, -32602, "session ids must be UUIDs, so they can't form paths");
   });
 
   it("rejects unknown methods", async () => {
@@ -57,7 +49,7 @@ describe("dispatch", () => {
   });
 
   it("maps RpcFailure codes and plain errors", async () => {
-    const failure = await call(req("session.interrupt"), {
+    const failure = await call(req("session.interrupt", { sessionId: SID }), {
       "session.interrupt": () => {
         throw new RpcFailure(-32001, "No active session.");
       },

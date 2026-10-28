@@ -43,8 +43,8 @@ jobs:
       - run: pnpm typecheck
       - name: Sidecar smoke (system.hello over stdio)
         run: |
-          echo '{"jsonrpc":"2.0","id":1,"method":"system.hello","params":{"protocolVersion":1}}' \
-            | node packages/sidecar/src/main.ts | tee /dev/stderr | grep -q '"protocolVersion":1'
+          echo '{"jsonrpc":"2.0","id":1,"method":"system.hello","params":{"protocolVersion":2}}' \
+            | node packages/sidecar/src/main.ts | tee /dev/stderr | grep -q '"protocolVersion":2'
       - name: Unit tests with coverage (all packages)
         run: pnpm test:coverage
       - name: Build frontend (tauri::generate_context! embeds it)

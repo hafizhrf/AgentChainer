@@ -26,9 +26,14 @@ export type Methods = {
       claudeVersion: string | null;
     };
   };
-  "session.start": { params: { cwd: string; model?: string }; result: { ok: true } };
+  "session.start": {
+    params: { cwd: string; model?: string; permissionMode?: PermissionMode };
+    result: { ok: true };
+  };
   "session.send": { params: { text: string }; result: { ok: true } };
-  "session.interrupt": { params: Record<string, never>; result: { ok: true } };
+  /** `interrupted: false` means no turn was running, so nothing was sent to the CLI. */
+  "session.interrupt": { params: Record<string, never>; result: { ok: true; interrupted: boolean } };
+  "session.setMode": { params: { mode: PermissionMode }; result: { ok: true } };
   "permission.respond": {
     params: { requestId: string; allow: boolean; message?: string };
     result: { ok: true };
@@ -36,9 +41,23 @@ export type Methods = {
 };
 export type MethodName = keyof Methods;
 
+/**
+ * Permission modes the app offers. `bypassPermissions` is deliberately excluded; profiles
+ * (Safe/Standard/Autonomous, ARCHITECTURE §6) arrive in M1-18.
+ */
+export const PERMISSION_MODES = ["default", "acceptEdits", "plan"] as const;
+export type PermissionMode = (typeof PERMISSION_MODES)[number];
+
 /** Normalized agent activity, independent of raw SDK message shapes (ARCHITECTURE §5.2). */
 export type AgentEvent =
-  | { type: "session.started"; sessionId: string; model: string; cwd: string; claudeCodeVersion: string }
+  | {
+      type: "session.started";
+      sessionId: string;
+      model: string;
+      cwd: string;
+      claudeCodeVersion: string;
+      permissionMode: string;
+    }
   | { type: "text.delta"; text: string }
   | { type: "tool.started"; toolUseId: string; name: string; input: unknown; parentToolUseId: string | null }
   | { type: "tool.completed"; toolUseId: string; isError: boolean; output: string }

@@ -218,9 +218,21 @@ textarea {
 
 .composer-actions {
   display: flex;
-  justify-content: space-between;
   align-items: center;
   gap: 1rem;
+}
+
+.grow {
+  flex: 1;
+}
+
+.badge {
+  font-size: 0.75rem;
+  padding: 0.1rem 0.45rem;
+  border-radius: 999px;
+  border: 1px solid var(--err);
+  color: var(--err);
+  white-space: nowrap;
 }
 
 .overlay {

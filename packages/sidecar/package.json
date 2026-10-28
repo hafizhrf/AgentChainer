@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "start": "node src/main.ts",
+    "test": "node --test \"src/**/*.test.ts\"",
     "typecheck": "tsc"
   },
   "dependencies": {

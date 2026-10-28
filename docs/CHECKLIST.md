@@ -62,6 +62,8 @@
 - [ ] **M0-08** Lint and format: decide Biome vs ESLint+Prettier; rustfmt; clippy with warnings denied; lefthook pre-commit;
       conventional commits (commitlint).
 - [ ] **M0-09** Test runners: Vitest (TS), `cargo test` (Rust), coverage reports.
+      Progress: the sidecar already runs zero-dependency `node:test` unit tests (`pnpm --filter @agentchainer/sidecar test`)
+      in CI. Decide whether to keep `node:test` or move to Vitest; the UI needs a DOM-capable runner either way.
 - [ ] **M0-10** CI (GitHub Actions): lint + typecheck + test on ubuntu/macos/windows; Tauri build with unsigned artifacts per OS
       on PRs; least-privilege `permissions:`; actions pinned by SHA. Then add the CI jobs as required status checks in
       the `protect-main` ruleset, with "require branches to be up to date".
@@ -93,9 +95,15 @@
   - Round-trip `canUseTool` and a `PreToolUse` hook to a UI modal.
   - Exercise `interrupt()` and a mid-session `setPermissionMode()`.
   - Document which calls bypass `canUseTool`.
-  - Progress: `canUseTool` allow and deny verified at the sidecar level (round trip < 1 ms), and the approval dialog is in
-    the UI. Read-only commands such as `echo` bypass `canUseTool`. Still open: `PreToolUse`, `setPermissionMode()`, and a
-    manual test of Stop / `interrupt()`. See [S2/S3 spike](spikes/S2-S3-chat-slice.md).
+  - Progress: all behaviours are verified against the real CLI by the spike harness (9/9 checks):
+    - `canUseTool` allow and deny;
+    - mid-session `setPermissionMode()`;
+    - `interrupt()`, which stops a tool in 20–35 ms; an interrupt while idle is now ignored, because it used to abort
+      the next turn;
+    - the `PreToolUse` guard, which blocks before any prompt; 10 unit tests cover it, and it runs in CI.
+  - Read-only commands such as `echo` bypass `canUseTool`.
+  - Remaining before ticking: a human checks the approval dialog, mode switcher and Stop in the app.
+    See [S2/S3 spike](spikes/S2-S3-chat-slice.md).
 - [ ] **M0-18** **S4 Subagent attribution.**
   - Capture `parent_tool_use_id`, `agent_id`, the `SubagentStart/Stop` hooks and `forwardSubagentText`.
   - Build an agent tree for a prompt that spawns 2 parallel subagents.

@@ -49,9 +49,13 @@
       linear history). The "green CI required" part moves to M0-10, because there is no CI to require yet.
       — evidence: [repo](https://github.com/hafizhrf/AgentChainer), [ruleset `protect-main`](https://github.com/hafizhrf/AgentChainer/rules/26015160), initial commit `53421cf`
 - [ ] **M0-05** Add issue/PR templates; labels `area/*`, `milestone/*`, `type/*`, `good first issue`; a GitHub Project board mirroring this checklist.
-- [ ] **M0-06** Monorepo scaffold: pnpm workspaces (`apps/desktop`, `packages/sidecar`, `packages/protocol`) + Cargo workspace
+- [x] **M0-06** Monorepo scaffold: pnpm workspaces (`apps/desktop`, `packages/sidecar`, `packages/protocol`) + Cargo workspace
       (`apps/desktop/src-tauri`). Layout per [ARCHITECTURE §11](ARCHITECTURE.md#11-planned-repository-layout).
+      — evidence: branch `chore/m0-06-monorepo-scaffold`. On macOS x86_64 these pass: `pnpm install`, `pnpm typecheck`,
+      sidecar runs on Node 24 type stripping, `cargo fmt --check`, `cargo clippy -D warnings`, `tauri build --debug`.
 - [ ] **M0-07** Tauri v2 + React + Vite + TS (strict) app shell that opens a window on macOS, Windows and Ubuntu.
+      Progress: on macOS x86_64 the debug build opens a 1280×800 window (seen via the CoreGraphics window list), and the
+      UI calls the `app_info` Rust command. Windows and Ubuntu are pending CI builds (M0-10).
 - [ ] **M0-08** Lint and format: decide Biome vs ESLint+Prettier; rustfmt; clippy with warnings denied; lefthook pre-commit;
       conventional commits (commitlint).
 - [ ] **M0-09** Test runners: Vitest (TS), `cargo test` (Rust), coverage reports.
@@ -424,6 +428,7 @@ All of these run on macOS, Windows and Ubuntu against a sample repo in `fixtures
 
 - [ ] **X-01** Threat model doc (`docs/THREAT_MODEL.md`), updated every milestone.
 - [ ] **X-02** Least-privilege Tauri capabilities, a sidecar argument allowlist, and IPC validation on both ends.
+      Replace the scaffold's `"csp": null` (Tauri template default) with a strict Content Security Policy.
 - [ ] **X-03** Secrets never appear in logs or the UI: a redaction filter covers logs, displayed tool output and diagnostics.
 - [ ] **X-04** No telemetry by default. Any future telemetry is opt-in and documented.
 

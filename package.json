@@ -1,0 +1,14 @@
+{
+  "name": "agentchainer",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@11.11.0",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "dev": "pnpm --filter @agentchainer/desktop tauri dev",
+    "build": "pnpm --filter @agentchainer/desktop tauri build",
+    "typecheck": "pnpm -r typecheck"
+  }
+}

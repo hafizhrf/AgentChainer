@@ -1,7 +1,13 @@
 # AgentChainer — agent context
 
 Open-source desktop app (Tauri v2 + React/TS + Node sidecar on the Claude Agent SDK) that makes repos agent-ready and
-keeps agent work transparent and verified. **Current phase: planning. Only docs exist; there is no code yet.**
+keeps agent work transparent and verified. **Current phase: M0 (foundations).** The monorepo scaffold exists; there are no agent features yet.
+
+Layout:
+- `apps/desktop`: Tauri app. `src/` is the React UI, `src-tauri/` is the Rust core.
+- `packages/protocol`: IPC types.
+- `packages/sidecar`: Node agent runtime.
+- `docs/`: planning docs.
 
 ## Source of truth
 
@@ -25,4 +31,19 @@ keeps agent work transparent and verified. **Current phase: planning. Only docs 
 
 ## Commands
 
-_To be filled in at M0-06 / M0-12, once the scaffold exists: install, dev, lint, typecheck, test, build._
+Prerequisites:
+- Node 24 (`.node-version`) and pnpm 11 (`packageManager`).
+- Rust stable via rustup (`rust-toolchain.toml`), with `~/.cargo/bin` on PATH.
+- The [Tauri v2 system prerequisites](https://v2.tauri.app/start/prerequisites/).
+
+| Task | Command |
+|---|---|
+| Install | `pnpm install` |
+| Run the desktop app (dev, hot reload) | `pnpm dev` |
+| Build the desktop app (installers) | `pnpm build` |
+| Fast debug build, no installers | `pnpm --filter @agentchainer/desktop tauri build --debug --no-bundle` |
+| Typecheck all TS packages | `pnpm typecheck` |
+| Rust check / lint / format | `cargo check --workspace` · `cargo clippy --workspace` · `cargo fmt --all` |
+| Run the sidecar placeholder | `pnpm --filter @agentchainer/sidecar start` |
+
+TS lint, format and test commands arrive with M0-08 / M0-09.

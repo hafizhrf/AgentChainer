@@ -40,8 +40,17 @@
 - [ ] **M0-01** Check the product name: GitHub org/repo, domain, npm scope and crates.io are free, and the name is policy-compliant
       (no "Claude Code" in name or icon; tagline "Powered by Claude"). → [ADR-0002](adr/0002-auth-and-branding.md)
 - [ ] **M0-02** Accept the license ([ADR-0006](adr/0006-license.md)), add `LICENSE` and `NOTICE`.
-- [ ] **M0-03** Check whether the Agent SDK's license or terms allow bundling its JS inside a distributed sidecar binary. Record
+- [x] **M0-03** Check whether the Agent SDK's license or terms allow bundling its JS inside a distributed sidecar binary. Record
       the answer in [ADR-0003](adr/0003-agent-runtime-and-ipc.md); fallback is installing the SDK on first run ([R-11](RISKS.md)).
+      — evidence: the SDK `LICENSE.md` ("All rights reserved", with use under Anthropic's legal agreements) and the
+      [legal page](https://code.claude.com/docs/en/legal-and-compliance), which grants no redistribution right.
+      **Decision:** don't bundle. Download the pinned SDK from npm on first run with an integrity check. Recorded in
+      ADR-0003 and R-11.
+- [ ] **M0-22** Owner asks Anthropic in writing (via [contact sales](https://www.anthropic.com/contact-sales)):
+  - (1) May an open-source desktop app bundle the Agent SDK?
+  - (2) Is a local GUI that drives the user's own unmodified, user-signed-in `claude` CLI through the Agent SDK
+    acceptable with Pro/Max subscriptions?
+  - Record the answer in ADR-0002 and ADR-0003 ([R-01](RISKS.md), [R-11](RISKS.md)).
 
 ### Repository & tooling
 
@@ -79,8 +88,12 @@
 ### Spikes
 
 - [ ] **M0-15** **S1 Sidecar packaging.**
-  - Compile a minimal sidecar using `@anthropic-ai/claude-agent-sdk` (optional deps omitted) into a single executable.
-    Compare `@yao-pkg/pkg` and Node SEA.
+  - Compile our sidecar code into a single executable **without the Agent SDK inside** (M0-03). Compare `@yao-pkg/pkg`
+    and Node SEA.
+  - First-run SDK fetch:
+    - download the pinned `@anthropic-ai/claude-agent-sdk` tarball from the npm registry into the app data dir;
+    - verify its sha512 integrity against the lockfile, then load it;
+    - test offline, behind a proxy, and with a tampered tarball.
   - Run it as a Tauri `externalBin` on 3 OS, driving the user's installed `claude` via `pathToClaudeCodeExecutable`.
   - Record binary size and cold start.
   - Check PATH resolution: a macOS app started from Finder, and `%USERPROFILE%\.local\bin` on Windows.

@@ -4,7 +4,8 @@
   --fg: #1d1d1f;
   --muted: #6e6e73;
   --border: #d9d9de;
-  --accent: #c2410c;
+  /* Primary: dark pastel green, never orange (it reads as Claude's own look). Full palette: UX-02. */
+  --accent: #3f6b52;
   --accent-fg: #ffffff;
   --user: #eef2ff;
   --ok: #15803d;
@@ -23,7 +24,7 @@
     --fg: #f2f2f7;
     --muted: #a1a1a6;
     --border: #3a3a3c;
-    --accent: #fb923c;
+    --accent: #7fb89a;
     --accent-fg: #1c1c1e;
     --user: #2b2f45;
     --ok: #4ade80;

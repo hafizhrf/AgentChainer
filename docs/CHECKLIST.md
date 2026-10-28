@@ -484,6 +484,11 @@ All of these run on macOS, Windows and Ubuntu against a sample repo in `fixtures
       approval patterns; write down principles and anti-patterns in `docs/design/ux-principles.md`.
 - [ ] **UX-02** Design system: tokens (color, type, spacing, radius, motion) for light and dark. Pick a component approach
       (e.g. Radix/shadcn + Tailwind) and record it in an ADR.
+      Owner decisions (2026-10-28):
+      - Primary color: a dark pastel green. No orange: it would look like Claude's own apps (see the branding rules
+        in ADR-0002).
+      - Dark mode stays a first-class theme.
+      - The plain UI already uses green accent tokens (`--accent` in `App.css`) as a placeholder until this item.
 - [ ] **UX-03** Information architecture and wireframes:
   - left sidebar with workspaces and sessions;
   - the main transcript;

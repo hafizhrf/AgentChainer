@@ -45,5 +45,9 @@ Prerequisites:
 | Typecheck all TS packages | `pnpm typecheck` |
 | Rust check / lint / format | `cargo check --workspace` · `cargo clippy --workspace` · `cargo fmt --all` |
 | Run the sidecar placeholder | `pnpm --filter @agentchainer/sidecar start` |
+| Launch smoke test (after a debug build) | `node scripts/smoke-launch.mjs target/debug/agentchainer [--seconds N]` |
+
+CI (`.github/workflows/ci.yml`) runs on every PR and on pushes to `main`. Actions are pinned by commit SHA, so keep the
+`# vX.Y.Z` comment next to each SHA when bumping.
 
 TS lint, format and test commands arrive with M0-08 / M0-09.

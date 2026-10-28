@@ -42,8 +42,20 @@
 - **Negative:**
   - A sidecar crash interrupts all running turns. SDK sessions are persisted, so they can be resumed, but in-flight tool calls are lost.
   - Backpressure: text deltas must be coalesced (~16 ms frames) before crossing to the UI.
-- **Open item (M0-03):** confirm that the Agent SDK's license/terms allow bundling its JS inside our distributed sidecar binary.
-  If not, install the SDK on first run from npm instead.
+- **SDK distribution (M0-03, resolved 2026-10-28): do not bundle the Agent SDK.**
+  - Its `LICENSE.md` reads: *"© Anthropic PBC. All rights reserved. Use is subject to the Legal Agreements outlined
+    here: https://code.claude.com/docs/en/legal-and-compliance."*
+  - That page grants no right to redistribute the SDK.
+  - **Decision:**
+    - Ship only our own sidecar code.
+    - On first run, the sidecar downloads the **pinned** `@anthropic-ai/claude-agent-sdk` version from the npm registry
+      into the app data directory.
+    - It checks the tarball against the lockfile's integrity hash (sha512) before loading it. A failed check means the
+      SDK is not loaded.
+  - Optional platform packages are skipped, as today ([ADR-0002](0002-auth-and-branding.md)).
+  - This adds a network step at first run, and S1 must cover offline and proxy failures.
+  - Revisit if Anthropic grants written permission to bundle (M0-22).
+  - This is the project's reading of the published terms, not legal advice.
 - **Revisit when:** S1/S2 numbers are unacceptable, the SDK changes its process model, or a multi-window feature needs per-window isolation.
 
 ## References

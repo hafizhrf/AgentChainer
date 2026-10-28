@@ -53,8 +53,19 @@
   - We depend on the user's CLI version, so the health check must enforce a minimum version and the compatibility matrix must be kept current.
   - On macOS and Linux, a GUI app does not inherit the shell's `PATH`/env, so the app must resolve the user's login-shell
     environment (see [ARCHITECTURE §3](../ARCHITECTURE.md#3-locating-claude-and-the-users-environment)).
-  - The policy text does not explicitly cover a GUI that drives a CLI the user signed into themselves. This is tracked as
-    [R-01](../RISKS.md) (monitor docs; optionally ask Anthropic for clarification).
+  - Anthropic's [Legal and compliance](https://code.claude.com/docs/en/legal-and-compliance) page (read 2026-10-28)
+    supports this design:
+    > "Nor does it prevent an end user from signing in to the unmodified Claude Code binary with their own Claude
+    > subscription, including where a platform hosts Claude Code…"
+  - The same page sets conditions we must keep meeting:
+    - run the Claude Code binary **unmodified**;
+    - never remove, disable or restrict its built-in sign-in methods;
+    - never pay for, resell or intermediate users' Claude usage;
+    - never collect, store or intermediate Claude.ai credentials or session tokens. Sign-in completes through
+      Anthropic's own flow.
+  - The page also says developers building products with the Agent SDK "should use API key authentication". AgentChainer
+    offers no login of its own; each user signs in to their own unmodified CLI. The remaining ambiguity is tracked as
+    [R-01](../RISKS.md): monitor the docs and ask Anthropic (M0-22).
 - **Revisit when:** Anthropic's policy or docs change, Anthropic contacts the project, or `claude auth status` output changes.
 
 ## References
@@ -62,3 +73,5 @@
 - Authentication: https://code.claude.com/docs/en/authentication
 - Setup: https://code.claude.com/docs/en/setup
 - Agent SDK overview (policy and branding): https://code.claude.com/docs/en/agent-sdk/overview
+- Legal and compliance (licensing, offering Claude Code in products, credential use, name and logo):
+  https://code.claude.com/docs/en/legal-and-compliance

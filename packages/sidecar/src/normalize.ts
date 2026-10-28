@@ -1,5 +1,5 @@
-import type { SDKMessage } from "@anthropic-ai/claude-agent-sdk";
 import type { AgentEvent } from "@agentchainer/protocol";
+import type { SDKMessage } from "@anthropic-ai/claude-agent-sdk";
 
 /**
  * Maps one raw SDK message to zero or more normalized events (ARCHITECTURE §5.2).
@@ -52,7 +52,11 @@ export function normalize(m: SDKMessage): AgentEvent[] {
 
     case "stream_event":
       // Only the main agent streams deltas; subagent text arrives as whole messages (forwardSubagentText).
-      if (m.parent_tool_use_id === null && m.event.type === "content_block_delta" && m.event.delta.type === "text_delta") {
+      if (
+        m.parent_tool_use_id === null &&
+        m.event.type === "content_block_delta" &&
+        m.event.delta.type === "text_delta"
+      ) {
         return [{ type: "text.delta", text: m.event.delta.text }];
       }
       return [];
@@ -71,7 +75,12 @@ export function normalize(m: SDKMessage): AgentEvent[] {
             ...(agentId ? { agentId } : {}),
           });
         } else if (block.type === "text" && m.parent_tool_use_id !== null && block.text.trim()) {
-          events.push({ type: "agent.text", parentToolUseId: m.parent_tool_use_id, ...(agentId ? { agentId } : {}), text: block.text });
+          events.push({
+            type: "agent.text",
+            parentToolUseId: m.parent_tool_use_id,
+            ...(agentId ? { agentId } : {}),
+            text: block.text,
+          });
         }
       }
       return events;
@@ -123,7 +132,9 @@ export function summarize(content: unknown): string {
     typeof content === "string"
       ? content
       : Array.isArray(content)
-        ? content.map((part) => (part && typeof part === "object" && "text" in part ? String(part.text) : "")).join("\n")
+        ? content
+            .map((part) => (part && typeof part === "object" && "text" in part ? String(part.text) : ""))
+            .join("\n")
         : "";
   return text.length > 4000 ? `${text.slice(0, 4000)}\n… (${text.length - 4000} more chars)` : text;
 }

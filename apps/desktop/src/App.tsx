@@ -1,15 +1,20 @@
-import { useEffect, useRef, useState, type KeyboardEvent } from "react";
 import {
-  PERMISSION_MODES,
   type AgentEvent,
   type EnvCheck,
   type Methods,
+  PERMISSION_MODES,
   type PermissionMode,
   type PermissionRequest,
 } from "@agentchainer/protocol";
-import { connect, onExit, request, subscribe } from "./sidecar.ts";
-import { applyEvent, closeAssistant, nextId, type AgentItem, type Item, type ToolItem } from "./transcript.ts";
+import { type KeyboardEvent, useEffect, useRef, useState } from "react";
+import { quitApp, readSelftestConfig } from "./selftest.ts";
+import { connect, onExit, request, subscribe, takeDeltaLatencies } from "./sidecar.ts";
+import { latencyStats } from "./stats.ts";
+import { type AgentItem, applyEvent, closeAssistant, type Item, nextId, type ToolItem } from "./transcript.ts";
 import "./App.css";
+
+/** Guards against React StrictMode running the mount effect twice in dev. */
+let selftestStarted = false;
 
 // Spike UI (S2–S5): readiness check, one session, streaming text, tool and subagent cards, approvals.
 // The real session core is M1 and the visual design pass is the UX track.
@@ -45,13 +50,25 @@ export function App() {
   const [permissions, setPermissions] = useState<PermissionRequest[]>([]);
   const [cost, setCost] = useState({ lastUsd: 0, totalUsd: 0, lastMs: 0 });
   const bottomRef = useRef<HTMLDivElement>(null);
+  const selftestActive = useRef(false);
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: subscribe once on mount; the handlers only call state setters, which are stable.
   useEffect(() => {
     connect()
       .then(() => request("system.hello", { protocolVersion: 1 }))
       .then((h) => {
         setHello(h);
         return recheck();
+      })
+      .then(async (checked) => {
+        const cfg = await readSelftestConfig();
+        if (!cfg || !checked.ready || selftestStarted) return;
+        selftestStarted = true;
+        selftestActive.current = true;
+        setCwd(cfg.cwd);
+        takeDeltaLatencies();
+        await startSession(cfg.cwd, cfg.model ?? "");
+        await sendText(cfg.prompt);
       })
       .catch((err: unknown) => setFatal(String(err)));
 
@@ -66,15 +83,27 @@ export function App() {
     };
   }, []);
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: scroll to the bottom whenever the transcript changes.
   useEffect(() => bottomRef.current?.scrollIntoView({ block: "end" }), [items]);
 
-  async function recheck() {
+  async function recheck(): Promise<EnvCheck> {
     setChecking(true);
     try {
-      setEnv(await request("env.check", {}));
+      const checked = await request("env.check", {});
+      setEnv(checked);
+      return checked;
     } finally {
       setChecking(false);
     }
+  }
+
+  async function reportSelftest(e: Extract<AgentEvent, { type: "turn.completed" }>) {
+    const stats = latencyStats(takeDeltaLatencies());
+    const report = {
+      selftest: { deltaLatencyMs: stats, turnMs: e.durationMs, costUsd: e.costUsd, subtype: e.subtype },
+    };
+    await request("debug.log", { message: JSON.stringify(report) });
+    await quitApp();
   }
 
   function onAgentEvent(e: AgentEvent) {
@@ -88,16 +117,20 @@ export function App() {
     if (e.type === "turn.completed") {
       setRunning(false);
       setCost((c) => ({ lastUsd: e.costUsd, totalUsd: c.totalUsd + e.costUsd, lastMs: e.durationMs }));
+      if (selftestActive.current) {
+        selftestActive.current = false;
+        void reportSelftest(e);
+      }
     }
     if (e.type === "error") setRunning(false);
     setItems((prev) => applyEvent(prev, e));
   }
 
-  async function startSession() {
+  async function startSession(dir: string, modelAlias: string) {
     try {
-      await request("session.start", { cwd, ...(model ? { model } : {}) });
+      await request("session.start", { cwd: dir, ...(modelAlias ? { model: modelAlias } : {}) });
       setSession({});
-      setItems([{ kind: "notice", id: nextId(), text: `Session started in ${cwd}` }]);
+      setItems([{ kind: "notice", id: nextId(), text: `Session started in ${dir}` }]);
     } catch (err) {
       setItems((prev) => [...prev, { kind: "notice", id: nextId(), text: String(err) }]);
     }
@@ -107,6 +140,10 @@ export function App() {
     const text = draft.trim();
     if (!text || running) return;
     setDraft("");
+    await sendText(text);
+  }
+
+  async function sendText(text: string) {
     setRunning(true);
     setItems((prev) => [...closeAssistant(prev), { kind: "user", id: nextId(), text }]);
     try {
@@ -168,7 +205,9 @@ export function App() {
             />
           </label>
           {hello && cwd.trim().replace(/\/+$/, "") === hello.homeDir && (
-            <p className="warn">That's your whole home folder. Pick a single project folder so the agent stays inside it.</p>
+            <p className="warn">
+              That's your whole home folder. Pick a single project folder so the agent stays inside it.
+            </p>
           )}
           <label>
             Model
@@ -180,7 +219,7 @@ export function App() {
               ))}
             </select>
           </label>
-          <button disabled={!env?.ready || !cwd} onClick={() => void startSession()}>
+          <button type="button" disabled={!env?.ready || !cwd} onClick={() => void startSession(cwd, model)}>
             Start session
           </button>
         </section>
@@ -219,11 +258,11 @@ export function App() {
                 session ≈${cost.totalUsd.toFixed(4)} (estimate)
               </span>
               {running ? (
-                <button className="secondary" onClick={() => void request("session.interrupt", {})}>
+                <button type="button" className="secondary" onClick={() => void request("session.interrupt", {})}>
                   Stop
                 </button>
               ) : (
-                <button disabled={!draft.trim()} onClick={() => void send()}>
+                <button type="button" disabled={!draft.trim()} onClick={() => void send()}>
                   Send
                 </button>
               )}
@@ -240,10 +279,12 @@ export function App() {
             {permission.agentId && <p className="muted">Requested by subagent {permission.agentId}</p>}
             <pre>{JSON.stringify(permission.input, null, 2)}</pre>
             <div className="dialog-actions">
-              <button className="secondary" onClick={() => void answer(permission, false)}>
+              <button type="button" className="secondary" onClick={() => void answer(permission, false)}>
                 Deny
               </button>
-              <button onClick={() => void answer(permission, true)}>Allow once</button>
+              <button type="button" onClick={() => void answer(permission, true)}>
+                Allow once
+              </button>
             </div>
           </div>
         </div>
@@ -256,22 +297,39 @@ export function App() {
 function Readiness({ env, checking, onRecheck }: { env: EnvCheck | null; checking: boolean; onRecheck: () => void }) {
   if (!env) return <p className="muted">{checking ? "Checking your setup…" : "Waiting for the sidecar…"}</p>;
   const install =
-    env.platform === "win32" ? "irm https://claude.ai/install.ps1 | iex" : "curl -fsSL https://claude.ai/install.sh | bash";
+    env.platform === "win32"
+      ? "irm https://claude.ai/install.ps1 | iex"
+      : "curl -fsSL https://claude.ai/install.sh | bash";
   const rows: { ok: boolean; label: string; fix?: string; command?: string }[] = [
     env.claude.path
       ? { ok: true, label: `Claude Code CLI found (${env.claude.version ?? "version unknown"})` }
-      : { ok: false, label: "Claude Code CLI not found", fix: "Install it in your terminal, then open a new terminal:", command: install },
+      : {
+          ok: false,
+          label: "Claude Code CLI not found",
+          fix: "Install it in your terminal, then open a new terminal:",
+          command: install,
+        },
   ];
   if (env.claude.path) {
     rows.push(
       env.claude.versionOk
         ? { ok: true, label: `Version ${env.claude.minVersion} or newer` }
-        : { ok: false, label: `Version older than ${env.claude.minVersion}`, fix: "Update it in your terminal:", command: "claude update" },
+        : {
+            ok: false,
+            label: `Version older than ${env.claude.minVersion}`,
+            fix: "Update it in your terminal:",
+            command: "claude update",
+          },
     );
     rows.push(
       env.auth?.loggedIn
         ? { ok: true, label: `Signed in (${authLabel(env)})` }
-        : { ok: false, label: "Not signed in", fix: "Sign in yourself in your terminal (AgentChainer never handles your login):", command: "claude auth login" },
+        : {
+            ok: false,
+            label: "Not signed in",
+            fix: "Sign in yourself in your terminal (AgentChainer never handles your login):",
+            command: "claude auth login",
+          },
     );
   }
   rows.push(
@@ -299,7 +357,7 @@ function Readiness({ env, checking, onRecheck }: { env: EnvCheck | null; checkin
           Step-by-step guide: <code>docs/guides/AUTH_SETUP.md</code>
         </p>
       )}
-      <button className="secondary" disabled={checking} onClick={onRecheck}>
+      <button type="button" className="secondary" disabled={checking} onClick={onRecheck}>
         {checking ? "Checking…" : "Re-check"}
       </button>
     </div>
@@ -360,7 +418,13 @@ function AgentView({ agent }: { agent: AgentItem }) {
       </summary>
       <div className="agent-children">
         {agent.children.map((c) =>
-          c.kind === "tool" ? <ToolView key={`tool-${c.id}`} tool={c} /> : <div key={`text-${c.id}`} className="msg agent-text">{c.text}</div>,
+          c.kind === "tool" ? (
+            <ToolView key={`tool-${c.id}`} tool={c} />
+          ) : (
+            <div key={`text-${c.id}`} className="msg agent-text">
+              {c.text}
+            </div>
+          ),
         )}
         {agent.summary && <div className="agent-summary">{agent.summary}</div>}
       </div>

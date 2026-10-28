@@ -1,6 +1,6 @@
 # ADR-0006: License — Apache-2.0
 
-- **Status:** Proposed (owner to confirm; MIT is an acceptable alternative; checklist M0-02)
+- **Status:** Accepted (owner confirmed 2026-10-28; checklist M0-02)
 - **Date:** 2026-10-28
 - **Deciders:** project owner
 - **Related:** [RISKS R-11](../RISKS.md), checklist M0-03
@@ -33,7 +33,7 @@ License AgentChainer's own code under **Apache-2.0** (explicit patent grant, per
 
 - Add `LICENSE` and SPDX headers (optional) at M0.
 - Add a `NOTICE` file listing third-party components bundled in releases.
-- Whether the SDK may be redistributed inside our binary is a separate question (M0-03 / R-11).
+- The SDK is not redistributed: it is downloaded on first run (M0-03, [ADR-0003](0003-agent-runtime-and-ipc.md)).
 
 ## References
 

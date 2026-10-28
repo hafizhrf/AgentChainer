@@ -1,12 +1,12 @@
 import { appendFileSync } from "node:fs";
+import type { AgentEvent, PermissionMode, PermissionRequest } from "@agentchainer/protocol";
 import {
-  query,
   type HookCallback,
   type PermissionResult,
   type Query,
+  query,
   type SDKUserMessage,
 } from "@anthropic-ai/claude-agent-sdk";
-import type { AgentEvent, PermissionMode, PermissionRequest } from "@agentchainer/protocol";
 import { checkToolCall } from "./guard.ts";
 import { normalize } from "./normalize.ts";
 

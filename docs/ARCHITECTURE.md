@@ -73,7 +73,10 @@ env vars the user set (`ANTHROPIC_API_KEY`, `CLAUDE_CODE_USE_BEDROCK`, …).
   only; logs go to stderr, which Rust captures into the log file.
 - **Handshake:** `system.hello {protocolVersion, appVersion}` → `{protocolVersion, sdkVersion, nodeVersion}`. On a major mismatch, refuse to start.
 - **Schemas:** `packages/protocol` (zod) → JSON Schema → generated TS + Rust types. Both ends validate every frame.
-- **Backpressure:** the sidecar coalesces `text.delta`/`thinking.delta` into ~16 ms batches. Rust forwards them to the UI as Tauri events.
+- **Backpressure:** each `text.delta` is forwarded as its own frame. Spike S2 measured p95 2–3 ms from sidecar to UI, so
+  ~16 ms coalescing is deferred until measurements show it's needed. Rust forwards frames to the UI as Tauri events.
+- **Metrics (dev):** with `AGENTCHAINER_METRICS=1`, notifications carry `ts` (send time). The self-test mode
+  (`AGENTCHAINER_SELFTEST`, `scripts/selftest-latency.mjs`) uses it to measure latency without UI clicks.
 - **Cancellation:** every long request carries a `requestId`; `request.cancel {requestId}` aborts it.
 
 Planned surface (v0.1):
@@ -81,6 +84,7 @@ Planned surface (v0.1):
 | Kind | Name | Purpose |
 |---|---|---|
 | request | `env.check` | Return CLI path, version, auth state (no secrets) |
+| request | `debug.log` | Dev only: write a UI line to the sidecar log (self-test metrics) |
 | request | `session.start` | Start a session `{workspace, model, effort, mode, profile, budgetUsd, resume?, fork?}` |
 | request | `session.send` | Push a user message (text, @files, images) into the streaming input |
 | request | `session.interrupt` | Interrupt the running turn |
@@ -300,8 +304,8 @@ agentchainer/
 | Layer | Tooling | Notes |
 |---|---|---|
 | Rust core | `cargo test`, clippy | Supervisor, IPC relay, DB migrations |
-| Sidecar | Vitest | Normalizer against recorded fixtures; installers and rollback on temp dirs; detectors on `fixtures/` |
-| UI | Vitest + Testing Library | Driven by a fake transport replaying fixtures. No live model calls in CI |
+| Sidecar | `node:test` (+ built-in coverage) | Normalizer against recorded fixtures; guard; CLI parsing; installers and rollback on temp dirs |
+| UI | `node:test` for pure logic (transcript reducer, stats); Vitest + Testing Library once DOM component tests are needed | Driven by a fake transport replaying fixtures. No live model calls in CI |
 | Protocol | Generated-type compile checks + schema round-trip tests | Rust ⇄ TS stay in sync |
 | E2E | `tauri-driver` (WebDriver) on Linux and Windows | macOS WKWebView has no WebDriver **(verify)**; use a manual checklist there |
 | Contract drift | Weekly CI job against the latest SDK + CLI | Opens an issue on mismatch (X-05) |

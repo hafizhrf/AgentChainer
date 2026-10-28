@@ -1,6 +1,6 @@
+import type { MethodName, Methods, Notifications, RpcError } from "@agentchainer/protocol";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import type { MethodName, Methods, Notifications, RpcError } from "@agentchainer/protocol";
 
 /** JSON-RPC client for the sidecar. Frames travel through the Rust core (ADR-0003). */
 
@@ -11,6 +11,8 @@ export type Notification = {
 type Pending = { resolve: (result: unknown) => void; reject: (err: Error) => void };
 
 let nextId = 1;
+/** Sidecar-to-UI latency of each streamed text delta, in ms. Only filled when the sidecar sends `ts` (spike S2). */
+const deltaLatencies: number[] = [];
 const pending = new Map<number, Pending>();
 const subscribers = new Set<(n: Notification) => void>();
 const exitSubscribers = new Set<(status: string) => void>();
@@ -36,7 +38,11 @@ function handleFrame(raw: string): void {
     params?: unknown;
     result?: unknown;
     error?: RpcError;
+    ts?: number;
   };
+  if (typeof frame.ts === "number" && (frame.params as { type?: string } | undefined)?.type === "text.delta") {
+    deltaLatencies.push(Date.now() - frame.ts);
+  }
   if (typeof frame.id === "number" && frame.method === undefined) {
     const p = pending.get(frame.id);
     if (!p) return;
@@ -57,13 +63,16 @@ export async function request<M extends MethodName>(
   const id = nextId++;
   return new Promise((resolve, reject) => {
     pending.set(id, { resolve: (result) => resolve(result as Methods[M]["result"]), reject });
-    invoke("sidecar_send", { frame: JSON.stringify({ jsonrpc: "2.0", id, method, params }) }).catch(
-      (err: unknown) => {
-        pending.delete(id);
-        reject(new Error(String(err)));
-      },
-    );
+    invoke("sidecar_send", { frame: JSON.stringify({ jsonrpc: "2.0", id, method, params }) }).catch((err: unknown) => {
+      pending.delete(id);
+      reject(new Error(String(err)));
+    });
   });
+}
+
+/** Returns and clears the collected delta latencies (spike S2 self-test). */
+export function takeDeltaLatencies(): number[] {
+  return deltaLatencies.splice(0);
 }
 
 export function subscribe(fn: (n: Notification) => void): () => void {

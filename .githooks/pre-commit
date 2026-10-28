@@ -1,0 +1,7 @@
+#!/usr/bin/env sh
+# Fast checks on staged files. Enable once per clone with: pnpm hooks:install
+set -e
+pnpm exec biome check --staged --no-errors-on-unmatched
+if git diff --cached --name-only | grep -qE '\.rs$'; then
+  cargo fmt --all --check
+fi

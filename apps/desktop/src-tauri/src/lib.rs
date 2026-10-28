@@ -25,6 +25,18 @@ fn sidecar_send(frame: String, sidecar: State<'_, Sidecar>) -> Result<(), String
     sidecar.send(&frame)
 }
 
+/// Dev-only self-test (spike S2): `AGENTCHAINER_SELFTEST` holds JSON `{cwd, model, prompt}`. When set, the UI runs
+/// one turn on its own, reports latency through `debug.log`, and quits via `quit_app`.
+#[tauri::command]
+fn selftest_config() -> Option<String> {
+    std::env::var("AGENTCHAINER_SELFTEST").ok()
+}
+
+#[tauri::command]
+fn quit_app(app: tauri::AppHandle) {
+    app.exit(0);
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -34,7 +46,24 @@ pub fn run() {
             app.manage(sidecar);
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![app_info, sidecar_send])
+        .invoke_handler(tauri::generate_handler![
+            app_info,
+            sidecar_send,
+            selftest_config,
+            quit_app
+        ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn app_info_reports_the_package_version() {
+        let info = app_info();
+        assert_eq!(info.name, "AgentChainer");
+        assert_eq!(info.version, env!("CARGO_PKG_VERSION"));
+    }
 }

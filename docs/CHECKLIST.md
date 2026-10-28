@@ -40,7 +40,9 @@
 
 - [ ] **M0-01** Check the product name: GitHub org/repo, domain, npm scope and crates.io are free, and the name is policy-compliant
       (no "Claude Code" in name or icon; tagline "Powered by Claude"). → [ADR-0002](adr/0002-auth-and-branding.md)
-- [ ] **M0-02** Accept the license ([ADR-0006](adr/0006-license.md)), add `LICENSE` and `NOTICE`.
+- [x] **M0-02** Accept the license ([ADR-0006](adr/0006-license.md)), add `LICENSE` and `NOTICE`.
+      — evidence: the owner chose Apache-2.0 (2026-10-28). `LICENSE` (SPDX text) and `NOTICE` added, `license` field set
+      in every package and crate, and ADR-0006 is Accepted.
 - [x] **M0-03** Check whether the Agent SDK's license or terms allow bundling its JS inside a distributed sidecar binary. Record
       the answer in [ADR-0003](adr/0003-agent-runtime-and-ipc.md); fallback is installing the SDK on first run ([R-11](RISKS.md)).
       — evidence: the SDK `LICENSE.md` ("All rights reserved", with use under Anthropic's legal agreements) and the
@@ -59,6 +61,8 @@
       linear history). The "green CI required" part moves to M0-10, because there is no CI to require yet.
       — evidence: [repo](https://github.com/hafizhrf/AgentChainer), [ruleset `protect-main`](https://github.com/hafizhrf/AgentChainer/rules/26015160), initial commit `53421cf`
 - [ ] **M0-05** Add issue/PR templates; labels `area/*`, `milestone/*`, `type/*`, `good first issue`; a GitHub Project board mirroring this checklist.
+      Progress: PR template (evidence checklist) and bug/feature issue templates added. Remaining for the owner, in
+      the GitHub UI: labels and a Project board.
 - [x] **M0-06** Monorepo scaffold: pnpm workspaces (`apps/desktop`, `packages/sidecar`, `packages/protocol`) + Cargo workspace
       (`apps/desktop/src-tauri`). Layout per [ARCHITECTURE §11](ARCHITECTURE.md#11-planned-repository-layout).
       — evidence: branch `chore/m0-06-monorepo-scaffold`. On macOS x86_64 these pass: `pnpm install`, `pnpm typecheck`,
@@ -69,22 +73,43 @@
       (app alive after 15 s) passed on macOS, Windows and Ubuntu in
       [run 40645248278](https://github.com/hafizhrf/AgentChainer/actions/runs/40645248278). Tick once the uploaded
       screenshots confirm the window renders on all three.
-- [ ] **M0-08** Lint and format: decide Biome vs ESLint+Prettier; rustfmt; clippy with warnings denied; lefthook pre-commit;
+- [x] **M0-08** Lint and format: decide Biome vs ESLint+Prettier; rustfmt; clippy with warnings denied; lefthook pre-commit;
       conventional commits (commitlint).
-- [ ] **M0-09** Test runners: Vitest (TS), `cargo test` (Rust), coverage reports.
-      Progress: the sidecar already runs zero-dependency `node:test` unit tests (`pnpm --filter @agentchainer/sidecar test`)
-      in CI. Decide whether to keep `node:test` or move to Vitest; the UI needs a DOM-capable runner either way.
-- [ ] **M0-10** CI (GitHub Actions): lint + typecheck + test on ubuntu/macos/windows; Tauri build with unsigned artifacts per OS
+      — evidence: **Biome 2.6** (`biome.json`) lints and formats TS/JSON/CSS/YAML (Markdown and the lockfile excluded).
+      `pnpm lint` runs `biome ci` in CI. rustfmt and clippy (`-D warnings`) were already in CI.
+      Deviations, chosen for zero extra dependencies:
+      - The pre-commit hook is a plain script in `.githooks/`, enabled with `pnpm hooks:install`. lefthook needs an
+        install script, which pnpm 11 blocks by default.
+      - commitlint is replaced by a **PR title** check (`.github/workflows/pr-title.yml`), because squash merges make the
+        PR title the commit message on `main`.
+- [x] **M0-09** Test runners: Vitest (TS), `cargo test` (Rust), coverage reports.
+      — evidence: decision to **keep `node:test`** (zero dependencies, runs `.ts` natively on Node 24). Vitest is added
+      only when DOM component tests are needed (M1).
+      - CI runs `pnpm test:coverage` (Node's built-in coverage; ~98% of desktop and ~90% of sidecar lines touched by
+        tests) and `cargo test --workspace` (first Rust test).
+      - 26 TS tests in total.
+- [x] **M0-10** CI (GitHub Actions): lint + typecheck + test on ubuntu/macos/windows; Tauri build with unsigned artifacts per OS
       on PRs; least-privilege `permissions:`; actions pinned by SHA. Then add the CI jobs as required status checks in
       the `protect-main` ruleset, with "require branches to be up to date".
-      Progress: `.github/workflows/ci.yml` is merged (PR #3) and green on all 4 jobs
-      ([run 40645248278](https://github.com/hafizhrf/AgentChainer/actions/runs/40645248278)). Remaining: required status
-      checks in the ruleset. Lint and tests join CI with M0-08 / M0-09.
+      — evidence: `.github/workflows/ci.yml` (PR #3, extended since), green on every PR since. The owner added all 4 jobs as
+      required status checks with "up to date" enforced, confirmed through the rules API (2026-10-28). Since then PRs
+      can't merge before CI passes (PR #8).
 - [ ] **M0-11** Renovate or Dependabot. Pin the Agent SDK and group it for manual review.
-- [ ] **M0-12** Dogfood: update [`CLAUDE.md`](../CLAUDE.md) with real commands; `.claude/settings.json` hooks (format on edit);
+      Progress: `.github/dependabot.yml` covers actions, npm and cargo, weekly, with a 3-day cooldown matching pnpm's
+      release-age policy. The Agent SDK gets its own group, and commit prefixes keep PR titles Conventional.
+      Tick after the first Dependabot run is seen on GitHub.
+- [x] **M0-12** Dogfood: update [`CLAUDE.md`](../CLAUDE.md) with real commands; `.claude/settings.json` hooks (format on edit);
       project skills for recurring work (e.g. `add-ipc-method`, `add-catalog-item`).
+      — evidence: CLAUDE.md lists the real commands.
+      - The `.claude/settings.json` PostToolUse hook formats every file Claude edits. It was exercised on itself while
+        building this PR.
+      - Finding: the hook must not apply lint fixes mid-edit. A `let` declared one edit before its reassignment was
+        turned into a `const`, so the hook now only formats and sorts imports.
+      - Project skill `.claude/skills/add-ipc-method`. `add-catalog-item` waits for the catalog (M2).
 - [ ] **M0-13** Render-check all Mermaid diagrams in `docs/` on GitHub.
 - [ ] **M0-14** Add `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`, `SECURITY.md` (private vulnerability reporting enabled).
+      Progress: all three files added. Reports go through GitHub's private advisories. Remaining for the owner: enable
+      **Settings → Code security → Private vulnerability reporting**.
 
 ### Spikes
 
@@ -101,10 +126,15 @@
   - Progress: the SDK runs against the user's CLI with the bundled binaries excluded (pnpm `ignoredOptionalDependencies`),
     and the sidecar finds the CLI on PATH or in known locations. Single-exe packaging is not started yet.
     See [S2/S3 spike](spikes/S2-S3-chat-slice.md).
-- [ ] **M0-16** **S2 Event stream.** Run a streaming-input `query()`, forward SDK messages through Rust to React, and measure
+- [x] **M0-16** **S2 Event stream.** Run a streaming-input `query()`, forward SDK messages through Rust to React, and measure
       end-to-end delta latency and CPU with partial messages on.
-  - Progress: streaming works end to end (sidecar → Rust → React chat UI). Time to first delta is 2.1–3.4 s and dominated
-    by the model. UI-side latency and CPU are not measured yet. See [S2/S3 spike](spikes/S2-S3-chat-slice.md).
+  - — evidence: self-test mode plus `scripts/selftest-latency.mjs`, two runs (haiku, macOS x86_64).
+    - Sidecar → Rust → UI delta latency: **p50 1 ms, p95 2–3 ms, max 4–16 ms** over 72 and 196 deltas.
+    - CPU while streaming: app ~2–3%, sidecar ~1.4–1.9%, `claude` ~6–9% average.
+    - RSS: app ~59 MB, sidecar ~86 MB, `claude` ~210–290 MB.
+  - Time to first delta (2–3 s) is the model's. Delta coalescing is not needed at these rates.
+  - Not measured: WebView render cost (its processes aren't children of the app on macOS).
+  - See [S2/S3 spike](spikes/S2-S3-chat-slice.md).
 - [x] **M0-17** **S3 Permissions.**
   - Round-trip `canUseTool` and a `PreToolUse` hook to a UI modal.
   - Exercise `interrupt()` and a mid-session `setPermissionMode()`.

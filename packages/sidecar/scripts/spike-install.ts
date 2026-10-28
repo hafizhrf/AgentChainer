@@ -35,7 +35,8 @@ function timed<T>(fn: () => T): [T, string] {
   const value = fn();
   return [value, `${(performance.now() - t0).toFixed(0)} ms`];
 }
-const readJson = (path: string) => (existsSync(path) ? (JSON.parse(readFileSync(path, "utf8")) as Record<string, unknown>) : null);
+const readJson = (path: string) =>
+  existsSync(path) ? (JSON.parse(readFileSync(path, "utf8")) as Record<string, unknown>) : null;
 const brief = (r: cli.CliResult) => JSON.stringify(r.json ?? (r.stdout.trim() || r.stderr.trim()).slice(0, 160));
 
 console.log(`project: ${project}\nplugin: ${plugin}\n`);
@@ -50,25 +51,44 @@ check("marketplace is configured", mk.ok && known, `${marketplace} known=${known
 const settingsPath = join(project, ".claude", "settings.json");
 const [inst, instTime] = timed(() => cli.installPlugin(claude, plugin, "project", project));
 const enabledAfterInstall = (readJson(settingsPath)?.enabledPlugins as Record<string, unknown> | undefined)?.[plugin];
-check("plugin install (project scope, no TTY, no -y)", inst.ok && enabledAfterInstall === true, `exit=${inst.status} ${instTime} result=${brief(inst)} enabledPlugins[${plugin}]=${enabledAfterInstall}`);
+check(
+  "plugin install (project scope, no TTY, no -y)",
+  inst.ok && enabledAfterInstall === true,
+  `exit=${inst.status} ${instTime} result=${brief(inst)} enabledPlugins[${plugin}]=${enabledAfterInstall}`,
+);
 
 // 3. What version did we get? (There is no flag to pin one; the lockfile must record it.)
 const [list] = timed(() => cli.listPlugins(claude, project));
-const entry = Array.isArray(list.json) ? list.json.find((p) => JSON.stringify(p).includes(plugin.split("@")[0]!)) : undefined;
-check("installed plugin is listed with a version", list.ok && entry !== undefined, `entry=${JSON.stringify(entry)?.slice(0, 300)}`);
+const pluginName = plugin.split("@")[0] ?? plugin;
+const entry = Array.isArray(list.json) ? list.json.find((p) => JSON.stringify(p).includes(pluginName)) : undefined;
+check(
+  "installed plugin is listed with a version",
+  list.ok && entry !== undefined,
+  `entry=${JSON.stringify(entry)?.slice(0, 300)}`,
+);
 
 // 4. Uninstall again.
 const [uninst, uninstTime] = timed(() => cli.uninstallPlugin(claude, plugin, "project", project));
 const enabledAfterUninstall = (readJson(settingsPath)?.enabledPlugins as Record<string, unknown> | undefined)?.[plugin];
-check("plugin uninstall (project scope)", uninst.ok && enabledAfterUninstall !== true, `exit=${uninst.status} ${uninstTime} result=${brief(uninst)} enabled after=${enabledAfterUninstall}`);
+check(
+  "plugin uninstall (project scope)",
+  uninst.ok && enabledAfterUninstall !== true,
+  `exit=${uninst.status} ${uninstTime} result=${brief(uninst)} enabled after=${enabledAfterUninstall}`,
+);
 
 // 5. MCP, local scope: private to this user and project (stored in the user's ~/.claude.json under this project).
 const server = "agentchainer-s6-probe";
-const [addLocal] = timed(() => cli.addMcpServer(claude, server, "local", "node", ["-e", "process.stdin.resume()"], project));
+const [addLocal] = timed(() =>
+  cli.addMcpServer(claude, server, "local", "node", ["-e", "process.stdin.resume()"], project),
+);
 const getLocal = cli.getMcpServer(claude, server, project);
 const removeLocal = cli.removeMcpServer(claude, server, "local", project);
 const goneLocal = !cli.getMcpServer(claude, server, project).ok;
-check("MCP add/get/remove (local scope)", addLocal.ok && getLocal.ok && removeLocal.ok && goneLocal, `add=${addLocal.status} get=${getLocal.status} remove=${removeLocal.status} gone=${goneLocal}`);
+check(
+  "MCP add/get/remove (local scope)",
+  addLocal.ok && getLocal.ok && removeLocal.ok && goneLocal,
+  `add=${addLocal.status} get=${getLocal.status} remove=${removeLocal.status} gone=${goneLocal}`,
+);
 
 // 6. MCP, project scope: writes the shareable .mcp.json in the project.
 const mcpJson = join(project, ".mcp.json");
@@ -76,7 +96,11 @@ const addProject = cli.addMcpServer(claude, server, "project", "node", ["-e", "p
 const inFile = Boolean((readJson(mcpJson)?.mcpServers as Record<string, unknown> | undefined)?.[server]);
 const removeProject = cli.removeMcpServer(claude, server, "project", project);
 const stillInFile = Boolean((readJson(mcpJson)?.mcpServers as Record<string, unknown> | undefined)?.[server]);
-check("MCP add/remove (project scope → .mcp.json)", addProject.ok && inFile && removeProject.ok && !stillInFile, `add=${addProject.status} written=${inFile} remove=${removeProject.status} still there=${stillInFile}`);
+check(
+  "MCP add/remove (project scope → .mcp.json)",
+  addProject.ok && inFile && removeProject.ok && !stillInFile,
+  `add=${addProject.status} written=${inFile} remove=${removeProject.status} still there=${stillInFile}`,
+);
 
 const failed = results.filter((r) => !r.ok).length;
 console.log(`\n${results.length - failed} passed, ${failed} failed`);

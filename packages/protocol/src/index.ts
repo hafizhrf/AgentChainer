@@ -10,7 +10,8 @@ export const PROTOCOL_VERSION = 1;
 export type RpcRequest = { jsonrpc: "2.0"; id: number; method: string; params?: unknown };
 export type RpcError = { code: number; message: string };
 export type RpcResponse = { jsonrpc: "2.0"; id: number; result?: unknown; error?: RpcError };
-export type RpcNotification = { jsonrpc: "2.0"; method: string; params?: unknown };
+/** `ts` (sidecar send time, epoch ms) is only present when AGENTCHAINER_METRICS=1, for latency measurement (spike S2). */
+export type RpcNotification = { jsonrpc: "2.0"; method: string; params?: unknown; ts?: number };
 export type RpcFrame = RpcRequest | RpcResponse | RpcNotification;
 
 /** Requests from the host (UI via Rust) to the sidecar. */
@@ -36,6 +37,8 @@ export type Methods = {
   /** `interrupted: false` means no turn was running, so nothing was sent to the CLI. */
   "session.interrupt": { params: Record<string, never>; result: { ok: true; interrupted: boolean } };
   "session.setMode": { params: { mode: PermissionMode }; result: { ok: true } };
+  /** Dev-only: lets the UI write a line to the sidecar's log, e.g. self-test metrics (spike S2). */
+  "debug.log": { params: { message: string }; result: { ok: true } };
   "permission.respond": {
     params: { requestId: string; allow: boolean; message?: string };
     result: { ok: true };

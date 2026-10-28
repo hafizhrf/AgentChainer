@@ -68,12 +68,13 @@ See [ADR-0001](docs/adr/0001-desktop-stack.md).
 
 ## Contributing
 
-The repository is being set up (checklist [M0](docs/CHECKLIST.md#m0--foundations--spikes)). Contribution guidelines will
-land in `CONTRIBUTING.md`.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for setup, workflow and the checks every PR must pass, and
+[SECURITY.md](SECURITY.md) to report a vulnerability privately. This project follows the
+[Code of Conduct](CODE_OF_CONDUCT.md).
 
 ## License
 
-Apache-2.0 (proposed; see [ADR-0006](docs/adr/0006-license.md)).
+[Apache-2.0](LICENSE). See [ADR-0006](docs/adr/0006-license.md) and [NOTICE](NOTICE).
 
 ---
 

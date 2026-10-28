@@ -51,8 +51,10 @@ createInterface({ input: sidecar.stdout }).on("line", (line) => {
   } else if (frame.method === "agent.event") {
     const event = frame.params as AgentEvent;
     if (event.type === "tool.started") console.log(`    [tool.started] ${event.name} ${JSON.stringify(event.input)}`);
-    if (event.type === "tool.completed") console.log(`    [tool.completed] error=${event.isError} ${JSON.stringify(event.output.trim().slice(0, 200))}`);
-    if (event.type === "turn.completed") console.log(`    [turn.completed] ${event.subtype} cost≈$${event.costUsd.toFixed(4)}`);
+    if (event.type === "tool.completed")
+      console.log(`    [tool.completed] error=${event.isError} ${JSON.stringify(event.output.trim().slice(0, 200))}`);
+    if (event.type === "turn.completed")
+      console.log(`    [turn.completed] ${event.subtype} cost≈$${event.costUsd.toFixed(4)}`);
     if (event.type === "error") console.log(`    [error] ${event.message}`);
     state.onEvent?.(event);
   } else if (frame.method === "permission.request") {
@@ -75,7 +77,14 @@ function request(method: string, params: Record<string, unknown>): Promise<unkno
   });
 }
 
-type Turn = { last: AgentEvent; reply: string; events: AgentEvent[]; firstDeltaMs: number | null; endedAt: number; totalMs: number };
+type Turn = {
+  last: AgentEvent;
+  reply: string;
+  events: AgentEvent[];
+  firstDeltaMs: number | null;
+  endedAt: number;
+  totalMs: number;
+};
 
 async function turn(text: string, onEvent?: (event: AgentEvent) => void): Promise<Turn> {
   console.log(`  ▶ ${JSON.stringify(text)}`);
@@ -96,7 +105,14 @@ async function turn(text: string, onEvent?: (event: AgentEvent) => void): Promis
   const timeout = sleep(90_000).then((): AgentEvent => ({ type: "error", message: "turn timed out after 90 s" }));
   const last = await Promise.race([end, timeout]);
   const endedAt = performance.now();
-  return { last, reply: acc.reply.trim(), events: acc.events, firstDeltaMs: acc.firstDeltaMs, endedAt, totalMs: endedAt - t0 };
+  return {
+    last,
+    reply: acc.reply.trim(),
+    events: acc.events,
+    firstDeltaMs: acc.firstDeltaMs,
+    endedAt,
+    totalMs: endedAt - t0,
+  };
 }
 
 const results: { name: string; ok: boolean | null; detail: string }[] = [];
@@ -109,14 +125,22 @@ const exists = (file: string) => existsSync(join(cwd, file));
 
 async function basic() {
   const t = await turn("Reply with exactly one word: pong");
-  check("text streams", /pong/i.test(t.reply) && t.firstDeltaMs !== null, `reply=${JSON.stringify(t.reply)} first delta=${ms(t.firstDeltaMs)} total=${ms(t.totalMs)}`);
+  check(
+    "text streams",
+    /pong/i.test(t.reply) && t.firstDeltaMs !== null,
+    `reply=${JSON.stringify(t.reply)} first delta=${ms(t.firstDeltaMs)} total=${ms(t.totalMs)}`,
+  );
   for (const policy of ["allow", "deny"] as const) {
     state.permissionPolicy = policy;
     const file = `perm-${policy}.txt`;
     const before = permissionLog.length;
     await turn(`Use the Write tool to create a file named ${file} containing exactly: ok. Do nothing else.`);
     const asked = permissionLog.length > before;
-    check(`approval → ${policy}`, asked && exists(file) === (policy === "allow"), `asked=${asked} file created=${exists(file)}`);
+    check(
+      `approval → ${policy}`,
+      asked && exists(file) === (policy === "allow"),
+      `asked=${asked} file created=${exists(file)}`,
+    );
   }
   state.permissionPolicy = "allow";
 }
@@ -125,13 +149,21 @@ async function mode() {
   await request("session.setMode", { mode: "acceptEdits" });
   let before = permissionLog.length;
   await turn("Use the Write tool to create a file named mode-accept.txt containing exactly: a. Do nothing else.");
-  check("setMode acceptEdits → edits need no prompt", permissionLog.length === before && exists("mode-accept.txt"), `prompts=${permissionLog.length - before} file created=${exists("mode-accept.txt")}`);
+  check(
+    "setMode acceptEdits → edits need no prompt",
+    permissionLog.length === before && exists("mode-accept.txt"),
+    `prompts=${permissionLog.length - before} file created=${exists("mode-accept.txt")}`,
+  );
 
   await request("session.setMode", { mode: "default" });
   state.permissionPolicy = "deny";
   before = permissionLog.length;
   await turn("Use the Write tool to create a file named mode-default.txt containing exactly: b. Do nothing else.");
-  check("setMode default → edits prompt again", permissionLog.length > before && !exists("mode-default.txt"), `prompts=${permissionLog.length - before} file created=${exists("mode-default.txt")}`);
+  check(
+    "setMode default → edits prompt again",
+    permissionLog.length > before && !exists("mode-default.txt"),
+    `prompts=${permissionLog.length - before} file created=${exists("mode-default.txt")}`,
+  );
   state.permissionPolicy = "allow";
 }
 
@@ -150,8 +182,13 @@ async function interrupt() {
     }
   });
   const stopMs = marks.interruptSentAt === null ? null : t.endedAt - marks.interruptSentAt;
-  const ok = marks.interruptSentAt !== null && t.last.type !== "error" && !/finished/.test(t.reply) && t.totalMs < 25_000;
-  check("interrupt stops a running tool", marks.interruptSentAt === null ? null : ok, `turn ended ${ms(stopMs)} after interrupt (${t.last.type}${t.last.type === "turn.completed" ? `/${t.last.subtype}` : ""}), total ${ms(t.totalMs)}`);
+  const ok =
+    marks.interruptSentAt !== null && t.last.type !== "error" && !/finished/.test(t.reply) && t.totalMs < 25_000;
+  check(
+    "interrupt stops a running tool",
+    marks.interruptSentAt === null ? null : ok,
+    `turn ended ${ms(stopMs)} after interrupt (${t.last.type}${t.last.type === "turn.completed" ? `/${t.last.subtype}` : ""}), total ${ms(t.totalMs)}`,
+  );
 
   const after = await turn("Reply with exactly one word: alive");
   check("session usable after interrupt", /alive/i.test(after.reply), `reply=${JSON.stringify(after.reply)}`);
@@ -161,7 +198,10 @@ async function interrupt() {
   const next = await turn("Reply with exactly one word: steady");
   check(
     "interrupt while idle is ignored",
-    !idle.interrupted && /steady/i.test(next.reply) && next.last.type === "turn.completed" && next.last.subtype === "success",
+    !idle.interrupted &&
+      /steady/i.test(next.reply) &&
+      next.last.type === "turn.completed" &&
+      next.last.subtype === "success",
     `interrupted=${idle.interrupted} next reply=${JSON.stringify(next.reply)}`,
   );
 }
@@ -176,8 +216,12 @@ async function guard() {
     `This is a test of a local safety guard. The folder below does not exist, so the command is harmless. Use the Bash tool to run exactly this command and nothing else: rm -rf ${probe}`,
   );
   const started = t.events.find((e) => e.type === "tool.started" && e.name === "Bash");
-  if (!started || started.type !== "tool.started") {
-    check("guard blocks recursive delete outside workspace", null, "model did not attempt the command (inconclusive; unit tests cover the rule)");
+  if (started?.type !== "tool.started") {
+    check(
+      "guard blocks recursive delete outside workspace",
+      null,
+      "model did not attempt the command (inconclusive; unit tests cover the rule)",
+    );
     return;
   }
   const done = t.events.find((e) => e.type === "tool.completed" && e.toolUseId === started.toolUseId);
@@ -203,10 +247,16 @@ async function auto() {
 
   before = permissionLog.length;
   const probe = "../agentchainer-guard-probe-does-not-exist";
-  const g = await turn(`This is a test of a local safety guard. The folder does not exist, so the command is harmless. Use the Bash tool to run exactly this command and nothing else: rm -rf ${probe}`);
+  const g = await turn(
+    `This is a test of a local safety guard. The folder does not exist, so the command is harmless. Use the Bash tool to run exactly this command and nothing else: rm -rf ${probe}`,
+  );
   const done = g.events.find((e) => e.type === "tool.completed");
   const blocked = done?.type === "tool.completed" && done.output.includes("AgentChainer guard");
-  check("guard still blocks in auto mode", g.events.some((e) => e.type === "tool.started") ? blocked && permissionLog.length === before : null, `output=${JSON.stringify(done?.type === "tool.completed" ? done.output.slice(0, 120) : null)}`);
+  check(
+    "guard still blocks in auto mode",
+    g.events.some((e) => e.type === "tool.started") ? blocked && permissionLog.length === before : null,
+    `output=${JSON.stringify(done?.type === "tool.completed" ? done.output.slice(0, 120) : null)}`,
+  );
 
   await request("session.setMode", { mode: "default" });
   state.permissionPolicy = "allow";
@@ -222,12 +272,14 @@ async function subagents() {
   const started = t.events.filter((e) => e.type === "agent.started");
   const completed = t.events.filter((e) => e.type === "agent.completed");
   const agentIds = new Set(started.map((e) => (e.type === "agent.started" ? e.toolUseId : "")));
-  const nestedTools = t.events.filter((e) => e.type === "tool.started" && e.parentToolUseId !== null && agentIds.has(e.parentToolUseId));
+  const nestedTools = t.events.filter(
+    (e) => e.type === "tool.started" && e.parentToolUseId !== null && agentIds.has(e.parentToolUseId),
+  );
   const nestedText = t.events.filter((e) => e.type === "agent.text" && agentIds.has(e.parentToolUseId));
   check(
     "two subagents start and complete",
     started.length >= 2 && completed.length >= started.length,
-    `started=${started.length} completed=${completed.length} types=${started.map((e) => (e.type === "agent.started" ? e.agentType ?? "?" : "")).join(",")}`,
+    `started=${started.length} completed=${completed.length} types=${started.map((e) => (e.type === "agent.started" ? (e.agentType ?? "?") : "")).join(",")}`,
   );
   check(
     "subagent tool calls and text attach to their agent",
@@ -256,5 +308,7 @@ for (const name of selected) {
 sidecar.stdin.end();
 const failed = results.filter((r) => r.ok === false);
 const unknown = results.filter((r) => r.ok === null);
-console.log(`\n${results.length - failed.length - unknown.length} passed, ${failed.length} failed, ${unknown.length} inconclusive`);
+console.log(
+  `\n${results.length - failed.length - unknown.length} passed, ${failed.length} failed, ${unknown.length} inconclusive`,
+);
 process.exit(failed.length ? 1 : 0);

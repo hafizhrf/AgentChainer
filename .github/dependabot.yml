@@ -1,0 +1,41 @@
+# Dependency updates (checklist M0-11).
+# - A 3-day cooldown mirrors pnpm 11's minimum-release-age policy, so brand-new releases aren't proposed.
+# - The Claude Agent SDK gets its own PR for manual review: it's exact-pinned and its event shapes are covered by
+#   recorded fixtures (packages/sidecar/test/fixtures).
+# - Commit prefixes keep Dependabot's PR titles Conventional (pr-title.yml).
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule: { interval: weekly }
+    cooldown: { default-days: 3 }
+    commit-message: { prefix: ci }
+    groups:
+      actions:
+        patterns: ["*"]
+
+  - package-ecosystem: npm
+    directory: /
+    schedule: { interval: weekly }
+    cooldown: { default-days: 3 }
+    commit-message: { prefix: "chore(deps)" }
+    groups:
+      claude-agent-sdk:
+        patterns: ["@anthropic-ai/*"]
+      tauri-js:
+        patterns: ["@tauri-apps/*"]
+      dev-tooling:
+        dependency-type: development
+        patterns: ["*"]
+      runtime:
+        dependency-type: production
+        patterns: ["*"]
+
+  - package-ecosystem: cargo
+    directory: /
+    schedule: { interval: weekly }
+    cooldown: { default-days: 3 }
+    commit-message: { prefix: "chore(deps)" }
+    groups:
+      cargo:
+        patterns: ["*"]

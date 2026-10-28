@@ -1,0 +1,12 @@
+AgentChainer
+Copyright 2026 hafizhrf and the AgentChainer contributors
+
+Licensed under the Apache License, Version 2.0 (see LICENSE).
+
+Third-party components keep their own licenses, recorded in their package
+metadata (npm and crates.io).
+
+The Claude Agent SDK and the Claude Code CLI are not part of this
+distribution. The SDK is downloaded from npm on first run and the CLI is the
+user's own installation; both are governed by Anthropic's terms
+(https://code.claude.com/docs/en/legal-and-compliance).

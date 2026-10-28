@@ -1,19 +1,22 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
-import type { SDKMessage } from "@anthropic-ai/claude-agent-sdk";
 import type { AgentEvent } from "@agentchainer/protocol";
+import type { SDKMessage } from "@anthropic-ai/claude-agent-sdk";
 import { normalize } from "./normalize.ts";
 
 /** Real stream recorded in spike S4: one prompt that launches two parallel subagents (haiku, CLI 2.1.293). */
 function replay(name: string): AgentEvent[] {
-  const lines = readFileSync(new URL(`../test/fixtures/${name}`, import.meta.url), "utf8").split("\n").filter(Boolean);
+  const lines = readFileSync(new URL(`../test/fixtures/${name}`, import.meta.url), "utf8")
+    .split("\n")
+    .filter(Boolean);
   return lines.flatMap((line) => normalize(JSON.parse(line) as SDKMessage));
 }
 
 describe("normalize: subagents-parallel fixture", () => {
   const events = replay("subagents-parallel.jsonl");
-  const of = <T extends AgentEvent["type"]>(type: T) => events.filter((e): e is Extract<AgentEvent, { type: T }> => e.type === type);
+  const of = <T extends AgentEvent["type"]>(type: T) =>
+    events.filter((e): e is Extract<AgentEvent, { type: T }> => e.type === type);
 
   it("reports two subagents, each started and completed by the Agent tool call that spawned it", () => {
     const started = of("agent.started");
@@ -31,7 +34,9 @@ describe("normalize: subagents-parallel fixture", () => {
     const agents = new Set(of("agent.started").map((e) => e.toolUseId));
     const nested = of("tool.started").filter((e) => e.parentToolUseId !== null);
     assert.ok(nested.length >= 2);
-    for (const e of nested) assert.ok(agents.has(e.parentToolUseId!), `tool ${e.name} belongs to a known agent`);
+    for (const e of nested) {
+      assert.ok(e.parentToolUseId !== null && agents.has(e.parentToolUseId), `tool ${e.name} belongs to a known agent`);
+    }
     assert.deepEqual(new Set(nested.map((e) => e.parentToolUseId)), agents, "both agents did work");
 
     const nestedResults = of("tool.completed").filter((e) => e.parentToolUseId !== null);

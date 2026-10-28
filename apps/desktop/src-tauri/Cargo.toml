@@ -4,6 +4,7 @@ version = "0.1.0"
 description = "AgentChainer desktop app (Tauri core)"
 authors = ["hafizhrf"]
 repository = "https://github.com/hafizhrf/AgentChainer"
+license = "Apache-2.0"
 edition = "2024"
 publish = false
 

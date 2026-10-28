@@ -73,6 +73,9 @@ The packaged loader (`sdk-loader.ts`, when `AGENTCHAINER_DATA_DIR` is set):
    is M1-03 (login-shell env resolution).
 7. **macOS signing:** the sidecar is ad-hoc signed after injection. Developer ID signing and notarization of the
    externalBin happen at R1-03.
+8. **A stalled download hung session start.** A later local smoke run sat in `sdk.prepare` for 10 minutes on a
+   flaky network. The download (body included) now has a 120 s deadline and a clear error, and the next session
+   retries. Unit-tested with a fetch that never answers.
 
 ## Not covered yet
 

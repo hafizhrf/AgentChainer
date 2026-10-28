@@ -1,7 +1,22 @@
 import { createInterface } from "node:readline";
-import type { Notifications, RpcFrame, RpcRequest } from "@agentchainer/protocol";
+import {
+  describeIssues,
+  isMethodName,
+  type MethodName,
+  type MethodParams,
+  type MethodResult,
+  methodSchemas,
+  type Notifications,
+  RpcErrorCode,
+  type RpcFrame,
+  type RpcRequest,
+} from "@agentchainer/protocol";
 
-export type Handler = (params: Record<string, unknown>) => unknown;
+/** One handler per protocol method. Params arrive validated against the method's schema (M1-02). */
+export type Handlers = {
+  [M in MethodName]: (params: MethodParams<M>) => MethodResult<M> | Promise<MethodResult<M>>;
+};
+export type Write = (frame: RpcFrame) => void;
 
 /** Thrown by handlers to return a JSON-RPC error with a specific code. */
 export class RpcFailure extends Error {
@@ -13,9 +28,9 @@ export class RpcFailure extends Error {
 }
 
 // stdout carries protocol frames only (ADR-0003). Everything else goes to stderr via log().
-function write(frame: RpcFrame): void {
+const writeStdout: Write = (frame) => {
   process.stdout.write(`${JSON.stringify(frame)}\n`);
-}
+};
 
 export function log(message: string): void {
   process.stderr.write(`${message}\n`);
@@ -24,18 +39,18 @@ export function log(message: string): void {
 const METRICS = process.env.AGENTCHAINER_METRICS === "1";
 
 export function notify<N extends keyof Notifications>(method: N, params: Notifications[N]): void {
-  write({ jsonrpc: "2.0", method, params, ...(METRICS ? { ts: Date.now() } : {}) });
+  writeStdout({ jsonrpc: "2.0", method, params, ...(METRICS ? { ts: Date.now() } : {}) });
 }
 
 /**
  * Reads NDJSON JSON-RPC requests from stdin and dispatches them. When stdin closes (host gone),
  * finishes in-flight requests, runs `onClose`, flushes stdout and exits.
  */
-export function serve(handlers: Record<string, Handler>, onClose?: () => void): void {
+export function serve(handlers: Handlers, onClose?: () => void): void {
   const inflight = new Set<Promise<void>>();
   const rl = createInterface({ input: process.stdin });
   rl.on("line", (line) => {
-    const done: Promise<void> = dispatch(line, handlers).finally(() => inflight.delete(done));
+    const done: Promise<void> = dispatch(line, handlers, writeStdout).finally(() => inflight.delete(done));
     inflight.add(done);
   });
   rl.on("close", () => {
@@ -46,30 +61,34 @@ export function serve(handlers: Record<string, Handler>, onClose?: () => void): 
   });
 }
 
-async function dispatch(line: string, handlers: Record<string, Handler>): Promise<void> {
+/** Validates one request, runs its handler, validates the result, and writes exactly one response. */
+export async function dispatch(line: string, handlers: Handlers, write: Write): Promise<void> {
   let req: RpcRequest;
   try {
     req = JSON.parse(line) as RpcRequest;
   } catch {
-    log(`rpc: ignoring non-JSON line`);
+    log("rpc: ignoring non-JSON line");
     return;
   }
-  const handler = handlers[req.method];
-  if (!handler) {
-    write({ jsonrpc: "2.0", id: req.id, error: { code: -32601, message: `Unknown method ${req.method}` } });
-    return;
+  const fail = (code: number, message: string) => write({ jsonrpc: "2.0", id: req.id, error: { code, message } });
+
+  if (!isMethodName(req.method)) return fail(RpcErrorCode.methodNotFound, `Unknown method ${req.method}`);
+  const schema = methodSchemas[req.method];
+  const params = schema.params.safeParse(req.params ?? {});
+  if (!params.success) {
+    return fail(RpcErrorCode.invalidParams, `Invalid params for ${req.method}: ${describeIssues(params.error)}`);
   }
+
   try {
-    const params = (req.params ?? {}) as Record<string, unknown>;
-    write({ jsonrpc: "2.0", id: req.id, result: await handler(params) });
+    // Each handler's param type matches its own schema; TypeScript can't correlate the two through the union.
+    const handler = handlers[req.method] as (p: unknown) => unknown;
+    const result = schema.result.safeParse(await handler(params.data));
+    if (!result.success) {
+      return fail(RpcErrorCode.internal, `Invalid result from ${req.method}: ${describeIssues(result.error)}`);
+    }
+    write({ jsonrpc: "2.0", id: req.id, result: result.data });
   } catch (err) {
     const code = err instanceof RpcFailure ? err.code : -32000;
-    write({ jsonrpc: "2.0", id: req.id, error: { code, message: err instanceof Error ? err.message : String(err) } });
+    fail(code, err instanceof Error ? err.message : String(err));
   }
-}
-
-export function requireString(params: Record<string, unknown>, key: string): string {
-  const value = params[key];
-  if (typeof value !== "string" || value === "") throw new RpcFailure(-32602, `Missing string param "${key}"`);
-  return value;
 }

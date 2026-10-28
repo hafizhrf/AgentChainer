@@ -18,7 +18,9 @@ if (!values.cwd) {
 }
 const claude = findClaude();
 if (!claude) {
-  console.error("claude CLI not found");
+  // Report what discovery saw, so a CI failure (e.g. npm's Windows shims) is diagnosable from the annotation alone.
+  const hint = `PATH has ${(process.env.PATH ?? "").split(process.platform === "win32" ? ";" : ":").length} entries; platform ${process.platform}`;
+  console.log(`::error title=S6 claude not found::findClaude() returned null (${hint})`);
   process.exit(2);
 }
 const project = join(values.cwd, `s6-project-${Date.now()}`);
@@ -29,6 +31,8 @@ const results: { name: string; ok: boolean; detail: string }[] = [];
 function check(name: string, ok: boolean, detail: string) {
   results.push({ name, ok, detail });
   console.log(`  ${ok ? "✓" : "✗"} ${name} — ${detail}`);
+  // In GitHub Actions, surface failures as annotations, which are readable without access to the job logs.
+  if (!ok && process.env.GITHUB_ACTIONS) console.log(`::error title=S6 ${name}::${detail.replace(/\r?\n/g, " ")}`);
 }
 function timed<T>(fn: () => T): [T, string] {
   const t0 = performance.now();

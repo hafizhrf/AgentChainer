@@ -2,7 +2,15 @@
   "$schema": "./node_modules/@biomejs/biome/configuration_schema.json",
   "vcs": { "enabled": true, "clientKind": "git", "useIgnoreFile": true },
   "files": {
-    "includes": ["**", "!**/*.md", "!pnpm-lock.yaml", "!**/src-tauri/gen", "!**/test/fixtures", "!**/dist"]
+    "includes": [
+      "**",
+      "!**/*.md",
+      "!pnpm-lock.yaml",
+      "!packages/protocol/schema",
+      "!**/src-tauri/gen",
+      "!**/test/fixtures",
+      "!**/dist"
+    ]
   },
   "formatter": {
     "enabled": true,

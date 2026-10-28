@@ -45,6 +45,7 @@ export async function ensureSdk(
   root: string,
   p: SdkPin,
   fetchImpl: typeof fetch = fetch,
+  timeoutMs = 120_000,
 ): Promise<{ entry: string; source: SdkSource }> {
   const dir = join(root, p.version);
   const entry = join(dir, "package", "sdk.mjs");
@@ -54,15 +55,24 @@ export async function ensureSdk(
   }
 
   log(`sdk: downloading ${p.name}@${p.version}`);
+  // A stalled connection must not hang session start forever (seen once on a flaky network), so the whole download,
+  // body included, has a deadline. The next session.start retries.
+  const signal = AbortSignal.timeout(timeoutMs);
   let res: Response;
+  let data: Uint8Array;
   try {
-    res = await fetchImpl(p.tarball);
+    res = await fetchImpl(p.tarball, { signal });
+    data = res.ok ? new Uint8Array(await res.arrayBuffer()) : new Uint8Array();
   } catch (err) {
+    if (signal.aborted) {
+      throw new Error(
+        `Downloading the Claude Agent SDK timed out after ${Math.round(timeoutMs / 1000)} s. Check your connection and try again.`,
+      );
+    }
     const reason = err instanceof Error ? err.message : String(err);
     throw new Error(`Couldn't download the Claude Agent SDK (offline or blocked by a proxy?): ${reason}`);
   }
   if (!res.ok) throw new Error(`Downloading the Claude Agent SDK failed: HTTP ${res.status}`);
-  const data = new Uint8Array(await res.arrayBuffer());
   if (sriOf(data) !== p.integrity) {
     throw new Error("The downloaded Claude Agent SDK failed its integrity check, so it was not loaded.");
   }

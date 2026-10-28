@@ -1,0 +1,726 @@
+{
+  "$comment": "Generated from packages/protocol/src/index.ts by `pnpm --filter @agentchainer/protocol export-schema`.",
+  "protocolVersion": 1,
+  "methods": {
+    "system.hello": {
+      "params": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "protocolVersion": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "protocolVersion"
+        ],
+        "additionalProperties": false
+      },
+      "result": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "protocolVersion": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "sdkVersion": {
+            "type": "string"
+          },
+          "nodeVersion": {
+            "type": "string"
+          },
+          "homeDir": {
+            "type": "string"
+          },
+          "claudePath": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "claudeVersion": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "protocolVersion",
+          "sdkVersion",
+          "nodeVersion",
+          "homeDir",
+          "claudePath",
+          "claudeVersion"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "system.ping": {
+      "params": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "result": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "const": true
+          }
+        },
+        "required": [
+          "ok"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "env.check": {
+      "params": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "result": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "platform": {
+            "type": "string"
+          },
+          "node": {
+            "type": "string"
+          },
+          "claude": {
+            "type": "object",
+            "properties": {
+              "path": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "version": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "minVersion": {
+                "type": "string"
+              },
+              "versionOk": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "path",
+              "version",
+              "minVersion",
+              "versionOk"
+            ],
+            "additionalProperties": false
+          },
+          "auth": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "loggedIn": {
+                    "type": "boolean"
+                  },
+                  "method": {
+                    "type": "string"
+                  },
+                  "provider": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "loggedIn",
+                  "method",
+                  "provider"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "git": {
+            "type": "object",
+            "properties": {
+              "version": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "version"
+            ],
+            "additionalProperties": false
+          },
+          "ready": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "platform",
+          "node",
+          "claude",
+          "auth",
+          "git",
+          "ready"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "sdk.prepare": {
+      "params": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "result": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "version": {
+            "type": "string"
+          },
+          "source": {
+            "type": "string",
+            "enum": [
+              "node_modules",
+              "download",
+              "cache"
+            ]
+          }
+        },
+        "required": [
+          "version",
+          "source"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "debug.log": {
+      "params": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "string",
+            "maxLength": 10000
+          }
+        },
+        "required": [
+          "message"
+        ],
+        "additionalProperties": false
+      },
+      "result": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "const": true
+          }
+        },
+        "required": [
+          "ok"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "session.start": {
+      "params": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "cwd": {
+            "type": "string",
+            "minLength": 1
+          },
+          "model": {
+            "type": "string"
+          },
+          "permissionMode": {
+            "type": "string",
+            "enum": [
+              "default",
+              "acceptEdits",
+              "auto",
+              "plan"
+            ]
+          }
+        },
+        "required": [
+          "cwd"
+        ],
+        "additionalProperties": false
+      },
+      "result": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "const": true
+          }
+        },
+        "required": [
+          "ok"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "session.send": {
+      "params": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "text": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "text"
+        ],
+        "additionalProperties": false
+      },
+      "result": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "const": true
+          }
+        },
+        "required": [
+          "ok"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "session.interrupt": {
+      "params": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "result": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "const": true
+          },
+          "interrupted": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ok",
+          "interrupted"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "session.setMode": {
+      "params": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "mode": {
+            "type": "string",
+            "enum": [
+              "default",
+              "acceptEdits",
+              "auto",
+              "plan"
+            ]
+          }
+        },
+        "required": [
+          "mode"
+        ],
+        "additionalProperties": false
+      },
+      "result": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "const": true
+          }
+        },
+        "required": [
+          "ok"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "permission.respond": {
+      "params": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "requestId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "allow": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "requestId",
+          "allow"
+        ],
+        "additionalProperties": false
+      },
+      "result": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "const": true
+          }
+        },
+        "required": [
+          "ok"
+        ],
+        "additionalProperties": false
+      }
+    }
+  },
+  "notifications": {
+    "agent.event": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "session.started"
+            },
+            "sessionId": {
+              "type": "string"
+            },
+            "model": {
+              "type": "string"
+            },
+            "cwd": {
+              "type": "string"
+            },
+            "claudeCodeVersion": {
+              "type": "string"
+            },
+            "permissionMode": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "sessionId",
+            "model",
+            "cwd",
+            "claudeCodeVersion",
+            "permissionMode"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "text.delta"
+            },
+            "text": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "text"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "tool.started"
+            },
+            "toolUseId": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            },
+            "input": {},
+            "parentToolUseId": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "agentId": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "toolUseId",
+            "name",
+            "input",
+            "parentToolUseId"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "tool.completed"
+            },
+            "toolUseId": {
+              "type": "string"
+            },
+            "isError": {
+              "type": "boolean"
+            },
+            "output": {
+              "type": "string"
+            },
+            "parentToolUseId": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          "required": [
+            "type",
+            "toolUseId",
+            "isError",
+            "output",
+            "parentToolUseId"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "agent.started"
+            },
+            "toolUseId": {
+              "type": "string"
+            },
+            "taskId": {
+              "type": "string"
+            },
+            "description": {
+              "type": "string"
+            },
+            "agentType": {
+              "type": "string"
+            },
+            "depth": {
+              "type": "number"
+            },
+            "background": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "type",
+            "toolUseId",
+            "taskId",
+            "description"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "agent.text"
+            },
+            "parentToolUseId": {
+              "type": "string"
+            },
+            "agentId": {
+              "type": "string"
+            },
+            "text": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "parentToolUseId",
+            "text"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "agent.completed"
+            },
+            "toolUseId": {
+              "type": "string"
+            },
+            "taskId": {
+              "type": "string"
+            },
+            "status": {
+              "type": "string"
+            },
+            "summary": {
+              "type": "string"
+            },
+            "totalTokens": {
+              "type": "number"
+            },
+            "toolUses": {
+              "type": "number"
+            },
+            "durationMs": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "type",
+            "toolUseId",
+            "taskId",
+            "status",
+            "summary"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "turn.completed"
+            },
+            "subtype": {
+              "type": "string"
+            },
+            "isError": {
+              "type": "boolean"
+            },
+            "costUsd": {
+              "type": "number"
+            },
+            "durationMs": {
+              "type": "number"
+            },
+            "numTurns": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "type",
+            "subtype",
+            "isError",
+            "costUsd",
+            "durationMs",
+            "numTurns"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "error"
+            },
+            "message": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "message"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "permission.request": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "requestId": {
+          "type": "string"
+        },
+        "toolName": {
+          "type": "string"
+        },
+        "toolUseId": {
+          "type": "string"
+        },
+        "agentId": {
+          "type": "string"
+        },
+        "input": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {}
+        },
+        "title": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "requestId",
+        "toolName",
+        "toolUseId",
+        "input"
+      ],
+      "additionalProperties": false
+    }
+  }
+}

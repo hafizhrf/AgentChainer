@@ -54,11 +54,14 @@ env vars the user set (`ANTHROPIC_API_KEY`, `CLAUDE_CODE_USE_BEDROCK`, …).
 1. **Resolve the login-shell environment** (macOS/Linux). GUI apps started from Finder or a desktop launcher do **not**
    inherit `~/.zshrc` or `~/.bashrc`. At startup, run `$SHELL -ilc 'env -0'` with a timeout and merge the result into the
    sidecar's env, as VS Code does. On failure, fall back to the process env and show a warning.
-2. **Find the binary**, in order:
-   - the user override in Settings;
+2. **Find the binary** (`findClaude()` in `claude.ts`), in order:
+   - the "Claude CLI path" setting (passed to the sidecar as `AGENTCHAINER_CLAUDE_PATH`);
    - `PATH` from the resolved env;
    - known locations: `~/.local/bin/claude`, `/opt/homebrew/bin/claude`, `/usr/local/bin/claude`,
-     `%USERPROFILE%\.local\bin\claude.exe`, the npm global prefix, the WinGet shim.
+     `%USERPROFILE%\.local\bin\claude.exe`, `%APPDATA%\npm`.
+   - On Windows, an npm install's `claude.cmd` shim is resolved to the real `claude.exe` (spike S6).
+   - Implemented (M1-03): the Rust core runs `$SHELL -ilc` once at startup (5 s timeout) and applies that environment
+     to every sidecar spawn.
 3. **Check the version**: run `claude --version`, parse it, and compare against `MIN_CLAUDE_VERSION` (set in spike S5).
    If it's too old, show "Run `claude update`" (or the package-manager equivalent).
 4. **Check auth**: run `claude auth status --json`. We only read the logged-in flag and method or provider; any other fields
@@ -72,7 +75,10 @@ env vars the user set (`ANTHROPIC_API_KEY`, `CLAUDE_CODE_USE_BEDROCK`, …).
 - **Framing:** one JSON-RPC 2.0 object per line (UTF-8) on the sidecar's stdin/stdout. stdout carries protocol frames
   only; logs go to stderr, which Rust captures into the log file.
 - **Handshake:** `system.hello {protocolVersion, appVersion}` → `{protocolVersion, sdkVersion, nodeVersion}`. On a major mismatch, refuse to start.
-- **Schemas:** `packages/protocol` (zod) → JSON Schema → generated TS + Rust types. Both ends validate every frame.
+- **Schemas:** `packages/protocol` (zod 4) with types inferred from the schemas.
+  - The sidecar validates params and its own results; the UI validates results and notifications.
+  - `schema/protocol.schema.json` is exported for docs and non-TS clients.
+  - The Rust core relays frames without parsing them, so it has no generated types (M1-02).
 - **Backpressure:** each `text.delta` is forwarded as its own frame. Spike S2 measured p95 2–3 ms from sidecar to UI, so
   ~16 ms coalescing is deferred until measurements show it's needed. Rust forwards frames to the UI as Tauri events.
 - **Metrics (dev):** with `AGENTCHAINER_METRICS=1`, notifications carry `ts` (send time). The self-test mode
@@ -83,7 +89,9 @@ Planned surface (v0.1):
 
 | Kind | Name | Purpose |
 |---|---|---|
+| request | `system.ping` | Health ping from the UI (M1-01) |
 | request | `env.check` | Return CLI path, version, auth state (no secrets) |
+| request | `sdk.prepare` | Make the Agent SDK ready: node_modules (dev), or download + verify + cache (packaged) |
 | request | `debug.log` | Dev only: write a UI line to the sidecar log (self-test metrics) |
 | request | `session.start` | Start a session `{workspace, model, effort, mode, profile, budgetUsd, resume?, fork?}` |
 | request | `session.send` | Push a user message (text, @files, images) into the streaming input |

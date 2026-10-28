@@ -59,4 +59,13 @@ describe("ensureSdk", () => {
     await assert.rejects(ensureSdk(join(work, "data-offline"), pin, offline), /offline or blocked/);
     await assert.rejects(ensureSdk(join(work, "data-404"), pin, serve(tarball, 404).fetchImpl), /HTTP 404/);
   });
+
+  it("gives up on a stalled download instead of hanging", async () => {
+    // Never answers, but honours the abort signal like the real fetch does.
+    const stalled = ((_url: string, init?: RequestInit) =>
+      new Promise((_, reject) =>
+        init?.signal?.addEventListener("abort", () => reject(init.signal?.reason)),
+      )) as typeof fetch;
+    await assert.rejects(ensureSdk(join(work, "data-stalled"), pin, stalled, 50), /timed out after 0 s/);
+  });
 });

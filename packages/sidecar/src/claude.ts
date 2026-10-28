@@ -1,25 +1,59 @@
 import { spawnSync } from "node:child_process";
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
-import { delimiter, join } from "node:path";
+import path from "node:path";
 import type { AuthState, EnvCheck } from "@agentchainer/protocol";
 
 /** Oldest Claude Code CLI version verified with this app (spikes S2/S3/S5 ran on 2.1.293). */
 export const MIN_CLAUDE_VERSION = "2.1.293";
 
-const exe = process.platform === "win32" ? "claude.exe" : "claude";
+/** Where npm puts the real binary relative to its bin shims: the package's `bin` is `bin/claude.exe` on every OS. */
+const NPM_EXE = ["node_modules", "@anthropic-ai", "claude-code", "bin", "claude.exe"];
+
+type Platform = NodeJS.Platform;
 
 /**
- * Finds the user's own `claude` binary (ADR-0002): PATH first, then the documented install locations.
- * Login-shell env resolution for GUI launches is M1-03; in dev the app inherits the terminal's PATH.
+ * Finds the user's own `claude` binary (ADR-0002).
+ * 1. `AGENTCHAINER_CLAUDE_PATH` (the app's "Claude CLI path" setting) wins.
+ * 2. Then each PATH entry. The Rust core resolves the login-shell PATH for GUI launches (M1-03).
+ * 3. Then the documented install locations.
  */
-export function findClaude(): string | null {
-  const fromPath = (process.env.PATH ?? "")
-    .split(delimiter)
-    .filter(Boolean)
-    .map((dir) => join(dir, exe));
-  const known = [join(homedir(), ".local", "bin", exe), "/opt/homebrew/bin/claude", "/usr/local/bin/claude"];
-  return [...fromPath, ...known].find((candidate) => existsSync(candidate)) ?? null;
+export function findClaude(
+  env: NodeJS.ProcessEnv = process.env,
+  platform: Platform = process.platform,
+  home: string = homedir(),
+  exists: (p: string) => boolean = existsSync,
+  readText: (p: string) => string = (p) => readFileSync(p, "utf8"),
+): string | null {
+  const override = env.AGENTCHAINER_CLAUDE_PATH;
+  if (override) return exists(override) ? override : null;
+
+  const p = platform === "win32" ? path.win32 : path.posix;
+  const dirs = (env.PATH ?? env.Path ?? "").split(platform === "win32" ? ";" : ":").filter(Boolean);
+  if (platform !== "win32") {
+    const known = [p.join(home, ".local", "bin", "claude"), "/opt/homebrew/bin/claude", "/usr/local/bin/claude"];
+    return [...dirs.map((d) => p.join(d, "claude")), ...known].find(exists) ?? null;
+  }
+
+  // Windows: the native installer puts claude.exe on PATH. An npm install puts a claude.cmd shim there instead
+  // (spike S6, CI), and Node can't spawn .cmd files without a shell, so resolve the shim to the real exe.
+  const appData = env.APPDATA ?? p.join(home, "AppData", "Roaming");
+  for (const dir of [...dirs, p.join(home, ".local", "bin"), p.join(appData, "npm")]) {
+    const native = p.join(dir, "claude.exe");
+    if (exists(native)) return native;
+    const shim = p.join(dir, "claude.cmd");
+    if (exists(shim)) {
+      const target = exeFromNpmShim(readText(shim), dir, p) ?? p.join(dir, ...NPM_EXE);
+      if (exists(target)) return target;
+    }
+  }
+  return null;
+}
+
+/** npm's cmd-shim launches `"%dp0%\…\claude.exe"`, where %dp0% is the shim's own folder. */
+export function exeFromNpmShim(text: string, dir: string, p: path.PlatformPath = path.win32): string | null {
+  const match = /"%~?dp0%?\\([^"]*claude\.exe)"/i.exec(text);
+  return match?.[1] ? p.join(dir, ...match[1].split("\\")) : null;
 }
 
 /** Returns the `claude --version` output, e.g. "2.1.293 (Claude Code)", or null if it can't run. */

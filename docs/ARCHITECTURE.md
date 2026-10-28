@@ -260,12 +260,23 @@ flowchart LR
 
 ## 10. Packaging and distribution
 
-- **Sidecar:**
-  - Compiled to a single executable per target triple. Candidates are `@yao-pkg/pkg` and Node SEA; spike S1 decides.
-  - Shipped via `bundle.externalBin` (`binaries/agentchainer-sidecar-<target-triple>`).
+- **Sidecar** (spike S1):
+  - `pnpm --filter @agentchainer/sidecar build:sea` bundles our code with esbuild into one CommonJS file (tens of KB).
+  - It then builds a **Node SEA** (single executable application) per target triple, about 117 MB on macOS x64 because
+    it embeds Node itself. On macOS the universal Node binary is thinned to the host architecture first.
+  - Shipped via `bundle.externalBin` (`binaries/agentchainer-sidecar-<target-triple>`). Tauri copies it next to the app
+    binary.
+  - Release builds run it with `AGENTCHAINER_DATA_DIR` (app data dir) and `NODE_USE_ENV_PROXY=1`. Debug builds run
+    `node src/main.ts` unless `AGENTCHAINER_SIDECAR_BIN` is set.
   - Avoid native Node addons in the sidecar.
+- **The Agent SDK is not bundled** (M0-03):
+  - `sdk-pin.json` (version, npm tarball URL, sha512 integrity) is generated from the lockfile.
+  - On first use, `sdk-loader.ts` downloads exactly that tarball into `<app data>/sdk/<version>`, verifies the hash,
+    extracts it with the system `tar`, and `import()`s `sdk.mjs`. A Node SEA can import ESM files from disk, as S1
+    confirmed.
+  - `sdk.mjs` imports only Node built-ins, so one tarball is enough.
 - **No Claude binary bundled:**
-  - Install the SDK with `--omit=optional` so its per-platform CLI packages are not pulled in.
+  - The SDK's per-platform CLI packages are skipped (pnpm `ignoredOptionalDependencies`).
   - The user's CLI is used instead ([ADR-0002](adr/0002-auth-and-branding.md)).
 - **Bundles:** dmg (macOS), msi/nsis (Windows), AppImage/deb/rpm (Linux).
 - **Signing:**

@@ -3,6 +3,7 @@ import { PERMISSION_MODES, type PermissionMode, PROTOCOL_VERSION } from "@agentc
 import pkg from "../package.json" with { type: "json" };
 import { checkEnvironment, claudeVersion, findClaude } from "./claude.ts";
 import { log, notify, RpcFailure, requireString, serve } from "./rpc.ts";
+import { loadSdk } from "./sdk-loader.ts";
 import { Session } from "./session.ts";
 
 // Spike S2/S3: one session at a time. Multi-session and the full method surface arrive in M1.
@@ -11,6 +12,13 @@ let session: Session | null = null;
 function requireSession(): Session {
   if (!session) throw new RpcFailure(-32001, "No active session. Call session.start first.");
   return session;
+}
+
+/** Loads the SDK; the packaged app downloads and verifies it on first use (a few seconds). */
+function prepareSdk() {
+  return loadSdk().catch((err: unknown) => {
+    throw new RpcFailure(-32004, err instanceof Error ? err.message : String(err));
+  });
 }
 
 function parseMode(value: unknown): PermissionMode {
@@ -35,19 +43,27 @@ serve(
 
     "env.check": () => checkEnvironment(),
 
+    "sdk.prepare": async () => {
+      const { version, source } = await prepareSdk();
+      return { version, source };
+    },
+
     "debug.log": (params) => {
       log(`ui: ${requireString(params, "message")}`);
       return { ok: true };
     },
 
-    "session.start": (params) => {
+    "session.start": async (params) => {
       const cwd = requireString(params, "cwd");
       const model = typeof params.model === "string" && params.model ? params.model : undefined;
       const permissionMode = params.permissionMode === undefined ? undefined : parseMode(params.permissionMode);
       const claudePath = findClaude();
       if (!claudePath) throw new RpcFailure(-32002, "Claude Code CLI not found. See docs/guides/AUTH_SETUP.md.");
+      // First run of the packaged app downloads and verifies the SDK here (a few seconds).
+      const { sdk } = await prepareSdk();
       session?.close();
       session = new Session(
+        sdk,
         { cwd, claudePath, ...(model ? { model } : {}), ...(permissionMode ? { permissionMode } : {}) },
         {
           emit: (event) => notify("agent.event", event),

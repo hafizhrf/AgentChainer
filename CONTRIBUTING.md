@@ -26,7 +26,7 @@ Prerequisites:
 ```bash
 pnpm install
 pnpm hooks:install   # pre-commit: Biome on staged files, cargo fmt when Rust changed
-pnpm dev             # run the desktop app with hot reload
+pnpm dev             # run the desktop app with hot reload (builds the sidecar executable first, ~10 s once)
 ```
 
 All commands are listed in [`CLAUDE.md`](CLAUDE.md#commands).

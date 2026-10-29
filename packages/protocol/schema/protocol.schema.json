@@ -2316,6 +2316,9 @@
                     ],
                     "additionalProperties": false
                   }
+                },
+                "installCommand": {
+                  "type": "string"
                 }
               },
               "required": [
@@ -2364,6 +2367,12 @@
             "items": {
               "type": "string"
             }
+          },
+          "install": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
           }
         },
         "required": [
@@ -2378,6 +2387,101 @@
         "properties": {
           "runId": {
             "type": "string"
+          },
+          "results": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "applied",
+                    "failed",
+                    "skipped"
+                  ]
+                },
+                "message": {
+                  "type": "string"
+                },
+                "warnings": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "checks": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "name": {
+                        "type": "string"
+                      },
+                      "status": {
+                        "type": "string",
+                        "enum": [
+                          "pass",
+                          "fail",
+                          "skipped"
+                        ]
+                      },
+                      "detail": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "name",
+                      "status",
+                      "detail"
+                    ],
+                    "additionalProperties": false
+                  }
+                }
+              },
+              "required": [
+                "id",
+                "status",
+                "warnings"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "runId",
+          "results"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "bootstrap.autoApply": {
+      "params": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "cwd": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "cwd"
+        ],
+        "additionalProperties": false
+      },
+      "result": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "runId": {
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "results": {
             "type": "array",

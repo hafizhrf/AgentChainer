@@ -3,6 +3,7 @@ import { existsSync } from "node:fs";
 import path from "node:path";
 import { detectWorkspace } from "../detect/detect.ts";
 import type { Check } from "./generate.ts";
+import { STOP_SCRIPT } from "./stop-hook.ts";
 import { guarded } from "./workspace-guard.ts";
 
 /**
@@ -15,14 +16,19 @@ const TAIL_LINES = 40;
 export type CommandRun = { command: string; exitCode: number | null; timedOut: boolean; tail: string; ms: number };
 
 /** Runs a project command through the shell (commands come from the project's own manifests) without blocking. */
-export function runCommand(command: string, cwd: string, timeoutMs: number): Promise<CommandRun> {
+export function runCommand(
+  command: string,
+  cwd: string,
+  timeoutMs: number,
+  env: Record<string, string> = {},
+): Promise<CommandRun> {
   const started = Date.now();
   return new Promise((resolve) => {
     const child = spawn(command, {
       cwd,
       shell: true,
       stdio: ["ignore", "pipe", "pipe"],
-      env: { ...process.env, CI: "1" },
+      env: { ...process.env, CI: "1", ...env },
     });
     let out = "";
     const keep = (chunk: Buffer) => {
@@ -51,8 +57,14 @@ export function runCommand(command: string, cwd: string, timeoutMs: number): Pro
 }
 
 /** Runs a verification command; whatever it changes in the workspace (lockfiles, snapshots) is reverted. */
-async function runGuarded(root: string, command: string, cwd: string, timeoutMs: number): Promise<CommandRun> {
-  const { result, reverted } = await guarded(root, () => runCommand(command, cwd, timeoutMs));
+async function runGuarded(
+  root: string,
+  command: string,
+  cwd: string,
+  timeoutMs: number,
+  env: Record<string, string> = {},
+): Promise<CommandRun> {
+  const { result, reverted } = await guarded(root, () => runCommand(command, cwd, timeoutMs, env));
   return reverted.length
     ? { ...result, tail: `${result.tail}\n(reverted changes the command made to ${reverted.join(", ")})` }
     : result;
@@ -100,6 +112,31 @@ export async function verifyApplied(root: string, action: string, files: string[
             ? `powershell -NoProfile -File ${script}`
             : `sh ${script}`;
     return [asCheck("smoke test runs", await runGuarded(root, command, root, 120_000))];
+  }
+  if (action === "stop-tests") {
+    // Run the hook as Claude Code would (no hook input on stdin): exit 0 when tests pass, 2 when they fail.
+    const r = await runGuarded(root, `sh ${STOP_SCRIPT}`, root, 300_000, { CLAUDE_PROJECT_DIR: root });
+    const seconds = (r.ms / 1000).toFixed(1);
+    if (r.timedOut || (r.exitCode !== 0 && r.exitCode !== 2)) return [asCheck("stop hook runs", r)];
+    return [
+      {
+        name: "stop hook runs",
+        status: "pass",
+        detail:
+          r.exitCode === 0
+            ? `the tests pass (${seconds} s)`
+            : `the hook works; the tests fail now (${seconds} s), so Claude will be asked to fix them when it stops`,
+      },
+      ...(r.ms > 60_000
+        ? [
+            {
+              name: "stop hook speed",
+              status: "fail" as const,
+              detail: `the tests take ${seconds} s, which every turn will wait for; consider a faster test command`,
+            },
+          ]
+        : []),
+    ];
   }
   return [];
 }

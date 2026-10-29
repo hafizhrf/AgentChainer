@@ -76,6 +76,33 @@
       "selected": true
     },
     {
+      "kind": "fix",
+      "risk": "low",
+      "scope": "project",
+      "permissions": [],
+      "secrets": [],
+      "id": "fix:stop-tests",
+      "title": "Run the tests when Claude stops",
+      "why": "After each turn, `flutter test` runs; if tests fail, Claude gets the failures and fixes them before stopping. Slow test suites make every turn slower.",
+      "preview": {
+        "type": "files",
+        "files": [
+          {
+            "path": ".claude/settings.json",
+            "before": "",
+            "after": "{\n  \"hooks\": {\n    \"Stop\": [\n      {\n        \"hooks\": [\n          {\n            \"type\": \"command\",\n            \"command\": \"sh \\\"$CLAUDE_PROJECT_DIR\\\"/.claude/hooks/stop-tests.sh\",\n            \"timeout\": 300\n          }\n        ]\n      }\n    ]\n  }\n}\n"
+          },
+          {
+            "path": ".claude/hooks/stop-tests.sh",
+            "before": "",
+            "after": "#!/bin/sh\n# Added by AgentChainer: runs the tests when Claude finishes a turn, and sends failures back so Claude fixes them.\ninput=$(cat)\n# Claude is already continuing because of this hook: stop here instead of looping.\ncase \"$input\" in *'\"stop_hook_active\":true'* | *'\"stop_hook_active\": true'*) exit 0 ;; esac\ncd \"${CLAUDE_PROJECT_DIR:-.}\" || exit 0\nexport CI=1\nif out=$(flutter test 2>&1); then exit 0; fi\necho 'The tests fail (flutter test). Fix them before finishing:' >&2\nprintf '%s\\n' \"$out\" | tail -n 40 >&2\nexit 2\n"
+          }
+        ]
+      },
+      "state": "recommended",
+      "selected": false
+    },
+    {
       "id": "item:code-review",
       "kind": "catalog",
       "title": "Code Review",

@@ -289,9 +289,35 @@ export function App() {
     return { effort, budgetUsd, showThinking: settings?.showThinking !== false };
   }
 
+  /**
+   * Opt-in auto-apply before a new session (M2-18): the sidecar applies only safe actions. Returns notices for the
+   * transcript; a failure never blocks the session.
+   */
+  async function autoApply(dir: string): Promise<string[]> {
+    try {
+      const { runId, results } = await request("bootstrap.autoApply", { cwd: dir });
+      if (!runId) return [];
+      const { runs } = await request("bootstrap.runs", { cwd: dir });
+      const titles = new Map(runs.find((r) => r.runId === runId)?.actions.map((a) => [a.id, a.title]) ?? []);
+      const applied = results.filter((r) => r.status === "applied").map((r) => titles.get(r.id) ?? r.id);
+      return [
+        ...(applied.length
+          ? [`Applied automatically: ${applied.join(", ")}. Roll back in Workspace setup → History.`]
+          : []),
+        ...results
+          .filter((r) => r.status === "failed")
+          .map((r) => `Auto-apply couldn't apply ${titles.get(r.id) ?? r.id}: ${r.message ?? "unknown error"}`),
+      ];
+    } catch (err) {
+      return [`Auto-apply didn't run: ${err}`];
+    }
+  }
+
   async function startSession(dir: string, modelAlias: string, mode: PermissionMode): Promise<string | null> {
     try {
       const { effort, budgetUsd, showThinking } = sessionOptions(mode);
+      // Before the session starts, so what's applied (plugins, settings) is there from its first turn.
+      const applied = settings?.autoApply ? await autoApply(dir) : [];
       const { sessionId } = await request("session.start", {
         cwd: dir,
         permissionMode: mode,
@@ -300,7 +326,7 @@ export function App() {
         ...(budgetUsd ? { maxBudgetUsd: budgetUsd } : {}),
         showThinking,
       });
-      const items = [notice(`Session started in ${folderName(dir)}`)];
+      const items = [notice(`Session started in ${folderName(dir)}`), ...applied.map(notice)];
       setTabs((ts) => [
         ...ts,
         newTab(sessionId, dir, { title: NEW_TITLE, mode, items, modelAlias, effort, budgetUsd }),

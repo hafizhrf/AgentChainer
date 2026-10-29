@@ -19,6 +19,15 @@ safely, and **why** it's worth it. The catalog lives in `catalog/` as data, so i
 | `verified-vendor` | The vendor of the tool (Cloudflare, Microsoft, GitHub, Upstash, …) | 1 maintainer | No |
 | `community` | Anyone else | 2 maintainers | No; never pre-selected |
 
+Auto-apply is a setting, off by default (M2-18). When it's on, before a new session the app applies, without a
+preview:
+- recommended, pre-selected first-party and official items that have their reviews;
+- the fixes that only add lines: env rules in `.gitignore`, and importing AGENTS.md.
+
+It never applies generators (they cost model calls), fixes that change git state (untracking `.env`, `git init`), or
+`verified-vendor` and `community` items. The session's first notices list what was applied; Workspace setup → History
+rolls it back.
+
 ## 3. Item schema
 
 Each item is one YAML file in `catalog/items/`, named `<id>.yaml`, and validated in CI.
@@ -242,8 +251,23 @@ Sources: [cloudflare/security-audit-skill](https://github.com/cloudflare/securit
 
 ## 8. Updates and rollback
 
-- **Upstream changes:** a scheduled workflow checks every item's upstream, then opens a PR that bumps ref and hash, with an
-  upstream diff summary. A human reviews it using §4.
+- **Upstream changes:** `.github/workflows/catalog-updates.yml` runs weekly (and on demand). It runs
+  `packages/sidecar/scripts/check-catalog-updates.ts` against each item's upstream:
+  - **marketplace plugins:** changes under the plugin's folder since `reviewedRef`;
+  - **git sources:** changes under `path` since `ref`;
+  - **release assets and npm:** the newest stable version at least 14 days old.
+
+  For each item that moved:
+  1. it bumps the pin, computing hashes from the downloads and cross-checking GitHub's digests;
+  2. it clears the item's `reviews`, because a new upstream version is reviewed again;
+  3. it rewrites only the changed values, so the rest of the file stays as written.
+
+  The workflow then rebuilds the catalog snapshot and the plan snapshots, and opens or updates one PR,
+  `chore(catalog): upstream updates [M2-04]`, with an upstream diff link per item. A maintainer reviews each item
+  with §4 and adds the reviews before merging.
+
+  Opening the PR needs the repository setting "Allow GitHub Actions to create and approve pull requests", or a
+  `CATALOG_BOT_TOKEN` secret. With the default token, CI doesn't start on the PR by itself.
 - **App releases** ship a catalog snapshot, and v0.1 never fetches catalog updates
   ([ADR-0007](adr/0007-catalog-distribution.md), M2-05).
 - **Installed items:** the app shows "update available" with the changelog. Updates are applied like any other action:

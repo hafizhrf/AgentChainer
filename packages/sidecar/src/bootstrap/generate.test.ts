@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { execFileSync } from "node:child_process";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { after, describe, it } from "node:test";
@@ -243,5 +244,71 @@ describe("generator proposals in the plan and apply engine", () => {
     assert.equal(r.results[0]?.status, "failed");
     assert.match(r.results[0]?.message ?? "", /changed since the proposal was made/);
     assert.equal(readFileSync(join(dir, ".claude", "settings.json"), "utf8"), '{"permissions":{"allow":["Read"]}}\n');
+  });
+});
+
+describe("installing dependencies before verifying, with consent (M2-23)", () => {
+  it("runs the install command shown in the plan, keeps the lockfile in the run, and rolls back", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "ac-install-"));
+    try {
+      writeFileSync(join(dir, "package.json"), `${JSON.stringify({ name: "demo", version: "1.0.0" }, null, 2)}\n`);
+      const git = (...a: string[]) =>
+        execFileSync("git", ["-c", "user.name=t", "-c", "user.email=t@e.x", ...a], { cwd: dir, encoding: "utf8" });
+      git("init", "-q");
+      git("add", "-A");
+      git("commit", "-qm", "init");
+      const pkg = `${JSON.stringify({ name: "demo", version: "1.0.0", scripts: { test: "node --test" } }, null, 2)}\n`;
+      const proposal: Proposal = {
+        action: "scaffold-tests",
+        files: [
+          { path: "package.json", before: readFileSync(join(dir, "package.json"), "utf8"), after: pkg },
+          { path: "test/example.test.js", before: "", after: 'import test from "node:test";\ntest("ok", () => {});\n' },
+        ],
+        summary: "",
+        checks: [],
+        costUsd: 0,
+        attempts: 1,
+      };
+      const env: PlanEnv = {
+        platform: "linux",
+        arch: "x64",
+        hasTool: () => true,
+        remoteHost: null,
+        enabledPlugins: new Set(),
+        toolsDir: null,
+        installedItems: new Set(),
+      };
+      const catalog = { version: "2026.10.29", items: [], profiles: [] };
+      const ctx = { catalog, env, cli: null, proposals: new Map([["scaffold-tests", proposal]]) };
+      const profile = detectWorkspace(dir);
+      const action = buildPlan(
+        dir,
+        profile,
+        auditWorkspace(dir, profile),
+        catalog,
+        env,
+        [],
+        ctx.proposals,
+      ).actions.find((a) => a.id === "gen:scaffold-tests");
+      assert.equal(action?.installCommand, "npm install");
+
+      const { runId, results } = await applyActions(dir, ["gen:scaffold-tests"], {
+        ...ctx,
+        install: ["gen:scaffold-tests"],
+      });
+      assert.deepEqual(
+        results[0]?.checks?.map((c) => [c.name, c.status]),
+        [
+          ["dependencies installed", "pass"],
+          ["tests run", "pass"],
+        ],
+      );
+      assert.ok(existsSync(join(dir, "package-lock.json")), "npm install wrote the lockfile");
+      rollback(dir, runId, { cli: null });
+      assert.ok(!existsSync(join(dir, "package-lock.json")), "the rollback removed the lockfile it created");
+      assert.equal(git("status", "--porcelain"), "");
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });

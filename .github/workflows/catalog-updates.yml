@@ -1,0 +1,75 @@
+name: Catalog updates
+
+# The upstream-update bot (M2-04, docs/CATALOG.md §8): checks every catalog item's upstream once a week, bumps the
+# ones that moved (pins and hashes computed here), clears their reviews, and opens or updates one pull request.
+# A maintainer reviews each bumped item against CATALOG §4 before merging.
+#
+# Opening the PR needs either the repository setting "Allow GitHub Actions to create and approve pull requests", or a
+# CATALOG_BOT_TOKEN secret (a fine-grained token with contents and pull-requests write). PRs opened with the default
+# token don't start other workflows, so with it CI has to be started by hand (close and reopen the PR).
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "41 5 * * 1"
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: catalog-updates
+  cancel-in-progress: false
+
+jobs:
+  update:
+    name: Check upstreams and open a PR
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .node-version
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+        with:
+          cache: true
+      - run: pnpm install --frozen-lockfile
+      - name: Check every upstream
+        run: node packages/sidecar/scripts/check-catalog-updates.ts --summary "$RUNNER_TEMP/summary.md"
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+      - name: Rebuild the catalog snapshot and plan snapshots
+        run: |
+          if git diff --quiet -- catalog; then
+            echo "Every item is up to date."
+            exit 0
+          fi
+          node packages/sidecar/scripts/build-catalog.ts
+          UPDATE_SNAPSHOTS=1 node --test packages/sidecar/src/detect/detect.test.ts packages/sidecar/src/bootstrap/plan.test.ts
+      - name: Open or update the pull request
+        env:
+          GH_TOKEN: ${{ secrets.CATALOG_BOT_TOKEN || github.token }}
+          HAS_BOT_TOKEN: ${{ secrets.CATALOG_BOT_TOKEN != '' }}
+          BRANCH: bot/catalog-updates
+          TITLE: "chore(catalog): upstream updates [M2-04]"
+        run: |
+          if git diff --quiet; then
+            exit 0
+          fi
+          body="$RUNNER_TEMP/summary.md"
+          if [ "$HAS_BOT_TOKEN" != "true" ]; then
+            printf '\n> Opened with the default token, so CI hasn'"'"'t started: close and reopen this PR to run it.\n' >> "$body"
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git switch -C "$BRANCH"
+          git add catalog packages/sidecar/src/catalog/catalog.json packages/sidecar/test/snapshots
+          git commit -qm "$TITLE"
+          git push --force "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" "$BRANCH"
+          if [ "$(gh pr view "$BRANCH" --json state --jq .state 2>/dev/null)" = "OPEN" ]; then
+            gh pr edit "$BRANCH" --body-file "$body"
+          else
+            gh pr create --base main --head "$BRANCH" --title "$TITLE" --body-file "$body"
+          fi

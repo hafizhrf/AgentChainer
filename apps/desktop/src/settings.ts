@@ -15,6 +15,8 @@ export type Settings = {
   showThinking: boolean | null;
   /** "light" or "dark"; null follows the OS (UX-02). */
   theme: string | null;
+  /** Apply safe setup before each new session (M2-18); null means off. */
+  autoApply: boolean | null;
   recentWorkspaces: string[];
 };
 

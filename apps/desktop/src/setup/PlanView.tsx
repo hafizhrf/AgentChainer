@@ -113,6 +113,8 @@ export function PlanView({
               generating={b.generating}
               disabled={b.busy || b.generating !== null}
               onGenerate={() => void b.generate(focused)}
+              install={b.install.has(focused.id)}
+              onToggleInstall={() => b.toggleInstall(focused.id)}
             />
           ) : (
             <EmptyState>Nothing to set up here.</EmptyState>
@@ -189,11 +191,15 @@ function ActionDetails({
   generating,
   disabled,
   onGenerate,
+  install,
+  onToggleInstall,
 }: {
   action: PlanAction;
   generating: string | null;
   disabled: boolean;
   onGenerate: () => void;
+  install: boolean;
+  onToggleInstall: () => void;
 }) {
   return (
     <article className="action-details">
@@ -262,6 +268,18 @@ function ActionDetails({
       </dl>
       {a.notes && <p className={a.kind === "generator" ? "muted" : "warn"}>{a.notes}</p>}
       {a.checks && <Checks checks={a.checks} />}
+      {a.installCommand && (
+        <label className="check install-consent">
+          <input type="checkbox" checked={install} onChange={onToggleInstall} />
+          <span>
+            Install dependencies first, so the tests can run: <code>{a.installCommand}</code>
+            <span className="field-help">
+              Downloads packages and may run their install scripts. Lockfile changes roll back with the run; installed
+              packages stay.
+            </span>
+          </span>
+        </label>
+      )}
       <h4 className="preview-title">What changes</h4>
       <Preview preview={a.preview} />
     </article>

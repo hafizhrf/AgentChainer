@@ -67,6 +67,17 @@
       }
     },
     {
+      "id": "stop-hook.missing",
+      "area": "agent",
+      "status": "info",
+      "title": "Tests don't run when Claude stops",
+      "detail": "A Stop hook can run `uv run pytest` after each turn and send failures back to Claude to fix.",
+      "fix": {
+        "action": "stop-tests",
+        "label": "Run the tests when Claude stops"
+      }
+    },
+    {
       "id": "claude-dir.inventory",
       "area": "agent",
       "status": "info",

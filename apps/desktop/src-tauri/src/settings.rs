@@ -27,6 +27,8 @@ pub struct Settings {
     pub show_thinking: Option<bool>,
     /// `light`, `dark` or `system` (UX-02). `None` follows the OS.
     pub theme: Option<String>,
+    /// Apply safe setup (first-party and official items, low-risk fixes) before each new session (M2-18). Off unless set.
+    pub auto_apply: Option<bool>,
     /// Most recent first.
     pub recent_workspaces: Vec<String>,
 }
@@ -102,6 +104,7 @@ mod tests {
             budget_usd: Some(-1.0),
             show_thinking: None,
             theme: Some(" dark ".into()),
+            auto_apply: None,
             recent_workspaces: (0..12)
                 .map(|i| format!("/p/{}", i % 10))
                 .chain([" ".into()])
@@ -122,6 +125,10 @@ mod tests {
         let s: Settings = serde_json::from_str(r#"{"defaultModel":"opus"}"#).unwrap();
         assert_eq!(s.default_model.as_deref(), Some("opus"));
         assert!(s.recent_workspaces.is_empty());
+        assert_eq!(
+            s.auto_apply, None,
+            "auto-apply is off unless the user turns it on"
+        );
     }
 
     #[test]

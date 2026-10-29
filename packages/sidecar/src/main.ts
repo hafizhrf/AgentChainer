@@ -3,7 +3,9 @@ import { homedir } from "node:os";
 import { PROTOCOL_VERSION, RpcErrorCode } from "@agentchainer/protocol";
 import pkg from "../package.json" with { type: "json" };
 import { applyActions, type Cli, listRuns, rollback } from "./bootstrap/apply.ts";
+import { generate } from "./bootstrap/generate.ts";
 import { buildPlan, planEnv } from "./bootstrap/plan.ts";
+import { proposals } from "./bootstrap/proposals.ts";
 import { catalog } from "./catalog/index.ts";
 import { checkEnvironment, claudeVersion, findClaude } from "./claude.ts";
 import { auditWorkspace, saveProfile } from "./detect/audit.ts";
@@ -239,12 +241,35 @@ serve(
 
     "bootstrap.apply": async ({ cwd, actions, profiles }) => {
       requireFolder(cwd);
-      return applyActions(cwd, actions, {
+      const result = await applyActions(cwd, actions, {
         catalog,
         env: planEnv(cwd),
         cli: cliFor(cwd),
         optIn: profiles ?? [],
+        proposals: proposals.of(cwd),
       });
+      for (const r of result.results) {
+        if (r.status === "applied" && r.id.startsWith("gen:")) proposals.delete(cwd, r.id.slice(4));
+      }
+      return result;
+    },
+
+    "bootstrap.generate": async ({ cwd, action, model }) => {
+      requireFolder(cwd);
+      const claudePath = findClaude();
+      if (!claudePath) throw new RpcFailure(RpcErrorCode.claudeNotFound, "Claude Code CLI not found.");
+      const { sdk } = await prepareSdk();
+      const p = await generate(sdk, claudePath, cwd, action.replace(/^gen:/, ""), detectWorkspace(cwd), {
+        ...(model ? { model } : {}),
+      });
+      proposals.set(cwd, p);
+      return {
+        summary: p.summary,
+        files: p.files.map((f) => f.path),
+        checks: p.checks,
+        attempts: p.attempts,
+        costUsd: p.costUsd,
+      };
     },
 
     "bootstrap.runs": ({ cwd }) => {
@@ -254,12 +279,13 @@ serve(
           runId,
           startedAt,
           catalogVersion,
-          actions: actions.map(({ id, title, status, error, warnings }) => ({
+          actions: actions.map(({ id, title, status, error, warnings, checks }) => ({
             id,
             title,
             status,
             warnings,
             ...(error ? { error } : {}),
+            ...(checks ? { checks } : {}),
           })),
         })),
       };
@@ -280,7 +306,15 @@ serve(
     "bootstrap.plan": ({ cwd, profiles }) => {
       requireFolder(cwd);
       const profile = detectWorkspace(cwd);
-      return buildPlan(cwd, profile, auditWorkspace(cwd, profile), catalog, planEnv(cwd), profiles ?? []);
+      return buildPlan(
+        cwd,
+        profile,
+        auditWorkspace(cwd, profile),
+        catalog,
+        planEnv(cwd),
+        profiles ?? [],
+        proposals.of(cwd),
+      );
     },
 
     "git.branches": ({ cwd }) => branches(cwd),

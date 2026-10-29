@@ -224,8 +224,21 @@ export const PlanPreviewSchema = z.discriminatedUnion("type", [
   /** Commands as argv arrays: run without a shell. */
   z.object({ type: z.literal("commands"), commands: z.array(z.array(z.string())) }),
   z.object({ type: z.literal("note"), text: z.string() }),
+  /** A generator's proposal: several files, each with its current and proposed content. */
+  z.object({
+    type: z.literal("files"),
+    files: z.array(z.object({ path: z.string(), before: z.string(), after: z.string() })),
+  }),
 ]);
 export type PlanPreview = z.infer<typeof PlanPreviewSchema>;
+
+/** A deterministic check of a generator's proposal or of applied files (M2-26). */
+export const CheckSchema = z.object({
+  name: z.string(),
+  status: z.enum(["pass", "fail", "skipped"]),
+  detail: z.string(),
+});
+export type Check = z.infer<typeof CheckSchema>;
 
 export const PlanActionSchema = z.object({
   /** `fix:<action>`, `item:<catalog id>` or `gen:<action>`. */
@@ -254,6 +267,10 @@ export const PlanActionSchema = z.object({
   /** Pre-selected. Never true for community items (ADR-0005). */
   selected: z.boolean(),
   reason: z.string().optional(),
+  /** Generators: a proposal can be (re)generated with `bootstrap.generate`. */
+  generatable: z.boolean().optional(),
+  /** Generators: checks of the current proposal. */
+  checks: z.array(CheckSchema).optional(),
 });
 export type PlanAction = z.infer<typeof PlanActionSchema>;
 
@@ -276,6 +293,8 @@ export const BootstrapRunSchema = z.object({
       status: z.enum(["applied", "failed", "rolled-back"]),
       error: z.string().optional(),
       warnings: z.array(z.string()),
+      /** Verification after applying generated files (M2-26). */
+      checks: z.array(CheckSchema).optional(),
     }),
   ),
 });
@@ -548,8 +567,23 @@ export const methodSchemas = {
           status: z.enum(["applied", "failed", "skipped"]),
           message: z.string().optional(),
           warnings: z.array(z.string()),
+          checks: z.array(CheckSchema).optional(),
         }),
       ),
+    }),
+  },
+  /**
+   * Runs a generator (M2-19…M2-25): a read-only Claude session proposes files, which are checked and then offered in
+   * the plan as a diff to review. Writes nothing. Costs a model call; `costUsd` is the estimate.
+   */
+  "bootstrap.generate": {
+    params: WorkspaceRef.extend({ action: z.string().min(1), model: z.string().optional() }),
+    result: z.object({
+      summary: z.string(),
+      files: z.array(z.string()),
+      checks: z.array(CheckSchema),
+      attempts: z.number().int(),
+      costUsd: z.number(),
     }),
   },
   "bootstrap.runs": { params: WorkspaceRef, result: z.object({ runs: z.array(BootstrapRunSchema) }) },

@@ -210,8 +210,8 @@ Sources: [cloudflare/security-audit-skill](https://github.com/cloudflare/securit
     { "id": "fix-gitignore", "appliedAt": "2026-10-28T10:00:00Z", "files": [".gitignore"] }
   ],
   "generated": [
-    { "path": "CLAUDE.md", "action": "merge", "generator": "ac-write-claude-md", "verified": true },
-    { "path": ".github/workflows/ci.yml", "action": "write", "generator": "ac-generate-ci", "verified": true, "checks": ["actionlint"] }
+    { "id": "generate-claude-md", "generator": "ac-write-claude-md", "appliedAt": "2026-10-28T10:00:00Z", "files": ["CLAUDE.md"], "verified": true },
+    { "id": "smoke-test", "generator": "ac-smoke-test", "appliedAt": "2026-10-28T10:00:00Z", "files": ["scripts/smoke.sh", ".github/workflows/smoke.yml"], "verified": true }
   ]
 }
 ```

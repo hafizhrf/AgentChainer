@@ -628,29 +628,86 @@ All of these run on macOS, Windows and Ubuntu against a sample repo in `fixtures
 
 ### Generators (agent-driven, verified deterministically)
 
-- [ ] **M2-19** First-party skills in `skills/`: `ac-write-claude-md`, `ac-setup-hooks`, `ac-scaffold-tests`,
+- [x] **M2-19** First-party skills in `skills/`: `ac-write-claude-md`, `ac-setup-hooks`, `ac-scaffold-tests`,
       `ac-generate-ci`, `ac-smoke-test`.
-- [ ] **M2-20** Generator sessions run under a restricted profile (edits inside the workspace, Bash limited to detected commands).
+      — evidence: the five `skills/ac-*/SKILL.md` files are compiled into the sidecar by `build-catalog.ts`; a test
+      fails while the compiled copy is stale. Each generator session runs with its skill appended to the system
+      prompt.
+- [x] **M2-20** Generator sessions run under a restricted profile (edits inside the workspace, Bash limited to detected commands).
       They produce a proposal diff and never write without review.
-- [ ] **M2-21** CLAUDE.md generator:
+      — evidence:
+      - **The session can't write.** It gets the tools Read, Grep, Glob and Bash, and `settingSources: []` (so no
+        user hooks or MCP servers), and it isn't persisted.
+      - A `PreToolUse` hook (which sees every call) allows:
+        - reads inside the workspace;
+        - the project's own test/lint/typecheck/build commands;
+        - the SDK's `StructuredOutput`.
+
+        It denies everything else (`generate.test.ts`).
+      - **Files come back as structured output.** Each proposed path must be one the generator owns. A disallowed
+        path, or a failed check, goes back to Claude as feedback, up to 2 attempts.
+      - **The workspace guard reverts command side effects.** Finding: pnpm 11 rewrites `pnpm-lock.yaml` and creates
+        `pnpm-workspace.yaml` before `pnpm run`. The guard reverts what commands change in git-visible files
+        (`workspace-guard.test.ts`; live, `pnpm run lint`'s changes are reverted). Outside git, generators get no
+        commands.
+      - Proposals show in the plan as file diffs, and apply refuses one whose files changed since.
+- [x] **M2-21** CLAUDE.md generator:
   - concise: real commands, an architecture map, conventions, Definition of Done;
   - merges into an existing CLAUDE.md;
   - if AGENTS.md exists, avoids contradicting it (link or import).
+      — evidence:
+      - `ac-write-claude-md` covers commands, layout, conventions, DoD, merging and `@AGENTS.md`.
+      - Checks:
+        - at most 300 lines;
+        - mentions the detected test command;
+        - imports AGENTS.md when present;
+        - no home-folder paths.
+      - Live on a fixture (haiku, $0.01, 59 s): 56 lines, all checks pass, and commands it couldn't run are marked
+        as failing rather than claimed.
 - [ ] **M2-22** Hooks generator:
   - format and lint on edit, written to `.claude/settings.json` (`PostToolUse`);
   - optional Stop hook that runs fast tests;
   - gitleaks pre-commit through whichever hook manager the repo already uses (lefthook, pre-commit, husky).
+      Progress:
+      - `ac-setup-hooks` plus checks: valid JSON, existing settings kept, a PostToolUse hook, referenced scripts
+        present.
+      - Live end to end over JSON-RPC: `.claude/settings.json` and a lint hook script were generated, applied and
+        verified, then rolled back to a clean `git status`.
+      - Remaining: the Stop hook option, and gitleaks (it needs the binary installer, M2-15).
 - [ ] **M2-23** Test scaffold, only when none exists:
   - Vitest or Jest, pytest, flutter_test, or `go test`;
   - plus one example test and a `test` command;
   - verified by running it.
+      Progress:
+      - `ac-scaffold-tests` plus checks: an example test, valid manifests, no dropped fields.
+      - After apply, the verifier runs the re-detected test command.
+      - Live on legacy-messy: Node and Python tests were generated and applied. `npm test` failed because the
+        fixture's dependencies weren't installed; this was reported, `verified: false` was recorded, and the run
+        rolled back cleanly.
+      - Remaining: offer the install step (with consent) before verifying.
 - [ ] **M2-24** CI generator: a GitHub Actions workflow (install, lint, typecheck, test, build) with dependency caching,
       least-privilege `permissions:` and SHA-pinned actions; validated with actionlint.
-- [ ] **M2-25** Smoke test: `scripts/smoke.(sh|ps1)` per stack (app boots, health endpoint responds, CLI `--help`, or Flutter
+      Progress:
+      - `ac-generate-ci` lists the verified action SHAs.
+      - Checks: the YAML parses, top-level `permissions:` is set, every `uses:` is pinned to a SHA, and actionlint
+        passes when installed.
+      - Live on go-service ($0.0035, 16 s): a pinned, least-privilege workflow.
+      - Remaining: actionlint isn't installed here (skipped); it arrives as a pinned catalog tool (M2-15).
+- [x] **M2-25** Smoke test: `scripts/smoke.(sh|ps1)` per stack (app boots, health endpoint responds, CLI `--help`, or Flutter
       build), plus a CI job.
-- [ ] **M2-26** Verifier: runs each generated command with a timeout and captures exit code and log tail.
+      — evidence: `ac-smoke-test`, with checks on the script and the workflow. Live on go-service over JSON-RPC:
+      `scripts/smoke.sh` and `.github/workflows/smoke.yml` were generated; after apply the verifier ran the script
+      (exit 0, 6.3 s); then rolled back cleanly.
+- [x] **M2-26** Verifier: runs each generated command with a timeout and captures exit code and log tail.
   - Generators get at most N repair attempts.
   - The Bootstrap Report lists what passed, what failed, and what was skipped, with reasons.
+      — evidence:
+      - `verify.ts` runs the test command (5 min) or the smoke script (2 min) asynchronously, so the sidecar keeps
+        answering pings. It keeps the exit code, duration and log tail, inside the workspace guard.
+      - Generators get up to 2 attempts, with failed checks as feedback.
+      - Each apply result and history entry lists its checks (pass, fail, skipped, with detail).
+      - The lockfile's `generated` entries record `verified`.
+      - `generate.test.ts` covers a failing and a passing smoke run.
 
 ### Fixtures & tests
 

@@ -322,8 +322,28 @@ flowchart LR
   - They run under a restricted profile: edits inside the workspace only, Bash limited to the detected commands.
   - They use AgentChainer's first-party skills (`skills/ac-*`).
   - They produce **proposals** (diffs) that go through review, and never write directly.
+  - Built (M2-19…M2-26, `packages/sidecar/src/bootstrap/generate.ts`):
+    - The session gets only Read, Grep, Glob and Bash, and runs without the user's or the project's settings.
+    - A `PreToolUse` hook allows reads inside the workspace, the project's own test/lint/typecheck/build commands,
+      and `StructuredOutput`.
+    - It answers with structured output (`{files, summary}`).
+    - Every path must belong to the generator. Checks (and disallowed paths) go back to Claude as feedback, up to
+      2 attempts.
+    - Proposals live in the sidecar's memory until applied. `bootstrap.generate` creates one; the plan shows it as a
+      multi-file diff.
+  - **Workspace guard** (`workspace-guard.ts`):
+    - Project commands have side effects. pnpm 11, for example, installs before `pnpm run`, rewriting the
+      lockfile and creating `pnpm-workspace.yaml`.
+    - Generator sessions and verifier runs are wrapped in a guard that snapshots git's view of the workspace and
+      reverts every change to git-visible files afterwards. Files the user was already editing are restored from a
+      copy.
+    - Outside git, generators get no commands.
 - **Verifier:**
   - Runs the real commands with timeouts and records exit code, duration and log tail.
+  - After apply it runs the test command (scaffold-tests) or the smoke script (smoke-test) asynchronously, inside
+    the guard.
+  - Results go into the apply result, the run history, and the lockfile's `generated[].verified`.
+  - It never rolls back on its own.
   - Generators get a bounded number of repair attempts.
   - The Bootstrap Report lists what passed, failed and was skipped, with reasons.
 - **Lockfile** `.agentchainer/lock.json` and the trust rules: [ADR-0005](adr/0005-catalog-trust-model.md), [CATALOG.md](CATALOG.md).

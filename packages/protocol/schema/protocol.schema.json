@@ -2231,6 +2231,43 @@
                         "text"
                       ],
                       "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string",
+                          "const": "files"
+                        },
+                        "files": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "path": {
+                                "type": "string"
+                              },
+                              "before": {
+                                "type": "string"
+                              },
+                              "after": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "path",
+                              "before",
+                              "after"
+                            ],
+                            "additionalProperties": false
+                          }
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "files"
+                      ],
+                      "additionalProperties": false
                     }
                   ]
                 },
@@ -2248,6 +2285,37 @@
                 },
                 "reason": {
                   "type": "string"
+                },
+                "generatable": {
+                  "type": "boolean"
+                },
+                "checks": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "name": {
+                        "type": "string"
+                      },
+                      "status": {
+                        "type": "string",
+                        "enum": [
+                          "pass",
+                          "fail",
+                          "skipped"
+                        ]
+                      },
+                      "detail": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "name",
+                      "status",
+                      "detail"
+                    ],
+                    "additionalProperties": false
+                  }
                 }
               },
               "required": [
@@ -2335,6 +2403,34 @@
                   "items": {
                     "type": "string"
                   }
+                },
+                "checks": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "name": {
+                        "type": "string"
+                      },
+                      "status": {
+                        "type": "string",
+                        "enum": [
+                          "pass",
+                          "fail",
+                          "skipped"
+                        ]
+                      },
+                      "detail": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "name",
+                      "status",
+                      "detail"
+                    ],
+                    "additionalProperties": false
+                  }
                 }
               },
               "required": [
@@ -2349,6 +2445,89 @@
         "required": [
           "runId",
           "results"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "bootstrap.generate": {
+      "params": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "cwd": {
+            "type": "string",
+            "minLength": 1
+          },
+          "action": {
+            "type": "string",
+            "minLength": 1
+          },
+          "model": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "cwd",
+          "action"
+        ],
+        "additionalProperties": false
+      },
+      "result": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "summary": {
+            "type": "string"
+          },
+          "files": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "checks": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "pass",
+                    "fail",
+                    "skipped"
+                  ]
+                },
+                "detail": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "name",
+                "status",
+                "detail"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "attempts": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "costUsd": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "summary",
+          "files",
+          "checks",
+          "attempts",
+          "costUsd"
         ],
         "additionalProperties": false
       }
@@ -2412,6 +2591,34 @@
                         "type": "array",
                         "items": {
                           "type": "string"
+                        }
+                      },
+                      "checks": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "name": {
+                              "type": "string"
+                            },
+                            "status": {
+                              "type": "string",
+                              "enum": [
+                                "pass",
+                                "fail",
+                                "skipped"
+                              ]
+                            },
+                            "detail": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "name",
+                            "status",
+                            "detail"
+                          ],
+                          "additionalProperties": false
                         }
                       }
                     },

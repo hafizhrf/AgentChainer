@@ -189,16 +189,18 @@
       "risk": "medium",
       "scope": "project",
       "permissions": [
-        "Runs a Claude session restricted to this workspace; its changes come back as a diff to review"
+        "Generating runs a Claude session that can only read this workspace and run its test, lint, typecheck and build commands",
+        "It proposes files; nothing is written until you apply the proposal"
       ],
       "secrets": [],
       "preview": {
         "type": "note",
-        "text": "A diff to review is produced when the generator runs."
+        "text": "Generate a proposal to see the exact files. Claude reads the project and proposes them; you review the diff here."
       },
       "state": "unavailable",
       "selected": false,
-      "reason": "Agent-driven generators arrive with M2-19…M2-26."
+      "reason": "Generate a proposal first (it costs a model call).",
+      "generatable": true
     },
     {
       "id": "gen:setup-hooks",
@@ -208,16 +210,18 @@
       "risk": "medium",
       "scope": "project",
       "permissions": [
-        "Runs a Claude session restricted to this workspace; its changes come back as a diff to review"
+        "Generating runs a Claude session that can only read this workspace and run its test, lint, typecheck and build commands",
+        "It proposes files; nothing is written until you apply the proposal"
       ],
       "secrets": [],
       "preview": {
         "type": "note",
-        "text": "A diff to review is produced when the generator runs."
+        "text": "Generate a proposal to see the exact files. Claude reads the project and proposes them; you review the diff here."
       },
       "state": "unavailable",
       "selected": false,
-      "reason": "Agent-driven generators arrive with M2-19…M2-26."
+      "reason": "Generate a proposal first (it costs a model call).",
+      "generatable": true
     },
     {
       "id": "gen:scaffold-tests",
@@ -227,16 +231,18 @@
       "risk": "medium",
       "scope": "project",
       "permissions": [
-        "Runs a Claude session restricted to this workspace; its changes come back as a diff to review"
+        "Generating runs a Claude session that can only read this workspace and run its test, lint, typecheck and build commands",
+        "It proposes files; nothing is written until you apply the proposal"
       ],
       "secrets": [],
       "preview": {
         "type": "note",
-        "text": "A diff to review is produced when the generator runs."
+        "text": "Generate a proposal to see the exact files. Claude reads the project and proposes them; you review the diff here."
       },
       "state": "unavailable",
       "selected": false,
-      "reason": "Agent-driven generators arrive with M2-19…M2-26."
+      "reason": "Generate a proposal first (it costs a model call).",
+      "generatable": true
     },
     {
       "id": "gen:add-linter",
@@ -246,16 +252,18 @@
       "risk": "medium",
       "scope": "project",
       "permissions": [
-        "Runs a Claude session restricted to this workspace; its changes come back as a diff to review"
+        "Generating runs a Claude session that can only read this workspace and run its test, lint, typecheck and build commands",
+        "It proposes files; nothing is written until you apply the proposal"
       ],
       "secrets": [],
       "preview": {
         "type": "note",
-        "text": "A diff to review is produced when the generator runs."
+        "text": "Generate a proposal to see the exact files. Claude reads the project and proposes them; you review the diff here."
       },
       "state": "unavailable",
       "selected": false,
-      "reason": "Agent-driven generators arrive with M2-19…M2-26."
+      "reason": "This generator comes later.",
+      "generatable": false
     },
     {
       "id": "gen:add-formatter",
@@ -265,16 +273,18 @@
       "risk": "medium",
       "scope": "project",
       "permissions": [
-        "Runs a Claude session restricted to this workspace; its changes come back as a diff to review"
+        "Generating runs a Claude session that can only read this workspace and run its test, lint, typecheck and build commands",
+        "It proposes files; nothing is written until you apply the proposal"
       ],
       "secrets": [],
       "preview": {
         "type": "note",
-        "text": "A diff to review is produced when the generator runs."
+        "text": "Generate a proposal to see the exact files. Claude reads the project and proposes them; you review the diff here."
       },
       "state": "unavailable",
       "selected": false,
-      "reason": "Agent-driven generators arrive with M2-19…M2-26."
+      "reason": "This generator comes later.",
+      "generatable": false
     },
     {
       "id": "gen:generate-ci",
@@ -284,16 +294,18 @@
       "risk": "medium",
       "scope": "project",
       "permissions": [
-        "Runs a Claude session restricted to this workspace; its changes come back as a diff to review"
+        "Generating runs a Claude session that can only read this workspace and run its test, lint, typecheck and build commands",
+        "It proposes files; nothing is written until you apply the proposal"
       ],
       "secrets": [],
       "preview": {
         "type": "note",
-        "text": "A diff to review is produced when the generator runs."
+        "text": "Generate a proposal to see the exact files. Claude reads the project and proposes them; you review the diff here."
       },
       "state": "unavailable",
       "selected": false,
-      "reason": "Agent-driven generators arrive with M2-19…M2-26."
+      "reason": "Generate a proposal first (it costs a model call).",
+      "generatable": true
     },
     {
       "id": "gen:smoke-test",
@@ -303,16 +315,18 @@
       "risk": "medium",
       "scope": "project",
       "permissions": [
-        "Runs a Claude session restricted to this workspace; its changes come back as a diff to review"
+        "Generating runs a Claude session that can only read this workspace and run its test, lint, typecheck and build commands",
+        "It proposes files; nothing is written until you apply the proposal"
       ],
       "secrets": [],
       "preview": {
         "type": "note",
-        "text": "A diff to review is produced when the generator runs."
+        "text": "Generate a proposal to see the exact files. Claude reads the project and proposes them; you review the diff here."
       },
       "state": "unavailable",
       "selected": false,
-      "reason": "Agent-driven generators arrive with M2-19…M2-26."
+      "reason": "Generate a proposal first (it costs a model call).",
+      "generatable": true
     }
   ]
 }

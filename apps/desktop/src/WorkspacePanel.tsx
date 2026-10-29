@@ -17,6 +17,7 @@ export function WorkspacePanel({
   error,
   items,
   selected,
+  model,
   confirm,
   onSelect,
   onRefresh,
@@ -26,6 +27,8 @@ export function WorkspacePanel({
   error: string | null;
   items: Item[];
   selected: string | null;
+  /** The session's model alias, for generators. */
+  model: string;
   confirm: Confirm;
   onSelect: (path: string) => void;
   onRefresh: () => void;
@@ -90,7 +93,7 @@ export function WorkspacePanel({
         />
       )}
       {view === "permissions" && <PermissionRules cwd={cwd} confirm={confirm} />}
-      {view === "setup" && <SetupReport cwd={cwd} confirm={confirm} />}
+      {view === "setup" && <SetupReport cwd={cwd} model={model} confirm={confirm} />}
     </div>
   );
 }

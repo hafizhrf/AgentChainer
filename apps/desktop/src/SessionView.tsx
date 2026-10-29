@@ -80,6 +80,7 @@ export function SessionView({
             error={workspace.error}
             items={tab.items}
             selected={selected}
+            model={tab.modelAlias}
             confirm={confirm}
             onSelect={setSelected}
             onRefresh={() => void refresh()}

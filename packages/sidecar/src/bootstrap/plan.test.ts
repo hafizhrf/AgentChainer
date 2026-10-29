@@ -4,7 +4,13 @@ import { after, describe, it } from "node:test";
 import { fileURLToPath } from "node:url";
 import { catalog as shipped } from "../catalog/index.ts";
 import type { Catalog, Item } from "../catalog/schema.ts";
-import { catalogJsonText, catalogSchemaText, readCatalogSource } from "../catalog/source.ts";
+import {
+  catalogJsonText,
+  catalogSchemaText,
+  readCatalogSource,
+  readSkills,
+  skillsJsonText,
+} from "../catalog/source.ts";
 import { auditWorkspace } from "../detect/audit.ts";
 import { detectWorkspace } from "../detect/detect.ts";
 import { copyFixture, FIXTURE_SETUPS, removeFixtureCopies } from "../detect/fixture-copy.ts";
@@ -147,6 +153,18 @@ describe("the shipped catalog", () => {
     assert.equal(readFileSync(new URL("../catalog/catalog.json", import.meta.url), "utf8"), catalogJsonText(source));
     assert.equal(readFileSync(new URL("schema.json", `file://${dir}`), "utf8"), catalogSchemaText());
     assert.deepEqual(shipped, source);
+  });
+
+  it("ships the first-party skills in skills/ (run scripts/build-catalog.ts)", () => {
+    const skills = readSkills(fileURLToPath(new URL("../../../../skills/", import.meta.url)));
+    assert.deepEqual(Object.keys(skills).sort(), [
+      "ac-generate-ci",
+      "ac-scaffold-tests",
+      "ac-setup-hooks",
+      "ac-smoke-test",
+      "ac-write-claude-md",
+    ]);
+    assert.equal(readFileSync(new URL("./skills.json", import.meta.url), "utf8"), skillsJsonText(skills));
   });
 
   it("pins every marketplace item to a reviewed marketplace commit", () => {

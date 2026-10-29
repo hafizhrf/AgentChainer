@@ -5,6 +5,7 @@
     "includes": [
       "**",
       "!**/*.md",
+      "!.release-please-manifest.json",
       "!pnpm-lock.yaml",
       "!packages/protocol/schema",
       "!catalog/schema.json",

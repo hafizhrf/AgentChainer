@@ -4,4 +4,4 @@ description: "Browser automation for web UIs, on request."
 suggest:
   optIn: true
 items:
-  - playwright
+  - playwright-mcp

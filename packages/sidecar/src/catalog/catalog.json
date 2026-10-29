@@ -2,6 +2,65 @@
   "version": "2026.10.29",
   "items": [
     {
+      "id": "actionlint",
+      "name": "actionlint (GitHub Actions checker)",
+      "kind": "tool",
+      "tier": "verified-vendor",
+      "license": "MIT",
+      "homepage": "https://github.com/rhysd/actionlint",
+      "summary": "Static checker for GitHub Actions workflow files.",
+      "why": "Catches mistakes in CI workflows (bad expressions, unknown inputs, shell errors) before they fail on GitHub.",
+      "source": {
+        "type": "release-asset",
+        "repo": "https://github.com/rhysd/actionlint",
+        "version": "1.7.12",
+        "assets": {
+          "darwin-arm64": {
+            "url": "https://github.com/rhysd/actionlint/releases/download/v1.7.12/actionlint_1.7.12_darwin_arm64.tar.gz",
+            "sha256": "aba9ced2dee8d27fecca3dc7feb1a7f9a52caefa1eb46f3271ea66b6e0e6953f"
+          },
+          "darwin-x64": {
+            "url": "https://github.com/rhysd/actionlint/releases/download/v1.7.12/actionlint_1.7.12_darwin_amd64.tar.gz",
+            "sha256": "5b44c3bc2255115c9b69e30efc0fecdf498fdb63c5d58e17084fd5f16324c644"
+          },
+          "linux-x64": {
+            "url": "https://github.com/rhysd/actionlint/releases/download/v1.7.12/actionlint_1.7.12_linux_amd64.tar.gz",
+            "sha256": "8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8"
+          },
+          "linux-arm64": {
+            "url": "https://github.com/rhysd/actionlint/releases/download/v1.7.12/actionlint_1.7.12_linux_arm64.tar.gz",
+            "sha256": "325e971b6ba9bfa504672e29be93c24981eeb1c07576d730e9f7c8805afff0c6"
+          },
+          "win32-x64": {
+            "url": "https://github.com/rhysd/actionlint/releases/download/v1.7.12/actionlint_1.7.12_windows_amd64.zip",
+            "sha256": "6e7241b51e6817ea6a047693d8e6fed13b31819c9a0dd6c5a726e1592d22f6e9"
+          }
+        }
+      },
+      "platforms": [
+        "darwin",
+        "linux",
+        "win32"
+      ],
+      "requires": [],
+      "risk": "low",
+      "permissions": [
+        "Reads workflow files; makes no network calls"
+      ],
+      "secrets": [],
+      "install": {
+        "scope": "local",
+        "steps": [
+          {
+            "download-binary": {
+              "binary": "actionlint"
+            }
+          }
+        ]
+      },
+      "reviews": []
+    },
+    {
       "id": "cloudflare-security-audit",
       "name": "Security Audit (Cloudflare)",
       "kind": "skill",
@@ -116,6 +175,90 @@
         ]
       },
       "reviews": []
+    },
+    {
+      "id": "codebase-memory-mcp",
+      "name": "Codebase memory (code graph MCP)",
+      "kind": "mcp",
+      "tier": "community",
+      "license": "MIT",
+      "homepage": "https://github.com/DeusData/codebase-memory-mcp",
+      "summary": "A local knowledge graph of the codebase that Claude queries instead of reading files one by one.",
+      "why": "Claude answers \"who calls this?\" or \"what breaks if I change it?\" from an index of the code, which is faster and uses far fewer tokens than searching file by file.",
+      "source": {
+        "type": "release-asset",
+        "repo": "https://github.com/DeusData/codebase-memory-mcp",
+        "version": "0.11.0",
+        "assets": {
+          "darwin-arm64": {
+            "url": "https://github.com/DeusData/codebase-memory-mcp/releases/download/v0.11.0/codebase-memory-mcp-darwin-arm64.tar.gz",
+            "sha256": "4dee7f38b63740e6751d7a7ed7eb10291c1f2a3ea2415f599dc68370ca0a2d18"
+          },
+          "darwin-x64": {
+            "url": "https://github.com/DeusData/codebase-memory-mcp/releases/download/v0.11.0/codebase-memory-mcp-darwin-amd64.tar.gz",
+            "sha256": "dbf1c73bfcbde64e7dde4cd1320da7afc02e2c972ee1789ae039521411f5132e"
+          },
+          "linux-x64": {
+            "url": "https://github.com/DeusData/codebase-memory-mcp/releases/download/v0.11.0/codebase-memory-mcp-linux-amd64-portable.tar.gz",
+            "sha256": "1f9e8293eb2bc5c05cfa27a7e8fc033da6d729ffad525ccfcdaa3fd606306683"
+          },
+          "linux-arm64": {
+            "url": "https://github.com/DeusData/codebase-memory-mcp/releases/download/v0.11.0/codebase-memory-mcp-linux-arm64-portable.tar.gz",
+            "sha256": "d62eeb224d5ee3eba3070938ec62cf1033f10b041ec1c4b2fb67f7aef390cc7b"
+          },
+          "win32-x64": {
+            "url": "https://github.com/DeusData/codebase-memory-mcp/releases/download/v0.11.0/codebase-memory-mcp-windows-amd64.zip",
+            "sha256": "6eb6beaf261b19e419766e78baf93cbc3cf1c6338cff8fb7c0234859f96d1685"
+          }
+        }
+      },
+      "platforms": [
+        "darwin",
+        "linux",
+        "win32"
+      ],
+      "requires": [],
+      "risk": "medium",
+      "permissions": [
+        "Indexes the workspace into a local graph database in its own cache folder",
+        "Starts a background daemon that watches indexed git projects for changes",
+        "Runs locally; the project states it makes no network requests and collects no telemetry"
+      ],
+      "secrets": [],
+      "install": {
+        "scope": "local",
+        "steps": [
+          {
+            "download-binary": {
+              "binary": "codebase-memory-mcp"
+            }
+          },
+          {
+            "mcp-add": {
+              "name": "codebase-memory",
+              "command": [
+                "{binary}"
+              ]
+            }
+          }
+        ]
+      },
+      "uninstall": {
+        "steps": [
+          {
+            "run": [
+              "claude",
+              "mcp",
+              "remove",
+              "--scope",
+              "local",
+              "codebase-memory"
+            ]
+          }
+        ]
+      },
+      "reviews": [],
+      "notes": "AgentChainer never runs the project's install script: it edits the global config of every coding agent it finds and adds hooks, agents and skills. Only the binary is used, registered for this workspace."
     },
     {
       "id": "commit-commands",
@@ -304,6 +447,87 @@
       "notes": "The token is read from the environment by the CLI; AgentChainer never stores it (ADR-0002). Use a fine-grained token limited to the repositories you need."
     },
     {
+      "id": "gitleaks",
+      "name": "Secret scan before each commit (gitleaks)",
+      "kind": "hook",
+      "tier": "verified-vendor",
+      "license": "MIT",
+      "homepage": "https://github.com/gitleaks/gitleaks",
+      "summary": "Scans staged changes for API keys, tokens and passwords before every commit, on your machine.",
+      "why": "Agents write and commit a lot of code quickly. A key pasted into a config file is caught before it reaches the repository, where removing it later means rewriting history and rotating the key.",
+      "source": {
+        "type": "release-asset",
+        "repo": "https://github.com/gitleaks/gitleaks",
+        "version": "8.30.1",
+        "assets": {
+          "darwin-arm64": {
+            "url": "https://github.com/gitleaks/gitleaks/releases/download/v8.30.1/gitleaks_8.30.1_darwin_arm64.tar.gz",
+            "sha256": "b40ab0ae55c505963e365f271a8d3846efbc170aa17f2607f13df610a9aeb6a5"
+          },
+          "darwin-x64": {
+            "url": "https://github.com/gitleaks/gitleaks/releases/download/v8.30.1/gitleaks_8.30.1_darwin_x64.tar.gz",
+            "sha256": "dfe101a4db2255fc85120ac7f3d25e4342c3c20cf749f2c20a18081af1952709"
+          },
+          "linux-x64": {
+            "url": "https://github.com/gitleaks/gitleaks/releases/download/v8.30.1/gitleaks_8.30.1_linux_x64.tar.gz",
+            "sha256": "551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb"
+          },
+          "linux-arm64": {
+            "url": "https://github.com/gitleaks/gitleaks/releases/download/v8.30.1/gitleaks_8.30.1_linux_arm64.tar.gz",
+            "sha256": "e4a487ee7ccd7d3a7f7ec08657610aa3606637dab924210b3aee62570fb4b080"
+          },
+          "win32-x64": {
+            "url": "https://github.com/gitleaks/gitleaks/releases/download/v8.30.1/gitleaks_8.30.1_windows_x64.zip",
+            "sha256": "d29144deff3a68aa93ced33dddf84b7fdc26070add4aa0f4513094c8332afc4e"
+          }
+        }
+      },
+      "platforms": [
+        "darwin",
+        "linux",
+        "win32"
+      ],
+      "requires": [],
+      "risk": "low",
+      "permissions": [
+        "Reads the staged changes of each commit, locally; nothing is sent anywhere",
+        "Stops a commit that contains a secret (skip one check with SKIP=gitleaks, or git commit --no-verify)"
+      ],
+      "secrets": [],
+      "install": {
+        "scope": "project",
+        "steps": [
+          {
+            "download-binary": {
+              "binary": "gitleaks"
+            }
+          },
+          {
+            "pre-commit-hook": {
+              "id": "gitleaks",
+              "run": [
+                "{binary}",
+                "git",
+                "--pre-commit",
+                "--staged",
+                "--redact",
+                "--no-banner"
+              ]
+            }
+          }
+        ]
+      },
+      "uninstall": {
+        "steps": [
+          {
+            "remove": ".agentchainer/hooks/gitleaks.sh"
+          }
+        ]
+      },
+      "reviews": [],
+      "notes": "Teammates without gitleaks (or AgentChainer) aren't blocked: the committed hook prints a hint and lets the commit through."
+    },
+    {
       "id": "gopls-lsp",
       "name": "Go language server (gopls)",
       "kind": "plugin",
@@ -367,6 +591,57 @@
         ]
       },
       "reviews": []
+    },
+    {
+      "id": "playwright-mcp",
+      "name": "Playwright browser (MCP, pinned)",
+      "kind": "mcp",
+      "tier": "verified-vendor",
+      "license": "Apache-2.0",
+      "homepage": "https://github.com/microsoft/playwright-mcp",
+      "summary": "Microsoft's Playwright MCP server: Claude drives a real browser to check web UIs.",
+      "why": "Claude can open your app in a browser, click through it and read what's on the page, so UI changes are checked the way a person would check them.",
+      "source": {
+        "type": "npm",
+        "name": "@playwright/mcp",
+        "version": "0.0.83",
+        "integrity": "sha512-oNcl+Ae2/IAjhfPeP46BfIkSakfmprY+aOtkv5MjrQ4lPav4/yNtPhL0iq8SlIM90oApWgBDUxaNKvktazUKOg=="
+      },
+      "platforms": [
+        "darwin",
+        "linux",
+        "win32"
+      ],
+      "requires": [],
+      "risk": "medium",
+      "permissions": [
+        "Starts a browser and visits the pages Claude chooses",
+        "Runs npx, which downloads @playwright/mcp 0.0.83 and its browser on first use"
+      ],
+      "secrets": [],
+      "install": {
+        "scope": "project",
+        "steps": [
+          {
+            "merge-json": {
+              "path": ".mcp.json",
+              "value": {
+                "mcpServers": {
+                  "playwright": {
+                    "command": "npx",
+                    "args": [
+                      "-y",
+                      "@playwright/mcp@0.0.83"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        ]
+      },
+      "reviews": [],
+      "notes": "Pinned to an exact version, unlike the playwright plugin, which runs @playwright/mcp@latest. Claude Code asks before using servers from a project's .mcp.json."
     },
     {
       "id": "playwright",
@@ -704,7 +979,8 @@
       "items": [
         "code-review",
         "commit-commands",
-        "security-guidance"
+        "security-guidance",
+        "gitleaks"
       ]
     },
     {
@@ -734,12 +1010,13 @@
     {
       "id": "knowledge",
       "name": "Knowledge",
-      "description": "Up-to-date library docs, on request.",
+      "description": "Up-to-date library docs and a code graph, on request.",
       "suggest": {
         "optIn": true
       },
       "items": [
-        "context7"
+        "context7",
+        "codebase-memory-mcp"
       ]
     },
     {
@@ -800,7 +1077,7 @@
         "optIn": true
       },
       "items": [
-        "playwright"
+        "playwright-mcp"
       ]
     }
   ]

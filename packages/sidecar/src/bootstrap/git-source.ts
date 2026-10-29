@@ -3,6 +3,7 @@ import { createHash } from "node:crypto";
 import { lstatSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
+import { systemTar } from "./tools.ts";
 
 /**
  * Pinned git sources for catalog items (M2-13, ADR-0005): a GitHub tarball at a full commit SHA, verified against
@@ -64,7 +65,7 @@ export const fetchGitHubTree: FetchTree = async (repo, ref, subpath) => {
     const archive = path.join(work, "source.tar.gz");
     writeFileSync(archive, new Uint8Array(await res.arrayBuffer()));
     // System tar (bsdtar on macOS and Windows 10+, GNU tar on Linux) refuses absolute and `..` entry paths.
-    const tar = spawnSync("tar", ["-xzf", archive, "-C", work], { encoding: "utf8" });
+    const tar = spawnSync(systemTar(), ["-xzf", archive, "-C", work], { encoding: "utf8" });
     if (tar.status !== 0) throw new Error(`Extracting the source failed: ${tar.stderr.trim()}`);
     const top = readdirSync(work).find((n) => n !== "source.tar.gz");
     if (!top) throw new Error("The source archive was empty.");

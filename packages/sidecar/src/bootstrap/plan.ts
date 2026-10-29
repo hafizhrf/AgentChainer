@@ -4,6 +4,8 @@ import type { BootstrapPlan, Finding, PlanAction, WorkspaceProfile } from "@agen
 import { type Catalog, type Item, type Profile, REQUIRED_REVIEWS } from "../catalog/schema.ts";
 import { git, repoOf } from "../workspace.ts";
 import { GENERATORS, type Proposal } from "./generate.ts";
+import { itemChanges } from "./steps.ts";
+import { binaryName, onPath, platformKey, toolsDir } from "./tools.ts";
 
 /**
  * The BootstrapPlan builder (M2-11): workspace profile + audit findings + catalog → actions, each with why, risk,
@@ -19,6 +21,11 @@ export type PlanEnv = {
   remoteHost: string | null;
   /** `plugin@marketplace` ids enabled in the project's `.claude/settings.json`. */
   enabledPlugins: Set<string>;
+  arch: string;
+  /** AgentChainer's tools folder for downloaded binaries (M2-15); null when the app didn't set one. */
+  toolsDir: string | null;
+  /** Catalog items recorded as installed in `.agentchainer/lock.json` or `local.json`. */
+  installedItems: Set<string>;
 };
 
 /** The block "Ignore env and secret files" appends to .gitignore. */
@@ -77,7 +84,7 @@ export function buildPlan(
       const item = catalog.items.find((i) => i.id === id);
       if (!item || seen.has(id)) continue;
       seen.add(id);
-      actions.push(itemAction(item, p, on, env));
+      actions.push(itemAction(root, item, p, on, env));
     }
   }
 
@@ -203,27 +210,40 @@ function fixActions(root: string, fixes: Set<string>): PlanAction[] {
   return actions;
 }
 
-function itemAction(item: Item, p: Profile, suggestedProfile: boolean, env: PlanEnv): PlanAction {
+function itemAction(root: string, item: Item, p: Profile, suggestedProfile: boolean, env: PlanEnv): PlanAction {
   const src = item.source;
+  const changes = itemChanges(root, item, env);
+  const key = platformKey(env.platform, env.arch);
+  const asset = src.type === "release-asset" && key ? src.assets[key] : undefined;
   const pluginId = src.type === "marketplace" ? `${src.plugin}@${src.marketplace}` : null;
   const missing = item.requires.filter((r) => !env.hasTool(r.tool));
   const reviews = item.reviews.length;
   const needed = REQUIRED_REVIEWS[item.tier];
   let state: PlanAction["state"] = suggestedProfile ? "recommended" : "optional";
   let reason: string | undefined;
-  if (pluginId && env.enabledPlugins.has(pluginId)) {
+  if ((pluginId && env.enabledPlugins.has(pluginId)) || env.installedItems.has(item.id)) {
     state = "installed";
-  } else if (!item.platforms.includes(env.platform as never)) {
+  } else if (!item.platforms.includes(env.platform as never) || (src.type === "release-asset" && !asset)) {
     state = "unavailable";
-    reason = `Not available on ${env.platform}.`;
+    reason = `Not available on ${env.platform}${src.type === "release-asset" ? ` (${env.arch})` : ""}.`;
   } else if (reviews < needed) {
     state = "unavailable";
     reason = `Not reviewed yet: needs ${needed - reviews} more maintainer review(s) against docs/CATALOG.md §4.`;
   } else if (missing.length) {
     state = "unavailable";
     reason = missing.map((r) => `Needs \`${r.tool}\` on PATH (${r.hint}).`).join(" ");
+  } else if (changes.unavailable) {
+    state = "unavailable";
+    reason = changes.unavailable;
   }
-  const commands = item.install.steps.flatMap((s) => ("run" in s ? [s.run] : []));
+  // A download is part of what the user agrees to: what, from where, and its pinned hash.
+  const permissions =
+    src.type === "release-asset" && asset
+      ? [
+          ...item.permissions,
+          `Downloads ${binaryName(item) ?? item.name} ${src.version} for ${key} from ${new URL(asset.url).host} (sha256 ${asset.sha256.slice(0, 12)}…) into AgentChainer's tools folder; it stays there after a rollback`,
+        ]
+      : item.permissions;
   const source =
     src.type === "marketplace"
       ? `${pluginId}${src.reviewedVersion ? `, reviewed v${src.reviewedVersion}` : ""} at ${src.reviewedRef.slice(0, 7)}`
@@ -238,17 +258,19 @@ function itemAction(item: Item, p: Profile, suggestedProfile: boolean, env: Plan
     title: item.name,
     why: item.why,
     risk: item.risk,
-    scope: item.install.scope,
+    scope: changes.scope,
     tier: item.tier,
     license: item.license,
     source,
     profile: p.id,
-    permissions: item.permissions,
+    permissions,
     secrets: item.secrets,
     ...(item.notes ? { notes: item.notes } : {}),
-    preview: commands.length
-      ? { type: "commands", commands }
-      : { type: "note", text: item.install.steps.map((s) => Object.keys(s)[0]).join(", ") },
+    preview: changes.files.length
+      ? { type: "files", files: changes.files.map(({ path: p, before, after }) => ({ path: p, before, after })) }
+      : changes.commands.length
+        ? { type: "commands", commands: changes.commands }
+        : { type: "note", text: item.install.steps.map((s) => Object.keys(s)[0]).join(", ") },
     state,
     // Community items are never pre-selected (ADR-0005), and nothing unavailable or installed is.
     selected: state === "recommended" && item.tier !== "community",
@@ -267,12 +289,7 @@ export function gitHost(url: string): string | null {
 
 /** The real environment of a workspace, for `buildPlan`. */
 export function planEnv(root: string, env: NodeJS.ProcessEnv = process.env): PlanEnv {
-  const dirs = (env.PATH ?? env.Path ?? "").split(path.delimiter).filter(Boolean);
-  const exts = process.platform === "win32" ? (env.PATHEXT ?? ".EXE;.CMD;.BAT").split(";") : [""];
-  const hasTool = (name: string) =>
-    dirs.some((d) =>
-      exts.some((e) => existsSync(path.join(d, name + e.toLowerCase())) || existsSync(path.join(d, name + e))),
-    );
+  const hasTool = (name: string) => onPath(name, env) !== null;
   let remoteHost: string | null = null;
   if (repoOf(root)) {
     const url = git(["remote", "get-url", "origin"], root).stdout.trim();
@@ -291,5 +308,27 @@ export function planEnv(root: string, env: NodeJS.ProcessEnv = process.env): Pla
   } catch {
     // no project settings yet
   }
-  return { platform: process.platform, hasTool, remoteHost, enabledPlugins };
+  return {
+    platform: process.platform,
+    arch: process.arch,
+    hasTool,
+    remoteHost,
+    enabledPlugins,
+    toolsDir: toolsDir(env),
+    installedItems: installedItems(root),
+  };
+}
+
+/** Item ids recorded in the committed lockfile and the private `local.json` (docs/CATALOG.md §7). */
+export function installedItems(root: string): Set<string> {
+  const ids = new Set<string>();
+  for (const file of [".agentchainer/lock.json", ".agentchainer/local.json"]) {
+    try {
+      const lock = JSON.parse(readFileSync(path.join(root, file), "utf8")) as { items?: { id?: unknown }[] };
+      for (const i of lock.items ?? []) if (typeof i.id === "string") ids.add(i.id);
+    } catch {
+      // not written yet
+    }
+  }
+  return ids;
 }

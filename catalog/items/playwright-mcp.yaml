@@ -1,0 +1,36 @@
+# Seed item (docs/CATALOG.md §6). Offered once reviewed: see `reviews` and §4.
+id: playwright-mcp
+name: "Playwright browser (MCP, pinned)"
+kind: mcp
+tier: verified-vendor
+license: Apache-2.0
+homepage: https://github.com/microsoft/playwright-mcp
+summary: "Microsoft's Playwright MCP server: Claude drives a real browser to check web UIs."
+why: >-
+  Claude can open your app in a browser, click through it and read what's on the page, so UI changes are checked
+  the way a person would check them.
+source:
+  type: npm
+  name: "@playwright/mcp"
+  version: "0.0.83"
+  integrity: "sha512-oNcl+Ae2/IAjhfPeP46BfIkSakfmprY+aOtkv5MjrQ4lPav4/yNtPhL0iq8SlIM90oApWgBDUxaNKvktazUKOg=="
+platforms: [darwin, linux, win32]
+risk: medium
+permissions:
+  - "Starts a browser and visits the pages Claude chooses"
+  - "Runs npx, which downloads @playwright/mcp 0.0.83 and its browser on first use"
+install:
+  # Portable (npx with an exact version), so it can be shared in the project's .mcp.json.
+  scope: project
+  steps:
+    - merge-json:
+        path: .mcp.json
+        value:
+          mcpServers:
+            playwright:
+              command: npx
+              args: ["-y", "@playwright/mcp@0.0.83"]
+reviews: []
+notes: >-
+  Pinned to an exact version, unlike the playwright plugin, which runs @playwright/mcp@latest. Claude Code asks
+  before using servers from a project's .mcp.json.

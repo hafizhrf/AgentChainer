@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -9,12 +10,21 @@ import { copyFixture, removeFixtureCopies } from "../detect/fixture-copy.ts";
 import type { CliResult } from "../installer.ts";
 import { type ApplyContext, applyActions, type Cli, listRuns, pluginVersion, rollback } from "./apply.ts";
 import { type FetchTree, treeHash } from "./git-source.ts";
-import type { PlanEnv } from "./plan.ts";
+import { installedItems, type PlanEnv } from "./plan.ts";
+import { systemTar } from "./tools.ts";
 
 /** Installer and rollback runs on temp copies of the fixture repos (M2-28). No network, no real CLI. */
 after(removeFixtureCopies);
 
-const env: PlanEnv = { platform: "linux", hasTool: () => true, remoteHost: null, enabledPlugins: new Set() };
+const env: PlanEnv = {
+  platform: "linux",
+  arch: "x64",
+  hasTool: () => true,
+  remoteHost: null,
+  enabledPlugins: new Set(),
+  toolsDir: null,
+  installedItems: new Set(),
+};
 const git = (cwd: string, ...args: string[]) => execFileSync("git", args, { cwd, encoding: "utf8" });
 const read = (dir: string, rel: string) => readFileSync(join(dir, rel), "utf8");
 const review = [{ by: "maintainer", date: "2026-10-29", ref: "test" }];
@@ -81,6 +91,14 @@ function fakeCli(root: string, opts: { marketplaces?: string[]; version?: string
     },
     listPlugins: () => ok([{ id: "demo@mkt", version: opts.version ?? "1.0.1", scope: "project" }]),
     listMarketplaces: () => ok((opts.marketplaces ?? ["mkt"]).map((name) => ({ name }))),
+    addMcp: (name, scope, command, args) => {
+      calls.push(`mcp add ${scope} ${name} ${[command, ...args].join(" ")}`);
+      return ok();
+    },
+    removeMcp: (name, scope) => {
+      calls.push(`mcp remove ${scope} ${name}`);
+      return ok();
+    },
   };
 }
 
@@ -111,7 +129,7 @@ describe("apply and roll back fixes", () => {
       lock.fixes.map((f: { id: string }) => f.id),
       ["untrack-env", "fix-gitignore"],
     );
-    assert.equal(read(dir, ".agentchainer/.gitignore"), "backups/\nprofile.json\n");
+    assert.equal(read(dir, ".agentchainer/.gitignore"), "backups/\nprofile.json\nlocal.json\n");
 
     // Idempotent: the fixed findings are gone, so a re-run applies nothing.
     const again = await applyActions(dir, ["fix:fix-gitignore"], ctx(dir));
@@ -257,5 +275,159 @@ describe("pluginVersion", () => {
     assert.equal(pluginVersion([{ id: "x@m", version: "1.2.3" }], "x@m"), "1.2.3");
     assert.equal(pluginVersion({ plugins: [{ name: "x", marketplace: "m", version: "2.0.0" }] }, "x@m"), "2.0.0");
     assert.equal(pluginVersion(null, "x@m"), undefined);
+  });
+});
+
+describe("release binaries, MCP servers and hooks (M2-15)", () => {
+  const work = mkdtempSync(join(tmpdir(), "ac-apply-tools-"));
+  after(() => rmSync(work, { recursive: true, force: true }));
+
+  // A release archive with a stand-in binary, served by a fake fetch.
+  const exe = process.platform === "win32" ? "fake-scan.exe" : "fake-scan";
+  mkdirSync(join(work, "pkg"), { recursive: true });
+  writeFileSync(join(work, "pkg", exe), "#!/bin/sh\nexit 0\n");
+  execFileSync(systemTar(), ["-czf", join(work, "fake.tar.gz"), "-C", join(work, "pkg"), exe]);
+  const archive = readFileSync(join(work, "fake.tar.gz"));
+  const fetchAsset = (async () => new Response(new Uint8Array(archive))) as unknown as typeof fetch;
+  const key = `${process.platform}-${process.arch}` as "linux-x64";
+  const sha256 = createHash("sha256").update(archive).digest("hex");
+  const toolEnv: PlanEnv = { ...env, platform: process.platform, arch: process.arch, toolsDir: join(work, "tools") };
+
+  const binaryItem = (over: Partial<Item>): Item => ({
+    ...pluginItem,
+    id: "fake-scan",
+    name: "Fake scan",
+    kind: "hook",
+    tier: "verified-vendor",
+    source: {
+      type: "release-asset",
+      repo: "https://example.com/fake",
+      version: "1.0.0",
+      assets: { [key]: { url: "https://example.com/fake.tar.gz", sha256 } },
+    },
+    install: {
+      scope: "project",
+      steps: [
+        { "download-binary": { binary: "fake-scan" } },
+        { "pre-commit-hook": { id: "fake-scan", run: ["{binary}", "--staged"] } },
+      ],
+    },
+    ...over,
+  });
+  const status = (dir: string) => git(dir, "status", "--porcelain");
+
+  it("downloads a checked binary, adds a local pre-commit hook, records it privately, and rolls back cleanly", async () => {
+    const dir = copyFixture("go-service");
+    const item = binaryItem({});
+    const c = ctx(dir, { catalog: catalogOf([item]), env: toolEnv, fetchAsset });
+    const { runId, results } = await applyActions(dir, ["item:fake-scan"], c);
+    assert.deepEqual(
+      results.map((r) => [r.id, r.status, r.message]),
+      [["item:fake-scan", "applied", undefined]],
+    );
+    const hook = read(dir, ".git/hooks/pre-commit");
+    assert.match(hook, /# Added by AgentChainer/);
+    assert.ok(hook.includes(join(work, "tools", "fake-scan", "1.0.0", exe).replaceAll("\\", "/")));
+    const local = JSON.parse(read(dir, ".agentchainer/local.json"));
+    assert.deepEqual(
+      local.items.map((i: { id: string; scope: string; archiveSha256: string }) => [i.id, i.scope, i.archiveSha256]),
+      [["fake-scan", "local", sha256]],
+    );
+    assert.ok(!existsSync(join(dir, ".agentchainer/lock.json")), "local items leave the committed lockfile alone");
+    assert.equal(read(dir, ".agentchainer/.gitignore"), "backups/\nprofile.json\nlocal.json\n");
+
+    // Re-planning sees it as installed (the real env reads the lockfiles).
+    const again = await applyActions(dir, ["item:fake-scan"], {
+      ...c,
+      env: { ...toolEnv, installedItems: installedItems(dir) },
+    });
+    assert.match(again.results[0]?.message ?? "", /installed/);
+
+    assert.deepEqual(
+      rollback(dir, runId, c).map((r) => r.status),
+      ["rolled-back"],
+    );
+    assert.ok(!existsSync(join(dir, ".git/hooks/pre-commit")));
+    assert.ok(!existsSync(join(dir, ".agentchainer")));
+    assert.equal(status(dir), "");
+    assert.ok(
+      existsSync(join(work, "tools", "fake-scan", "1.0.0", exe)),
+      "the binary stays in the shared tools folder",
+    );
+  });
+
+  it("adds the hook to the repo's lefthook config and a committed wrapper script", async () => {
+    const dir = copyFixture("go-service");
+    writeFileSync(join(dir, "lefthook.yml"), "# hooks\npre-commit:\n  commands:\n    vet:\n      run: go vet ./...\n");
+    git(dir, "add", "lefthook.yml");
+    git(dir, "-c", "user.name=t", "-c", "user.email=t@example.invalid", "commit", "-qm", "lefthook");
+    const before = read(dir, "lefthook.yml");
+    const c = ctx(dir, { catalog: catalogOf([binaryItem({})]), env: toolEnv, fetchAsset });
+    const { runId } = await applyActions(dir, ["item:fake-scan"], c);
+    assert.match(read(dir, "lefthook.yml"), /fake-scan:\n\s+run: sh \.agentchainer\/hooks\/fake-scan\.sh/);
+    assert.match(read(dir, ".agentchainer/hooks/fake-scan.sh"), /exec "\$bin" --staged/);
+    const lock = JSON.parse(read(dir, ".agentchainer/lock.json"));
+    assert.deepEqual(
+      lock.items.map((i: { id: string; scope: string; files: string[] }) => [i.id, i.scope, i.files]),
+      [["fake-scan", "project", [".agentchainer/hooks/fake-scan.sh", "lefthook.yml"]]],
+    );
+    rollback(dir, runId, c);
+    assert.equal(read(dir, "lefthook.yml"), before);
+    assert.equal(status(dir), "");
+  });
+
+  it("registers a downloaded MCP server privately and removes it on rollback", async () => {
+    const dir = copyFixture("go-service");
+    const cli = fakeCli(dir);
+    const item = binaryItem({
+      id: "fake-mcp",
+      kind: "mcp",
+      install: {
+        scope: "local",
+        steps: [
+          { "download-binary": { binary: "fake-scan" } },
+          { "mcp-add": { name: "fake", command: ["{binary}", "serve"] } },
+        ],
+      },
+    });
+    const c = ctx(dir, { catalog: catalogOf([item]), env: toolEnv, fetchAsset, cli });
+    const { runId, results } = await applyActions(dir, ["item:fake-mcp"], c);
+    assert.equal(results[0]?.status, "applied");
+    assert.deepEqual(cli.calls, [`mcp add local fake ${join(work, "tools", "fake-mcp", "1.0.0", exe)} serve`]);
+    rollback(dir, runId, c);
+    assert.deepEqual(cli.calls.at(-1), "mcp remove local fake");
+    assert.equal(status(dir), "");
+  });
+
+  it("merges a pinned npx server into .mcp.json, keeping what's there, and restores it byte for byte", async () => {
+    const dir = copyFixture("go-service");
+    const before = '{\n  "mcpServers": { "docs": { "type": "http", "url": "https://example.com/mcp" } }\n}\n';
+    writeFileSync(join(dir, ".mcp.json"), before);
+    git(dir, "add", ".mcp.json");
+    git(dir, "-c", "user.name=t", "-c", "user.email=t@example.invalid", "commit", "-qm", "mcp");
+    const item: Item = {
+      ...pluginItem,
+      id: "fake-npx",
+      kind: "mcp",
+      tier: "verified-vendor",
+      source: { type: "npm", name: "@example/mcp", version: "1.2.3", integrity: "sha512-x" },
+      install: {
+        scope: "project",
+        steps: [
+          {
+            "merge-json": {
+              path: ".mcp.json",
+              value: { mcpServers: { example: { command: "npx", args: ["-y", "@example/mcp@1.2.3"] } } },
+            },
+          },
+        ],
+      },
+    };
+    const c = ctx(dir, { catalog: catalogOf([item]), env: toolEnv });
+    const { runId } = await applyActions(dir, ["item:fake-npx"], c);
+    assert.deepEqual(Object.keys(JSON.parse(read(dir, ".mcp.json")).mcpServers), ["docs", "example"]);
+    rollback(dir, runId, c);
+    assert.equal(read(dir, ".mcp.json"), before);
+    assert.equal(status(dir), "");
   });
 });

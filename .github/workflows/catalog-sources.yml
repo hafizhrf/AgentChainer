@@ -1,8 +1,8 @@
 name: Catalog sources
 
-# Re-downloads every pinned git source in catalog/ and checks its sha256 (docs/CATALOG.md §4: hashes are computed by
-# CI, not by hand). Not a required check: it needs network access to GitHub. Runs when the catalog changes, weekly to
-# catch upstream rewrites of pinned commits, and on demand.
+# Re-downloads every pinned source in catalog/ (git trees, release assets, npm packages) and checks its hash
+# (docs/CATALOG.md §4: hashes are computed by CI, not by hand). Not a required check: it needs network access to
+# GitHub and npm. Runs when the catalog changes, weekly to catch upstream rewrites, and on demand.
 on:
   workflow_dispatch:
   schedule:
@@ -33,5 +33,8 @@ jobs:
         with:
           cache: true
       - run: pnpm install --frozen-lockfile
-      - name: Verify sha256 of every git source
+      - name: Verify every pinned source
         run: node packages/sidecar/scripts/verify-catalog-sources.ts
+        env:
+          # Read-only use of the GitHub API (release asset digests), to stay clear of anonymous rate limits.
+          GITHUB_TOKEN: ${{ github.token }}

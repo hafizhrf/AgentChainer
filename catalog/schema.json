@@ -151,14 +151,7 @@
                     "url",
                     "sha256"
                   ]
-                },
-                "required": [
-                  "darwin-arm64",
-                  "darwin-x64",
-                  "linux-x64",
-                  "linux-arm64",
-                  "win32-x64"
-                ]
+                }
               }
             },
             "required": [
@@ -339,17 +332,79 @@
                     "download-binary": {
                       "type": "object",
                       "properties": {
-                        "to": {
-                          "type": "string"
+                        "binary": {
+                          "type": "string",
+                          "pattern": "^[\\w.-]+$"
                         }
                       },
                       "required": [
-                        "to"
-                      ]
+                        "binary"
+                      ],
+                      "additionalProperties": false
                     }
                   },
                   "required": [
                     "download-binary"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "mcp-add": {
+                      "type": "object",
+                      "properties": {
+                        "name": {
+                          "type": "string",
+                          "pattern": "^[\\w-]+$"
+                        },
+                        "command": {
+                          "minItems": 1,
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        }
+                      },
+                      "required": [
+                        "name",
+                        "command"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "mcp-add"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "pre-commit-hook": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "pattern": "^[a-z0-9-]+$"
+                        },
+                        "run": {
+                          "minItems": 1,
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "run"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "pre-commit-hook"
                   ],
                   "additionalProperties": false
                 },
@@ -480,17 +535,79 @@
                     "download-binary": {
                       "type": "object",
                       "properties": {
-                        "to": {
-                          "type": "string"
+                        "binary": {
+                          "type": "string",
+                          "pattern": "^[\\w.-]+$"
                         }
                       },
                       "required": [
-                        "to"
-                      ]
+                        "binary"
+                      ],
+                      "additionalProperties": false
                     }
                   },
                   "required": [
                     "download-binary"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "mcp-add": {
+                      "type": "object",
+                      "properties": {
+                        "name": {
+                          "type": "string",
+                          "pattern": "^[\\w-]+$"
+                        },
+                        "command": {
+                          "minItems": 1,
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        }
+                      },
+                      "required": [
+                        "name",
+                        "command"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "mcp-add"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "pre-commit-hook": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "pattern": "^[a-z0-9-]+$"
+                        },
+                        "run": {
+                          "minItems": 1,
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "run"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "pre-commit-hook"
                   ],
                   "additionalProperties": false
                 },
@@ -598,8 +715,7 @@
       "platforms",
       "risk",
       "permissions",
-      "install",
-      "uninstall"
+      "install"
     ],
     "additionalProperties": false
   },

@@ -510,10 +510,12 @@ All of these run on macOS, Windows and Ubuntu against a sample repo in `fixtures
       - `cloudflare-security-audit` is pinned to commit `c1c8a8c` with a tree sha256.
         - The `catalog-sources` workflow re-downloads every git source and checks its hash (CI-computed, §4).
         - A pre-review scan found no network calls in its scripts.
-      - Remaining:
-        - maintainer reviews (each item is offered once its `reviews` count is met);
-        - release-asset and npm items (codebase-memory-mcp, gitleaks, actionlint), which need the binary installer
-          (M2-15).
+      - Release-asset and npm items added with the installer (M2-15):
+        - gitleaks 8.30.1, actionlint 1.7.12 and codebase-memory-mcp 0.11.0, each with 5 platform assets;
+        - playwright-mcp 0.0.83, pinned, which replaces the unpinned plugin in `web-testing`.
+        - The `catalog-sources` workflow re-downloads every asset, checks its sha256 against the catalog and GitHub's
+          digest, and checks npm integrity. Run locally: all 16 pins match.
+      - Remaining: maintainer reviews (each item is offered once its `reviews` count is met).
 - [ ] **M2-03** Show trust tiers in the UI. Community items are never pre-selected or auto-applied.
       Progress: the plan review shows each item's tier (community in red); the builder never pre-selects community
       items (`plan.test.ts`). Remaining: auto-apply (M2-18) must also exclude them; look at it in the app.
@@ -601,11 +603,32 @@ All of these run on macOS, Windows and Ubuntu against a sample repo in `fixtures
       - Tests use a fake CLI.
       - Live: `code-review@claude-plugins-official` was installed as 1.0.1 (the reviewed version), then uninstalled by
         rollback.
-- [ ] **M2-15** MCP installer:
+- [x] **M2-15** MCP installer:
   - command-based servers are registered with `claude mcp add --scope local`;
   - portable servers (`npx`, remote HTTP) may go to the project `.mcp.json`;
   - binaries are downloaded with checksums into an app-managed dir (never `curl | bash`);
   - secrets are referenced as env vars and never written to repo files.
+      — evidence:
+      - **Binaries:** `tools.ts` downloads a release asset, checks its sha256 before unpacking, unpacks it with the
+        system tar, and keeps it in `<app data>/tools/<item>/<version>/`. The Rust core passes the folder to every
+        sidecar.
+        - The cache is re-verified on reuse.
+        - On macOS, a binary without a signature gets an ad-hoc one.
+        - Rollbacks keep binaries (shared cache).
+      - **Install steps:** `mcp-add` runs `claude mcp add` with the item's scope; `merge-json` handles `.mcp.json`.
+        Plan previews and apply share `steps.ts`, so the preview is what gets written.
+      - **Local items** are recorded in the git-ignored `.agentchainer/local.json`.
+      - **Catalog rules (tested):**
+        - binaries only from release assets;
+        - a server that runs a downloaded binary uses `local` scope;
+        - npm steps run the pinned version;
+        - `${VAR}` only for declared `secrets`.
+      - **Tests:** `tools.test.ts`, `schema.test.ts`, and `apply.test.ts` (local hook, lefthook, private MCP
+        server, `.mcp.json` merge). Every case rolls back to byte-identical files and a clean `git status`.
+      - **Live, with real downloads and the real CLI:**
+        - codebase-memory-mcp 0.11.0 ran on macOS. `claude mcp get` showed it "Local config … ✔ Connected", and
+          rollback removed it.
+        - playwright-mcp was merged into `.mcp.json` and rolled back.
 - [x] **M2-16** Lockfile `.agentchainer/lock.json` ([CATALOG §7](CATALOG.md#7-lockfile)); re-running bootstrap is idempotent.
       — evidence:
       - It holds items (source, scope, version, files) and fixes, and `.agentchainer/.gitignore` keeps `backups/`
@@ -673,7 +696,15 @@ All of these run on macOS, Windows and Ubuntu against a sample repo in `fixtures
         present.
       - Live end to end over JSON-RPC: `.claude/settings.json` and a lint hook script were generated, applied and
         verified, then rolled back to a clean `git status`.
-      - Remaining: the Stop hook option, and gitleaks (it needs the binary installer, M2-15).
+      - **gitleaks pre-commit (M2-15 installer):**
+        - **With a hook manager** (lefthook, pre-commit, husky), its config gets a committed wrapper
+          (`.agentchainer/hooks/gitleaks.sh`). The wrapper uses gitleaks from PATH or AgentChainer's copy, and lets
+          the commit through with a hint when neither exists.
+        - **Without one**, a local `.git/hooks/pre-commit` (never over an existing hook).
+        - Tested in `git-hooks.test.ts`: comments kept, refusals, and a real commit blocked by a stand-in.
+        - Live with gitleaks 8.30.1: a commit holding a GitHub token was blocked ("leaks found: 1"), a clean one went
+          through, and rollback left a clean `git status`.
+      - Remaining: the Stop hook option.
 - [ ] **M2-23** Test scaffold, only when none exists:
   - Vitest or Jest, pytest, flutter_test, or `go test`;
   - plus one example test and a `test` command;
@@ -685,14 +716,16 @@ All of these run on macOS, Windows and Ubuntu against a sample repo in `fixtures
         fixture's dependencies weren't installed; this was reported, `verified: false` was recorded, and the run
         rolled back cleanly.
       - Remaining: offer the install step (with consent) before verifying.
-- [ ] **M2-24** CI generator: a GitHub Actions workflow (install, lint, typecheck, test, build) with dependency caching,
+- [x] **M2-24** CI generator: a GitHub Actions workflow (install, lint, typecheck, test, build) with dependency caching,
       least-privilege `permissions:` and SHA-pinned actions; validated with actionlint.
-      Progress:
+      — evidence:
       - `ac-generate-ci` lists the verified action SHAs.
       - Checks: the YAML parses, top-level `permissions:` is set, every `uses:` is pinned to a SHA, and actionlint
-        passes when installed.
+        passes.
       - Live on go-service ($0.0035, 16 s): a pinned, least-privilege workflow.
-      - Remaining: actionlint isn't installed here (skipped); it arrives as a pinned catalog tool (M2-15).
+      - **actionlint now runs:** found on PATH or in the tools folder, or else the catalog's pinned 1.7.12 is
+        downloaded and hash-checked on demand.
+      - **Live on go-service** (haiku, $0.005, 1 attempt): every check passed, including `actionlint: clean`.
 - [x] **M2-25** Smoke test: `scripts/smoke.(sh|ps1)` per stack (app boots, health endpoint responds, CLI `--help`, or Flutter
       build), plus a CI job.
       — evidence: `ac-smoke-test`, with checks on the script and the workflow. Live on go-service over JSON-RPC:

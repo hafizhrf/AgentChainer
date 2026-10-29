@@ -97,19 +97,23 @@ license: MIT
 source:
   type: release-asset
   repo: https://github.com/DeusData/codebase-memory-mcp
-  version: "<x.y.z>"
-  assets:                    # per platform, each with sha256
+  version: "0.11.0"
+  assets:                    # per platform, each with sha256 (CI re-downloads them and checks GitHub's digest too)
     darwin-arm64: { url: "<asset url>", sha256: "<hash>" }
     linux-x64:   { url: "<asset url>", sha256: "<hash>" }
     win32-x64:   { url: "<asset url>", sha256: "<hash>" }
 install:
   scope: local               # binary path isn't portable → private per-project registration
   steps:
-    - download-binary: { to: "{appBin}/codebase-memory-mcp" }
-    - run: [claude, mcp, add, --scope, local, codebase-memory, "{appBin}/codebase-memory-mcp"]   # (verify exact args)
+    - download-binary: { binary: codebase-memory-mcp }        # the app picks the folder, never the item
+    - mcp-add: { name: codebase-memory, command: ["{binary}"] } # claude mcp add --scope local codebase-memory -- <binary>
 notes: >-
   Do NOT run the upstream installer: it edits ~/.claude.json globally and adds hooks/agents/skills.
 ```
+
+Release binaries are downloaded into AgentChainer's tools folder (`<app data>/tools/<item>/<version>/`), checked
+against the pinned sha256 before anything is unpacked, and unpacked with the system `tar`. The folder is a cache
+shared by workspaces, so rollbacks leave binaries there.
 
 **Field reference:**
 
@@ -120,10 +124,21 @@ notes: >-
 | `platforms`, `requires` | yes | Unmet requirements make the item unavailable, with an explanation |
 | `detect` | no | Signals: files (`package.json`, `pubspec.yaml`), dependencies (`next`, `django`), git remote host, etc. |
 | `risk`, `permissions` | yes | Shown in the review UI |
-| `install`, `uninstall` | yes | Declarative steps only: `copy`, `remove`, `run` (argv array, no shell), `download-binary`, `merge-json`, `write-file` |
+| `install` | yes | Declarative steps only: `copy`, `remove`, `run` (argv array, no shell), `download-binary` (`{binary}`), `mcp-add` (`{name, command}`, registered with the item's scope), `pre-commit-hook` (`{id, run}`, see below), `merge-json`, `write-file`. In an argv, `{binary}` is the downloaded binary |
+| `uninstall` | no | What removing the item takes, for reviewers. Rollback restores files from backups and undoes the CLI registrations it made, so items that only write files or download a tool leave it out |
 | `secrets` | no | Env var names the item needs (e.g. `GITHUB_TOKEN`). The installer references them and never writes values to files |
 | `reviews` | no | `{by, date, ref, notes}` per maintainer review against §4. An item is offered only once its tier's count is met: first-party 0, official 1, verified-vendor 1, community 2. Until then the plan shows it as "not reviewed yet" |
 | `notes` | no | Caveats for reviewers and users, shown in the plan |
+
+`pre-commit-hook` goes through the repo's hook manager when it has one (`lefthook.yml`, `.pre-commit-config.yaml`,
+`.husky/`): the config gets a command that runs a committed wrapper, `.agentchainer/hooks/<id>.sh`. The wrapper uses the
+tool from PATH or AgentChainer's copy, and lets the commit through with a hint when neither exists, so teammates
+without it aren't blocked. Without a hook manager, a local `.git/hooks/pre-commit` (this machine only) runs the app's
+binary; an existing hook is never overwritten.
+
+CI-checked rules beyond the schema: a release-asset item has exactly one `download-binary`; `{binary}` needs a
+release asset; an MCP server that runs a downloaded binary uses `local` scope; npm steps run the pinned version; any
+`${VAR}` in steps is one of the item's `secrets`.
 
 Marketplace plugins can't be pinned by the CLI (spike S6). Their `source` records the version that was reviewed
 (`reviewedVersion`) and the marketplace commit it was read at (`reviewedRef`).
@@ -151,8 +166,8 @@ Profiles group items. The detector picks profiles; the user can add or remove it
 | `rust` | Rust stack | `rust-analyzer-lsp` (needs `rust-analyzer`) |
 | `flutter` | `pubspec.yaml` | None yet: the official marketplace has no Dart/Flutter LSP plugin (checked at `f8c5e7a`). `firebase` if Firebase config is detected **(later)** |
 | `github` | Git remote on github.com, including SSH host aliases such as `github-personal.com` | `github` plugin (reads `GITHUB_PERSONAL_ACCESS_TOKEN` from your environment) |
-| `knowledge` (opt-in) | On request | `context7`; `codebase-memory-mcp` later |
-| `web-testing` (opt-in) | On request | `playwright` |
+| `knowledge` (opt-in) | On request | `context7`, `codebase-memory-mcp` |
+| `web-testing` (opt-in) | On request | `playwright-mcp` (pinned; the `playwright` plugin runs `@latest`) |
 | `security` (opt-in) | Before release, or on request | `cloudflare-security-audit`, `semgrep` (CLI), `trivy` (CLI) **(later: needs the hashing installer)** |
 
 Profiles live in `catalog/profiles/<id>.yaml` with `suggest: {always | stacks | remoteHost | optIn}`.
@@ -167,14 +182,15 @@ Profiles live in `catalog/profiles/<id>.yaml` with `suggest: {always | stacks | 
 | `commit-commands` (1.0.1) | plugin | official | Apache-2.0 (marketplace repo) | same pattern | In `catalog/`, awaiting review |
 | `typescript-lsp`, `pyright-lsp`, `gopls-lsp`, `rust-analyzer-lsp` (1.0.0) | plugin | official | Apache-2.0 (marketplace repo) | same pattern; each needs its language server on PATH | In `catalog/`, awaiting review |
 | `context7` | plugin | verified-vendor | **(verify)** | Partner plugin: the hosted MCP at `mcp.context7.com`, may ask you to sign in | In `catalog/`, awaiting review |
-| `playwright` | plugin | verified-vendor | Apache-2.0 **(verify)** | Partner plugin. **It runs `npx @playwright/mcp@latest`, which is unpinned**, so prefer a pinned MCP item | In `catalog/`, awaiting review |
+| `playwright` | plugin | verified-vendor | Apache-2.0 **(verify)** | Partner plugin. **It runs `npx @playwright/mcp@latest`, which is unpinned**, so the profile uses `playwright-mcp` | In `catalog/`, in no profile |
+| `playwright-mcp` (0.0.83) | mcp | verified-vendor | Apache-2.0 | `npx -y @playwright/mcp@0.0.83` merged into the project's `.mcp.json` | In `catalog/`, awaiting review |
 | `github` | plugin | verified-vendor | MIT **(verify)** | Partner plugin: the remote MCP `api.githubcopilot.com` with `GITHUB_PERSONAL_ACCESS_TOKEN` from your environment | In `catalog/`, awaiting review |
 | `firebase` | plugin | verified-vendor | per plugin | Partner plugin | Seed **(verify)** |
 | `cloudflare-security-audit` | skill | verified-vendor | MIT | Copy `skills/security-audit/` at a pinned SHA | Seed |
-| `codebase-memory-mcp` | mcp | community | MIT | Pinned release binary + `claude mcp add --scope local` | Seed (needs 2 reviews) |
+| `codebase-memory-mcp` (0.11.0) | mcp | community | MIT | Pinned release binary + `claude mcp add --scope local` | In `catalog/`, awaiting 2 reviews |
 | `anthropic-example-skills` | plugin | official | Apache-2.0 (subset) | `example-skills@anthropic-agent-skills` | Optional; exclude source-available document skills |
-| `gitleaks` | hook + tool | verified-vendor | MIT | Pinned release binary; pre-commit hook via the repo's hook manager | Seed |
-| `actionlint` | tool | verified-vendor | MIT | Pinned release binary; used by the verifier | Seed |
+| `gitleaks` (8.30.1) | hook | verified-vendor | MIT | Pinned release binary; pre-commit hook via the repo's hook manager, or a local hook | In `catalog/`, awaiting review |
+| `actionlint` (1.7.12) | tool | verified-vendor | MIT | Pinned release binary. The verifier downloads it on demand to check generated workflows (AgentChainer's own tool, like the Agent SDK); not offered as an install | In `catalog/` |
 | `semgrep` | tool | verified-vendor | LGPL-2.1 (CLI) **(verify)** | Pinned CLI; CI gate / on-demand scan | Optional **(verify no-login usage)** |
 | `trivy` | tool | verified-vendor | Apache-2.0 | Pinned CLI; CI gate for deps/containers | Optional |
 
@@ -220,7 +236,9 @@ Sources: [cloudflare/security-audit-skill](https://github.com/cloudflare/securit
   every file the run changed. `.agentchainer/.gitignore` keeps it (and `profile.json`) out of git. It's used for
   byte-exact rollback, and a whole-run rollback removes it.
 - `fixes` records deterministic fixes from the readiness audit (`.gitignore` env rules, untracking `.env`, …).
-- `local`-scope items are recorded in the app DB, not the committed lockfile, because they're private to the user.
+- `local`-scope items are private to the user, so they're recorded in `.agentchainer/local.json`, which
+  `.agentchainer/.gitignore` keeps out of git, not in the committed lockfile. A run of local items only doesn't touch
+  `lock.json`.
 
 ## 8. Updates and rollback
 
@@ -235,3 +253,4 @@ Sources: [cloudflare/security-audit-skill](https://github.com/cloudflare/securit
   - Scope is **project files** plus the CLI entries we added (plugins, MCP servers).
   - Caches the CLI manages itself stay behind and are reported, not deleted. Example: `plugin uninstall` keeps
     `~/.claude/plugins/cache/…` (spike S6).
+  - Downloaded binaries stay in AgentChainer's tools folder: other workspaces may use them.

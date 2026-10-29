@@ -5,10 +5,12 @@ import path from "node:path";
 import type { WorkspaceProfile } from "@agentchainer/protocol";
 import type { HookCallback } from "@anthropic-ai/claude-agent-sdk";
 import { parse as parseYaml } from "yaml";
+import type { Item } from "../catalog/schema.ts";
 import { checkToolCall } from "../guard.ts";
 import type { AgentSdkModule } from "../sdk-loader.ts";
 import { repoOf } from "../workspace.ts";
 import skills from "./skills.json" with { type: "json" };
+import { ensureTool, findTool } from "./tools.ts";
 import { guarded } from "./workspace-guard.ts";
 
 /**
@@ -36,8 +38,12 @@ type Spec = {
   allow: RegExp[];
   /** The same, in words, for the prompt. */
   allowText: string;
-  check: (root: string, files: ProposedFile[], profile: WorkspaceProfile) => Check[];
+  check: (root: string, files: ProposedFile[], profile: WorkspaceProfile, tools: CheckTools) => Check[];
 };
+
+/** Tools the checks may run: actionlint's path, or why there isn't one. */
+export type CheckTools = { actionlint: { path: string | null; note?: string } };
+const NO_TOOLS: CheckTools = { actionlint: { path: null, note: "actionlint isn't installed" } };
 
 const CLAUDE_MD = /^(\.claude\/)?CLAUDE\.md$/;
 const WORKFLOW = /^\.github\/workflows\/[\w.-]+\.ya?ml$/;
@@ -85,20 +91,20 @@ export const GENERATORS: Record<string, Spec> = {
     task: "Generate a GitHub Actions CI workflow for this project.",
     allow: [WORKFLOW],
     allowText: "workflow files in .github/workflows/",
-    check: (_root, files) => checkWorkflows(files),
+    check: (_root, files, _profile, tools) => checkWorkflows(files, tools.actionlint),
   },
   "smoke-test": {
     skill: "ac-smoke-test",
     task: "Add a smoke test script (and optionally a CI job) that proves the app still starts.",
     allow: [/^scripts\/smoke\.(sh|ps1|mjs|py)$/, /^\.github\/workflows\/smoke\.ya?ml$/],
     allowText: "scripts/smoke.sh (or .mjs, .py, .ps1) and .github/workflows/smoke.yml",
-    check: (_root, files) => [
+    check: (_root, files, _profile, tools) => [
       check(
         "smoke script",
         files.some((f) => f.path.startsWith("scripts/smoke.")),
         "proposes scripts/smoke.*",
       ),
-      ...checkWorkflows(files),
+      ...checkWorkflows(files, tools.actionlint),
     ],
   },
 };
@@ -200,6 +206,8 @@ export type GenerateOptions = {
   maxBudgetUsd?: number;
   /** Total attempts, the first included: failed checks go back to Claude as feedback. */
   maxAttempts?: number;
+  /** Tools for the deterministic checks; without them, checks that need one are skipped. */
+  tools?: CheckTools;
 };
 
 export async function generate(
@@ -297,7 +305,7 @@ async function attempts(
       feedback = `- ${err instanceof Error ? err.message : String(err)}. You may propose only: ${spec.allowText}.`;
       continue;
     }
-    const checks = spec.check(root, files, profile);
+    const checks = spec.check(root, files, profile, opts.tools ?? NO_TOOLS);
     const failed = checks.filter((c) => c.status === "fail");
     if (failed.length === 0 || attempt >= maxAttempts) {
       return { action, files, summary, checks, costUsd, attempts: attempt };
@@ -409,8 +417,11 @@ function checkTests(_root: string, files: ProposedFile[]): Check[] {
   ];
 }
 
-/** YAML parses, least-privilege permissions, every action pinned to a SHA, and actionlint when it's installed. */
-export function checkWorkflows(files: ProposedFile[]): Check[] {
+/** YAML parses, least-privilege permissions, every action pinned to a SHA, and actionlint when it's available. */
+export function checkWorkflows(
+  files: ProposedFile[],
+  actionlint: CheckTools["actionlint"] = NO_TOOLS.actionlint,
+): Check[] {
   const checks: Check[] = [];
   for (const f of files.filter((x) => WORKFLOW.test(x.path))) {
     let doc: Record<string, unknown> | null = null;
@@ -433,20 +444,20 @@ export function checkWorkflows(files: ProposedFile[]): Check[] {
         unpinned.length ? `not pinned to a SHA: ${unpinned.join(", ")}` : "every action pinned to a commit SHA",
       ),
     );
-    checks.push(actionlint(f));
+    checks.push(runActionlint(f, actionlint));
   }
   return checks;
 }
 
-function actionlint(f: ProposedFile): Check {
-  const probe = spawnSync("actionlint", ["-version"], { encoding: "utf8" });
-  if (probe.status !== 0)
-    return { name: `${f.path}: actionlint`, status: "skipped", detail: "actionlint isn't installed" };
+function runActionlint(f: ProposedFile, tool: CheckTools["actionlint"]): Check {
+  if (!tool.path)
+    return { name: `${f.path}: actionlint`, status: "skipped", detail: tool.note ?? "actionlint isn't installed" };
   const dir = mkdtempSync(path.join(tmpdir(), "ac-actionlint-"));
   try {
     const file = path.join(dir, path.basename(f.path));
     writeFileSync(file, f.after);
-    const r = spawnSync("actionlint", ["-no-color", file], { encoding: "utf8" });
+    // Run from the temp folder, so findings name the file (ci.yml:8:23), not the temp path.
+    const r = spawnSync(tool.path, ["-no-color", path.basename(file)], { cwd: dir, encoding: "utf8" });
     return check(
       `${f.path}: actionlint`,
       r.status === 0,
@@ -454,5 +465,25 @@ function actionlint(f: ProposedFile): Check {
     );
   } finally {
     rmSync(dir, { recursive: true, force: true });
+  }
+}
+
+/**
+ * actionlint for the workflow checks (M2-24): a copy that's already there, else the catalog's pinned release,
+ * downloaded and hash-checked on demand like the Agent SDK. It's AgentChainer's own checking tool, not something
+ * installed into the project.
+ */
+export async function resolveActionlint(
+  item: Item | undefined,
+  dir: string | null,
+  fetchImpl?: typeof fetch,
+): Promise<CheckTools["actionlint"]> {
+  const found = findTool("actionlint", dir);
+  if (found) return { path: found };
+  if (!item || !dir) return { path: null, note: "actionlint isn't installed" };
+  try {
+    return { path: (await ensureTool(item, { dir, ...(fetchImpl ? { fetchImpl } : {}) })).path };
+  } catch (err) {
+    return { path: null, note: `couldn't get actionlint: ${err instanceof Error ? err.message : String(err)}` };
   }
 }

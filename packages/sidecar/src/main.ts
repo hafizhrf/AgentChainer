@@ -3,15 +3,23 @@ import { homedir } from "node:os";
 import { PROTOCOL_VERSION, RpcErrorCode } from "@agentchainer/protocol";
 import pkg from "../package.json" with { type: "json" };
 import { applyActions, type Cli, listRuns, rollback } from "./bootstrap/apply.ts";
-import { generate } from "./bootstrap/generate.ts";
+import { generate, resolveActionlint } from "./bootstrap/generate.ts";
 import { buildPlan, planEnv } from "./bootstrap/plan.ts";
 import { proposals } from "./bootstrap/proposals.ts";
+import { toolsDir } from "./bootstrap/tools.ts";
 import { catalog } from "./catalog/index.ts";
 import { checkEnvironment, claudeVersion, findClaude } from "./claude.ts";
 import { auditWorkspace, saveProfile } from "./detect/audit.ts";
 import { detectWorkspace } from "./detect/detect.ts";
 import { branches, commit, draftMessage, push, stage, switchBranch, unstage } from "./git.ts";
-import { installPlugin, listMarketplaces, listPlugins, uninstallPlugin } from "./installer.ts";
+import {
+  addMcpServer,
+  installPlugin,
+  listMarketplaces,
+  listPlugins,
+  removeMcpServer,
+  uninstallPlugin,
+} from "./installer.ts";
 import { listRules, removeRule } from "./permissions.ts";
 import { log, notify, RpcFailure, serve } from "./rpc.ts";
 import { loadSdk } from "./sdk-loader.ts";
@@ -31,12 +39,17 @@ function requireSession(sessionId: string): Session {
 }
 
 /** The user's own CLI for plugin installs (spike S6), or null when it isn't found. */
+/** Generators whose proposals include GitHub workflows, checked with actionlint (M2-24). */
+const WORKFLOW_GENERATORS = new Set(["generate-ci", "smoke-test"]);
+
 function cliFor(cwd: string): Cli | null {
   const claude = findClaude();
   if (!claude) return null;
   return {
     installPlugin: (id, scope) => installPlugin(claude, id, scope, cwd),
     uninstallPlugin: (id, scope) => uninstallPlugin(claude, id, scope, cwd),
+    addMcp: (name, scope, command, args) => addMcpServer(claude, name, scope, command, args, cwd),
+    removeMcp: (name, scope) => removeMcpServer(claude, name, scope, cwd),
     listPlugins: () => listPlugins(claude, cwd),
     listMarketplaces: () => listMarketplaces(claude, cwd),
   };
@@ -259,8 +272,19 @@ serve(
       const claudePath = findClaude();
       if (!claudePath) throw new RpcFailure(RpcErrorCode.claudeNotFound, "Claude Code CLI not found.");
       const { sdk } = await prepareSdk();
-      const p = await generate(sdk, claudePath, cwd, action.replace(/^gen:/, ""), detectWorkspace(cwd), {
+      const name = action.replace(/^gen:/, "");
+      // Workflow checks use actionlint, fetched (pinned) on first use.
+      const tools = WORKFLOW_GENERATORS.has(name)
+        ? {
+            actionlint: await resolveActionlint(
+              catalog.items.find((i) => i.id === "actionlint"),
+              toolsDir(),
+            ),
+          }
+        : undefined;
+      const p = await generate(sdk, claudePath, cwd, name, detectWorkspace(cwd), {
         ...(model ? { model } : {}),
+        ...(tools ? { tools } : {}),
       });
       proposals.set(cwd, p);
       return {

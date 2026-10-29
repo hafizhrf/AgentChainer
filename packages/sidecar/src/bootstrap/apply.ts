@@ -1,5 +1,5 @@
 import { createHash, randomBytes } from "node:crypto";
-import { existsSync, mkdirSync, readdirSync, readFileSync, rmdirSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, readdirSync, readFileSync, rmdirSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import type { PlanAction } from "@agentchainer/protocol";
 import type { Catalog, Item } from "../catalog/schema.ts";
@@ -10,6 +10,8 @@ import { git } from "../workspace.ts";
 import { type Check, GENERATORS, type Proposal } from "./generate.ts";
 import { type FetchTree, fetchGitHubTree, listFiles, treeHash } from "./git-source.ts";
 import { buildPlan, type PlanEnv } from "./plan.ts";
+import { itemChanges } from "./steps.ts";
+import { ensureTool, platformKey } from "./tools.ts";
 import { verifyApplied } from "./verify.ts";
 
 /**
@@ -26,6 +28,8 @@ export type Cli = {
   uninstallPlugin: (id: string, scope: "project" | "user" | "local") => CliResult;
   listPlugins: () => CliResult;
   listMarketplaces: () => CliResult;
+  addMcp: (name: string, scope: "project" | "user" | "local", command: string, args: string[]) => CliResult;
+  removeMcp: (name: string, scope: "project" | "user" | "local") => CliResult;
 };
 
 export type ApplyContext = {
@@ -34,6 +38,8 @@ export type ApplyContext = {
   /** The user's `claude` CLI, or null when it isn't found (plugin installs then fail with a clear message). */
   cli: Cli | null;
   fetchTree?: FetchTree;
+  /** Downloads release assets; tests pass a fake. */
+  fetchAsset?: typeof fetch;
   optIn?: string[];
   /** Generator proposals waiting for review, by action. */
   proposals?: Map<string, Proposal>;
@@ -43,6 +49,7 @@ export type ApplyContext = {
 type FileRecord = { path: string; existed: boolean; backup?: string; afterSha256: string | null };
 type Undo =
   | { type: "plugin"; pluginId: string; scope: "project" | "user" | "local" }
+  | { type: "mcp"; name: string; scope: "project" | "user" | "local" }
   | { type: "git-unstage-removal"; paths: string[] }
   | { type: "git-init" };
 type ActionRecord = {
@@ -82,6 +89,8 @@ type LockItem = {
   scope: string;
   installedAt: string;
   version?: string;
+  /** Release assets: the sha256 of the archive that was checked before unpacking. */
+  archiveSha256?: string;
   files?: string[];
 };
 type LockFix = { id: string; appliedAt: string; files: string[] };
@@ -99,6 +108,8 @@ type Lock = {
 const AC_DIR = ".agentchainer";
 const BACKUPS = `${AC_DIR}/backups`;
 const LOCK = `${AC_DIR}/lock.json`;
+/** Local-scope items are private to this user, so they're recorded here, kept out of git (docs/CATALOG.md §7). */
+const LOCAL = `${AC_DIR}/local.json`;
 const AC_IGNORE = `${AC_DIR}/.gitignore`;
 const GENERATED_BY = "agentchainer@0.1.0";
 
@@ -151,18 +162,19 @@ class Tracker {
     }
   }
 
-  write(records: FileRecord[], rel: string, content: string | Buffer): void {
+  write(records: FileRecord[], rel: string, content: string | Buffer, executable = false): void {
     const rec = this.record(records, rel);
     const file = insideRoot(this.root, rel);
     mkdirSync(path.dirname(file), { recursive: true });
     writeFileSync(file, content);
+    if (executable) chmodSync(file, 0o755);
     rec.afterSha256 = sha256(readFileSync(file));
   }
 }
 
-function readLock(root: string, catalogVersion: string): Lock {
+function readLock(root: string, catalogVersion: string, file = LOCK): Lock {
   try {
-    const lock = JSON.parse(readFileSync(abs(root, LOCK), "utf8")) as Lock;
+    const lock = JSON.parse(readFileSync(abs(root, file), "utf8")) as Lock;
     return { ...lock, items: lock.items ?? [], fixes: lock.fixes ?? [], generated: lock.generated ?? [] };
   } catch {
     return { lockfileVersion: 1, generatedBy: GENERATED_BY, catalogVersion, items: [], fixes: [], generated: [] };
@@ -274,19 +286,30 @@ export async function applyActions(
   const applied = run.actions.filter((a) => a.status === "applied");
   if (applied.length) {
     const lock = readLock(root, ctx.catalog.version);
+    const local = readLock(root, ctx.catalog.version, LOCAL);
+    let localChanged = false;
+    let lockChanged = existsSync(abs(root, LOCK));
     lock.catalogVersion = ctx.catalog.version;
     lock.generatedBy = GENERATED_BY;
     for (const a of applied) {
       const entry = a.lock;
       if (!entry) continue;
-      if ("kind" in entry) lock.items = [...lock.items.filter((i) => i.id !== entry.id), entry];
-      else if ("generator" in entry) lock.generated = [...lock.generated.filter((g) => g.id !== entry.id), entry];
-      else lock.fixes = [...lock.fixes.filter((f) => f.id !== entry.id), entry];
+      if ("kind" in entry && entry.scope === "local") {
+        local.items = [...local.items.filter((i) => i.id !== entry.id), entry];
+        localChanged = true;
+      } else {
+        lockChanged = true;
+        if ("kind" in entry) lock.items = [...lock.items.filter((i) => i.id !== entry.id), entry];
+        else if ("generator" in entry) lock.generated = [...lock.generated.filter((g) => g.id !== entry.id), entry];
+        else lock.fixes = [...lock.fixes.filter((f) => f.id !== entry.id), entry];
+      }
     }
-    tracker.write(run.meta, LOCK, lockText(lock));
+    // A run of local-only items leaves the committed lockfile alone.
+    if (lockChanged) tracker.write(run.meta, LOCK, lockText(lock));
+    if (localChanged) tracker.write(run.meta, LOCAL, lockText(local));
     const ignore = existsSync(abs(root, AC_IGNORE)) ? readFileSync(abs(root, AC_IGNORE), "utf8") : "";
     const lines = ignore.split("\n");
-    const missing = ["backups/", "profile.json"].filter((l) => !lines.includes(l));
+    const missing = ["backups/", "profile.json", "local.json"].filter((l) => !lines.includes(l));
     if (missing.length) {
       tracker.write(
         run.meta,
@@ -417,7 +440,46 @@ async function applyOne(
     }
     return;
   }
-  throw new Error(`Installing ${src.type} sources arrives later (M2-15).`);
+  if (src.type === "release-asset" || src.type === "npm") {
+    // The same changes the plan previewed: hook files, .mcp.json entries, CLI registrations.
+    const changes = itemChanges(root, item, ctx.env);
+    if (changes.unavailable) throw new Error(changes.unavailable);
+    let archiveSha256: string | undefined;
+    if (src.type === "release-asset") {
+      if (!ctx.env.toolsDir) throw new Error("AgentChainer's tools folder isn't set up. Restart the app.");
+      const tool = await ensureTool(item, {
+        dir: ctx.env.toolsDir,
+        platform: ctx.env.platform,
+        key: platformKey(ctx.env.platform, ctx.env.arch),
+        ...(ctx.fetchAsset ? { fetchImpl: ctx.fetchAsset } : {}),
+      });
+      archiveSha256 = tool.archiveSha256;
+    }
+    for (const f of changes.files) tracker.write(rec.files, f.path, f.after, f.executable);
+    for (const step of item.install.steps) {
+      if ("download-binary" in step || "pre-commit-hook" in step || "merge-json" in step) continue;
+      if (!("mcp-add" in step))
+        throw new Error(`Unsupported install step for a ${src.type} source: ${Object.keys(step)[0]}`);
+      if (!ctx.cli) throw new Error("Claude Code CLI not found, so MCP servers can't be registered.");
+      const [command = "", ...args] = step["mcp-add"].command.map((a) =>
+        a === "{binary}" ? (changes.binary ?? a) : a,
+      );
+      const name = step["mcp-add"].name;
+      const res = ctx.cli.addMcp(name, item.install.scope, command, args);
+      if (!res.ok) throw new Error(`claude mcp add failed: ${(res.stderr || res.stdout).trim().slice(0, 300)}`);
+      rec.undo.push({ type: "mcp", name, scope: item.install.scope });
+    }
+    rec.lock = {
+      ...base,
+      scope: changes.scope,
+      installedAt: now().toISOString(),
+      version: src.version,
+      ...(archiveSha256 ? { archiveSha256 } : {}),
+      files: changes.files.map((f) => f.path),
+    };
+    return;
+  }
+  throw new Error(`Installing ${src.type} sources isn't supported.`);
 }
 
 function run(cwd: string, argv: string[]): void {
@@ -449,6 +511,9 @@ function undoAction(
       const res = ctx.cli?.uninstallPlugin(u.pluginId, u.scope);
       if (!res?.ok)
         kept.push(`plugin ${u.pluginId} (uninstall it with: claude plugin uninstall ${u.pluginId} --scope ${u.scope})`);
+    } else if (u.type === "mcp") {
+      const res = ctx.cli?.removeMcp(u.name, u.scope);
+      if (!res?.ok) kept.push(`MCP server ${u.name} (remove it with: claude mcp remove --scope ${u.scope} ${u.name})`);
     } else if (u.type === "git-unstage-removal") {
       const r = git(["reset", "-q", "--", ...u.paths], root);
       if (r.status !== 0) kept.push(`index entries for ${u.paths.join(", ")}`);
@@ -565,11 +630,12 @@ export function rollback(
       pruneEmptyDirs(root, abs(root, BACKUPS));
     }
   } else {
-    // Some of the run stays: take the rolled-back actions out of the lockfile.
-    const lockFile = abs(root, LOCK);
-    if (existsSync(lockFile)) {
+    // Some of the run stays: take the rolled-back actions out of the lockfiles.
+    const gone = new Set(run.actions.filter((a) => a.status === "rolled-back").map((a) => a.lock?.id));
+    for (const rel of [LOCK, LOCAL]) {
+      const lockFile = abs(root, rel);
+      if (!existsSync(lockFile)) continue;
       const lock = JSON.parse(readFileSync(lockFile, "utf8")) as Lock;
-      const gone = new Set(run.actions.filter((a) => a.status === "rolled-back").map((a) => a.lock?.id));
       lock.items = (lock.items ?? []).filter((i) => !gone.has(i.id));
       lock.fixes = (lock.fixes ?? []).filter((f) => !gone.has(f.id));
       lock.generated = (lock.generated ?? []).filter((g) => !gone.has(g.id));

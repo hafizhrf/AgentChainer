@@ -516,10 +516,27 @@ All of these run on macOS, Windows and Ubuntu against a sample repo in `fixtures
         - The `catalog-sources` workflow re-downloads every asset, checks its sha256 against the catalog and GitHub's
           digest, and checks npm integrity. Run locally: all 16 pins match.
       - Remaining: maintainer reviews (each item is offered once its `reviews` count is met).
-- [ ] **M2-03** Show trust tiers in the UI. Community items are never pre-selected or auto-applied.
-      Progress: the plan review shows each item's tier (community in red); the builder never pre-selects community
-      items (`plan.test.ts`). Remaining: auto-apply (M2-18) must also exclude them; look at it in the app.
-- [ ] **M2-04** Upstream-update bot: a scheduled workflow that opens PRs bumping refs and hashes, with a diff summary.
+- [x] **M2-03** Show trust tiers in the UI. Community items are never pre-selected or auto-applied.
+      — evidence:
+      - The plan review shows each item's tier (community in red).
+      - The builder never pre-selects community items (`plan.test.ts`).
+      - Auto-apply takes only first-party and official items (`auto-apply.test.ts`).
+- [x] **M2-04** Upstream-update bot: a scheduled workflow that opens PRs bumping refs and hashes, with a diff summary.
+      — evidence:
+      - `scripts/check-catalog-updates.ts`, run by `.github/workflows/catalog-updates.yml` (weekly or on demand,
+        clean under actionlint).
+      - It bumps marketplace refs, git refs with a new tree hash, and release-asset and npm versions at least 14
+        days old, with hashes from the downloads checked against GitHub's digests.
+      - It clears reviews and writes a summary.
+      - Only the changed values are rewritten.
+      - Pure helpers are tested (`updates.test.ts`).
+      - **Live:**
+        - against today's catalog, everything is up to date;
+        - against a copy with older pins (gitleaks 8.30.0, actionlint 1.7.11, codebase-memory-mcp 0.10.8,
+          playwright-mcp 0.0.82, an older code-review commit), the bumped files came out byte-identical to the
+          verified pins.
+      - **Owner:** enable "Allow GitHub Actions to create and approve pull requests", or add `CATALOG_BOT_TOKEN`,
+        before the first scheduled run.
 - [x] **M2-05** Decide whether v0.1 ships a bundled catalog snapshot only, or can also fetch signed catalog updates from Releases.
       — evidence: [ADR-0007](adr/0007-catalog-distribution.md) (Proposed): a bundled snapshot only. The sidecar
       imports the compiled `catalog.json`; verified in the packaged executable, where `bootstrap.plan` answers from it.
@@ -647,7 +664,15 @@ All of these run on macOS, Windows and Ubuntu against a sample repo in `fixtures
         - a per-action rollback updates the lockfile;
         - conflicts and forcing.
       - Live: the plugin and skill install rolled back to a clean `git status`.
-- [ ] **M2-18** Auto-apply as an opt-in setting, limited to first-party and official items.
+- [x] **M2-18** Auto-apply as an opt-in setting, limited to first-party and official items.
+      — evidence:
+      - The Settings toggle, "Apply safe setup automatically before a new session", is off by default
+        (`settings.rs`, tested).
+      - Before `session.start`, the app calls `bootstrap.autoApply`. That applies only recommended, pre-selected
+        first-party and official items and the fixes that add lines.
+      - The policy is `auto-apply.ts` (tested).
+      - The session's first notices list what was applied and point to History for rollback. Failures never block
+        the session.
 
 ### Generators (agent-driven, verified deterministically)
 
@@ -687,11 +712,11 @@ All of these run on macOS, Windows and Ubuntu against a sample repo in `fixtures
         - no home-folder paths.
       - Live on a fixture (haiku, $0.01, 59 s): 56 lines, all checks pass, and commands it couldn't run are marked
         as failing rather than claimed.
-- [ ] **M2-22** Hooks generator:
+- [x] **M2-22** Hooks generator:
   - format and lint on edit, written to `.claude/settings.json` (`PostToolUse`);
   - optional Stop hook that runs fast tests;
   - gitleaks pre-commit through whichever hook manager the repo already uses (lefthook, pre-commit, husky).
-      Progress:
+      — evidence:
       - `ac-setup-hooks` plus checks: valid JSON, existing settings kept, a PostToolUse hook, referenced scripts
         present.
       - Live end to end over JSON-RPC: `.claude/settings.json` and a lint hook script were generated, applied and
@@ -704,18 +729,28 @@ All of these run on macOS, Windows and Ubuntu against a sample repo in `fixtures
         - Tested in `git-hooks.test.ts`: comments kept, refusals, and a real commit blocked by a stand-in.
         - Live with gitleaks 8.30.1: a commit holding a GitHub token was blocked ("leaks found: 1"), a clean one went
           through, and rollback left a clean `git status`.
-      - Remaining: the Stop hook option.
-- [ ] **M2-23** Test scaffold, only when none exists:
+      - **Stop hook (optional fix, not pre-selected):**
+        - The script and a `Stop` entry in `.claude/settings.json` run the detected test command.
+        - When tests fail, the script exits 2 with the failure tail for Claude, and it stops on `stop_hook_active`.
+        - The verifier times one run.
+        - Tested in `stop-hook.test.ts`: settings kept, exit 0/2, no loop, monorepo folder, and apply → verify →
+          rollback with a real `npm test`.
+- [x] **M2-23** Test scaffold, only when none exists:
   - Vitest or Jest, pytest, flutter_test, or `go test`;
   - plus one example test and a `test` command;
   - verified by running it.
-      Progress:
+      — evidence:
       - `ac-scaffold-tests` plus checks: an example test, valid manifests, no dropped fields.
       - After apply, the verifier runs the re-detected test command.
       - Live on legacy-messy: Node and Python tests were generated and applied. `npm test` failed because the
         fixture's dependencies weren't installed; this was reported, `verified: false` was recorded, and the run
         rolled back cleanly.
-      - Remaining: offer the install step (with consent) before verifying.
+      - **Install step with consent:**
+        - The plan's scaffold-tests action carries the detected install command, and the Plan view offers it as an
+          unchecked "Install dependencies first" option.
+        - Apply runs it only if it's still the command shown, with the lockfiles backed up first.
+        - Test (`generate.test.ts`): `npm install` ran, the tests passed, and rollback removed the lockfile it
+          created and left a clean `git status`.
 - [x] **M2-24** CI generator: a GitHub Actions workflow (install, lint, typecheck, test, build) with dependency caching,
       least-privilege `permissions:` and SHA-pinned actions; validated with actionlint.
       — evidence:

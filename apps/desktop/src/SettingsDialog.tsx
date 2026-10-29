@@ -140,6 +140,19 @@ export function SettingsDialog({
               Show summaries of Claude's thinking <span className="muted">(no extra cost)</span>
             </span>
           </label>
+          <label className="check">
+            <input
+              type="checkbox"
+              checked={draft.autoApply === true}
+              onChange={(e) => setDraft({ ...draft, autoApply: e.target.checked || null })}
+            />
+            <span>Apply safe setup automatically before a new session</span>
+          </label>
+          <p className="field-help">
+            Only reviewed first-party and official catalog items, plus fixes that only add lines (env rules in
+            .gitignore, importing AGENTS.md). Never generators, git changes, or vendor and community items. What was
+            applied shows in the session, and Workspace setup → History can roll it back.
+          </p>
         </section>
 
         <section className="settings-section">

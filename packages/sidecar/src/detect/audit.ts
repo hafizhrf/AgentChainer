@@ -19,6 +19,7 @@ export const FIXES = {
   "add-formatter": "Add a formatter",
   "generate-ci": "Generate a CI workflow",
   "smoke-test": "Add a smoke test",
+  "stop-tests": "Run the tests when Claude stops",
   "fix-gitignore": "Ignore env and secret files",
   "untrack-env": "Stop tracking .env",
   "git-init": "Initialize git",
@@ -123,6 +124,18 @@ export function auditWorkspace(root: string, profile: WorkspaceProfile): Finding
           fix: "setup-hooks",
         },
   );
+  // Optional (M2-22): with a test command, Claude can be made to run the tests before it stops.
+  const testCommand = firstRun("test");
+  if (testCommand && !hooks.Stop) {
+    checks.push({
+      id: "stop-hook.missing",
+      area: "agent",
+      status: "info",
+      title: "Tests don't run when Claude stops",
+      detail: `A Stop hook can run \`${testCommand}\` after each turn and send failures back to Claude to fix.`,
+      fix: "stop-tests",
+    });
+  }
   const skills = list(".claude/skills").filter((d) => exists(`.claude/skills/${d}/SKILL.md`));
   const agents = list(".claude/agents").filter((a) => a.endsWith(".md"));
   const mcp = parseJson(read(".mcp.json"));

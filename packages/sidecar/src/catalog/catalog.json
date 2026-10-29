@@ -616,7 +616,7 @@
       "risk": "medium",
       "permissions": [
         "Starts a browser and visits the pages Claude chooses",
-        "Runs npx, which downloads @playwright/mcp 0.0.83 and its browser on first use"
+        "Runs npx, which downloads the pinned @playwright/mcp and its browser on first use"
       ],
       "secrets": [],
       "install": {

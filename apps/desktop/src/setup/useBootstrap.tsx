@@ -22,6 +22,8 @@ export function useBootstrap(cwd: string, model: string, confirm: Confirm, onCha
   const [outcome, setOutcome] = useState<Outcome[] | null>(null);
   const [generating, setGenerating] = useState<string | null>(null);
   const [generated, setGenerated] = useState<string | null>(null);
+  /** Actions whose install command the user allowed to run before verification (M2-23). */
+  const [install, setInstall] = useState<Set<string>>(new Set());
 
   const load = useCallback(async () => {
     try {
@@ -112,8 +114,14 @@ export function useBootstrap(cwd: string, model: string, confirm: Confirm, onCha
       confirmLabel: "Apply",
     });
     if (!ok) return;
+    const allowed = [...install].filter((id) => selected.has(id));
     await run(() =>
-      request("bootstrap.apply", { cwd, actions: [...selected], profiles: optIn }).then((r) => r.results),
+      request("bootstrap.apply", {
+        cwd,
+        actions: [...selected],
+        profiles: optIn,
+        ...(allowed.length ? { install: allowed } : {}),
+      }).then((r) => r.results),
     );
   }
 
@@ -142,9 +150,18 @@ export function useBootstrap(cwd: string, model: string, confirm: Confirm, onCha
     );
   }
 
+  const toggleInstall = (id: string) =>
+    setInstall((s) => {
+      const next = new Set(s);
+      if (!next.delete(id)) next.add(id);
+      return next;
+    });
+
   return {
     plan,
     runs,
+    install,
+    toggleInstall,
     optIn,
     setOptIn,
     selected,

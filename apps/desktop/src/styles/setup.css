@@ -700,3 +700,19 @@ button.chip:hover {
 .panel-loading {
   padding: var(--space-3);
 }
+
+.install-consent {
+  align-items: flex-start;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface-2);
+}
+
+.install-consent input {
+  margin-top: 3px;
+}
+
+.install-consent .field-help {
+  display: block;
+}

@@ -12,7 +12,7 @@ import { type FetchTree, fetchGitHubTree, listFiles, treeHash } from "./git-sour
 import { buildPlan, type PlanEnv } from "./plan.ts";
 import { itemChanges } from "./steps.ts";
 import { ensureTool, platformKey } from "./tools.ts";
-import { verifyApplied } from "./verify.ts";
+import { runCommand, verifyApplied } from "./verify.ts";
 
 /**
  * The bootstrap apply engine (M2-13…M2-17):
@@ -40,6 +40,8 @@ export type ApplyContext = {
   fetchTree?: FetchTree;
   /** Downloads release assets; tests pass a fake. */
   fetchAsset?: typeof fetch;
+  /** Actions whose install command the user allowed to run before verification (M2-23). */
+  install?: string[];
   optIn?: string[];
   /** Generator proposals waiting for review, by action. */
   proposals?: Map<string, Proposal>;
@@ -342,6 +344,15 @@ async function applyOne(
       fixRecord([action.preview.path]);
       return;
     }
+    if (action.preview.type === "files") {
+      for (const f of action.preview.files) tracker.write(rec.files, f.path, f.after, f.path.endsWith(".sh"));
+      fixRecord(action.preview.files.map((f) => f.path));
+      if (action.id === "fix:stop-tests") {
+        rec.checks = await verifyApplied(root, "stop-tests", []);
+        for (const c of rec.checks) if (c.status === "fail") rec.warnings.push(`${c.name}: ${c.detail}`);
+      }
+      return;
+    }
     if (action.id === "fix:git-init") {
       run(root, ["git", "init", "-q"]);
       rec.undo.push({ type: "git-init" });
@@ -368,12 +379,15 @@ async function applyOne(
       if (current !== f.before) throw new Error(`${f.path} changed since the proposal was made. Generate it again.`);
     }
     for (const f of proposal.files) tracker.write(rec.files, f.path, f.after);
+    if (action.installCommand && ctx.install?.includes(action.id)) {
+      rec.checks = [await installDependencies(root, action.installCommand, rec, tracker)];
+    }
     const verification = await verifyApplied(
       root,
       name,
       proposal.files.map((f) => f.path),
     );
-    rec.checks = [...proposal.checks, ...verification];
+    rec.checks = [...proposal.checks, ...(rec.checks ?? []), ...verification];
     const failed = verification.filter((c) => c.status === "fail");
     for (const c of failed) rec.warnings.push(`Verification failed (${c.name}): ${c.detail}`);
     rec.lock = {
@@ -480,6 +494,48 @@ async function applyOne(
     return;
   }
   throw new Error(`Installing ${src.type} sources isn't supported.`);
+}
+
+/** Lockfiles an install may rewrite; they're backed up first so a rollback restores them byte for byte. */
+const LOCKFILES = [
+  "package-lock.json",
+  "pnpm-lock.yaml",
+  "yarn.lock",
+  "bun.lock",
+  "bun.lockb",
+  "uv.lock",
+  "poetry.lock",
+  "pubspec.lock",
+  "go.sum",
+];
+
+/**
+ * Runs the consented install command before the tests are verified (M2-23). Only when it's still the command the user
+ * saw: the applied files may have changed what's detected. Lockfile changes are part of the run; installed packages
+ * (node_modules, .venv) are ignored by git and stay.
+ */
+async function installDependencies(root: string, shown: string, rec: ActionRecord, tracker: Tracker): Promise<Check> {
+  const pkg = detectWorkspace(root).packages.find((p) => p.commands.install);
+  const command = pkg?.commands.install?.run;
+  if (command !== shown) {
+    return {
+      name: "dependencies installed",
+      status: "skipped",
+      detail: `the install command changed (now ${command ?? "none"}); not run`,
+    };
+  }
+  const dir = pkg?.path && pkg.path !== "." ? `${pkg.path}/` : "";
+  // Watched whether or not they exist yet: a lockfile the install creates is removed again by a rollback.
+  for (const lock of LOCKFILES) tracker.watch(rec.files, `${dir}${lock}`);
+  const r = await runCommand(command, path.join(root, ...dir.split("/").filter(Boolean)), 600_000);
+  tracker.settle(rec.files);
+  return {
+    name: "dependencies installed",
+    status: r.exitCode === 0 ? "pass" : "fail",
+    detail: r.timedOut
+      ? `\`${command}\` timed out after ${Math.round(r.ms / 1000)} s`
+      : `\`${command}\` exited ${r.exitCode} in ${(r.ms / 1000).toFixed(1)} s${r.exitCode === 0 ? "; installed packages stay after a rollback (git ignores them)" : `:\n${r.tail}`}`,
+  };
 }
 
 function run(cwd: string, argv: string[]): void {

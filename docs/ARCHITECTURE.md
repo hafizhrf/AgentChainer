@@ -113,8 +113,9 @@ Planned surface (v0.1):
 | request | `workspace.scan` | Detect stack, commands, and audit the setup → `WorkspaceProfile` + findings (read-only) |
 | request | `workspace.saveProfile` | Write the profile to `.agentchainer/profile.json` |
 | request | `bootstrap.plan` | Fixes + catalog items + generators for the workspace, each with a preview (read-only; M2-11) |
-| request | `bootstrap.apply` / `bootstrap.runs` / `bootstrap.rollback` | Apply selected actions after re-planning; list runs; roll back a run or one action, byte for byte (M2-13…M2-17) |
-| request | `bootstrap.plan` / `bootstrap.apply` / `bootstrap.rollback` | Bootstrap engine |
+| request | `bootstrap.apply` / `bootstrap.runs` / `bootstrap.rollback` | Apply selected actions after re-planning; list runs; roll back a run or one action, byte for byte (M2-13…M2-17). `install` lists actions whose install command the user allowed to run before verification (M2-23) |
+| request | `bootstrap.autoApply` | Opt-in, before a new session: applies only recommended first-party and official items and the fixes that add lines; `runId` null when nothing applies (M2-18) |
+| request | `bootstrap.generate` | A read-only Claude session proposes files for a generator action; nothing is written (M2-19…M2-26) |
 | notification | `agent.event` | `{sessionId, event}`: a normalized `AgentEvent` (see §5.2) |
 | notification | `permission.request` | `{sessionId, …}`: ask the user to approve a tool call |
 

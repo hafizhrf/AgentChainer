@@ -271,6 +271,11 @@ export const PlanActionSchema = z.object({
   generatable: z.boolean().optional(),
   /** Generators: checks of the current proposal. */
   checks: z.array(CheckSchema).optional(),
+  /**
+   * Generators whose verification runs the project's tests (M2-23): the install command that can run first, with
+   * the user's consent (`bootstrap.apply` `install`). It may run package scripts.
+   */
+  installCommand: z.string().optional(),
 });
 export type PlanAction = z.infer<typeof PlanActionSchema>;
 
@@ -299,6 +304,20 @@ export const BootstrapRunSchema = z.object({
   ),
 });
 export type BootstrapRun = z.infer<typeof BootstrapRunSchema>;
+
+/** What `bootstrap.apply` did, per action. */
+export const ApplyResultSchema = z.object({
+  runId: z.string(),
+  results: z.array(
+    z.object({
+      id: z.string(),
+      status: z.enum(["applied", "failed", "skipped"]),
+      message: z.string().optional(),
+      warnings: z.array(z.string()),
+      checks: z.array(CheckSchema).optional(),
+    }),
+  ),
+});
 
 const WorkspaceRef = z.object({ cwd: z.string().min(1) });
 /** A file inside the workspace; the sidecar rejects absolute paths and `..`. */
@@ -558,19 +577,21 @@ export const methodSchemas = {
    * selectable run. Files are backed up before their first change; the run is recorded in `.agentchainer/lock.json`.
    */
   "bootstrap.apply": {
-    params: WorkspaceRef.extend({ actions: z.array(z.string()).min(1), profiles: z.array(z.string()).optional() }),
-    result: z.object({
-      runId: z.string(),
-      results: z.array(
-        z.object({
-          id: z.string(),
-          status: z.enum(["applied", "failed", "skipped"]),
-          message: z.string().optional(),
-          warnings: z.array(z.string()),
-          checks: z.array(CheckSchema).optional(),
-        }),
-      ),
+    params: WorkspaceRef.extend({
+      actions: z.array(z.string()).min(1),
+      profiles: z.array(z.string()).optional(),
+      /** Actions whose `installCommand` the user allowed to run before verification (M2-23). */
+      install: z.array(z.string()).optional(),
     }),
+    result: ApplyResultSchema,
+  },
+  /**
+   * The opt-in auto-apply before a new session (M2-18): only recommended first-party and official catalog items and
+   * the low-risk fixes, never generators or vendor and community items. `runId` is null when nothing applied.
+   */
+  "bootstrap.autoApply": {
+    params: WorkspaceRef,
+    result: ApplyResultSchema.extend({ runId: z.string().nullable() }),
   },
   /**
    * Runs a generator (M2-19…M2-25): a read-only Claude session proposes files, which are checked and then offered in

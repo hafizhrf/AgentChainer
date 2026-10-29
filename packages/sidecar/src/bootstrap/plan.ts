@@ -5,6 +5,7 @@ import { type Catalog, type Item, type Profile, REQUIRED_REVIEWS } from "../cata
 import { git, repoOf } from "../workspace.ts";
 import { GENERATORS, type Proposal } from "./generate.ts";
 import { itemChanges } from "./steps.ts";
+import { stopHookFiles, stopTestTarget } from "./stop-hook.ts";
 import { binaryName, onPath, platformKey, toolsDir } from "./tools.ts";
 
 /**
@@ -68,7 +69,7 @@ export function buildPlan(
   proposals: Map<string, Proposal> = new Map(),
 ): BootstrapPlan {
   const fixes = new Set(findings.filter((f) => f.status !== "ok" && f.fix).map((f) => f.fix?.action ?? ""));
-  const actions: PlanAction[] = [...fixActions(root, fixes)];
+  const actions: PlanAction[] = [...fixActions(root, fixes, profile)];
 
   const suggested = (p: Profile) =>
     "always" in p.suggest ||
@@ -104,10 +105,13 @@ export function buildPlan(
       secrets: [],
     };
     const proposal = proposals.get(action);
+    // Scaffolded tests are verified by running them, which needs the project's dependencies (M2-23).
+    const install = action === "scaffold-tests" ? installCommand(profile) : undefined;
     if (proposal) {
       const failing = proposal.checks.filter((c) => c.status === "fail").length;
       actions.push({
         ...base,
+        ...(install ? { installCommand: install } : {}),
         notes: proposal.summary,
         preview: { type: "files", files: proposal.files },
         checks: proposal.checks,
@@ -145,7 +149,7 @@ export function buildPlan(
 }
 
 /** Deterministic fixes: file edits and git commands whose full effect the preview shows. */
-function fixActions(root: string, fixes: Set<string>): PlanAction[] {
+function fixActions(root: string, fixes: Set<string>, profile: WorkspaceProfile): PlanAction[] {
   const read = (rel: string) => {
     const file = path.join(root, rel);
     return existsSync(file) ? readFileSync(file, "utf8") : "";
@@ -193,6 +197,22 @@ function fixActions(root: string, fixes: Set<string>): PlanAction[] {
       state: "recommended",
       selected: true,
     });
+  }
+  if (fixes.has("stop-tests")) {
+    const target = stopTestTarget(profile);
+    const files = target && stopHookFiles(root, target);
+    if (target && files) {
+      actions.push({
+        ...base,
+        id: "fix:stop-tests",
+        title: "Run the tests when Claude stops",
+        why: `After each turn, \`${target.run}\` runs; if tests fail, Claude gets the failures and fixes them before stopping. Slow test suites make every turn slower.`,
+        preview: { type: "files", files: files.map(({ path: p, before, after }) => ({ path: p, before, after })) },
+        // Optional: it changes how every turn ends.
+        state: "recommended",
+        selected: false,
+      });
+    }
   }
   if (fixes.has("link-agents-md")) {
     const file = existsSync(path.join(root, "CLAUDE.md")) ? "CLAUDE.md" : ".claude/CLAUDE.md";
@@ -331,4 +351,9 @@ export function installedItems(root: string): Set<string> {
     }
   }
   return ids;
+}
+
+/** The install command of the first package that has one, for installing before tests run (M2-23). */
+export function installCommand(profile: WorkspaceProfile): string | undefined {
+  return profile.packages.find((p) => p.commands.install)?.commands.install?.run;
 }

@@ -3,6 +3,7 @@ import { homedir } from "node:os";
 import { PROTOCOL_VERSION, RpcErrorCode } from "@agentchainer/protocol";
 import pkg from "../package.json" with { type: "json" };
 import { applyActions, type Cli, listRuns, rollback } from "./bootstrap/apply.ts";
+import { autoApplicable } from "./bootstrap/auto-apply.ts";
 import { generate, resolveActionlint } from "./bootstrap/generate.ts";
 import { buildPlan, planEnv } from "./bootstrap/plan.ts";
 import { proposals } from "./bootstrap/proposals.ts";
@@ -252,7 +253,7 @@ serve(
 
     "workspace.saveProfile": ({ cwd }) => ({ path: saveProfile(cwd, detectWorkspace(cwd)) }),
 
-    "bootstrap.apply": async ({ cwd, actions, profiles }) => {
+    "bootstrap.apply": async ({ cwd, actions, profiles, install }) => {
       requireFolder(cwd);
       const result = await applyActions(cwd, actions, {
         catalog,
@@ -260,11 +261,22 @@ serve(
         cli: cliFor(cwd),
         optIn: profiles ?? [],
         proposals: proposals.of(cwd),
+        install: install ?? [],
       });
       for (const r of result.results) {
         if (r.status === "applied" && r.id.startsWith("gen:")) proposals.delete(cwd, r.id.slice(4));
       }
       return result;
+    },
+
+    "bootstrap.autoApply": async ({ cwd }) => {
+      requireFolder(cwd);
+      const profile = detectWorkspace(cwd);
+      const env = planEnv(cwd);
+      const plan = buildPlan(cwd, profile, auditWorkspace(cwd, profile), catalog, env);
+      const ids = plan.actions.filter(autoApplicable).map((a) => a.id);
+      if (ids.length === 0) return { runId: null, results: [] };
+      return applyActions(cwd, ids, { catalog, env, cli: cliFor(cwd) });
     },
 
     "bootstrap.generate": async ({ cwd, action, model }) => {

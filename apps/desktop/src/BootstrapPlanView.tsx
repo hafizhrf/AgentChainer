@@ -1,5 +1,6 @@
-import type { BootstrapPlan, PlanAction, PlanPreview } from "@agentchainer/protocol";
+import type { BootstrapPlan, BootstrapRun, Methods, PlanAction, PlanPreview } from "@agentchainer/protocol";
 import { useCallback, useEffect, useState } from "react";
+import type { Confirm } from "./Dialog.tsx";
 import { request } from "./sidecar.ts";
 import { lineDiff } from "./textdiff.ts";
 
@@ -10,28 +11,117 @@ const STATE_LABEL: Record<PlanAction["state"], string> = {
   unavailable: "unavailable",
 };
 
+type ApplyResult = Methods["bootstrap.apply"]["result"]["results"][number];
+type RollbackResult = Methods["bootstrap.rollback"]["result"]["results"][number];
+
 /**
- * Review of the bootstrap plan (M2-12): each action with why, trust tier, license, risk, the permissions and secrets
- * it needs, and an exact preview. Toggle actions, opt into extra profiles. Applying arrives with the installers
- * (M2-13…M2-17); until then nothing here changes the workspace.
+ * Review and apply the bootstrap plan (M2-12…M2-17): each action with why, trust tier, license, risk, the permissions
+ * and secrets it needs, and an exact preview. Selected actions apply after a confirmation; every run can be rolled
+ * back, whole or per action, from the history below.
  */
-export function BootstrapPlanView({ cwd }: { cwd: string }) {
+export function BootstrapPlanView({
+  cwd,
+  confirm,
+  onChanged,
+}: {
+  cwd: string;
+  confirm: Confirm;
+  /** The workspace changed (applied or rolled back): the readiness report should rescan. */
+  onChanged: () => void;
+}) {
   const [plan, setPlan] = useState<BootstrapPlan | null>(null);
   const [optIn, setOptIn] = useState<string[]>([]);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [open, setOpen] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [runs, setRuns] = useState<BootstrapRun[]>([]);
+  const [busy, setBusy] = useState(false);
+  const [outcome, setOutcome] = useState<(ApplyResult | RollbackResult)[] | null>(null);
 
   const load = useCallback(async () => {
     try {
-      const next = await request("bootstrap.plan", { cwd, profiles: optIn });
+      const [next, history] = await Promise.all([
+        request("bootstrap.plan", { cwd, profiles: optIn }),
+        request("bootstrap.runs", { cwd }),
+      ]);
       setPlan(next);
+      setRuns(history.runs);
       setSelected(new Set(next.actions.filter((a) => a.selected).map((a) => a.id)));
       setError(null);
     } catch (err) {
       setError(String(err));
     }
   }, [cwd, optIn]);
+
+  async function apply() {
+    if (!plan) return;
+    const chosen = plan.actions.filter((a) => selected.has(a.id));
+    const ok = await confirm({
+      title: `Apply ${chosen.length} action${chosen.length > 1 ? "s" : ""}?`,
+      body: (
+        <>
+          <ul className="file-list">
+            {chosen.map((a) => (
+              <li key={a.id}>
+                {a.title}{" "}
+                <span className="muted">
+                  ({a.tier ?? a.kind}, {a.scope} scope)
+                </span>
+              </li>
+            ))}
+          </ul>
+          <p className="muted">
+            Files are backed up first and the run is recorded in <code>.agentchainer/lock.json</code>. You can roll the
+            run back from the history below.
+          </p>
+        </>
+      ),
+      confirmLabel: "Apply",
+    });
+    if (!ok) return;
+    await run(() =>
+      request("bootstrap.apply", { cwd, actions: [...selected], profiles: optIn }).then((r) => r.results),
+    );
+  }
+
+  async function undo(runId: string, actionId?: string, force = false) {
+    const ok = await confirm({
+      title: force ? "Force the rollback?" : actionId ? "Roll back this action?" : "Roll back the whole run?",
+      body: force ? (
+        <p>Files you edited after the run are overwritten with their contents from before it.</p>
+      ) : (
+        <p>
+          Undoes what the {actionId ? "action" : "run"} installed and restores the files it changed, byte for byte.
+          Files you edited since are left alone.
+        </p>
+      ),
+      confirmLabel: force ? "Overwrite and roll back" : "Roll back",
+      danger: force,
+    });
+    if (!ok) return;
+    await run(() =>
+      request("bootstrap.rollback", {
+        cwd,
+        runId,
+        ...(actionId ? { actionId } : {}),
+        ...(force ? { force } : {}),
+      }).then((r) => r.results),
+    );
+  }
+
+  async function run(action: () => Promise<(ApplyResult | RollbackResult)[]>) {
+    setBusy(true);
+    setOutcome(null);
+    try {
+      setOutcome(await action());
+      onChanged();
+      await load();
+    } catch (err) {
+      setError(String(err));
+    } finally {
+      setBusy(false);
+    }
+  }
 
   useEffect(() => {
     void load();
@@ -116,14 +206,83 @@ export function BootstrapPlanView({ cwd }: { cwd: string }) {
       })}
 
       <div className="row">
-        <button type="button" disabled title="Applying arrives with the installers (M2-13…M2-17)">
-          Apply selected ({selected.size})
+        <button type="button" disabled={selected.size === 0 || busy} onClick={() => void apply()}>
+          {busy ? "Working…" : `Apply selected (${selected.size})`}
         </button>
         <button type="button" className="link" onClick={() => void load()}>
           Refresh
         </button>
       </div>
-      <p className="muted">Applying comes with the installers; nothing here changes the workspace yet.</p>
+
+      {outcome && (
+        <ul className="plan-outcome">
+          {outcome.map((r) => (
+            <li key={r.id} className={`outcome ${r.status}`}>
+              <strong>{r.status}</strong> {r.id}
+              {r.message && <span className="muted"> — {r.message}</span>}
+              {"warnings" in r &&
+                r.warnings.map((w) => (
+                  <div key={w} className="warn">
+                    {w}
+                  </div>
+                ))}
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {runs.length > 0 && (
+        <>
+          <h4>History</h4>
+          <ul className="runs">
+            {runs.map((r) => {
+              const live = r.actions.filter((a) => a.status === "applied");
+              const conflict = outcome?.some((o) => o.status === "conflict");
+              return (
+                <li key={r.runId}>
+                  <div className="plan-head">
+                    <span>{new Date(r.startedAt).toLocaleString()}</span>
+                    <span className="muted">catalog {r.catalogVersion}</span>
+                    {live.length > 0 && (
+                      <button type="button" className="link" disabled={busy} onClick={() => void undo(r.runId)}>
+                        Roll back run
+                      </button>
+                    )}
+                    {live.length > 0 && conflict && (
+                      <button
+                        type="button"
+                        className="link"
+                        disabled={busy}
+                        onClick={() => void undo(r.runId, undefined, true)}
+                      >
+                        Force
+                      </button>
+                    )}
+                  </div>
+                  <ul className="run-actions">
+                    {r.actions.map((a) => (
+                      <li key={a.id} className="plan-head">
+                        <span className={`outcome ${a.status}`}>{a.status}</span> {a.title}
+                        {a.status === "applied" && (
+                          <button
+                            type="button"
+                            className="link"
+                            disabled={busy}
+                            onClick={() => void undo(r.runId, a.id)}
+                          >
+                            Roll back
+                          </button>
+                        )}
+                        {a.error && <span className="muted"> — {a.error}</span>}
+                      </li>
+                    ))}
+                  </ul>
+                </li>
+              );
+            })}
+          </ul>
+        </>
+      )}
     </div>
   );
 }

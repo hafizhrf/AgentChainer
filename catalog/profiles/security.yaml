@@ -1,0 +1,7 @@
+id: security
+name: "Security"
+description: "A deep security audit, on request (before a release)."
+suggest:
+  optIn: true
+items:
+  - cloudflare-security-audit

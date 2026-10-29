@@ -206,6 +206,9 @@ Sources: [cloudflare/security-audit-skill](https://github.com/cloudflare/securit
       "backup": ".agentchainer/backups/<run-id>/"
     }
   ],
+  "fixes": [
+    { "id": "fix-gitignore", "appliedAt": "2026-10-28T10:00:00Z", "files": [".gitignore"] }
+  ],
   "generated": [
     { "path": "CLAUDE.md", "action": "merge", "generator": "ac-write-claude-md", "verified": true },
     { "path": ".github/workflows/ci.yml", "action": "write", "generator": "ac-generate-ci", "verified": true, "checks": ["actionlint"] }
@@ -213,7 +216,10 @@ Sources: [cloudflare/security-audit-skill](https://github.com/cloudflare/securit
 }
 ```
 
-- `backups/` holds the previous content of any file that bootstrap modified. It is git-ignored and used for byte-exact rollback.
+- `backups/<run-id>/` holds `run.json` (what the run did, including CLI changes to undo) and the previous content of
+  every file the run changed. `.agentchainer/.gitignore` keeps it (and `profile.json`) out of git. It's used for
+  byte-exact rollback, and a whole-run rollback removes it.
+- `fixes` records deterministic fixes from the readiness audit (`.gitignore` env rules, untracking `.env`, …).
 - `local`-scope items are recorded in the app DB, not the committed lockfile, because they're private to the user.
 
 ## 8. Updates and rollback

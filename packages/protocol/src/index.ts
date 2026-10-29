@@ -264,6 +264,23 @@ export const BootstrapPlanSchema = z.object({
 });
 export type BootstrapPlan = z.infer<typeof BootstrapPlanSchema>;
 
+/** One bootstrap run: what was applied, from `.agentchainer/backups/<runId>/run.json` (M2-16/M2-17). */
+export const BootstrapRunSchema = z.object({
+  runId: z.string(),
+  startedAt: z.string(),
+  catalogVersion: z.string(),
+  actions: z.array(
+    z.object({
+      id: z.string(),
+      title: z.string(),
+      status: z.enum(["applied", "failed", "rolled-back"]),
+      error: z.string().optional(),
+      warnings: z.array(z.string()),
+    }),
+  ),
+});
+export type BootstrapRun = z.infer<typeof BootstrapRunSchema>;
+
 const WorkspaceRef = z.object({ cwd: z.string().min(1) });
 /** A file inside the workspace; the sidecar rejects absolute paths and `..`. */
 const WorkspacePath = WorkspaceRef.extend({ path: z.string().min(1) });
@@ -515,6 +532,46 @@ export const methodSchemas = {
   "bootstrap.plan": {
     params: WorkspaceRef.extend({ profiles: z.array(z.string()).optional() }),
     result: BootstrapPlanSchema,
+  },
+
+  /**
+   * Applies the given plan actions (M2-13…M2-16). The plan is rebuilt first, so only actions that are currently
+   * selectable run. Files are backed up before their first change; the run is recorded in `.agentchainer/lock.json`.
+   */
+  "bootstrap.apply": {
+    params: WorkspaceRef.extend({ actions: z.array(z.string()).min(1), profiles: z.array(z.string()).optional() }),
+    result: z.object({
+      runId: z.string(),
+      results: z.array(
+        z.object({
+          id: z.string(),
+          status: z.enum(["applied", "failed", "skipped"]),
+          message: z.string().optional(),
+          warnings: z.array(z.string()),
+        }),
+      ),
+    }),
+  },
+  "bootstrap.runs": { params: WorkspaceRef, result: z.object({ runs: z.array(BootstrapRunSchema) }) },
+  /**
+   * Rolls back a run, or one action of it (M2-17): CLI changes are undone and files restored byte for byte. A file
+   * edited since the run is left alone (`conflict`) unless `force`.
+   */
+  "bootstrap.rollback": {
+    params: WorkspaceRef.extend({
+      runId: z.string().regex(/^[\w-]+$/),
+      actionId: z.string().optional(),
+      force: z.boolean().optional(),
+    }),
+    result: z.object({
+      results: z.array(
+        z.object({
+          id: z.string(),
+          status: z.enum(["rolled-back", "conflict", "failed", "kept"]),
+          message: z.string().optional(),
+        }),
+      ),
+    }),
   },
 
   /* Git panel (M1-30). Never force-pushes. */

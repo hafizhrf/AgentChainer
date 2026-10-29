@@ -507,10 +507,13 @@ All of these run on macOS, Windows and Ubuntu against a sample repo in `fixtures
         - the playwright plugin runs `@playwright/mcp@latest`, unpinned;
         - github needs `GITHUB_PERSONAL_ACCESS_TOKEN`;
         - there is no Dart/Flutter LSP plugin.
+      - `cloudflare-security-audit` is pinned to commit `c1c8a8c` with a tree sha256.
+        - The `catalog-sources` workflow re-downloads every git source and checks its hash (CI-computed, §4).
+        - A pre-review scan found no network calls in its scripts.
       - Remaining:
         - maintainer reviews (each item is offered once its `reviews` count is met);
-        - git, release-asset and npm items (cloudflare-security-audit, codebase-memory-mcp, gitleaks, actionlint),
-          which need the hashing installer (M2-13/M2-15).
+        - release-asset and npm items (codebase-memory-mcp, gitleaks, actionlint), which need the binary installer
+          (M2-15).
 - [ ] **M2-03** Show trust tiers in the UI. Community items are never pre-selected or auto-applied.
       Progress: the plan review shows each item's tier (community in red); the builder never pre-selects community
       items (`plan.test.ts`). Remaining: auto-apply (M2-18) must also exclude them; look at it in the app.
@@ -573,19 +576,54 @@ All of these run on macOS, Windows and Ubuntu against a sample repo in `fixtures
   - toggle actions on and off;
   - inspect each preview, the permissions an item needs, and its license;
   - "Apply selected".
-      Progress: the Setup tab's plan lists actions with checkboxes, tier/risk badges, why, license, scope,
-      permissions, secrets, notes, and a diff or command preview, plus opt-in profile toggles. "Apply selected" is
-      disabled until the installers land (M2-13…M2-17).
-- [ ] **M2-13** Skill installer: fetch the pinned source → verify sha256 → copy to `.claude/skills/<name>` (project) or `~/.claude/skills` (user).
-- [ ] **M2-14** Plugin installer: `claude plugin marketplace add` + `claude plugin install … --scope project -y --json`;
+      Progress:
+      - The Setup tab's plan lists actions with checkboxes, tier/risk badges, why, license, scope, permissions,
+        secrets, notes, and a diff or command preview, plus opt-in profile toggles.
+      - "Apply selected" confirms the list, then shows each action's result and warnings.
+      - The history shows each run, with "Roll back run", per-action "Roll back", and "Force" after a conflict.
+      - Remaining: click through in the app.
+- [x] **M2-13** Skill installer: fetch the pinned source → verify sha256 → copy to `.claude/skills/<name>` (project) or `~/.claude/skills` (user).
+      — evidence:
+      - `bootstrap/git-source.ts` downloads the GitHub tarball at a full SHA and extracts it with system tar.
+      - The tree hash is the sha256 of the sorted per-file sha256s, and symlinks are refused.
+      - `apply.test.ts` covers a hash mismatch (nothing written), an existing target (refused), and a matching source
+        (copied, files recorded).
+      - Live: `cloudflare-security-audit` was downloaded at `c1c8a8c`; the hash matched; 20 files were copied and then
+        rolled back.
+      - User scope isn't offered yet; every seed item is project-scoped.
+- [x] **M2-14** Plugin installer: `claude plugin marketplace add` + `claude plugin install … --scope project -y --json`;
       record the installed version.
+      — evidence:
+      - Installs go through the user's CLI (`installer.ts`, spike S6) with no `-y` and without adding marketplaces
+        implicitly. If the marketplace is missing, the user gets the exact command to run.
+      - The installed version comes from `plugin list --json` and is written to the lockfile, with a warning when it
+        differs from the reviewed version.
+      - Tests use a fake CLI.
+      - Live: `code-review@claude-plugins-official` was installed as 1.0.1 (the reviewed version), then uninstalled by
+        rollback.
 - [ ] **M2-15** MCP installer:
   - command-based servers are registered with `claude mcp add --scope local`;
   - portable servers (`npx`, remote HTTP) may go to the project `.mcp.json`;
   - binaries are downloaded with checksums into an app-managed dir (never `curl | bash`);
   - secrets are referenced as env vars and never written to repo files.
-- [ ] **M2-16** Lockfile `.agentchainer/lock.json` ([CATALOG §7](CATALOG.md#7-lockfile)); re-running bootstrap is idempotent.
-- [ ] **M2-17** Rollback per item and per run, restoring previous file contents byte-for-byte from backups.
+- [x] **M2-16** Lockfile `.agentchainer/lock.json` ([CATALOG §7](CATALOG.md#7-lockfile)); re-running bootstrap is idempotent.
+      — evidence:
+      - It holds items (source, scope, version, files) and fixes, and `.agentchainer/.gitignore` keeps `backups/`
+        and `profile.json` out of git.
+      - Apply re-plans first, so a re-run skips what's already applied. Tested: the second apply of a fix is
+        "skipped".
+- [x] **M2-17** Rollback per item and per run, restoring previous file contents byte-for-byte from backups.
+      — evidence:
+      - Files are backed up before their first change in a run.
+      - A rollback first undoes CLI changes (plugin uninstall, `git reset` of untracked env files, removing a fresh
+        `.git`), then restores files byte for byte.
+      - A file edited since the run is a conflict, left alone unless forced.
+      - Tested:
+        - after a whole-run rollback, files are byte-identical and `git status` is clean, with no `.agentchainer/`
+          left;
+        - a per-action rollback updates the lockfile;
+        - conflicts and forcing.
+      - Live: the plugin and skill install rolled back to a clean `git status`.
 - [ ] **M2-18** Auto-apply as an opt-in setting, limited to first-party and official items.
 
 ### Generators (agent-driven, verified deterministically)
@@ -627,9 +665,11 @@ All of these run on macOS, Windows and Ubuntu against a sample repo in `fixtures
       - `sample-app` (M1 exit scenarios) is there too.
       - The fixtures carry manifests and a little code, not dependencies. Tests add per-fixture git state on temp
         copies.
-- [ ] **M2-28** Automated bootstrap tests per fixture: detector and plan snapshots; installer and rollback run on temp copies.
-      Progress: detector, audit and plan snapshots per fixture (`test/snapshots/*.json`, `*.plan.json`, regenerated
-      with `UPDATE_SNAPSHOTS=1`). Remaining: installer and rollback runs on temp copies (M2-13…M2-17).
+- [x] **M2-28** Automated bootstrap tests per fixture: detector and plan snapshots; installer and rollback run on temp copies.
+      — evidence:
+      - Detector, audit and plan snapshots per fixture (`test/snapshots/*.json`, `*.plan.json`).
+      - `apply.test.ts` runs installers and rollback on temp copies of the fixtures, with a fake CLI and fake fetch,
+        so there's no network in CI.
 
 ### Exit criteria
 

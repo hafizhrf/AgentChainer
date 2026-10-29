@@ -573,7 +573,8 @@
   padding: var(--space-2);
 }
 
-.panel-body [role="tabpanel"] {
+/* Radix keeps inactive tab panels in the DOM as empty, hidden divs: keep them out of the layout. */
+.panel-body [role="tabpanel"]:not([hidden]) {
   display: flex;
   flex-direction: column;
   gap: var(--space-2);

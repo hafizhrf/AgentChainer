@@ -870,3 +870,78 @@ button.toggle[aria-pressed="true"] {
   white-space: nowrap;
   font-size: 0.8rem;
 }
+
+/* Markdown (M1-10), git panel (M1-30) */
+
+.markdown {
+  white-space: normal;
+}
+
+.markdown > :first-child {
+  margin-top: 0;
+}
+
+.markdown > :last-child {
+  margin-bottom: 0;
+}
+
+.markdown pre {
+  white-space: pre;
+  overflow-x: auto;
+  padding: 0.6rem 0.75rem;
+  border-radius: 6px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+}
+
+.markdown :not(pre) > code {
+  padding: 0.05rem 0.3rem;
+  border-radius: 4px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  font-size: 0.9em;
+}
+
+.markdown table {
+  border-collapse: collapse;
+}
+
+.markdown th,
+.markdown td {
+  border: 1px solid var(--border);
+  padding: 0.25rem 0.5rem;
+}
+
+.markdown a {
+  color: var(--accent);
+}
+
+.show-earlier {
+  align-self: center;
+}
+
+.git-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.git-branch {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.git-branch select {
+  flex: 1;
+  min-width: 0;
+}
+
+.git-panel .row input {
+  min-width: 0;
+}
+
+.commit-message {
+  width: 100%;
+  font-size: 0.85rem;
+}

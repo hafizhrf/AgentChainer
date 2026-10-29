@@ -116,6 +116,8 @@ export const WorkspaceFileSchema = z.object({
   status: FileStatusSchema.optional(),
   /** Some of the change is staged. */
   staged: z.boolean().optional(),
+  /** Some of the change (or the whole file, if untracked) is not staged. */
+  unstaged: z.boolean().optional(),
   /** The old path of a rename. */
   origPath: z.string().optional(),
 });
@@ -374,6 +376,28 @@ export const methodSchemas = {
   "workspace.revert": { params: WorkspacePath.extend({ hunk: z.number().int().min(0).optional() }), result: Ok },
   /** Offered when the workspace isn't a git repository (M1-06). */
   "workspace.gitInit": { params: WorkspaceRef, result: Ok },
+
+  /* Git panel (M1-30). Never force-pushes. */
+  "git.branches": {
+    params: WorkspaceRef,
+    result: z.object({
+      current: z.string().nullable(),
+      branches: z.array(z.string()),
+      upstream: z.string().nullable(),
+      ahead: z.number().int(),
+      behind: z.number().int(),
+    }),
+  },
+  "git.switch": {
+    params: WorkspaceRef.extend({ branch: z.string().min(1).max(250), create: z.boolean().optional() }),
+    result: Ok,
+  },
+  "git.stage": { params: WorkspaceRef.extend({ paths: z.array(z.string().min(1)).min(1) }), result: Ok },
+  "git.unstage": { params: WorkspaceRef.extend({ paths: z.array(z.string().min(1)).min(1) }), result: Ok },
+  "git.commit": { params: WorkspaceRef.extend({ message: z.string().min(1) }), result: z.object({ sha: z.string() }) },
+  "git.push": { params: WorkspaceRef, result: z.object({ output: z.string() }) },
+  /** A commit message drafted by Claude (haiku, no tools) from the staged diff, for the user to edit. */
+  "git.draftMessage": { params: WorkspaceRef, result: z.object({ message: z.string() }) },
 } as const;
 
 export type MethodName = keyof typeof methodSchemas;

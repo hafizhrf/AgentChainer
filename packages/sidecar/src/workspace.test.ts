@@ -27,12 +27,12 @@ describe("parseStatus", () => {
   it("maps porcelain codes and keeps a rename's original path", () => {
     const entries = parseStatus(" M a.txt\0A  new.txt\0?? u.txt\0R  moved.txt\0old.txt\0UU c.txt\0 D gone.txt\0");
     assert.deepEqual(Object.fromEntries(entries), {
-      "a.txt": { status: "modified", staged: false },
-      "new.txt": { status: "added", staged: true },
-      "u.txt": { status: "untracked", staged: false },
-      "moved.txt": { status: "renamed", staged: true, origPath: "old.txt" },
-      "c.txt": { status: "conflicted", staged: true },
-      "gone.txt": { status: "deleted", staged: false },
+      "a.txt": { status: "modified", staged: false, unstaged: true },
+      "new.txt": { status: "added", staged: true, unstaged: false },
+      "u.txt": { status: "untracked", staged: false, unstaged: true },
+      "moved.txt": { status: "renamed", staged: true, unstaged: false, origPath: "old.txt" },
+      "c.txt": { status: "conflicted", staged: true, unstaged: true },
+      "gone.txt": { status: "deleted", staged: false, unstaged: true },
     });
   });
 });
@@ -88,7 +88,7 @@ describe("workspace on a real git repo", () => {
   it("lists paths relative to a subfolder workspace", () => {
     writeFileSync(join(dir, "sub", "b.txt"), "bee!\n");
     const ws = listFiles(join(dir, "sub"));
-    assert.deepEqual(ws.files, [{ path: "b.txt", status: "modified", staged: false }]);
+    assert.deepEqual(ws.files, [{ path: "b.txt", status: "modified", staged: false, unstaged: true }]);
     git(dir, "checkout", "-q", "--", "sub/b.txt");
   });
 

@@ -23,7 +23,7 @@ use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use serde::Serialize;
 use tauri::{AppHandle, Emitter, Manager};
 
-use crate::{settings, shell_env};
+use crate::{applog, settings, shell_env};
 
 const SIDECAR_ENTRY: &str = concat!(
     env!("CARGO_MANIFEST_DIR"),
@@ -128,7 +128,7 @@ fn supervise(inner: &Arc<Inner>) {
                 e
             }
         };
-        eprintln!("[sidecar] stopped: {status}");
+        applog::warn("core", &format!("sidecar stopped: {status}"));
         let _ = inner.app.emit(
             "sidecar://exit",
             ExitEvent {
@@ -193,7 +193,7 @@ fn run_once(
             if serde_json::from_str::<serde_json::Value>(&line).is_ok() {
                 let _ = app.emit("sidecar://frame", line);
             } else {
-                eprintln!("[sidecar] dropped a non-JSON stdout line");
+                applog::warn("core", "dropped a non-JSON sidecar stdout line");
             }
         }
     });
@@ -201,7 +201,7 @@ fn run_once(
     let tail_writer = Arc::clone(&tail);
     let logger = std::thread::spawn(move || {
         for line in BufReader::new(stderr).lines().map_while(Result::ok) {
-            eprintln!("[sidecar] {line}");
+            applog::info("sidecar", &line);
             if let Ok(mut tail) = tail_writer.lock() {
                 if tail.len() == STDERR_TAIL_LINES {
                     tail.pop_front();
@@ -289,7 +289,7 @@ fn write_crash_log(app: &AppHandle, status: &str, tail: &[String]) {
         tail.join("\n")
     );
     if std::fs::create_dir_all(&dir).is_ok() && std::fs::write(&file, text).is_ok() {
-        eprintln!("[sidecar] crash log written to {}", file.display());
+        applog::warn("core", &format!("crash log written to {}", file.display()));
     }
 }
 

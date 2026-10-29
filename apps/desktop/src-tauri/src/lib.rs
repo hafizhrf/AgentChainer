@@ -1,4 +1,7 @@
+mod applog;
+mod diagnostics;
 mod editor;
+mod history;
 mod pty;
 mod settings;
 mod shell_env;
@@ -6,6 +9,7 @@ mod sidecar;
 mod terminal;
 mod watcher;
 
+use history::{History, SessionCost, Summary, TurnRecord};
 use pty::{PtyEvent, Ptys};
 use serde::Serialize;
 use settings::Settings;
@@ -129,6 +133,47 @@ fn pty_close(id: u32, ptys: State<'_, Ptys>) {
     ptys.close(id);
 }
 
+/// Records a completed turn in the local cost history (M1-33).
+#[tauri::command]
+fn cost_record(turn: TurnRecord, history: State<'_, HistoryState>) -> Result<(), String> {
+    history.get()?.record(&turn)
+}
+
+/// Each session's latest total in a workspace (shown in the session list, M1-21).
+#[tauri::command]
+fn cost_sessions(
+    cwd: String,
+    history: State<'_, HistoryState>,
+) -> Result<Vec<SessionCost>, String> {
+    history.get()?.sessions(&cwd)
+}
+
+#[tauri::command]
+fn cost_summary(
+    cwd: String,
+    now: i64,
+    history: State<'_, HistoryState>,
+) -> Result<Summary, String> {
+    history.get()?.summary(&cwd, now)
+}
+
+/// Writes the redacted diagnostics bundle (M1-35) to a path the user picked.
+#[tauri::command]
+fn diagnostics_export(app: AppHandle, path: String, ui: serde_json::Value) -> Result<(), String> {
+    diagnostics::export(&app, std::path::Path::new(&path), ui)
+}
+
+/// The cost history, or why it couldn't be opened (the app works without it).
+struct HistoryState(Result<History, String>);
+
+impl HistoryState {
+    fn get(&self) -> Result<&History, String> {
+        self.0
+            .as_ref()
+            .map_err(|e| format!("cost history unavailable: {e}"))
+    }
+}
+
 /// Dev-only self-test (spike S2): `AGENTCHAINER_SELFTEST` holds JSON `{cwd, model, prompt}`. When set, the UI runs
 /// one turn on its own, reports latency through `debug.log`, and quits via `quit_app`.
 #[tauri::command]
@@ -147,6 +192,22 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .setup(|app| {
+            if let Ok(dir) = app.path().app_log_dir() {
+                applog::init(&dir);
+            }
+            applog::info(
+                "core",
+                &format!("AgentChainer {} starting", env!("CARGO_PKG_VERSION")),
+            );
+            let history = app
+                .path()
+                .app_data_dir()
+                .map_err(|e| e.to_string())
+                .and_then(|dir| History::open(&dir.join("agentchainer.db")));
+            if let Err(e) = &history {
+                applog::warn("core", &format!("cost history unavailable: {e}"));
+            }
+            app.manage(HistoryState(history));
             let sidecar = Sidecar::start(app.handle());
             app.manage(sidecar);
             app.manage(Watchers::default());
@@ -168,7 +229,11 @@ pub fn run() {
             pty_open,
             pty_write,
             pty_resize,
-            pty_close
+            pty_close,
+            cost_record,
+            cost_sessions,
+            cost_summary,
+            diagnostics_export
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application");

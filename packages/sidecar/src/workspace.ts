@@ -20,18 +20,24 @@ const WALK_SKIP = new Set([".git", "node_modules", "target", "dist", "build", ".
 
 type GitResult = { status: number | null; stdout: string; stderr: string };
 
-function git(args: string[], cwd: string, input?: string): GitResult {
+export function git(
+  args: string[],
+  cwd: string,
+  input?: string,
+  opts: { env?: Record<string, string>; timeoutMs?: number } = {},
+): GitResult {
   const r = spawnSync("git", args, {
     cwd,
     encoding: "utf8",
-    timeout: 30_000,
+    ...(opts.env ? { env: { ...process.env, ...opts.env } } : {}),
+    timeout: opts.timeoutMs ?? 30_000,
     maxBuffer: 64 * 1024 * 1024,
     ...(input !== undefined ? { input } : {}),
   });
   return { status: r.status, stdout: r.stdout ?? "", stderr: r.stderr ?? "" };
 }
 
-function gitOrThrow(args: string[], cwd: string, input?: string): string {
+export function gitOrThrow(args: string[], cwd: string, input?: string): string {
   const r = git(args, cwd, input);
   if (r.status !== 0) throw new Error(`git ${args[0]} failed: ${r.stderr.trim() || `exit ${r.status}`}`);
   return r.stdout;
@@ -49,7 +55,7 @@ export function insideWorkspace(cwd: string, rel: string): string {
   return path.join(cwd, ...parts);
 }
 
-type StatusEntry = { status: FileStatus; staged: boolean; origPath?: string };
+type StatusEntry = { status: FileStatus; staged: boolean; unstaged: boolean; origPath?: string };
 
 /** Parses `git status --porcelain=v1 -z`. Paths are relative to the repo root. */
 export function parseStatus(z: string): Map<string, StatusEntry> {
@@ -67,6 +73,7 @@ export function parseStatus(z: string): Map<string, StatusEntry> {
     entries.set(file, {
       status: statusOf(x, y),
       staged: x !== " " && x !== "?",
+      unstaged: y !== " ",
       ...(origPath ? { origPath } : {}),
     });
   }
@@ -84,7 +91,7 @@ function statusOf(x: string, y: string): FileStatus {
 
 type RepoInfo = { top: string; prefix: string };
 
-function repoOf(cwd: string): RepoInfo | null {
+export function repoOf(cwd: string): RepoInfo | null {
   const r = git(["rev-parse", "--show-toplevel", "--show-prefix"], cwd);
   if (r.status !== 0) return null;
   const [top = "", prefix = ""] = r.stdout.split("\n");
@@ -104,6 +111,7 @@ function statusUnder(cwd: string, repo: RepoInfo): Map<string, StatusEntry> {
     local.set(file.slice(repo.prefix.length), {
       status: entry.status,
       staged: entry.staged,
+      unstaged: entry.unstaged,
       ...(origPath ? { origPath } : {}),
     });
   }

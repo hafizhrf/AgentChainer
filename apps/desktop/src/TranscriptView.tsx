@@ -1,3 +1,5 @@
+import { useState } from "react";
+import { Markdown } from "./Markdown.tsx";
 import { editPairs, lineDiff } from "./textdiff.ts";
 import type { AgentItem, Item, ToolItem } from "./transcript.ts";
 
@@ -14,14 +16,24 @@ export function TranscriptView({
   onRewind?: (messageId: string) => void;
   onOpenFile?: (file: string) => void;
 }) {
+  // Long sessions render their latest items only; earlier ones load on demand (M1-10).
+  const [shown, setShown] = useState(WINDOW);
+  const hidden = Math.max(0, items.length - shown);
   return (
     <>
-      {items.map((it) => (
+      {hidden > 0 && (
+        <button type="button" className="link show-earlier" onClick={() => setShown((n) => n + WINDOW)}>
+          Show {Math.min(hidden, WINDOW)} earlier of {hidden} hidden
+        </button>
+      )}
+      {items.slice(hidden).map((it) => (
         <ItemView key={`${it.kind}-${it.id}`} item={it} onRewind={onRewind} onOpenFile={onOpenFile} />
       ))}
     </>
   );
 }
+
+const WINDOW = 200;
 
 type OpenFile = ((file: string) => void) | undefined;
 
@@ -54,7 +66,11 @@ function ItemView({
       );
     }
     case "assistant":
-      return <div className="msg assistant">{item.text}</div>;
+      return (
+        <div className="msg assistant">
+          <Markdown text={item.text} />
+        </div>
+      );
     case "thinking":
       return (
         <details className="thinking-block">

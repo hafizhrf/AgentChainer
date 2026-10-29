@@ -286,8 +286,12 @@
 - [ ] **M1-09** Event normalizer: SDK messages → `AgentEvent` ([§5.2](ARCHITECTURE.md#52-normalized-events)), with a recorded
       fixture for every event type.
 - [ ] **M1-10** Message list: streaming markdown, collapsible thinking, virtualized for long sessions.
-      Progress: the main agent's thinking streams into a collapsed "Thinking" block (`thinking.delta`).
-      Remaining: markdown rendering and virtualization.
+      Progress:
+      - The main agent's thinking streams into a collapsed "Thinking" block (`thinking.delta`).
+      - Assistant text renders as GitHub-flavored markdown (react-markdown + remark-gfm). Raw HTML is dropped, links
+        open in the browser (http/https only), and images show as text, so model output can't load anything.
+      - Long sessions render the latest 200 items, with "Show earlier".
+      - Remaining: look at it in the app; code highlighting is UX-04.
 - [ ] **M1-11** Tool-call cards (Read, Edit, Write, Bash, Grep, Glob, WebFetch, MCP):
   - status, duration, collapsible input and output;
   - Edit and Write show an inline diff.
@@ -344,7 +348,8 @@
 - [ ] **M1-21** Session list per workspace via the SDK, showing title, last activity and cost; rename, tag, delete.
       Progress: `session.list/rename/tag/delete` on the SDK session APIs, shown on the new-session screen with title,
       last activity, git branch and tag. Deleting an open session is refused (−32006). Verified live by
-      `spike-host --scenario sessions`. Remaining: cost per session, which needs the local cost history (M1-33).
+      `spike-host --scenario sessions`. Each session's cost now comes from the local cost history (M1-33).
+      Remaining: look at it in the app.
 - [x] **M1-22** Resume and fork. Sessions started in the terminal CLI appear in the list and can be resumed.
       — evidence:
       - `spike-host --scenario sessions`: a closed session resumes with the same id and remembers the conversation;
@@ -390,6 +395,15 @@
   - branch indicator, switch and create;
   - stage and unstage; commit with an AI-drafted message the user edits; push;
   - never force-push.
+      Progress:
+      - The sidebar's Git tab has a branch switcher with ↑/↓ counts, create, stage/unstage per file or all, commit,
+        and push / publish branch behind a confirmation.
+      - Tested on real repos with a bare remote (`git.test.ts`): staging before the first commit, commits, a new
+        branch pushed with tracking, and a diverged push that fails instead of overwriting the remote. No code path
+        passes `--force`.
+      - "Draft with Claude" is a one-shot haiku query: no tools, no settings, not saved as a session. Live: a
+        Conventional Commits message in 3.6 s, and no session left behind.
+      - Remaining: click through in the app.
 
 ### Cost & limits
 
@@ -402,11 +416,28 @@
       "cap reached" notice are unit-tested; resumed sessions only get the SDK's stop, since their earlier spend
       isn't known. Remaining: see it in the app.
 - [ ] **M1-33** Local cost history per workspace.
+      Progress:
+      - SQLite (`rusqlite`, bundled) in the app data dir: one row per completed turn (`history.rs`, 3 tests).
+      - A turn whose own cost the UI doesn't know (the first after a resume) gets it from the session's previous
+        recorded total.
+      - Verified in the app: the resume self-test wrote 2 turns, both with known costs.
+      - The session list shows each session's cost and the folder's spend today / 7 / 30 days.
+      - Remaining: look at it in the app.
 
 ### Quality
 
 - [ ] **M1-34** UI tests driven by recorded fixtures through a fake transport. No live API calls in CI.
 - [ ] **M1-35** Diagnostics: structured logs (Rust `tracing`, sidecar stderr) and an "Export diagnostics" bundle with secrets redacted.
+      Progress:
+      - `agentchainer.log` in the app log dir, one JSON object per line, rotated at 5 MB. It holds core supervisor
+        events and the sidecar's stderr, and was written in the app run.
+      - A small logger instead of `tracing`: one file, no extra dependencies.
+      - Settings → "Export diagnostics…" writes one JSON file:
+        - versions, OS, settings, the readiness check;
+        - the last 500 log lines and up to 5 crash logs.
+      - Everything is redacted first: the home folder becomes `~`, and API keys, tokens, bearer headers, passwords
+        and emails are masked (`diagnostics.rs` tests).
+      - Remaining: export from the app.
 
 ### Exit criteria
 

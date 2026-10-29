@@ -2,6 +2,7 @@ import { homedir } from "node:os";
 import { PROTOCOL_VERSION, RpcErrorCode } from "@agentchainer/protocol";
 import pkg from "../package.json" with { type: "json" };
 import { checkEnvironment, claudeVersion, findClaude } from "./claude.ts";
+import { branches, commit, draftMessage, push, stage, switchBranch, unstage } from "./git.ts";
 import { listRules, removeRule } from "./permissions.ts";
 import { log, notify, RpcFailure, serve } from "./rpc.ts";
 import { loadSdk } from "./sdk-loader.ts";
@@ -199,6 +200,34 @@ serve(
     "workspace.gitInit": ({ cwd }) => {
       gitInit(cwd);
       return { ok: true };
+    },
+
+    "git.branches": ({ cwd }) => branches(cwd),
+
+    "git.switch": ({ cwd, branch, create }) => {
+      switchBranch(cwd, branch, create ?? false);
+      return { ok: true };
+    },
+
+    "git.stage": ({ cwd, paths }) => {
+      stage(cwd, paths);
+      return { ok: true };
+    },
+
+    "git.unstage": ({ cwd, paths }) => {
+      unstage(cwd, paths);
+      return { ok: true };
+    },
+
+    "git.commit": ({ cwd, message }) => ({ sha: commit(cwd, message) }),
+
+    "git.push": ({ cwd }) => ({ output: push(cwd) }),
+
+    "git.draftMessage": async ({ cwd }) => {
+      const claudePath = findClaude();
+      if (!claudePath) throw new RpcFailure(RpcErrorCode.claudeNotFound, "Claude Code CLI not found.");
+      const { sdk } = await prepareSdk();
+      return { message: await draftMessage(sdk, claudePath, cwd) };
     },
   },
   () => {

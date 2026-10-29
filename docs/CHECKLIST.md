@@ -798,10 +798,37 @@ All of these run on macOS, Windows and Ubuntu against a sample repo in `fixtures
 
 ### Exit criteria
 
-- [ ] **M2-E1** Bootstrap succeeds on every fixture on macOS, Windows and Ubuntu.
+- [x] **M2-E1** Bootstrap succeeds on every fixture on macOS, Windows and Ubuntu.
+      — evidence: CI job "Bootstrap exit" ([run 40861455099](https://github.com/hafizhrf/AgentChainer/actions/runs/40861455099)),
+      8 of 8 fixtures on each OS.
+      - **What runs, per fixture:** the default bootstrap plus every catalog item (`exit.test.ts`), with all items
+        reviewed and all profiles on. That covers:
+        - pinned git copy;
+        - release binaries (gitleaks; codebase-memory-mcp's zip on Windows);
+        - local git hook;
+        - MCP registration;
+        - `.mcp.json` merge;
+        - plugins;
+        - fixes.
+      - Downloads are real; the `claude` CLI is a stand-in. Generators need a model and are covered by their own
+        live runs (M2-21…M2-25).
+      - The job also runs the sidecar unit tests on all three OSes. On Windows it found CRLF checkouts and 8.3 short
+        paths (fixed: `.gitattributes`, native realpath).
 - [ ] **M2-E2** For each tier-1 stack, the generated CI runs green on a real GitHub test repo.
-- [ ] **M2-E3** A full rollback leaves `git status` clean and every file byte-identical.
-- [ ] **M2-E4** No action is applied without a preview, unless the user opted into auto-apply.
+- [x] **M2-E3** A full rollback leaves `git status` clean and every file byte-identical.
+      — evidence: the same run.
+      - After the rollback, every file (including `.git/hooks`) hashes the same as before, and `git status` matches,
+        on every fixture and OS.
+      - It found a bug: actions of one run that changed the same file (every plugin install edits
+        `.claude/settings.json`) shared one backup, so a whole-run rollback restored the wrong content. Each backup
+        now has its own path, with a regression test in `apply.test.ts`.
+- [x] **M2-E4** No action is applied without a preview, unless the user opted into auto-apply.
+      — evidence:
+      - Apply re-plans and only runs actions of the current plan.
+      - `plan.test.ts` checks that every action that can be applied, in every fixture, has a concrete preview: a diff,
+        files, commands, or a described copy with its commit and tree hash. All four kinds are exercised.
+      - Generators can't be applied until their proposal (files) exists.
+      - The only path without a preview is the opt-in auto-apply (M2-18), limited by `auto-apply.ts`.
 
 ---
 

@@ -60,7 +60,10 @@ export function historyEvents(messages: SessionMessage[]): AgentEvent[] {
         .filter((b) => b.type === "text" && typeof b.text === "string" && !META_TEXT.test(b.text))
         .map((b) => b.text as string)
         .join("\n");
-      if (text.trim()) events.push({ type: "user.message", messageId: m.uuid, text });
+      const imageCount = blocks.filter((b) => b.type === "image").length;
+      if (text.trim() || imageCount) {
+        events.push({ type: "user.message", messageId: m.uuid, text, ...(imageCount ? { imageCount } : {}) });
+      }
       for (const b of blocks) {
         if (b.type !== "tool_result" || typeof b.tool_use_id !== "string") continue;
         events.push({

@@ -31,7 +31,7 @@ export type AgentItem = {
 };
 export type Item =
   /** `messageId` is the SDK's uuid for the message: the anchor for rewinding files (M1-23). */
-  | { kind: "user"; id: number; text: string; messageId?: string }
+  | { kind: "user"; id: number; text: string; messageId?: string; images?: string[]; imageCount?: number }
   | { kind: "assistant"; id: number; text: string; open: boolean }
   /** The main agent's visible thinking, collapsed by default (M1-10). */
   | { kind: "thinking"; id: number; text: string; open: boolean }
@@ -65,7 +65,16 @@ export function applyEvent(items: Item[], e: AgentEvent, now?: number): Item[] {
     }
 
     case "user.message":
-      return [...closeAssistant(items), { kind: "user", id: nextId(), text: e.text, messageId: e.messageId }];
+      return [
+        ...closeAssistant(items),
+        {
+          kind: "user",
+          id: nextId(),
+          text: e.text,
+          messageId: e.messageId,
+          ...(e.imageCount ? { imageCount: e.imageCount } : {}),
+        },
+      ];
 
     case "tool.started": {
       const tool: ToolItem = {

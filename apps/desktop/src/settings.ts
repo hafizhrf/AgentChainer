@@ -11,6 +11,8 @@ export type Settings = {
   defaultEffort: string | null;
   /** Spend cap per session in USD (M1-32); the Autonomous profile requires one. */
   budgetUsd: number | null;
+  /** Stream summaries of Claude's thinking (M1-10); null means on. */
+  showThinking: boolean | null;
   recentWorkspaces: string[];
 };
 

@@ -50,6 +50,13 @@ describe("historyEvents", () => {
     assert.deepEqual(events, [{ type: "user.message", messageId: "u2", text: "real prompt" }]);
   });
 
+  it("counts pasted images on user messages", () => {
+    const image = { type: "image", source: { type: "base64", media_type: "image/png", data: "AAAA" } };
+    assert.deepEqual(historyEvents([msg("user", "u1", [image, { type: "text", text: "what is this?" }])]), [
+      { type: "user.message", messageId: "u1", text: "what is this?", imageCount: 1 },
+    ]);
+  });
+
   it("ignores messages without readable content", () => {
     const odd = { ...msg("assistant", "a1", null), message: "not an object" };
     assert.deepEqual(historyEvents([odd, msg("system", "s1", "compacted")]), []);

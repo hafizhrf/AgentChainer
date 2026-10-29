@@ -137,6 +137,14 @@ export function SettingsPanel({
           placeholder="e.g. 5"
         />
       </label>
+      <label className="check">
+        <input
+          type="checkbox"
+          checked={draft.showThinking !== false}
+          onChange={(e) => setDraft({ ...draft, showThinking: e.target.checked })}
+        />
+        Show summaries of Claude's thinking <span className="muted">(new sessions; no extra cost)</span>
+      </label>
       <label>
         Open files in
         <select value={draft.editor ?? "system"} onChange={(e) => setDraft({ ...draft, editor: e.target.value })}>

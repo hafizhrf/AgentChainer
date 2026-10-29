@@ -1,6 +1,13 @@
 import { randomUUID } from "node:crypto";
 import { appendFileSync } from "node:fs";
-import type { AgentEvent, Effort, PermissionMode, PermissionRequest, RewindResult } from "@agentchainer/protocol";
+import type {
+  AgentEvent,
+  Effort,
+  Image,
+  PermissionMode,
+  PermissionRequest,
+  RewindResult,
+} from "@agentchainer/protocol";
 // Types only: the SDK itself is loaded at runtime by sdk-loader.ts (node_modules in dev, verified download when packaged).
 import type {
   HookCallback,
@@ -26,6 +33,7 @@ export type SessionOptions = {
   permissionMode?: PermissionMode;
   effort?: Effort;
   maxBudgetUsd?: number;
+  showThinking?: boolean;
   claudePath: string;
   /** Session id from `listSessions` to continue. */
   resume?: string;
@@ -89,6 +97,9 @@ export class Session {
         settingSources: ["user", "project", "local"],
         ...(options.effort ? { effort: options.effort } : {}),
         ...(options.maxBudgetUsd ? { maxBudgetUsd: options.maxBudgetUsd } : {}),
+        // Without a display mode the CLI streams thinking with empty text; `showThinkingSummaries` alone didn't change
+        // that on haiku, adaptive + summarized did (probed live on CLI 2.1.293).
+        ...(options.showThinking ? { thinking: { type: "adaptive" as const, display: "summarized" as const } } : {}),
         // Backs up files before Edit/Write so they can be rewound (M1-23).
         enableFileCheckpointing: true,
         ...(options.model ? { model: options.model } : {}),
@@ -124,11 +135,20 @@ export class Session {
     void this.pump();
   }
 
-  /** Returns the message's uuid, which `rewind()` takes. */
-  send(text: string): string {
+  /** Returns the message's uuid, which `rewind()` takes. Images go before the text, as the API recommends. */
+  send(text: string, images: Image[] = []): string {
     const uuid = randomUUID();
     this.openTurns++;
-    this.input.push({ type: "user", message: { role: "user", content: text }, parent_tool_use_id: null, uuid });
+    const content = images.length
+      ? [
+          ...images.map((i) => ({
+            type: "image" as const,
+            source: { type: "base64" as const, media_type: i.mediaType, data: i.data },
+          })),
+          { type: "text" as const, text },
+        ]
+      : text;
+    this.input.push({ type: "user", message: { role: "user", content }, parent_tool_use_id: null, uuid });
     return uuid;
   }
 

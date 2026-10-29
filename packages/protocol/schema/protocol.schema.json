@@ -281,6 +281,9 @@
             "type": "number",
             "exclusiveMinimum": 0
           },
+          "showThinking": {
+            "type": "boolean"
+          },
           "resume": {
             "type": "string",
             "format": "uuid",
@@ -321,6 +324,33 @@
           "text": {
             "type": "string",
             "minLength": 1
+          },
+          "images": {
+            "maxItems": 5,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "mediaType": {
+                  "type": "string",
+                  "enum": [
+                    "image/png",
+                    "image/jpeg",
+                    "image/gif",
+                    "image/webp"
+                  ]
+                },
+                "data": {
+                  "type": "string",
+                  "maxLength": 7000000
+                }
+              },
+              "required": [
+                "mediaType",
+                "data"
+              ],
+              "additionalProperties": false
+            }
           }
         },
         "required": [
@@ -926,6 +956,11 @@
                     },
                     "text": {
                       "type": "string"
+                    },
+                    "imageCount": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
                     }
                   },
                   "required": [
@@ -1992,6 +2027,11 @@
                 },
                 "text": {
                   "type": "string"
+                },
+                "imageCount": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
                 }
               },
               "required": [

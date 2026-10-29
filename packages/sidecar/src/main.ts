@@ -70,7 +70,7 @@ serve(
       return { ok: true };
     },
 
-    "session.start": async ({ cwd, model, permissionMode, effort, maxBudgetUsd, resume }) => {
+    "session.start": async ({ cwd, model, permissionMode, effort, maxBudgetUsd, showThinking, resume }) => {
       const claudePath = findClaude();
       if (!claudePath) {
         throw new RpcFailure(RpcErrorCode.claudeNotFound, "Claude Code CLI not found. See docs/guides/AUTH_SETUP.md.");
@@ -89,6 +89,7 @@ serve(
           ...(permissionMode ? { permissionMode } : {}),
           ...(effort ? { effort } : {}),
           ...(maxBudgetUsd ? { maxBudgetUsd } : {}),
+          ...(showThinking ? { showThinking } : {}),
           ...(resume ? { resume } : {}),
         },
         {
@@ -103,7 +104,10 @@ serve(
       return { sessionId: session.id };
     },
 
-    "session.send": ({ sessionId, text }) => ({ ok: true, messageId: requireSession(sessionId).send(text) }),
+    "session.send": ({ sessionId, text, images }) => ({
+      ok: true,
+      messageId: requireSession(sessionId).send(text, images),
+    }),
 
     "session.interrupt": async ({ sessionId }) => ({
       ok: true,

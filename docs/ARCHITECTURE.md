@@ -373,15 +373,16 @@ agentchainer/
 |---|---|---|
 | Rust core | `cargo test`, clippy | Supervisor, IPC relay, DB migrations |
 | Sidecar | `node:test` (+ built-in coverage) | Normalizer against recorded fixtures; guard; CLI parsing; installers and rollback on temp dirs |
-| UI | `node:test` for pure logic (transcript reducer, stats); Vitest + Testing Library once DOM component tests are needed | Driven by a fake transport replaying fixtures. No live model calls in CI |
+| UI | `node:test` for pure logic (transcript reducer, tabs, diff, fuzzy) and for the RPC client over a fake transport (`rpc-client.test.ts`) replaying the sidecar's event snapshots of recorded fixtures; Vitest + Testing Library once DOM component tests are needed | No live model calls in CI |
 | Protocol | Generated-type compile checks + schema round-trip tests | Rust ⇄ TS stay in sync |
 | E2E | `tauri-driver` (WebDriver) on Linux and Windows | macOS WKWebView has no WebDriver **(verify)**; use a manual checklist there |
 | Contract drift | Weekly CI job against the latest SDK + CLI | Opens an issue on mismatch (X-05) |
-| Live smoke | Manual or opt-in job with the maintainer's own credentials | Never in PR CI |
+| Live smoke | `spike-host` scenarios with the maintainer's own login: `basic`, `mode`, `interrupt`, `guard`, `auto`, `subagents`, `sessions`, `approvals`, `plan`, `fixtures`, `image`, and `exit` (M1 exit criteria E1–E5 on `fixtures/sample-app`) | Never in PR CI |
 
 ## 13. Observability of the app
 
-- Structured logs: Rust `tracing` and the sidecar's stderr, to rotating files in the app data dir.
+- Structured logs: `agentchainer.log` in the app log dir, one JSON object per line (core events and the sidecar's
+  stderr), rotated at 5 MB (§7).
 - "Export diagnostics" bundles logs, versions and the env check, with secrets redacted.
 - No telemetry by default (X-04).
 

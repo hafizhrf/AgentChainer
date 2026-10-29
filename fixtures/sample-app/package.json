@@ -1,0 +1,9 @@
+{
+  "name": "sample-app",
+  "private": true,
+  "type": "module",
+  "description": "Tiny app with a seeded bug, for AgentChainer's M1 exit scenarios",
+  "scripts": {
+    "test": "node --test"
+  }
+}

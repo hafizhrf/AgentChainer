@@ -1,6 +1,6 @@
 import type { Effort, PermissionMode } from "@agentchainer/protocol";
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
-import { Composer } from "./Composer.tsx";
+import { type Attachment, Composer } from "./Composer.tsx";
 import type { Confirm } from "./Dialog.tsx";
 import { TranscriptView } from "./TranscriptView.tsx";
 import { budgetWarning, type Cost, type Tab } from "./tabs.ts";
@@ -31,7 +31,7 @@ export function SessionView({
 }: {
   tab: Tab;
   hidden: boolean;
-  onSend: (text: string) => void;
+  onSend: (text: string, images: Attachment[]) => void;
   onInterrupt: () => void;
   onModeChange: (mode: PermissionMode) => void;
   onModelChange: (alias: string) => void;

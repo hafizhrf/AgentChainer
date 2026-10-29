@@ -1,8 +1,16 @@
-import { EFFORTS, type Effort, PERMISSION_MODES, type PermissionMode } from "@agentchainer/protocol";
-import { type KeyboardEvent, type ReactNode, useEffect, useMemo, useRef, useState } from "react";
+import { EFFORTS, type Effort, type Image, PERMISSION_MODES, type PermissionMode } from "@agentchainer/protocol";
+import { type ClipboardEvent, type KeyboardEvent, type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { fuzzyFilter, tokenAt } from "./fuzzy.ts";
 import { MODE_HELP, MODE_LABELS, MODELS } from "./SettingsPanel.tsx";
 import { asMode, type Tab } from "./tabs.ts";
+
+/** An image pasted into the composer: base64 data for the API and a data URL for the thumbnail. */
+export type Attachment = Image & { preview: string };
+type Queued = { text: string; images: Attachment[] };
+
+const IMAGE_TYPES = new Set(["image/png", "image/jpeg", "image/gif", "image/webp"]);
+const MAX_IMAGES = 5;
+const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 
 /**
  * The composer of a session tab (M1-13…M1-15):
@@ -26,7 +34,7 @@ export function Composer({
   files: string[];
   /** Extra buttons on the left of the action row (panel toggles). */
   actions: ReactNode;
-  onSend: (text: string) => void;
+  onSend: (text: string, images: Attachment[]) => void;
   onInterrupt: () => void;
   onResume: () => void;
   onModeChange: (mode: PermissionMode) => void;
@@ -35,7 +43,9 @@ export function Composer({
 }) {
   const [draft, setDraft] = useState("");
   const [cursor, setCursor] = useState(0);
-  const [queue, setQueue] = useState<string[]>([]);
+  const [queue, setQueue] = useState<Queued[]>([]);
+  const [images, setImages] = useState<Attachment[]>([]);
+  const [pasteError, setPasteError] = useState<string | null>(null);
   const [pick, setPick] = useState(0);
   /** Start of a token whose suggestions the user dismissed with Esc. */
   const [dismissed, setDismissed] = useState<number | null>(null);
@@ -50,7 +60,7 @@ export function Composer({
     const [next, ...rest] = queue;
     if (next === undefined) return;
     setQueue(rest);
-    onSend(next);
+    onSend(next.text, next.images);
   }, [tab.running, tab.ended, tab.lastSubtype, queue, onSend]);
 
   const token = tokenAt(draft, cursor);
@@ -64,8 +74,33 @@ export function Composer({
     if (!text || tab.ended) return;
     setDraft("");
     setCursor(0);
-    if (tab.running || queue.length > 0) setQueue((q) => [...q, text]);
-    else onSend(text);
+    setImages([]);
+    if (tab.running || queue.length > 0) setQueue((q) => [...q, { text, images }]);
+    else onSend(text, images);
+  }
+
+  /** Pasted screenshots become image attachments (M1-13); other pastes stay text. */
+  function onPaste(e: ClipboardEvent<HTMLTextAreaElement>) {
+    const files = [...e.clipboardData.items]
+      .filter((item) => item.kind === "file" && IMAGE_TYPES.has(item.type))
+      .map((item) => item.getAsFile())
+      .filter((f): f is File => f !== null);
+    if (files.length === 0) return;
+    e.preventDefault();
+    setPasteError(null);
+    for (const file of files) {
+      if (images.length >= MAX_IMAGES) return setPasteError(`At most ${MAX_IMAGES} images per message.`);
+      if (file.size > MAX_IMAGE_BYTES) return setPasteError("That image is over 5 MB; paste a smaller one.");
+      const reader = new FileReader();
+      reader.onload = () => {
+        const url = String(reader.result);
+        setImages((all) => [
+          ...all,
+          { mediaType: file.type as Attachment["mediaType"], data: url.slice(url.indexOf(",") + 1), preview: url },
+        ]);
+      };
+      reader.readAsDataURL(file);
+    }
   }
 
   function accept(choice: string) {
@@ -113,11 +148,12 @@ export function Composer({
       {queue.length > 0 && (
         <div className="queue">
           <span className="muted">Queued, sent after this turn:</span>
-          {queue.map((q, i) => (
+          {queue.map(({ text: q, images: qi }, i) => (
             // Queued messages can repeat, so the position is part of the key.
             // biome-ignore lint/suspicious/noArrayIndexKey: see above.
             <span key={`${i}-${q}`} className="queued" title={q}>
               {q.length > 40 ? `${q.slice(0, 40)}…` : q}
+              {qi.length > 0 && ` (+${qi.length} image${qi.length > 1 ? "s" : ""})`}
               <button
                 type="button"
                 className="link"
@@ -144,8 +180,28 @@ export function Composer({
           ))}
         </ul>
       )}
+      {images.length > 0 && (
+        <div className="attachments">
+          {images.map((img, i) => (
+            // biome-ignore lint/suspicious/noArrayIndexKey: attachments have no ids; removal is by position.
+            <span key={i} className="attachment">
+              <img src={img.preview} alt={`Pasted screenshot ${i + 1}`} />
+              <button
+                type="button"
+                className="link"
+                aria-label={`Remove screenshot ${i + 1}`}
+                onClick={() => setImages((all) => all.filter((_, j) => j !== i))}
+              >
+                ×
+              </button>
+            </span>
+          ))}
+        </div>
+      )}
+      {pasteError && <p className="warn">{pasteError}</p>}
       <textarea
         ref={area}
+        onPaste={onPaste}
         value={draft}
         placeholder={
           tab.running

@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
 import { describe, it } from "node:test";
 import type { AgentEvent } from "@agentchainer/protocol";
 import type { SDKMessage } from "@anthropic-ai/claude-agent-sdk";
@@ -85,4 +85,59 @@ describe("normalize: streamed thinking, slash commands and usage", () => {
       cacheCreationTokens: 24,
     });
   });
+});
+
+describe("normalize: turn-basics fixture", () => {
+  // Recorded with `spike-host --scenario fixtures` (haiku, CLI 2.1.293): a turn with summarized thinking, a Write
+  // call and a reply, then a session stopped by a $0.0001 budget cap.
+  const events = replay("turn-basics.jsonl");
+  const types = new Set(events.map((e) => e.type));
+
+  it("covers a whole main-agent turn", () => {
+    for (const t of ["session.started", "thinking.delta", "text.delta", "tool.started", "tool.completed"] as const) {
+      assert.ok(types.has(t), `missing ${t}`);
+    }
+    const write = events.find((e) => e.type === "tool.started" && e.name === "Write");
+    assert.ok(write, "the Write call");
+    const done = events.filter((e) => e.type === "turn.completed");
+    assert.deepEqual(
+      done.map((e) => e.type === "turn.completed" && [e.subtype, e.isError]),
+      [
+        ["success", false],
+        ["error_max_budget_usd", true],
+      ],
+    );
+  });
+
+  it("with subagents-parallel, covers every event the normalizer emits", () => {
+    // user.message only comes from session.history, and error from the session runtime, not from SDK messages.
+    const all = new Set([...types, ...replay("subagents-parallel.jsonl").map((e) => e.type)]);
+    const emitted = [
+      "session.started",
+      "text.delta",
+      "thinking.delta",
+      "tool.started",
+      "tool.completed",
+      "agent.started",
+      "agent.text",
+      "agent.completed",
+      "turn.completed",
+    ];
+    assert.deepEqual(
+      emitted.filter((t) => !all.has(t as AgentEvent["type"])),
+      [],
+    );
+  });
+});
+
+describe("event snapshots for UI tests (M1-34)", () => {
+  // apps/desktop replays these through a fake transport. Regenerate with UPDATE_FIXTURES=1 after re-recording.
+  for (const name of ["turn-basics", "subagents-parallel"]) {
+    it(`${name}.events.json is up to date`, () => {
+      const file = new URL(`../test/fixtures/${name}.events.json`, import.meta.url);
+      const text = `${JSON.stringify(replay(`${name}.jsonl`), null, 1)}\n`;
+      if (process.env.UPDATE_FIXTURES === "1") writeFileSync(file, text);
+      assert.equal(readFileSync(file, "utf8"), text);
+    });
+  }
 });

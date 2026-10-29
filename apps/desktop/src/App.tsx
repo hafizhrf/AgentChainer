@@ -13,6 +13,7 @@ import {
 import { invoke } from "@tauri-apps/api/core";
 import { save } from "@tauri-apps/plugin-dialog";
 import { useEffect, useRef, useState } from "react";
+import type { Attachment } from "./Composer.tsx";
 import { useConfirm } from "./Dialog.tsx";
 import { joinPath } from "./files.ts";
 import { GitInitOffer } from "./GitInitOffer.tsx";
@@ -235,18 +236,19 @@ export function App() {
     if (mode === "auto" && budgetUsd === null) {
       throw new Error("The Autonomous profile needs a budget cap. Set one in Settings, or pick another profile.");
     }
-    return { effort, budgetUsd };
+    return { effort, budgetUsd, showThinking: settings?.showThinking !== false };
   }
 
   async function startSession(dir: string, modelAlias: string, mode: PermissionMode): Promise<string | null> {
     try {
-      const { effort, budgetUsd } = sessionOptions(mode);
+      const { effort, budgetUsd, showThinking } = sessionOptions(mode);
       const { sessionId } = await request("session.start", {
         cwd: dir,
         permissionMode: mode,
         ...(modelAlias ? { model: modelAlias } : {}),
         ...(effort ? { effort } : {}),
         ...(budgetUsd ? { maxBudgetUsd: budgetUsd } : {}),
+        showThinking,
       });
       const items = [notice(`Session started in ${dir}`)];
       setTabs((ts) => [
@@ -267,7 +269,7 @@ export function App() {
   async function resume(sessionId: string, dir: string, title: string, modelAlias = model) {
     const mode = asMode(settings?.defaultMode);
     try {
-      const { effort, budgetUsd } = sessionOptions(mode);
+      const { effort, budgetUsd, showThinking } = sessionOptions(mode);
       const { events } = await request("session.history", { cwd: dir, sessionId });
       await request("session.start", {
         cwd: dir,
@@ -276,6 +278,7 @@ export function App() {
         ...(modelAlias ? { model: modelAlias } : {}),
         ...(effort ? { effort } : {}),
         ...(budgetUsd ? { maxBudgetUsd: budgetUsd } : {}),
+        showThinking,
       });
       const items = closeAssistant(
         events.reduce<Item[]>((acc, e) => applyEvent(acc, e), [notice(`Resumed “${title}” in ${dir}`)]),
@@ -295,16 +298,23 @@ export function App() {
     else void resume(s.sessionId, cwd.trim(), s.title);
   }
 
-  async function sendText(sessionId: string, text: string) {
+  async function sendText(sessionId: string, text: string, images: Attachment[] = []) {
     const itemId = nextId();
     patchTab(sessionId, (t) => ({
       ...t,
       running: true,
       title: t.title === NEW_TITLE ? text.slice(0, 60) : t.title,
-      items: [...closeAssistant(t.items), { kind: "user", id: itemId, text }],
+      items: [
+        ...closeAssistant(t.items),
+        { kind: "user", id: itemId, text, ...(images.length ? { images: images.map((i) => i.preview) } : {}) },
+      ],
     }));
     try {
-      const { messageId } = await request("session.send", { sessionId, text });
+      const { messageId } = await request("session.send", {
+        sessionId,
+        text,
+        ...(images.length ? { images: images.map(({ mediaType, data }) => ({ mediaType, data })) } : {}),
+      });
       patchTab(sessionId, (t) => ({ ...t, items: setMessageId(t.items, itemId, messageId) }));
     } catch (err) {
       patchTab(sessionId, (t) => ({
@@ -531,7 +541,7 @@ export function App() {
           key={t.sessionId}
           tab={t}
           hidden={t.sessionId !== active}
-          onSend={(text) => void sendText(t.sessionId, text)}
+          onSend={(text, images) => void sendText(t.sessionId, text, images)}
           onInterrupt={() => void request("session.interrupt", { sessionId: t.sessionId })}
           onModeChange={(mode) => void changeMode(t.sessionId, mode)}
           onModelChange={(alias) => void changeModel(t.sessionId, alias)}

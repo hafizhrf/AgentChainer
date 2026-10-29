@@ -23,6 +23,8 @@ pub struct Settings {
     pub default_effort: Option<String>,
     /// Spend cap per session in USD (`maxBudgetUsd`, M1-32). Required for the Autonomous profile.
     pub budget_usd: Option<f64>,
+    /// Stream summaries of Claude's thinking (M1-10). `None` means on.
+    pub show_thinking: Option<bool>,
     /// Most recent first.
     pub recent_workspaces: Vec<String>,
 }
@@ -95,6 +97,7 @@ mod tests {
             editor: Some(" vscode ".into()),
             default_effort: None,
             budget_usd: Some(-1.0),
+            show_thinking: None,
             recent_workspaces: (0..12)
                 .map(|i| format!("/p/{}", i % 10))
                 .chain([" ".into()])

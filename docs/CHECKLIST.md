@@ -283,8 +283,17 @@
           apply mid-session.
       - Design change: no `PostToolUse` change tracker. The changes panel derives agent edits from the transcript and
         adds git status, which also catches Bash edits (M1-26).
-- [ ] **M1-09** Event normalizer: SDK messages → `AgentEvent` ([§5.2](ARCHITECTURE.md#52-normalized-events)), with a recorded
+- [x] **M1-09** Event normalizer: SDK messages → `AgentEvent` ([§5.2](ARCHITECTURE.md#52-normalized-events)), with a recorded
       fixture for every event type.
+      — evidence:
+      - `test/fixtures/turn-basics.jsonl` was recorded with `spike-host --scenario fixtures` and sanitized by
+        `make-fixture.ts`. It holds summarized thinking, a Write call, the reply, and an `error_max_budget_usd` result.
+      - Together with `subagents-parallel.jsonl`, a test checks that every event the normalizer emits appears in a
+        recording.
+      - `user.message` (from `session.history`) and `error` (from the session runtime) don't come from SDK stream
+        messages. They are covered by `stored-sessions.test.ts` and the runtime.
+      - Finding: without a thinking display mode, the CLI streams thinking with empty text. The app now asks for
+        adaptive thinking with the summarized display (a setting, on by default).
 - [ ] **M1-10** Message list: streaming markdown, collapsible thinking, virtualized for long sessions.
       Progress:
       - The main agent's thinking streams into a collapsed "Thinking" block (`thinking.delta`).
@@ -426,7 +435,15 @@
 
 ### Quality
 
-- [ ] **M1-34** UI tests driven by recorded fixtures through a fake transport. No live API calls in CI.
+- [x] **M1-34** UI tests driven by recorded fixtures through a fake transport. No live API calls in CI.
+      — evidence:
+      - The UI's RPC client takes its transport as a parameter (`rpc-client.ts`); the app passes the Tauri one.
+      - `rpc-client.test.ts` replays the normalizer's output for both recordings through a fake sidecar: the
+        `*.events.json` snapshots, kept current by a sidecar test.
+      - Through the client's validation and the tab reducers, it checks the real transcript: thinking, a timed Write
+        card, the reply, cost and tokens, the budget-cap error, and nested subagent cards. Malformed and unknown
+        frames are dropped, and error codes are mapped.
+      - CI runs only `pnpm test`, with no model calls.
 - [ ] **M1-35** Diagnostics: structured logs (Rust `tracing`, sidecar stderr) and an "Export diagnostics" bundle with secrets redacted.
       Progress:
       - `agentchainer.log` in the app log dir, one JSON object per line, rotated at 5 MB. It holds core supervisor
@@ -442,6 +459,18 @@
 ### Exit criteria
 
 All of these run on macOS, Windows and Ubuntu against a sample repo in `fixtures/`:
+
+- Sample repo: `fixtures/sample-app`. `total()` ignores quantities, so `node --test` fails.
+- `spike-host --scenario exit --cwd <empty dir>` runs E1–E5 against the sidecar with your own login, including a
+  real sidecar restart for E2.
+- **macOS: E1–E5 pass**, 8/8 checks on CLI 2.1.293 with haiku:
+  - E1: approvals for Bash, Edit, Bash; one hunk reviewed; committed.
+  - E3: the file is back to the seeded bug.
+  - E4: stopped 24 ms after the interrupt.
+  - E2: after the restart, the agent named the fixed file.
+  - E5: ExitPlanMode approved, then executed with a subagent; the tests pass.
+- Still to do: the same run on Windows and Ubuntu; E6 by hand on each OS (never automated: it would mean signing
+  the user out); and the UI click-through of the same flows.
 
 - [ ] **M1-E1** Fix a seeded bug with tool approvals in the Safe profile, review the diff, commit.
 - [ ] **M1-E2** Quit the app mid-session, relaunch, resume, and continue the conversation.

@@ -1,0 +1,169 @@
+[
+ {
+  "type": "session.started",
+  "sessionId": "212b2659-c67a-46b4-81be-cd2ad668ad16",
+  "model": "claude-haiku-5-5",
+  "cwd": "/workspace",
+  "claudeCodeVersion": "2.1.293",
+  "permissionMode": "default",
+  "slashCommands": []
+ },
+ {
+  "type": "thinking.delta",
+  "text": "17*23 equ"
+ },
+ {
+  "type": "thinking.delta",
+  "text": "als 391, so I'll"
+ },
+ {
+  "type": "thinking.delta",
+  "text": " create calc.txt contain"
+ },
+ {
+  "type": "thinking.delta",
+  "text": "ing that result in the working directory"
+ },
+ {
+  "type": "thinking.delta",
+  "text": ", using an absolute path since"
+ },
+ {
+  "type": "thinking.delta",
+  "text": " this"
+ },
+ {
+  "type": "thinking.delta",
+  "text": " is a new file."
+ },
+ {
+  "type": "thinking.delta",
+  "text": "\n\n"
+ },
+ {
+  "type": "tool.started",
+  "toolUseId": "toolu_01DWyBEpEk2QtvV5oBB6fjMm",
+  "name": "Write",
+  "input": {
+   "file_path": "/workspace/calc.txt",
+   "content": "391"
+  },
+  "parentToolUseId": null
+ },
+ {
+  "type": "tool.completed",
+  "toolUseId": "toolu_01DWyBEpEk2QtvV5oBB6fjMm",
+  "isError": false,
+  "output": "File created successfully at: /workspace/calc.txt (file state is current in your context — no need to Read it back)",
+  "parentToolUseId": null
+ },
+ {
+  "type": "thinking.delta",
+  "text": "The file's"
+ },
+ {
+  "type": "thinking.delta",
+  "text": " created now"
+ },
+ {
+  "type": "thinking.delta",
+  "text": ", so I just need to give a"
+ },
+ {
+  "type": "thinking.delta",
+  "text": " brief re"
+ },
+ {
+  "type": "thinking.delta",
+  "text": "ply—"
+ },
+ {
+  "type": "thinking.delta",
+  "text": "no"
+ },
+ {
+  "type": "thinking.delta",
+  "text": " need to mention the unrel"
+ },
+ {
+  "type": "thinking.delta",
+  "text": "ated Docs tools or au"
+ },
+ {
+  "type": "thinking.delta",
+  "text": "th servers that"
+ },
+ {
+  "type": "thinking.delta",
+  "text": " came up in the results."
+ },
+ {
+  "type": "thinking.delta",
+  "text": "\n\n"
+ },
+ {
+  "type": "text.delta",
+  "text": "17 × 23"
+ },
+ {
+  "type": "text.delta",
+  "text": " = 391,"
+ },
+ {
+  "type": "text.delta",
+  "text": " and I sa"
+ },
+ {
+  "type": "text.delta",
+  "text": "ved it"
+ },
+ {
+  "type": "text.delta",
+  "text": " to calc.txt in"
+ },
+ {
+  "type": "text.delta",
+  "text": " the working"
+ },
+ {
+  "type": "text.delta",
+  "text": " directory."
+ },
+ {
+  "type": "turn.completed",
+  "subtype": "success",
+  "isError": false,
+  "totalCostUsd": 0.0028998900000000005,
+  "durationMs": 4681,
+  "numTurns": 2,
+  "usage": {
+   "inputTokens": 1220,
+   "outputTokens": 454,
+   "cacheReadTokens": 56309,
+   "cacheCreationTokens": 9939
+  }
+ },
+ {
+  "type": "session.started",
+  "sessionId": "b6345530-8e86-44b4-94ab-0cbf13377549",
+  "model": "claude-haiku-5-5",
+  "cwd": "/workspace",
+  "claudeCodeVersion": "2.1.293",
+  "permissionMode": "default",
+  "slashCommands": []
+ },
+ {
+  "type": "turn.completed",
+  "subtype": "error_max_budget_usd",
+  "isError": true,
+  "totalCostUsd": 0.0001236,
+  "durationMs": 1125,
+  "numTurns": 1,
+  "usage": {
+   "inputTokens": 1176,
+   "outputTokens": 12,
+   "cacheReadTokens": 0,
+   "cacheCreationTokens": 0
+  }
+ }
+]

@@ -51,6 +51,19 @@ function ItemView({
       const { messageId } = item;
       return (
         <div className="msg user">
+          {item.images && item.images.length > 0 && (
+            <div className="attachments">
+              {item.images.map((src, i) => (
+                // biome-ignore lint/suspicious/noArrayIndexKey: a message's images never reorder.
+                <img key={i} src={src} alt={`Attachment ${i + 1}`} />
+              ))}
+            </div>
+          )}
+          {!item.images && item.imageCount ? (
+            <div className="muted">
+              [{item.imageCount} image{item.imageCount > 1 ? "s" : ""}]
+            </div>
+          ) : null}
           {item.text}
           {onRewind && messageId && (
             <button

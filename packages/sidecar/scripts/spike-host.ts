@@ -1,16 +1,17 @@
 // Drives the sidecar the way the Rust core will (spikes S2/S3) and checks real behaviour
 // against the user's own `claude` CLI.
 //
-// Usage: node scripts/spike-host.ts --cwd <empty scratch dir> [--model haiku] [--scenario basic|mode|interrupt|guard|auto|subagents|sessions|approvals|plan|all] [--record out.jsonl] [--sidecar <executable> --data-dir <dir>]
+// Usage: node scripts/spike-host.ts --cwd <empty scratch dir> [--model haiku] [--scenario basic|mode|interrupt|guard|auto|subagents|sessions|approvals|plan|fixtures|image|exit|all] [--record out.jsonl] [--sidecar <executable> --data-dir <dir>]
 // Makes real model calls with the user's own login (haiku keeps a full run around a few cents).
-import { spawn } from "node:child_process";
-import { existsSync, readFileSync, rmSync } from "node:fs";
+import { execFileSync, spawn, spawnSync } from "node:child_process";
+import { cpSync, existsSync, readdirSync, readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { performance } from "node:perf_hooks";
 import { createInterface } from "node:readline";
 import { setTimeout as sleep } from "node:timers/promises";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
+import { crc32, deflateSync } from "node:zlib";
 import {
   type AgentEvent,
   type MethodName,
@@ -47,7 +48,6 @@ const env = {
 const [command, args] = values.sidecar
   ? [values.sidecar, []]
   : [process.execPath, [fileURLToPath(new URL("../src/main.ts", import.meta.url))]];
-const sidecar = spawn(command, args, { stdio: ["pipe", "pipe", "inherit"], env });
 
 type Frame = Record<string, unknown>;
 let nextId = 1;
@@ -65,7 +65,24 @@ const state = {
 };
 const permissionLog: PermissionRequest[] = [];
 
-createInterface({ input: sidecar.stdout }).on("line", (line) => {
+/** Spawns a sidecar; `restartSidecar()` replaces it, as when the app is quit and relaunched (exit criterion M1-E2). */
+function startSidecar() {
+  const child = spawn(command, args, { stdio: ["pipe", "pipe", "inherit"], env });
+  createInterface({ input: child.stdout }).on("line", onLine);
+  return child;
+}
+let sidecar = startSidecar();
+
+async function restartSidecar(): Promise<void> {
+  const old = sidecar;
+  const exited = new Promise((resolve) => old.once("exit", resolve));
+  old.stdin.end();
+  await exited;
+  sidecar = startSidecar();
+  await request("system.hello", { protocolVersion: PROTOCOL_VERSION });
+}
+
+function onLine(line: string) {
   const frame = JSON.parse(line) as Frame;
   if (typeof frame.id === "number" && !("method" in frame)) {
     pending.get(frame.id)?.(frame);
@@ -92,7 +109,7 @@ createInterface({ input: sidecar.stdout }).on("line", (line) => {
     console.log(`    [permission.request] ${req.toolName} → ${JSON.stringify(answer).slice(0, 120)}`);
     void request("permission.respond", { sessionId: req.sessionId, requestId: req.requestId, ...answer });
   }
-});
+}
 
 function request<M extends MethodName>(method: M, params: Methods[M]["params"]): Promise<Methods[M]["result"]> {
   return new Promise((resolve, reject) => {
@@ -541,6 +558,171 @@ async function plan() {
   state.sessionId = main;
 }
 
+/**
+ * One recording with every event type the normalizer emits for a main-agent turn (M1-09): run with `--record`, then
+ * turn the raw file into a fixture with scripts/make-fixture.ts. Subagent events come from subagents-parallel.jsonl.
+ */
+async function fixtures() {
+  state.permissionPolicy = "allow";
+  const plain = state.sessionId;
+  state.sessionId = (await request("session.start", { cwd, model: values.model, showThinking: true })).sessionId;
+  await request("session.setEffort", { sessionId: state.sessionId, effort: "high" });
+  const t = await turn(
+    "Think it through briefly first. What is 17 * 23? Then use the Write tool to create a file named calc.txt " +
+      "containing only the number, and reply with one short sentence.",
+  );
+  const types = new Set(t.events.map((e) => e.type));
+  check(
+    "one turn covers text, thinking, tools and the result",
+    ["session.started", "text.delta", "tool.started", "tool.completed", "turn.completed"].every((x) =>
+      types.has(x as never),
+    ),
+    `types=${[...types].join(",")} thinking=${types.has("thinking.delta")}`,
+  );
+  check(
+    "showThinking streams thinking text",
+    t.events.some((e) => e.type === "thinking.delta" && e.text.trim().length > 0),
+    `thinking deltas=${t.events.filter((e) => e.type === "thinking.delta").length}`,
+  );
+  await request("session.close", { sessionId: state.sessionId });
+  await request("session.delete", { cwd, sessionId: state.sessionId });
+  state.sessionId = plain;
+
+  const main = state.sessionId;
+  state.sessionId = (await request("session.start", { cwd, model: values.model, maxBudgetUsd: 0.0001 })).sessionId;
+  const capped = await turn("Reply with exactly one word: budget");
+  check(
+    "an error result is recorded too",
+    capped.last.type === "turn.completed" && capped.last.isError,
+    `subtype=${capped.last.type === "turn.completed" ? capped.last.subtype : capped.last.type}`,
+  );
+  await request("session.close", { sessionId: state.sessionId });
+  await request("session.delete", { cwd, sessionId: state.sessionId });
+  state.sessionId = main;
+}
+
+/** A solid-colour PNG, built by hand so the scenario needs no image files. */
+function solidPng(size: number, [r, g, b]: [number, number, number]): string {
+  const chunk = (type: string, data: Buffer) => {
+    const body = Buffer.concat([Buffer.from(type, "ascii"), data]);
+    const out = Buffer.alloc(body.length + 8);
+    out.writeUInt32BE(data.length, 0);
+    body.copy(out, 4);
+    out.writeUInt32BE(crc32(body), body.length + 4);
+    return out;
+  };
+  const header = Buffer.alloc(13);
+  header.writeUInt32BE(size, 0);
+  header.writeUInt32BE(size, 4);
+  header.set([8, 2, 0, 0, 0], 8); // 8-bit RGB
+  const row = Buffer.from([0, ...Array.from({ length: size }, () => [r, g, b]).flat()]);
+  const pixels = deflateSync(Buffer.concat(Array.from({ length: size }, () => row)));
+  const png = Buffer.concat([
+    Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+    chunk("IHDR", header),
+    chunk("IDAT", pixels),
+    chunk("IEND", Buffer.alloc(0)),
+  ]);
+  return png.toString("base64");
+}
+
+/** A pasted image reaches the model (M1-13). */
+async function image() {
+  const sessionId = state.sessionId;
+  let reply = "";
+  const done = new Promise<AgentEvent>((resolve) => {
+    state.onEvent = (event) => {
+      if (event.type === "text.delta") reply += event.text;
+      if (event.type === "turn.completed" || event.type === "error") resolve(event);
+    };
+  });
+  await request("session.send", {
+    sessionId,
+    text: "What single colour fills this image? Reply with one word.",
+    images: [{ mediaType: "image/png", data: solidPng(32, [220, 20, 20]) }],
+  });
+  const last = await done;
+  check(
+    "a pasted image reaches the model",
+    /red/i.test(reply),
+    `reply=${JSON.stringify(reply.trim())} end=${last.type}`,
+  );
+}
+
+/**
+ * M1 exit criteria E1–E5 on fixtures/sample-app (E6, starting logged out, stays manual: never sign the user out).
+ * Copies the sample into --cwd, which must be empty, and makes it a git repo.
+ */
+async function exit() {
+  if (readdirSync(cwd).some((f) => f !== ".DS_Store")) throw new Error("--scenario exit needs an empty --cwd");
+  cpSync(fileURLToPath(new URL("../../../fixtures/sample-app", import.meta.url)), cwd, { recursive: true });
+  const git = (...a: string[]) =>
+    execFileSync("git", ["-c", "user.name=exit", "-c", "user.email=exit@example.invalid", ...a], {
+      cwd,
+      encoding: "utf8",
+    });
+  git("init", "-q", "-b", "main");
+  git("add", ".");
+  git("commit", "-q", "-m", "sample app with a seeded bug");
+  const testsPass = () => spawnSync(process.execPath, ["--test"], { cwd, stdio: "ignore" }).status === 0;
+  const cart = () => readFileSync(join(cwd, "src", "cart.js"), "utf8");
+  const buggy = cart();
+  check("the seeded bug fails the tests", !testsPass(), "node --test fails before the fix");
+
+  // E1: fix the bug in the Safe profile with approvals, review the diff, commit.
+  state.permissionPolicy = "allow";
+  let before = permissionLog.length;
+  const fix = await turn(
+    "The tests fail when run with `node --test`. Fix the bug in src/cart.js with the Edit tool, then run " +
+      "`node --test` with the Bash tool to confirm. Don't change the tests.",
+  );
+  const asked = permissionLog.slice(before).map((r) => r.toolName);
+  const diff = (await request("workspace.diff", { cwd, path: "src/cart.js" })).hunks.length;
+  await request("git.stage", { cwd, paths: ["src/cart.js"] });
+  const { sha } = await request("git.commit", { cwd, message: "fix: count item quantities in cart totals" });
+  check(
+    "E1: bug fixed with approvals, diff reviewed, committed",
+    testsPass() && asked.includes("Edit") && diff > 0 && /^[0-9a-f]+$/.test(sha),
+    `prompts=${asked.join(",")} hunks=${diff} commit=${sha}`,
+  );
+
+  // E3: rewind files to before the fix; the working tree matches that point.
+  await request("session.rewind", { sessionId: state.sessionId, messageId: fix.messageId });
+  check("E3: rewind restores the file to before the fix", cart() === buggy && !testsPass(), "src/cart.js == seeded");
+  git("checkout", "-q", "--", ".");
+
+  // E4: interrupt a long-running Bash call; the session stays usable.
+  await interrupt();
+
+  // E2: quit and relaunch (a new sidecar process), resume, continue the conversation.
+  const sessionId = state.sessionId;
+  await restartSidecar();
+  await request("session.start", { cwd, model: values.model, resume: sessionId });
+  const recall = await turn("Which file did you fix earlier in this conversation? Reply with the path only.");
+  check("E2: after a relaunch, the resumed session continues", /cart\.js/.test(recall.reply), `reply=${recall.reply}`);
+
+  // E5: plan mode → approve → execute, with a subagent card during execution.
+  await request("session.setMode", { sessionId, mode: "plan" });
+  state.answer = (req) => (req.toolName === "ExitPlanMode" ? { allow: true, mode: "acceptEdits" } : { allow: true });
+  before = permissionLog.length;
+  const plan = await turn(
+    "Plan adding a test for an empty cart (total of [] is 0) to test/cart.test.js. The plan must hand writing the " +
+      "test to one subagent via the Agent tool. Then exit plan mode and carry it out.",
+  );
+  state.answer = null;
+  const planAsked = permissionLog.slice(before).map((r) => r.toolName);
+  const subagent = plan.events.some((e) => e.type === "agent.started");
+  check(
+    "E5: plan approved and executed, with a subagent",
+    planAsked.includes("ExitPlanMode") &&
+      subagent &&
+      testsPass() &&
+      /\[\]/.test(readFileSync(join(cwd, "test", "cart.test.js"), "utf8")),
+    `prompts=${planAsked.join(",")} subagent=${subagent} tests pass=${testsPass()}`,
+  );
+  await request("session.setMode", { sessionId, mode: "default" });
+}
+
 const scenarios: Record<string, () => Promise<void>> = {
   basic,
   mode,
@@ -551,8 +733,12 @@ const scenarios: Record<string, () => Promise<void>> = {
   sessions,
   approvals,
   plan,
+  fixtures,
+  image,
+  exit,
 };
-const selected = values.scenario === "all" ? Object.keys(scenarios) : [values.scenario];
+// "all" skips exit, which needs an empty --cwd of its own.
+const selected = values.scenario === "all" ? Object.keys(scenarios).filter((n) => n !== "exit") : [values.scenario];
 for (const file of [
   "perm-allow.txt",
   "perm-deny.txt",
@@ -563,6 +749,7 @@ for (const file of [
   "edited.txt",
   "planned.txt",
   "deny-probe.txt",
+  "calc.txt",
   ".claude",
 ]) {
   rmSync(join(cwd, file), { recursive: true, force: true });

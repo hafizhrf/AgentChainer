@@ -80,6 +80,13 @@ const Empty = z.object({});
 const Ok = z.object({ ok: z.literal(true) });
 
 export const SessionIdSchema = z.uuid();
+
+/** An image attached to a user message. ~5 MB of image data at most, the API's per-image limit (verify). */
+export const ImageSchema = z.object({
+  mediaType: z.enum(["image/png", "image/jpeg", "image/gif", "image/webp"]),
+  data: z.string().max(7_000_000),
+});
+export type Image = z.infer<typeof ImageSchema>;
 /** A live session, open in a tab. */
 const SessionRef = z.object({ sessionId: SessionIdSchema });
 /** A session on disk; `cwd` lets the SDK look in that project only instead of scanning every project. */
@@ -175,7 +182,12 @@ export const AgentEventSchema = z.discriminatedUnion("type", [
   /** The main agent's visible thinking, when the model streams it (M1-10). */
   z.object({ type: z.literal("thinking.delta"), text: z.string() }),
   /** Only in `session.history`: live user messages are added by the UI when it sends them. */
-  z.object({ type: z.literal("user.message"), messageId: z.string(), text: z.string() }),
+  z.object({
+    type: z.literal("user.message"),
+    messageId: z.string(),
+    text: z.string(),
+    imageCount: z.number().int().optional(),
+  }),
   /**
    * `parentToolUseId` is null for the main agent; otherwise it is the `toolUseId` of the Agent tool call that
    * spawned the subagent doing this work (the key of the agent tree, ARCHITECTURE §5.2).
@@ -286,13 +298,22 @@ export const methodSchemas = {
       effort: EffortSchema.optional(),
       /** The SDK stops the session's turns once this much is spent since start (M1-32). */
       maxBudgetUsd: z.number().positive().optional(),
+      /** Stream summaries of Claude's thinking (adaptive thinking, summarized display); off, they arrive empty (M1-10). */
+      showThinking: z.boolean().optional(),
       resume: SessionIdSchema.optional(),
     }),
     result: z.object({ sessionId: SessionIdSchema }),
   },
-  /** `messageId` is the user message's uuid: the anchor for "Rewind files to here" (M1-23). */
+  /**
+   * `messageId` is the user message's uuid: the anchor for "Rewind files to here" (M1-23). `images` are pasted
+   * screenshots (M1-13), base64 without the data-URL prefix.
+   */
   "session.send": {
-    params: z.object({ sessionId: SessionIdSchema, text: z.string().min(1) }),
+    params: z.object({
+      sessionId: SessionIdSchema,
+      text: z.string().min(1),
+      images: z.array(ImageSchema).max(5).optional(),
+    }),
     result: z.object({ ok: z.literal(true), messageId: z.string() }),
   },
   /** `interrupted: false` means no turn was running, so nothing was sent to the CLI. */

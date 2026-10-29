@@ -583,11 +583,13 @@ button.danger {
 
 .panel-tabs {
   display: flex;
+  flex-wrap: wrap;
   gap: 0.25rem;
 }
 
 .panel-tabs button {
-  padding: 0.2rem 0.6rem;
+  font-size: 0.8rem;
+  padding: 0.15rem 0.45rem;
   background: transparent;
   color: var(--fg);
   border: 1px solid transparent;
@@ -972,4 +974,48 @@ button.toggle[aria-pressed="true"] {
 .settings label.check {
   flex-direction: row;
   align-items: center;
+}
+
+/* Readiness report (M2-08/M2-09) */
+
+.setup-report h4 {
+  margin: 0.5rem 0 0.2rem;
+  font-size: 0.8rem;
+}
+
+.findings li,
+.commands li {
+  align-items: flex-start;
+  gap: 0.35rem;
+  padding: 0.1rem 0;
+}
+
+.finding-icon {
+  width: 1rem;
+  flex-shrink: 0;
+  text-align: center;
+}
+
+.finding.ok .finding-icon {
+  color: var(--ok);
+}
+
+.finding.warn .finding-icon,
+.finding.missing .finding-icon {
+  color: var(--err);
+}
+
+.finding .fix {
+  display: block;
+  font-size: 0.8rem;
+  color: var(--accent);
+}
+
+.package {
+  margin: 0.4rem 0;
+}
+
+.commands {
+  padding-left: 0.6rem;
+  font-size: 0.8rem;
 }

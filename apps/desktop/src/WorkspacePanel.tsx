@@ -3,6 +3,7 @@ import { type CSSProperties, useCallback, useEffect, useMemo, useState } from "r
 import type { Confirm } from "./Dialog.tsx";
 import { agentEdits, buildTree, STATUS_LETTER, type TreeNode } from "./files.ts";
 import { GitPanel } from "./GitPanel.tsx";
+import { SetupReport } from "./SetupReport.tsx";
 import { request } from "./sidecar.ts";
 import type { Item } from "./transcript.ts";
 
@@ -29,7 +30,7 @@ export function WorkspacePanel({
   onSelect: (path: string) => void;
   onRefresh: () => void;
 }) {
-  const [view, setView] = useState<"files" | "changes" | "git" | "permissions">("changes");
+  const [view, setView] = useState<"files" | "changes" | "git" | "permissions" | "setup">("changes");
   const [initError, setInitError] = useState<string | null>(null);
   const changed = files?.files.filter((f) => f.status) ?? [];
 
@@ -56,6 +57,9 @@ export function WorkspacePanel({
         </button>
         <button type="button" role="tab" aria-selected={view === "permissions"} onClick={() => setView("permissions")}>
           Rules
+        </button>
+        <button type="button" role="tab" aria-selected={view === "setup"} onClick={() => setView("setup")}>
+          Setup
         </button>
         <button type="button" className="refresh" title="Refresh" aria-label="Refresh files" onClick={onRefresh}>
           ↻
@@ -86,6 +90,7 @@ export function WorkspacePanel({
         />
       )}
       {view === "permissions" && <PermissionRules cwd={cwd} confirm={confirm} />}
+      {view === "setup" && <SetupReport cwd={cwd} />}
     </div>
   );
 }

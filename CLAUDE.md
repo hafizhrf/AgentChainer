@@ -1,7 +1,7 @@
 # AgentChainer — agent context
 
 Open-source desktop app (Tauri v2 + React/TS + Node sidecar on the Claude Agent SDK) that makes repos agent-ready and
-keeps agent work transparent and verified. **Current phase: M1 (agent session core).**
+keeps agent work transparent and verified. **Current phase: M2 (workspace bootstrap); M1 awaits its UI click-through and the Windows/Ubuntu exit runs.**
 
 The app has a functional (deliberately plain) M1 UI:
 - readiness check, session tabs with resume, fork and file rewind, tool approvals, subagent cards;
@@ -61,6 +61,7 @@ Prerequisites:
 | Rust tests | `cargo test --workspace` |
 | Spike harness: real model calls with your own `claude` login (haiku, a few cents) | `node packages/sidecar/scripts/spike-host.ts --cwd <empty scratch dir> [--scenario basic\|mode\|interrupt\|guard\|auto\|subagents\|sessions\|approvals\|plan\|fixtures\|image\|all] [--record raw.jsonl]` |
 | M1 exit criteria E1–E5 on `fixtures/sample-app` (real model calls; a few cents to ~$0.30) | `node packages/sidecar/scripts/spike-host.ts --cwd <empty dir> --scenario exit` |
+| Regenerate the detector/audit snapshots of `fixtures/` after changing detection | `UPDATE_SNAPSHOTS=1 node --test packages/sidecar/src/detect/detect.test.ts` |
 | Regenerate the event snapshots the UI tests replay, after re-recording a fixture | `UPDATE_FIXTURES=1 node --test packages/sidecar/src/normalize.test.ts` |
 | Turn a raw recording into a committable fixture (fails if anything identifying survives) | `node packages/sidecar/scripts/make-fixture.ts raw.jsonl packages/sidecar/test/fixtures/<name>.jsonl --cwd <recording workspace>` |
 | Plugin/MCP install spike (installs and removes again, in a throwaway project) | `node packages/sidecar/scripts/spike-install.ts --cwd <empty scratch dir>` |

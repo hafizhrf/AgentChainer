@@ -1,0 +1,138 @@
+{
+  "profile": {
+    "stacks": [
+      "python"
+    ],
+    "monorepo": null,
+    "packages": [
+      {
+        "path": ".",
+        "name": "python-uv-fastapi",
+        "stack": "python",
+        "packageManager": "uv",
+        "frameworks": [
+          "fastapi"
+        ],
+        "testFrameworks": [
+          "pytest"
+        ],
+        "commands": {
+          "install": {
+            "run": "uv sync",
+            "source": "uv.lock",
+            "confidence": "high"
+          },
+          "test": {
+            "run": "uv run pytest",
+            "source": "dependency: pytest",
+            "confidence": "high"
+          },
+          "lint": {
+            "run": "uv run ruff check .",
+            "source": "pyproject.toml#tool.ruff",
+            "confidence": "high"
+          },
+          "format": {
+            "run": "uv run ruff format .",
+            "source": "pyproject.toml#tool.ruff",
+            "confidence": "high"
+          },
+          "typecheck": {
+            "run": "uv run mypy .",
+            "source": "mypy",
+            "confidence": "high"
+          }
+        }
+      }
+    ],
+    "ci": []
+  },
+  "findings": [
+    {
+      "id": "claude-md.ok",
+      "area": "agent",
+      "status": "ok",
+      "title": "CLAUDE.md present",
+      "detail": "4 lines."
+    },
+    {
+      "id": "hooks.missing",
+      "area": "agent",
+      "status": "missing",
+      "title": "No format/lint hook on edits",
+      "detail": "Claude's edits aren't formatted or linted until someone runs the tools by hand.",
+      "fix": {
+        "action": "setup-hooks",
+        "label": "Add format/lint hooks"
+      }
+    },
+    {
+      "id": "claude-dir.inventory",
+      "area": "agent",
+      "status": "info",
+      "title": "Project skills, agents and MCP servers",
+      "detail": "0 skill(s), 0 agent(s), 0 MCP server(s)."
+    },
+    {
+      "id": "tests.ok",
+      "area": "quality",
+      "status": "ok",
+      "title": "Test command found",
+      "detail": "`uv run pytest`"
+    },
+    {
+      "id": "lint.ok",
+      "area": "quality",
+      "status": "ok",
+      "title": "Lint command found",
+      "detail": "`uv run ruff check .`"
+    },
+    {
+      "id": "format.ok",
+      "area": "quality",
+      "status": "ok",
+      "title": "Format command found",
+      "detail": "`uv run ruff format .`"
+    },
+    {
+      "id": "ci.missing",
+      "area": "quality",
+      "status": "missing",
+      "title": "No CI",
+      "detail": "Nothing checks a change once it leaves your machine.",
+      "fix": {
+        "action": "generate-ci",
+        "label": "Generate a CI workflow"
+      }
+    },
+    {
+      "id": "smoke.missing",
+      "area": "quality",
+      "status": "missing",
+      "title": "No smoke test",
+      "detail": "There's no quick check that the app still starts after a change.",
+      "fix": {
+        "action": "smoke-test",
+        "label": "Add a smoke test"
+      }
+    },
+    {
+      "id": "gitignore.ok",
+      "area": "hygiene",
+      "status": "ok",
+      "title": ".env is ignored",
+      "detail": ".gitignore covers env files."
+    },
+    {
+      "id": "remote.missing",
+      "area": "git",
+      "status": "info",
+      "title": "No git remote",
+      "detail": "Pushing, pull requests and hosted CI need one.",
+      "fix": {
+        "action": "add-remote",
+        "label": "Add a git remote (manual)"
+      }
+    }
+  ]
+}

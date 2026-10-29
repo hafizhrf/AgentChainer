@@ -25,3 +25,8 @@ apps/desktop/src-tauri/gen/schemas/
 
 # Generated sidecar executables (pnpm --filter @agentchainer/sidecar build:sea)
 apps/desktop/src-tauri/binaries/
+
+# Env files can hold secrets (keep examples)
+.env
+.env.*
+!.env.example

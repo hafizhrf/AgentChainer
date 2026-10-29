@@ -162,6 +162,59 @@ export const FileDiffSchema = z.object({
 });
 export type FileDiff = z.infer<typeof FileDiffSchema>;
 
+/* ---------- Workspace profile and readiness (M2-06…M2-10) ---------- */
+
+export const COMMAND_KINDS = ["install", "build", "lint", "format", "typecheck", "test", "dev"] as const;
+export type CommandKind = (typeof COMMAND_KINDS)[number];
+
+/** A discovered command: what to run, where it came from (e.g. `package.json#scripts.test`) and how sure we are. */
+export const DetectedCommandSchema = z.object({
+  run: z.string(),
+  source: z.string(),
+  confidence: z.enum(["high", "medium", "low"]),
+});
+export type DetectedCommand = z.infer<typeof DetectedCommandSchema>;
+
+export const PackageProfileSchema = z.object({
+  /** Relative to the workspace, `/`-separated; "." for the root. */
+  path: z.string(),
+  name: z.string().optional(),
+  stack: z.enum(["node", "python", "flutter", "dart", "go", "rust"]),
+  /** npm, pnpm, yarn, bun, uv, poetry, pip, pub, go, cargo. */
+  packageManager: z.string(),
+  frameworks: z.array(z.string()),
+  testFrameworks: z.array(z.string()),
+  commands: z.object(Object.fromEntries(COMMAND_KINDS.map((k) => [k, DetectedCommandSchema.optional()]))) as z.ZodType<
+    Partial<Record<CommandKind, DetectedCommand>>
+  >,
+});
+export type PackageProfile = z.infer<typeof PackageProfileSchema>;
+
+/** What a workspace is made of. Paths are relative, so the profile can be shared (`.agentchainer/profile.json`). */
+export const WorkspaceProfileSchema = z.object({
+  stacks: z.array(z.string()),
+  /** pnpm-workspace, npm-workspaces, yarn-workspaces, go-work, cargo-workspace, or "multiple" (no workspace tool). */
+  monorepo: z.string().nullable(),
+  packages: z.array(PackageProfileSchema),
+  /** github-actions, gitlab-ci, … */
+  ci: z.array(z.string()),
+});
+export type WorkspaceProfile = z.infer<typeof WorkspaceProfileSchema>;
+
+/**
+ * One readiness finding (M2-08/M2-09). Anything short of `ok` carries the fix that resolves it; the bootstrap plan
+ * (M2-11) turns fixes into actions.
+ */
+export const FindingSchema = z.object({
+  id: z.string(),
+  area: z.enum(["agent", "quality", "hygiene", "git"]),
+  status: z.enum(["ok", "info", "warn", "missing"]),
+  title: z.string(),
+  detail: z.string(),
+  fix: z.object({ action: z.string(), label: z.string() }).optional(),
+});
+export type Finding = z.infer<typeof FindingSchema>;
+
 const WorkspaceRef = z.object({ cwd: z.string().min(1) });
 /** A file inside the workspace; the sidecar rejects absolute paths and `..`. */
 const WorkspacePath = WorkspaceRef.extend({ path: z.string().min(1) });
@@ -397,6 +450,14 @@ export const methodSchemas = {
   "workspace.revert": { params: WorkspacePath.extend({ hunk: z.number().int().min(0).optional() }), result: Ok },
   /** Offered when the workspace isn't a git repository (M1-06). */
   "workspace.gitInit": { params: WorkspaceRef, result: Ok },
+
+  /** Detects stacks and commands and audits the agent setup (M2-06…M2-09). Read-only. */
+  "workspace.scan": {
+    params: WorkspaceRef,
+    result: z.object({ profile: WorkspaceProfileSchema, findings: z.array(FindingSchema) }),
+  },
+  /** Writes the profile to `.agentchainer/profile.json`, kept out of git by `.agentchainer/.gitignore` (M2-10). */
+  "workspace.saveProfile": { params: WorkspaceRef, result: z.object({ path: z.string() }) },
 
   /* Git panel (M1-30). Never force-pushes. */
   "git.branches": {

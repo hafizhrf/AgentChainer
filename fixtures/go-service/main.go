@@ -1,0 +1,8 @@
+package main
+
+import "fmt"
+
+func main() { fmt.Println(Add(1, 2)) }
+
+// Add returns a+b.
+func Add(a, b int) int { return a + b }

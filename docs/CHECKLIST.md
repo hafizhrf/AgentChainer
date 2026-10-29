@@ -497,19 +497,41 @@ All of these run on macOS, Windows and Ubuntu against a sample repo in `fixtures
 
 ### Detection & audit
 
-- [ ] **M2-06** Stack detector for the tier-1 stacks, monorepo-aware:
+- [x] **M2-06** Stack detector for the tier-1 stacks, monorepo-aware:
   - TS/JS: npm, pnpm, yarn, bun; framework hints such as Next, Vite, Express, Nest.
   - Python: uv, poetry, pip; framework hints such as Django, FastAPI, Flask.
   - Flutter/Dart.
   - Go.
-- [ ] **M2-07** Command discovery per package: install, build, lint, format, typecheck, test, dev. Sources are manifests,
+      — evidence: `src/detect/detect.ts`, tested with `detect.test.ts` (19 tests).
+      - Fixture repos per stack are snapshot-tested. Inline variants cover yarn, bun and poetry.
+      - Monorepo support: pnpm/npm/yarn workspaces, `go.work`, Cargo workspaces, and combinations of them.
+      - Dogfood: this repo scans as `pnpm-workspace+cargo-workspace` with Node and Rust packages.
+- [x] **M2-07** Command discovery per package: install, build, lint, format, typecheck, test, dev. Sources are manifests,
       scripts, Makefile and justfile; each command gets a confidence level.
-- [ ] **M2-08** Setup audit:
+      — evidence: each command carries its source and a high/medium/low confidence. Ranking: scripts, then
+      make/just targets, then conventions. Asserted per fixture: Go's `make test` beats `go test ./...`, npm's
+      placeholder test script is ignored, bun scripts go through `bun run`, and justfile targets are read.
+- [x] **M2-08** Setup audit:
   - agent files: CLAUDE.md/AGENTS.md (presence, size, staleness signals); `.claude/` settings, skills, agents and hooks; `.mcp.json`;
   - project health: CI, test framework, lint/format config;
   - `.gitignore` covers env and secret files; git remote.
+      — evidence: `src/detect/audit.ts`, covered by the fixture scenarios:
+      - no git (empty);
+      - a committed `.env` (legacy-messy);
+      - a remote (ts-pnpm-vite);
+      - a CLAUDE.md that mentions the test command (python-uv-fastapi).
+      The audit found a real gap here (`.env` wasn't ignored), now fixed in this repo's `.gitignore`.
 - [ ] **M2-09** Readiness report: checklist-style findings, each mapped to a fix action. No score that has no actions behind it.
-- [ ] **M2-10** Persist the `WorkspaceProfile` as `.agentchainer/profile.json`; decide and document whether it's committed by default.
+      Progress:
+      - The sidebar's Setup tab shows the stacks, the packages with their commands, and the findings grouped by
+        area, each gap with its fix.
+      - The headline is a count of things to fix, not a score.
+      - A test asserts no finding lacks a fix.
+      - Remaining: one-click fixes (they come with M2-11/M2-12), and a look at the tab in the app.
+- [x] **M2-10** Persist the `WorkspaceProfile` as `.agentchainer/profile.json`; decide and document whether it's committed by default.
+      — evidence: `workspace.saveProfile` writes it, and `.agentchainer/.gitignore` keeps it out of git (tested, and
+      idempotent). Decision (ARCHITECTURE §8): not committed, because it's derived data. The bootstrap lockfile will
+      be committed.
 
 ### Plan & apply
 
@@ -559,12 +581,20 @@ All of these run on macOS, Windows and Ubuntu against a sample repo in `fixtures
 
 ### Fixtures & tests
 
-- [ ] **M2-27** Fixture repos in `fixtures/`:
+- [x] **M2-27** Fixture repos in `fixtures/`:
   - one per tier-1 stack;
   - an empty repo;
   - a messy legacy repo (mixed tooling, no tests);
   - a monorepo.
+      — evidence:
+      - `fixtures/` holds ts-pnpm-vite, python-uv-fastapi, flutter-app, go-service, empty, legacy-messy and
+        monorepo-pnpm.
+      - `sample-app` (M1 exit scenarios) is there too.
+      - The fixtures carry manifests and a little code, not dependencies. Tests add per-fixture git state on temp
+        copies.
 - [ ] **M2-28** Automated bootstrap tests per fixture: detector and plan snapshots; installer and rollback run on temp copies.
+      Progress: detector and audit snapshots per fixture (`test/snapshots/*.json`, regenerated with
+      `UPDATE_SNAPSHOTS=1`). Remaining: plan snapshots, and installer and rollback runs (M2-11…M2-17).
 
 ### Exit criteria
 

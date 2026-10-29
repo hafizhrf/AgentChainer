@@ -1,7 +1,10 @@
+import { existsSync } from "node:fs";
 import { homedir } from "node:os";
 import { PROTOCOL_VERSION, RpcErrorCode } from "@agentchainer/protocol";
 import pkg from "../package.json" with { type: "json" };
 import { checkEnvironment, claudeVersion, findClaude } from "./claude.ts";
+import { auditWorkspace, saveProfile } from "./detect/audit.ts";
+import { detectWorkspace } from "./detect/detect.ts";
 import { branches, commit, draftMessage, push, stage, switchBranch, unstage } from "./git.ts";
 import { listRules, removeRule } from "./permissions.ts";
 import { log, notify, RpcFailure, serve } from "./rpc.ts";
@@ -205,6 +208,14 @@ serve(
       gitInit(cwd);
       return { ok: true };
     },
+
+    "workspace.scan": ({ cwd }) => {
+      if (!existsSync(cwd)) throw new RpcFailure(RpcErrorCode.invalidParams, `Folder not found: ${cwd}`);
+      const profile = detectWorkspace(cwd);
+      return { profile, findings: auditWorkspace(cwd, profile) };
+    },
+
+    "workspace.saveProfile": ({ cwd }) => ({ path: saveProfile(cwd, detectWorkspace(cwd)) }),
 
     "git.branches": ({ cwd }) => branches(cwd),
 

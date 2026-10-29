@@ -1,0 +1,1 @@
+{ "name": "monorepo-pnpm", "private": true, "scripts": { "lint": "biome check .", "test": "pnpm -r test" } }

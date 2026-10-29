@@ -1,0 +1,150 @@
+{
+  "profile": {
+    "stacks": [
+      "node"
+    ],
+    "monorepo": null,
+    "packages": [
+      {
+        "path": ".",
+        "name": "ts-pnpm-vite",
+        "stack": "node",
+        "packageManager": "pnpm",
+        "frameworks": [
+          "vite",
+          "react"
+        ],
+        "testFrameworks": [
+          "vitest"
+        ],
+        "commands": {
+          "install": {
+            "run": "pnpm install",
+            "source": "lockfile",
+            "confidence": "high"
+          },
+          "build": {
+            "run": "pnpm run build",
+            "source": "package.json#scripts.build",
+            "confidence": "high"
+          },
+          "lint": {
+            "run": "pnpm run lint",
+            "source": "package.json#scripts.lint",
+            "confidence": "high"
+          },
+          "typecheck": {
+            "run": "pnpm run typecheck",
+            "source": "package.json#scripts.typecheck",
+            "confidence": "high"
+          },
+          "test": {
+            "run": "pnpm test",
+            "source": "package.json#scripts.test",
+            "confidence": "high"
+          },
+          "dev": {
+            "run": "pnpm run dev",
+            "source": "package.json#scripts.dev",
+            "confidence": "high"
+          }
+        }
+      }
+    ],
+    "ci": [
+      "github-actions"
+    ]
+  },
+  "findings": [
+    {
+      "id": "claude-md.missing",
+      "area": "agent",
+      "status": "missing",
+      "title": "No CLAUDE.md",
+      "detail": "Claude starts every session without your commands, architecture or conventions.",
+      "fix": {
+        "action": "generate-claude-md",
+        "label": "Generate CLAUDE.md"
+      }
+    },
+    {
+      "id": "hooks.missing",
+      "area": "agent",
+      "status": "missing",
+      "title": "No format/lint hook on edits",
+      "detail": "Claude's edits aren't formatted or linted until someone runs the tools by hand.",
+      "fix": {
+        "action": "setup-hooks",
+        "label": "Add format/lint hooks"
+      }
+    },
+    {
+      "id": "claude-dir.inventory",
+      "area": "agent",
+      "status": "info",
+      "title": "Project skills, agents and MCP servers",
+      "detail": "0 skill(s), 0 agent(s), 0 MCP server(s)."
+    },
+    {
+      "id": "tests.ok",
+      "area": "quality",
+      "status": "ok",
+      "title": "Test command found",
+      "detail": "`pnpm test`"
+    },
+    {
+      "id": "lint.ok",
+      "area": "quality",
+      "status": "ok",
+      "title": "Lint command found",
+      "detail": "`pnpm run lint`"
+    },
+    {
+      "id": "format.missing",
+      "area": "quality",
+      "status": "warn",
+      "title": "No formatter",
+      "detail": "Edits keep whatever style they were written in, which makes diffs noisy.",
+      "fix": {
+        "action": "add-formatter",
+        "label": "Add a formatter"
+      }
+    },
+    {
+      "id": "ci.ok",
+      "area": "quality",
+      "status": "ok",
+      "title": "CI configured",
+      "detail": "github-actions"
+    },
+    {
+      "id": "smoke.missing",
+      "area": "quality",
+      "status": "missing",
+      "title": "No smoke test",
+      "detail": "There's no quick check that the app still starts after a change.",
+      "fix": {
+        "action": "smoke-test",
+        "label": "Add a smoke test"
+      }
+    },
+    {
+      "id": "gitignore.env",
+      "area": "hygiene",
+      "status": "missing",
+      "title": ".env isn't ignored",
+      "detail": "A secret dropped into .env would be committed with the next `git add .`.",
+      "fix": {
+        "action": "fix-gitignore",
+        "label": "Ignore env and secret files"
+      }
+    },
+    {
+      "id": "remote.ok",
+      "area": "git",
+      "status": "ok",
+      "title": "Git remote set",
+      "detail": "origin"
+    }
+  ]
+}

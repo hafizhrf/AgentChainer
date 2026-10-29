@@ -1,0 +1,174 @@
+{
+  "profile": {
+    "stacks": [
+      "node",
+      "python"
+    ],
+    "monorepo": null,
+    "packages": [
+      {
+        "path": ".",
+        "name": "legacy-messy",
+        "stack": "node",
+        "packageManager": "npm",
+        "frameworks": [
+          "express"
+        ],
+        "testFrameworks": [],
+        "commands": {
+          "install": {
+            "run": "npm install",
+            "source": "package.json",
+            "confidence": "medium"
+          },
+          "dev": {
+            "run": "npm run start",
+            "source": "package.json#scripts.start",
+            "confidence": "high"
+          }
+        }
+      },
+      {
+        "path": ".",
+        "stack": "python",
+        "packageManager": "pip",
+        "frameworks": [
+          "flask"
+        ],
+        "testFrameworks": [],
+        "commands": {
+          "install": {
+            "run": "pip install -r requirements.txt",
+            "source": "requirements.txt",
+            "confidence": "medium"
+          },
+          "dev": {
+            "run": "make run",
+            "source": "Makefile",
+            "confidence": "high"
+          }
+        }
+      }
+    ],
+    "ci": []
+  },
+  "findings": [
+    {
+      "id": "claude-md.missing",
+      "area": "agent",
+      "status": "missing",
+      "title": "No CLAUDE.md",
+      "detail": "Claude starts every session without your commands, architecture or conventions.",
+      "fix": {
+        "action": "generate-claude-md",
+        "label": "Generate CLAUDE.md"
+      }
+    },
+    {
+      "id": "hooks.missing",
+      "area": "agent",
+      "status": "missing",
+      "title": "No format/lint hook on edits",
+      "detail": "Claude's edits aren't formatted or linted until someone runs the tools by hand.",
+      "fix": {
+        "action": "setup-hooks",
+        "label": "Add format/lint hooks"
+      }
+    },
+    {
+      "id": "claude-dir.inventory",
+      "area": "agent",
+      "status": "info",
+      "title": "Project skills, agents and MCP servers",
+      "detail": "0 skill(s), 0 agent(s), 0 MCP server(s)."
+    },
+    {
+      "id": "tests.missing",
+      "area": "quality",
+      "status": "missing",
+      "title": "No test command",
+      "detail": "Neither you nor Claude can check a change by running tests.",
+      "fix": {
+        "action": "scaffold-tests",
+        "label": "Scaffold tests"
+      }
+    },
+    {
+      "id": "lint.missing",
+      "area": "quality",
+      "status": "warn",
+      "title": "No linter",
+      "detail": "Common mistakes in Claude's edits won't be caught automatically.",
+      "fix": {
+        "action": "add-linter",
+        "label": "Add a linter"
+      }
+    },
+    {
+      "id": "format.missing",
+      "area": "quality",
+      "status": "warn",
+      "title": "No formatter",
+      "detail": "Edits keep whatever style they were written in, which makes diffs noisy.",
+      "fix": {
+        "action": "add-formatter",
+        "label": "Add a formatter"
+      }
+    },
+    {
+      "id": "ci.missing",
+      "area": "quality",
+      "status": "missing",
+      "title": "No CI",
+      "detail": "Nothing checks a change once it leaves your machine.",
+      "fix": {
+        "action": "generate-ci",
+        "label": "Generate a CI workflow"
+      }
+    },
+    {
+      "id": "smoke.missing",
+      "area": "quality",
+      "status": "missing",
+      "title": "No smoke test",
+      "detail": "There's no quick check that the app still starts after a change.",
+      "fix": {
+        "action": "smoke-test",
+        "label": "Add a smoke test"
+      }
+    },
+    {
+      "id": "env.tracked",
+      "area": "hygiene",
+      "status": "warn",
+      "title": ".env is committed",
+      "detail": "Env files often hold secrets; anything committed stays in the history.",
+      "fix": {
+        "action": "untrack-env",
+        "label": "Stop tracking .env"
+      }
+    },
+    {
+      "id": "gitignore.env",
+      "area": "hygiene",
+      "status": "missing",
+      "title": ".env isn't ignored",
+      "detail": "A secret dropped into .env would be committed with the next `git add .`.",
+      "fix": {
+        "action": "fix-gitignore",
+        "label": "Ignore env and secret files"
+      }
+    },
+    {
+      "id": "remote.missing",
+      "area": "git",
+      "status": "info",
+      "title": "No git remote",
+      "detail": "Pushing, pull requests and hosted CI need one.",
+      "fix": {
+        "action": "add-remote",
+        "label": "Add a git remote (manual)"
+      }
+    }
+  ]
+}

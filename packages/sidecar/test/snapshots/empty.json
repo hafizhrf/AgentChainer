@@ -1,0 +1,105 @@
+{
+  "profile": {
+    "stacks": [],
+    "monorepo": null,
+    "packages": [],
+    "ci": []
+  },
+  "findings": [
+    {
+      "id": "claude-md.missing",
+      "area": "agent",
+      "status": "missing",
+      "title": "No CLAUDE.md",
+      "detail": "Claude starts every session without your commands, architecture or conventions.",
+      "fix": {
+        "action": "generate-claude-md",
+        "label": "Generate CLAUDE.md"
+      }
+    },
+    {
+      "id": "hooks.missing",
+      "area": "agent",
+      "status": "missing",
+      "title": "No format/lint hook on edits",
+      "detail": "Claude's edits aren't formatted or linted until someone runs the tools by hand.",
+      "fix": {
+        "action": "setup-hooks",
+        "label": "Add format/lint hooks"
+      }
+    },
+    {
+      "id": "claude-dir.inventory",
+      "area": "agent",
+      "status": "info",
+      "title": "Project skills, agents and MCP servers",
+      "detail": "0 skill(s), 0 agent(s), 0 MCP server(s)."
+    },
+    {
+      "id": "tests.missing",
+      "area": "quality",
+      "status": "missing",
+      "title": "No test command",
+      "detail": "Neither you nor Claude can check a change by running tests.",
+      "fix": {
+        "action": "scaffold-tests",
+        "label": "Scaffold tests"
+      }
+    },
+    {
+      "id": "lint.missing",
+      "area": "quality",
+      "status": "warn",
+      "title": "No linter",
+      "detail": "Common mistakes in Claude's edits won't be caught automatically.",
+      "fix": {
+        "action": "add-linter",
+        "label": "Add a linter"
+      }
+    },
+    {
+      "id": "format.missing",
+      "area": "quality",
+      "status": "warn",
+      "title": "No formatter",
+      "detail": "Edits keep whatever style they were written in, which makes diffs noisy.",
+      "fix": {
+        "action": "add-formatter",
+        "label": "Add a formatter"
+      }
+    },
+    {
+      "id": "ci.missing",
+      "area": "quality",
+      "status": "missing",
+      "title": "No CI",
+      "detail": "Nothing checks a change once it leaves your machine.",
+      "fix": {
+        "action": "generate-ci",
+        "label": "Generate a CI workflow"
+      }
+    },
+    {
+      "id": "smoke.missing",
+      "area": "quality",
+      "status": "missing",
+      "title": "No smoke test",
+      "detail": "There's no quick check that the app still starts after a change.",
+      "fix": {
+        "action": "smoke-test",
+        "label": "Add a smoke test"
+      }
+    },
+    {
+      "id": "git.missing",
+      "area": "git",
+      "status": "missing",
+      "title": "Not a git repository",
+      "detail": "Changes can't be reviewed, reverted or rewound safely.",
+      "fix": {
+        "action": "git-init",
+        "label": "Initialize git"
+      }
+    }
+  ]
+}

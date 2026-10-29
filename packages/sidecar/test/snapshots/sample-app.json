@@ -1,0 +1,137 @@
+{
+  "profile": {
+    "stacks": [
+      "node"
+    ],
+    "monorepo": null,
+    "packages": [
+      {
+        "path": ".",
+        "name": "sample-app",
+        "stack": "node",
+        "packageManager": "npm",
+        "frameworks": [],
+        "testFrameworks": [
+          "node:test"
+        ],
+        "commands": {
+          "install": {
+            "run": "npm install",
+            "source": "package.json",
+            "confidence": "medium"
+          },
+          "test": {
+            "run": "npm test",
+            "source": "package.json#scripts.test",
+            "confidence": "high"
+          }
+        }
+      }
+    ],
+    "ci": []
+  },
+  "findings": [
+    {
+      "id": "claude-md.missing",
+      "area": "agent",
+      "status": "missing",
+      "title": "No CLAUDE.md",
+      "detail": "Claude starts every session without your commands, architecture or conventions.",
+      "fix": {
+        "action": "generate-claude-md",
+        "label": "Generate CLAUDE.md"
+      }
+    },
+    {
+      "id": "hooks.missing",
+      "area": "agent",
+      "status": "missing",
+      "title": "No format/lint hook on edits",
+      "detail": "Claude's edits aren't formatted or linted until someone runs the tools by hand.",
+      "fix": {
+        "action": "setup-hooks",
+        "label": "Add format/lint hooks"
+      }
+    },
+    {
+      "id": "claude-dir.inventory",
+      "area": "agent",
+      "status": "info",
+      "title": "Project skills, agents and MCP servers",
+      "detail": "0 skill(s), 0 agent(s), 0 MCP server(s)."
+    },
+    {
+      "id": "tests.ok",
+      "area": "quality",
+      "status": "ok",
+      "title": "Test command found",
+      "detail": "`npm test`"
+    },
+    {
+      "id": "lint.missing",
+      "area": "quality",
+      "status": "warn",
+      "title": "No linter",
+      "detail": "Common mistakes in Claude's edits won't be caught automatically.",
+      "fix": {
+        "action": "add-linter",
+        "label": "Add a linter"
+      }
+    },
+    {
+      "id": "format.missing",
+      "area": "quality",
+      "status": "warn",
+      "title": "No formatter",
+      "detail": "Edits keep whatever style they were written in, which makes diffs noisy.",
+      "fix": {
+        "action": "add-formatter",
+        "label": "Add a formatter"
+      }
+    },
+    {
+      "id": "ci.missing",
+      "area": "quality",
+      "status": "missing",
+      "title": "No CI",
+      "detail": "Nothing checks a change once it leaves your machine.",
+      "fix": {
+        "action": "generate-ci",
+        "label": "Generate a CI workflow"
+      }
+    },
+    {
+      "id": "smoke.missing",
+      "area": "quality",
+      "status": "missing",
+      "title": "No smoke test",
+      "detail": "There's no quick check that the app still starts after a change.",
+      "fix": {
+        "action": "smoke-test",
+        "label": "Add a smoke test"
+      }
+    },
+    {
+      "id": "gitignore.env",
+      "area": "hygiene",
+      "status": "missing",
+      "title": ".env isn't ignored",
+      "detail": "A secret dropped into .env would be committed with the next `git add .`.",
+      "fix": {
+        "action": "fix-gitignore",
+        "label": "Ignore env and secret files"
+      }
+    },
+    {
+      "id": "remote.missing",
+      "area": "git",
+      "status": "info",
+      "title": "No git remote",
+      "detail": "Pushing, pull requests and hosted CI need one.",
+      "fix": {
+        "action": "add-remote",
+        "label": "Add a git remote (manual)"
+      }
+    }
+  ]
+}

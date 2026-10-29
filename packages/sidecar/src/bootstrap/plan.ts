@@ -290,7 +290,7 @@ function itemAction(root: string, item: Item, p: Profile, suggestedProfile: bool
       ? { type: "files", files: changes.files.map(({ path: p, before, after }) => ({ path: p, before, after })) }
       : changes.commands.length
         ? { type: "commands", commands: changes.commands }
-        : { type: "note", text: item.install.steps.map((s) => Object.keys(s)[0]).join(", ") },
+        : { type: "note", text: notePreview(item) },
     state,
     // Community items are never pre-selected (ADR-0005), and nothing unavailable or installed is.
     selected: state === "recommended" && item.tier !== "community",
@@ -356,4 +356,14 @@ export function installedItems(root: string): Set<string> {
 /** The install command of the first package that has one, for installing before tests run (M2-23). */
 export function installCommand(profile: WorkspaceProfile): string | undefined {
   return profile.packages.find((p) => p.commands.install)?.commands.install?.run;
+}
+
+/** In words, for items whose changes aren't known before downloading (a pinned git folder copied into the project). */
+function notePreview(item: Item): string {
+  const src = item.source;
+  const targets = item.install.steps.flatMap((s) => ("copy" in s ? [s.copy.to] : []));
+  if (src.type === "git" && targets.length) {
+    return `Copies ${src.path} from ${src.repo} at ${src.ref.slice(0, 7)} into ${targets.join(", ")}, after checking it against the pinned tree sha256 (${src.sha256.slice(0, 12)}…). Nothing else changes.`;
+  }
+  return item.install.steps.map((s) => Object.keys(s)[0]).join(", ");
 }

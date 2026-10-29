@@ -130,6 +130,11 @@ function insideRoot(root: string, rel: string): string {
 class Tracker {
   private readonly root: string;
   private readonly runDir: string;
+  /**
+   * Numbers each backup: several actions of a run can change the same file (every plugin install edits
+   * .claude/settings.json), and each needs the content from before its own change.
+   */
+  private backups = 0;
   constructor(root: string, runDir: string) {
     this.root = root;
     this.runDir = runDir;
@@ -142,7 +147,7 @@ class Tracker {
       const existed = existsSync(file);
       rec = { path: rel, existed, afterSha256: null };
       if (existed) {
-        rec.backup = `files/${rel}`;
+        rec.backup = `files/${++this.backups}/${rel}`;
         const backup = path.join(this.runDir, ...rec.backup.split("/"));
         mkdirSync(path.dirname(backup), { recursive: true });
         writeFileSync(backup, readFileSync(file));

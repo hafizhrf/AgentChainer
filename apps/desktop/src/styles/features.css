@@ -1,0 +1,75 @@
+/* Feature styles: readiness commands, the rewind file list and markdown. */
+
+.command {
+  display: inline-block;
+  margin-top: 0.3rem;
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  user-select: all;
+}
+
+.command-line {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  margin-top: 0.3rem;
+}
+
+.command-line .command {
+  margin-top: 0;
+}
+
+/* Files listed in the rewind confirmation (M1-23) */
+
+.file-list {
+  max-height: 12rem;
+  overflow-y: auto;
+  padding-left: 1.2rem;
+}
+
+/* Markdown (M1-10) */
+
+.markdown {
+  white-space: normal;
+}
+
+.markdown > :first-child {
+  margin-top: 0;
+}
+
+.markdown > :last-child {
+  margin-bottom: 0;
+}
+
+.markdown pre {
+  white-space: pre;
+  overflow-x: auto;
+  padding: 0.6rem 0.75rem;
+  border-radius: 6px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+}
+
+.markdown :not(pre) > code {
+  padding: 0.05rem 0.3rem;
+  border-radius: 4px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  font-size: 0.9em;
+}
+
+.markdown table {
+  border-collapse: collapse;
+}
+
+.markdown th,
+.markdown td {
+  border: 1px solid var(--border);
+  padding: 0.25rem 0.5rem;
+}
+
+.markdown a {
+  color: var(--accent);
+}

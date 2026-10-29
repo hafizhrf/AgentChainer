@@ -1,6 +1,11 @@
 import type { Methods, PermissionMode, PermissionRequest } from "@agentchainer/protocol";
 import { useState } from "react";
-import { MODE_LABELS } from "./SettingsPanel.tsx";
+import { Modal } from "./Dialog.tsx";
+import { Markdown } from "./Markdown.tsx";
+import { MODE_HELP, modeOptions } from "./options.ts";
+import { asMode } from "./tabs.ts";
+import { Field } from "./ui/Field.tsx";
+import { Select } from "./ui/Select.tsx";
 
 export type PermissionAnswer = Omit<Methods["permission.respond"]["params"], "sessionId" | "requestId">;
 
@@ -49,54 +54,19 @@ function Approval({ request, onAnswer }: { request: PermissionRequest; onAnswer:
   }
 
   return (
-    <div className="overlay">
-      <div className="dialog" role="dialog" aria-modal="true" aria-labelledby="perm-title">
-        <h2 id="perm-title">{request.title ?? `Allow ${request.toolName}?`}</h2>
-        {request.description && <p>{request.description}</p>}
-        {request.decisionReason && <p className="muted">Why it asks: {request.decisionReason}</p>}
-        {request.blockedPath && (
-          <p className="muted">
-            Path: <code>{request.blockedPath}</code>
-          </p>
-        )}
-        <p className="muted">
+    <Modal
+      open
+      onOpenChange={() => undefined}
+      dismissible={false}
+      title={request.title ?? `Allow ${request.toolName}?`}
+      description={
+        <>
           {request.agentId ? `Requested by subagent ${request.agentId}` : "Requested by the main agent"} ·{" "}
           {request.toolName}
-        </p>
-        {editing ? (
-          <textarea
-            className="input-editor"
-            value={input}
-            onChange={(e) => {
-              setInput(e.target.value);
-              setError(null);
-            }}
-            rows={Math.min(16, input.split("\n").length + 1)}
-            spellCheck={false}
-            aria-label="Tool input (JSON)"
-          />
-        ) : (
-          <pre>{input}</pre>
-        )}
-        <button type="button" className="link" onClick={() => setEditing((v) => !v)}>
-          {editing ? "Stop editing" : "Edit input before allowing"}
-        </button>
-        {error && <p className="warn">{error}</p>}
-        <label>
-          Message to Claude if you deny <span className="muted">(optional)</span>
-          <input value={message} onChange={(e) => setMessage(e.target.value)} placeholder="e.g. use pnpm instead" />
-        </label>
-        {request.alwaysRules.length > 0 && (
-          <p className="muted">
-            "Always allow" saves to <code>.claude/settings.local.json</code>:{" "}
-            {request.alwaysRules.map((r) => (
-              <code key={r} className="rule">
-                {r}
-              </code>
-            ))}
-          </p>
-        )}
-        <div className="dialog-actions">
+        </>
+      }
+      actions={
+        <>
           <button
             type="button"
             className="secondary"
@@ -114,9 +84,51 @@ function Approval({ request, onAnswer }: { request: PermissionRequest; onAnswer:
           <button type="button" onClick={() => allow(false)}>
             Allow once
           </button>
-        </div>
+        </>
+      }
+    >
+      {request.description && <p>{request.description}</p>}
+      {request.decisionReason && <p className="muted">Why it asks: {request.decisionReason}</p>}
+      {request.blockedPath && (
+        <p className="muted">
+          Path: <code>{request.blockedPath}</code>
+        </p>
+      )}
+      {editing ? (
+        <textarea
+          className="input-editor"
+          value={input}
+          onChange={(e) => {
+            setInput(e.target.value);
+            setError(null);
+          }}
+          rows={Math.min(16, input.split("\n").length + 1)}
+          spellCheck={false}
+          aria-label="Tool input (JSON)"
+        />
+      ) : (
+        <pre className="tool-input">{input}</pre>
+      )}
+      <div>
+        <button type="button" className="link" onClick={() => setEditing((v) => !v)}>
+          {editing ? "Stop editing" : "Edit input before allowing"}
+        </button>
       </div>
-    </div>
+      {error && <p className="warn">{error}</p>}
+      <Field label="Message to Claude if you deny" help="Optional, e.g. “use pnpm instead”.">
+        <input value={message} onChange={(e) => setMessage(e.target.value)} />
+      </Field>
+      {request.alwaysRules.length > 0 && (
+        <p className="muted">
+          "Always allow" saves to <code>.claude/settings.local.json</code>:{" "}
+          {request.alwaysRules.map((r) => (
+            <code key={r} className="rule">
+              {r}
+            </code>
+          ))}
+        </p>
+      )}
+    </Modal>
   );
 }
 
@@ -134,26 +146,14 @@ function PlanReview({
   const [feedback, setFeedback] = useState("");
 
   return (
-    <div className="overlay">
-      <div className="dialog plan" role="dialog" aria-modal="true" aria-labelledby="plan-title">
-        <h2 id="plan-title">Review the plan</h2>
-        {plan ? <pre className="plan-text">{plan}</pre> : <p className="muted">The plan is in the transcript above.</p>}
-        <label>
-          Then run it as
-          <select value={mode} onChange={(e) => setMode(e.target.value as PermissionMode)}>
-            {EXECUTE_MODES.map((m) => (
-              <option key={m} value={m} disabled={m === "auto" && !canAutonomous}>
-                {MODE_LABELS[m]}
-                {m === "auto" && !canAutonomous ? " (set a budget cap first)" : ""}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label>
-          Changes you want <span className="muted">(for Revise)</span>
-          <textarea value={feedback} onChange={(e) => setFeedback(e.target.value)} rows={3} />
-        </label>
-        <div className="dialog-actions">
+    <Modal
+      open
+      onOpenChange={() => undefined}
+      dismissible={false}
+      size="lg"
+      title="Review the plan"
+      actions={
+        <>
           <button
             type="button"
             className="secondary"
@@ -177,10 +177,29 @@ function PlanReview({
             Revise
           </button>
           <button type="button" onClick={() => onAnswer({ allow: true, mode })}>
-            Approve &amp; execute
+            Approve &amp; run
           </button>
+        </>
+      }
+    >
+      {plan ? (
+        <div className="plan-text">
+          <Markdown text={plan} />
         </div>
-      </div>
-    </div>
+      ) : (
+        <p className="muted">The plan is in the transcript.</p>
+      )}
+      <Field label="Then run it as" help={MODE_HELP[mode]}>
+        <Select
+          label="Run the plan as"
+          value={mode}
+          options={modeOptions(EXECUTE_MODES, canAutonomous)}
+          onChange={(m) => setMode(asMode(m))}
+        />
+      </Field>
+      <Field label="Changes you want" help="For Revise: Claude updates the plan and asks again.">
+        <textarea value={feedback} onChange={(e) => setFeedback(e.target.value)} rows={3} />
+      </Field>
+    </Modal>
   );
 }

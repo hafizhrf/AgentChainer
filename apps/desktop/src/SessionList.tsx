@@ -3,6 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { useCallback, useEffect, useState } from "react";
 import type { Confirm } from "./Dialog.tsx";
 import { request } from "./sidecar.ts";
+import { ActionMenu } from "./ui/ActionMenu.tsx";
 
 /** From the local cost history (M1-33), kept by the Rust core. */
 type SessionCost = { sessionId: string; totalCostUsd: number };
@@ -108,13 +109,15 @@ export function SessionList({
 
   if (!cwd) return null;
   return (
-    <section className="session-list" aria-label="Previous sessions">
-      <h2>Previous sessions</h2>
+    <section className="card session-list" aria-labelledby="previous-title">
+      <div className="card-title">
+        <h2 id="previous-title">Previous sessions</h2>
+      </div>
       {error && <p className="warn">{error}</p>}
       {sessions === null ? (
         <p className="muted">Loading…</p>
       ) : sessions.length === 0 ? (
-        <p className="muted">No sessions in this folder yet.</p>
+        <p className="muted">No sessions in this folder yet. Sessions started in the terminal show up here too.</p>
       ) : (
         <ul>
           {sessions.map((s) => {
@@ -123,63 +126,59 @@ export function SessionList({
             return (
               <li key={s.sessionId}>
                 <div className="session-main">
-                  {edit ? (
-                    <input
-                      // biome-ignore lint/a11y/noAutofocus: the field appears because the user just asked to edit it.
-                      autoFocus
-                      value={edit.value}
-                      aria-label={edit.field === "title" ? "Session title" : "Session tag"}
-                      placeholder={edit.field === "tag" ? "Tag (empty to clear)" : ""}
-                      onChange={(e) => setEditing({ ...edit, value: e.target.value })}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") void saveEdit(edit);
-                        if (e.key === "Escape") setEditing(null);
-                      }}
-                      onBlur={() => void saveEdit(edit)}
-                    />
-                  ) : (
-                    <span className="session-title" title={s.title}>
-                      {s.title}
-                    </span>
-                  )}
-                  <span className="muted">
+                  <div className="session-title-row">
+                    {edit ? (
+                      <input
+                        // biome-ignore lint/a11y/noAutofocus: the field appears because the user just asked to edit it.
+                        autoFocus
+                        value={edit.value}
+                        aria-label={edit.field === "title" ? "Session title" : "Session tag"}
+                        placeholder={edit.field === "tag" ? "Tag (empty to clear)" : ""}
+                        onChange={(e) => setEditing({ ...edit, value: e.target.value })}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") void saveEdit(edit);
+                          if (e.key === "Escape") setEditing(null);
+                        }}
+                        onBlur={() => void saveEdit(edit)}
+                      />
+                    ) : (
+                      <span className="session-title" title={s.title}>
+                        {s.title}
+                      </span>
+                    )}
+                    {s.tag && <span className="badge">{s.tag}</span>}
+                    {open && <span className="badge">open</span>}
+                  </div>
+                  <span className="session-meta">
                     {new Date(s.lastModified).toLocaleString()}
                     {s.gitBranch ? ` · ${s.gitBranch}` : ""}
                     {costs.has(s.sessionId) ? ` · ${usd(costs.get(s.sessionId) ?? 0)}` : ""}
                   </span>
-                  {s.tag && <span className="badge">{s.tag}</span>}
-                  {open && <span className="badge">open</span>}
                 </div>
                 <div className="session-actions">
-                  <button type="button" className="secondary" onClick={() => onOpen(s)}>
+                  <button type="button" className="secondary small" onClick={() => onOpen(s)}>
                     {open ? "Show" : "Resume"}
                   </button>
-                  <button type="button" className="link" onClick={() => void fork(s)}>
-                    Fork
-                  </button>
-                  <button
-                    type="button"
-                    className="link"
-                    onClick={() => setEditing({ sessionId: s.sessionId, field: "title", value: s.title })}
-                  >
-                    Rename
-                  </button>
-                  <button
-                    type="button"
-                    className="link"
-                    onClick={() => setEditing({ sessionId: s.sessionId, field: "tag", value: s.tag ?? "" })}
-                  >
-                    Tag
-                  </button>
-                  <button
-                    type="button"
-                    className="link"
-                    disabled={open}
-                    title={open ? "Close its tab first" : undefined}
-                    onClick={() => void remove(s)}
-                  >
-                    Delete
-                  </button>
+                  <ActionMenu
+                    label={`Actions for ${s.title}`}
+                    items={[
+                      { label: "Fork", onSelect: () => void fork(s) },
+                      {
+                        label: "Rename",
+                        onSelect: () => setEditing({ sessionId: s.sessionId, field: "title", value: s.title }),
+                      },
+                      {
+                        label: "Tag",
+                        onSelect: () => setEditing({ sessionId: s.sessionId, field: "tag", value: s.tag ?? "" }),
+                      },
+                      {
+                        label: open ? "Delete (close it first)" : "Delete",
+                        danger: true,
+                        disabled: open,
+                        onSelect: () => void remove(s),
+                      },
+                    ]}
+                  />
                 </div>
               </li>
             );
@@ -187,7 +186,7 @@ export function SessionList({
         </ul>
       )}
       {summary && summary.last30Usd + summary.uncountedTurns > 0 && (
-        <p className="muted">
+        <p className="muted small-print">
           Spent in this folder (estimates, sessions run in AgentChainer): today {usd(summary.todayUsd)} · 7 days{" "}
           {usd(summary.last7Usd)} · 30 days {usd(summary.last30Usd)}
           {summary.uncountedTurns > 0 &&
@@ -195,7 +194,7 @@ export function SessionList({
         </p>
       )}
       {retention && (
-        <p className="muted retention">
+        <p className="muted small-print">
           Claude Code deletes sessions after {retention.days} days without activity (
           {retention.source === "default" ? "default" : `set in your ${retention.source} settings`}). To keep them
           longer, raise <code>cleanupPeriodDays</code> in <code>~/.claude/settings.json</code>.

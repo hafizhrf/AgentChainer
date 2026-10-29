@@ -1,0 +1,474 @@
+/*
+ * App shell (UX-03): sidebar | main. Main shows Home or the active session; every open session stays mounted on top
+ * of each other, the inactive ones invisible, so their panel sizes and terminals keep their real dimensions.
+ */
+
+.app {
+  height: 100vh;
+  overflow: hidden;
+}
+
+.shell,
+.session-split,
+.center-split {
+  height: 100%;
+}
+
+/* Resize handles: a 1px line with a wider invisible grab area. */
+.resize-handle {
+  position: relative;
+  flex: 0 0 1px;
+  background: var(--border);
+  outline: none;
+  transition: background var(--duration);
+}
+
+.resize-handle::after {
+  content: "";
+  position: absolute;
+  inset: 0 -3px;
+  z-index: 1;
+}
+
+.center-split > .resize-handle::after {
+  inset: -3px 0;
+}
+
+.resize-handle[data-separator="hover"],
+.resize-handle[data-separator="active"],
+.resize-handle[data-separator="focus"] {
+  background: var(--accent);
+}
+
+/* ---------- Sidebar ---------- */
+
+.sidebar {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: var(--surface-2);
+  min-width: 0;
+}
+
+.sidebar-top {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-3) var(--space-3);
+}
+
+.brand {
+  padding: 0 var(--space-2);
+  font-size: var(--text-md);
+  font-weight: 650;
+  letter-spacing: -0.01em;
+}
+
+.new-session {
+  width: 100%;
+  justify-content: flex-start;
+}
+
+.new-session kbd {
+  margin-left: auto;
+  color: inherit;
+  border-color: currentColor;
+  opacity: 0.6;
+}
+
+.sidebar-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: 0 var(--space-2) var(--space-3);
+}
+
+.sidebar-heading {
+  padding: var(--space-1) var(--space-2);
+  color: var(--muted);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.sidebar-empty {
+  padding: 0 var(--space-2);
+  color: var(--muted);
+  font-size: var(--text-sm);
+}
+
+.nav-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.nav-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding-right: var(--space-1);
+  border-radius: var(--radius);
+}
+
+.nav-row:hover {
+  background: var(--surface-3);
+}
+
+.nav-row.active {
+  background: var(--accent-soft);
+}
+
+.nav-main {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: flex-start;
+  gap: 0;
+  padding: 6px var(--space-2);
+  background: none;
+  border: none;
+  color: var(--fg);
+  font-weight: 400;
+  text-align: left;
+}
+
+.nav-main:hover {
+  background: none;
+}
+
+.nav-main.workspace {
+  flex-direction: row;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.nav-main svg {
+  flex-shrink: 0;
+  color: var(--muted);
+}
+
+.nav-title,
+.nav-sub {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.nav-row.active .nav-title {
+  font-weight: 500;
+}
+
+.nav-sub {
+  color: var(--muted);
+  font-size: var(--text-xs);
+}
+
+/* The row's "⋯" shows on hover or focus, and while its menu is open. */
+.nav-row > button.icon {
+  opacity: 0;
+}
+
+.nav-row:hover > button.icon,
+.nav-row:focus-within > button.icon,
+.nav-row > button.icon[data-state="open"] {
+  opacity: 1;
+}
+
+.nav-status {
+  flex-shrink: 0;
+  color: var(--muted);
+}
+
+.nav-status.approval {
+  width: 8px;
+  height: 8px;
+  margin: 0 3px;
+  border-radius: 50%;
+  background: var(--warn);
+}
+
+.nav-status.ended {
+  font-size: var(--text-xs);
+}
+
+.sidebar-footer {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border-top: 1px solid var(--border);
+}
+
+.ready-pill {
+  min-height: 26px;
+  padding: 0 var(--space-2);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-full);
+  background: transparent;
+  color: var(--ok);
+  font-size: var(--text-sm);
+}
+
+.ready-pill:hover {
+  background: var(--surface-3);
+  border-color: var(--border-strong);
+}
+
+.ready-pill.not-ready {
+  color: var(--warn);
+}
+
+/* ---------- Main ---------- */
+
+.main {
+  height: 100%;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+}
+
+.main > .banner {
+  border-bottom: 1px solid var(--border);
+}
+
+.main-body {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+}
+
+.session {
+  position: absolute;
+  inset: 0;
+  display: flex;
+}
+
+.session[hidden] {
+  display: flex;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+/* ---------- Home ---------- */
+
+.home {
+  position: absolute;
+  inset: 0;
+  overflow-y: auto;
+}
+
+.home-inner {
+  max-width: 760px;
+  margin: 0 auto;
+  padding: var(--space-8) var(--space-6);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.home-header {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  margin-bottom: var(--space-2);
+}
+
+.workspace-selected {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface-2);
+}
+
+.workspace-icon {
+  flex-shrink: 0;
+  color: var(--accent);
+}
+
+.workspace-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.workspace-text span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--text-sm);
+}
+
+.workspace-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-3);
+}
+
+.recent-heading {
+  margin-bottom: var(--space-1);
+  color: var(--muted);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.recent ul {
+  list-style: none;
+  margin: 0 calc(-1 * var(--space-2));
+  padding: 0;
+}
+
+.recent-row {
+  width: 100%;
+  min-height: 0;
+  justify-content: flex-start;
+  gap: var(--space-2);
+  padding: 6px var(--space-2);
+  background: none;
+  border: none;
+  border-radius: var(--radius-sm);
+  color: var(--fg);
+  font-weight: 400;
+}
+
+.recent-row:hover {
+  background: var(--surface-3);
+}
+
+.recent-row svg {
+  flex-shrink: 0;
+  color: var(--muted);
+}
+
+.recent-name {
+  flex-shrink: 0;
+  font-weight: 500;
+}
+
+.recent-path {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--muted);
+  font-size: var(--text-xs);
+}
+
+.readiness.compact {
+  flex-direction: row;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+}
+
+.readiness-ok {
+  flex-shrink: 0;
+  color: var(--ok);
+}
+
+.readiness ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.readiness li {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+}
+
+.readiness li > svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.readiness li.ok > svg {
+  color: var(--ok);
+}
+
+.readiness li.fail > svg {
+  color: var(--err);
+}
+
+/* Previous sessions */
+
+.session-list ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.session-list li {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) 0;
+  border-top: 1px solid var(--border);
+}
+
+.session-list li:first-child {
+  border-top: none;
+  padding-top: 0;
+}
+
+.session-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.session-title-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.session-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 500;
+}
+
+.session-title-row input {
+  flex: 1;
+  min-width: 0;
+  min-height: 26px;
+  padding: 2px var(--space-2);
+}
+
+.session-list .session-meta {
+  color: var(--muted);
+  font-size: var(--text-xs);
+}
+
+.session-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}

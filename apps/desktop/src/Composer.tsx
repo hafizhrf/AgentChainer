@@ -1,8 +1,10 @@
-import { EFFORTS, type Effort, type Image, PERMISSION_MODES, type PermissionMode } from "@agentchainer/protocol";
-import { type ClipboardEvent, type KeyboardEvent, type ReactNode, useEffect, useMemo, useRef, useState } from "react";
+import { type Effort, type Image, PERMISSION_MODES, type PermissionMode } from "@agentchainer/protocol";
+import { ArrowUp, ListPlus, Play, Square, X } from "lucide-react";
+import { type ClipboardEvent, type KeyboardEvent, useEffect, useMemo, useRef, useState } from "react";
 import { fuzzyFilter, tokenAt } from "./fuzzy.ts";
-import { MODE_HELP, MODE_LABELS, MODELS } from "./SettingsPanel.tsx";
+import { EFFORT_OPTIONS, MODELS, modeOptions } from "./options.ts";
 import { asMode, type Tab } from "./tabs.ts";
+import { Select } from "./ui/Select.tsx";
 
 /** An image pasted into the composer: base64 data for the API and a data URL for the thumbnail. */
 export type Attachment = Image & { preview: string };
@@ -21,7 +23,7 @@ const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 export function Composer({
   tab,
   files,
-  actions,
+  seed,
   onSend,
   onInterrupt,
   onResume,
@@ -32,8 +34,8 @@ export function Composer({
   tab: Tab;
   /** Workspace-relative file paths for `@` mentions. */
   files: string[];
-  /** Extra buttons on the left of the action row (panel toggles). */
-  actions: ReactNode;
+  /** Text to put in the composer (a starter prompt); a new object each time it's used. */
+  seed: { text: string } | null;
   onSend: (text: string, images: Attachment[]) => void;
   onInterrupt: () => void;
   onResume: () => void;
@@ -51,6 +53,13 @@ export function Composer({
   const [dismissed, setDismissed] = useState<number | null>(null);
   const area = useRef<HTMLTextAreaElement>(null);
   const wasRunning = useRef(tab.running);
+
+  useEffect(() => {
+    if (!seed) return;
+    setDraft(seed.text);
+    setCursor(seed.text.length);
+    area.current?.focus();
+  }, [seed]);
 
   // Send the next queued message once a turn finishes successfully. Errors and the budget cap keep the queue.
   useEffect(() => {
@@ -144,7 +153,7 @@ export function Composer({
   const track = (el: HTMLTextAreaElement) => setCursor(el.selectionStart);
 
   return (
-    <footer className="composer">
+    <div className="composer">
       {queue.length > 0 && (
         <div className="queue">
           <span className="muted">Queued, sent after this turn:</span>
@@ -156,11 +165,11 @@ export function Composer({
               {qi.length > 0 && ` (+${qi.length} image${qi.length > 1 ? "s" : ""})`}
               <button
                 type="button"
-                className="link"
+                className="ghost icon tiny"
                 aria-label="Remove from queue"
                 onClick={() => setQueue((all) => all.filter((_, j) => j !== i))}
               >
-                ×
+                <X size={12} />
               </button>
             </span>
           ))}
@@ -169,107 +178,123 @@ export function Composer({
           </button>
         </div>
       )}
-      {suggestions.length > 0 && (
-        <ul className="suggestions" aria-label={token?.kind === "@" ? "Matching files" : "Matching commands"}>
-          {suggestions.map((s, i) => (
-            <li key={s} className={i === pick ? "active" : undefined}>
-              <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => accept(s)}>
-                {token?.kind === "/" ? `/${s}` : s}
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
-      {images.length > 0 && (
-        <div className="attachments">
-          {images.map((img, i) => (
-            // biome-ignore lint/suspicious/noArrayIndexKey: attachments have no ids; removal is by position.
-            <span key={i} className="attachment">
-              <img src={img.preview} alt={`Pasted screenshot ${i + 1}`} />
+      <div className="composer-box">
+        {suggestions.length > 0 && (
+          <ul className="suggestions" aria-label={token?.kind === "@" ? "Matching files" : "Matching commands"}>
+            {suggestions.map((s, i) => (
+              <li key={s} className={i === pick ? "active" : undefined}>
+                <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => accept(s)}>
+                  {token?.kind === "/" ? `/${s}` : s}
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+        {images.length > 0 && (
+          <div className="attachments">
+            {images.map((img, i) => (
+              // biome-ignore lint/suspicious/noArrayIndexKey: attachments have no ids; removal is by position.
+              <span key={i} className="attachment">
+                <img src={img.preview} alt={`Pasted screenshot ${i + 1}`} />
+                <button
+                  type="button"
+                  className="ghost icon tiny"
+                  aria-label={`Remove screenshot ${i + 1}`}
+                  onClick={() => setImages((all) => all.filter((_, j) => j !== i))}
+                >
+                  <X size={12} />
+                </button>
+              </span>
+            ))}
+          </div>
+        )}
+        {pasteError && <p className="warn">{pasteError}</p>}
+        <textarea
+          ref={area}
+          onPaste={onPaste}
+          value={draft}
+          aria-label="Message to Claude"
+          placeholder={
+            tab.ended
+              ? "This session ended. Resume it to continue."
+              : tab.running
+                ? "Claude is working… type a follow-up to queue it"
+                : "Ask Claude to do something… @ for files, / for commands"
+          }
+          onChange={(e) => {
+            setDraft(e.target.value);
+            track(e.target);
+            setPick(0);
+          }}
+          onSelect={(e) => track(e.currentTarget)}
+          onKeyDown={onKey}
+          rows={3}
+          disabled={tab.ended}
+        />
+        <div className="composer-toolbar">
+          <Select
+            compact
+            label="Permission profile"
+            value={tab.mode}
+            options={modeOptions(PERMISSION_MODES, tab.budgetUsd !== null)}
+            onChange={(m) => onModeChange(asMode(m))}
+            disabled={tab.ended}
+          />
+          <Select
+            compact
+            label="Model"
+            value={tab.modelAlias}
+            options={MODELS}
+            onChange={onModelChange}
+            disabled={tab.ended}
+          />
+          <Select
+            compact
+            label="Effort"
+            value={tab.effort ?? ""}
+            options={EFFORT_OPTIONS}
+            onChange={(e) => onEffortChange((e || null) as Effort | null)}
+            disabled={tab.ended}
+          />
+          <span className="grow" />
+          {tab.ended ? (
+            <button
+              type="button"
+              className="small"
+              onClick={onResume}
+              title="Continue this conversation in a new live session"
+            >
+              <Play size={14} />
+              Resume session
+            </button>
+          ) : (
+            <>
+              <span className="composer-hint">{tab.running ? "Esc stops" : "Enter sends · Shift+Enter new line"}</span>
+              {tab.running && (
+                <button
+                  type="button"
+                  className="secondary icon round"
+                  onClick={onInterrupt}
+                  aria-label="Stop the running turn"
+                  title="Stop (Esc)"
+                >
+                  <Square size={12} fill="currentColor" />
+                </button>
+              )}
               <button
                 type="button"
-                className="link"
-                aria-label={`Remove screenshot ${i + 1}`}
-                onClick={() => setImages((all) => all.filter((_, j) => j !== i))}
+                className="icon round"
+                disabled={!draft.trim()}
+                onClick={submit}
+                aria-label={tab.running ? "Queue message" : "Send message"}
+                title={tab.running ? "Queue (Enter)" : "Send (Enter)"}
               >
-                ×
+                {tab.running ? <ListPlus size={16} /> : <ArrowUp size={16} />}
               </button>
-            </span>
-          ))}
+            </>
+          )}
         </div>
-      )}
-      {pasteError && <p className="warn">{pasteError}</p>}
-      <textarea
-        ref={area}
-        onPaste={onPaste}
-        value={draft}
-        placeholder={
-          tab.running
-            ? "Claude is working… type a follow-up to queue it (Esc stops the turn)"
-            : "Ask Claude to do something… (Enter to send, Shift+Enter for a new line, @ for files, / for commands)"
-        }
-        onChange={(e) => {
-          setDraft(e.target.value);
-          track(e.target);
-          setPick(0);
-        }}
-        onSelect={(e) => track(e.currentTarget)}
-        onKeyDown={onKey}
-        rows={3}
-        disabled={tab.ended}
-      />
-      <div className="composer-actions">
-        {actions}
-        <select
-          value={tab.mode}
-          onChange={(e) => onModeChange(asMode(e.target.value))}
-          aria-label="Permission profile"
-          title={MODE_HELP[tab.mode]}
-        >
-          {PERMISSION_MODES.map((m) => (
-            <option key={m} value={m} disabled={m === "auto" && tab.budgetUsd === null}>
-              {MODE_LABELS[m]}
-              {m === "auto" && tab.budgetUsd === null ? " (needs a budget cap)" : ""}
-            </option>
-          ))}
-        </select>
-        <select value={tab.modelAlias} onChange={(e) => onModelChange(e.target.value)} aria-label="Model">
-          {MODELS.map((m) => (
-            <option key={m.value} value={m.value}>
-              {m.value ? m.label : "Default model"}
-            </option>
-          ))}
-        </select>
-        <select
-          value={tab.effort ?? ""}
-          onChange={(e) => onEffortChange((e.target.value || null) as Effort | null)}
-          aria-label="Effort"
-        >
-          <option value="">Default effort</option>
-          {EFFORTS.map((ef) => (
-            <option key={ef} value={ef}>
-              {ef} effort
-            </option>
-          ))}
-        </select>
-        <span className="grow" />
-        {tab.ended ? (
-          <button type="button" onClick={onResume} title="Continue this conversation in a new live session">
-            Resume session
-          </button>
-        ) : (
-          <>
-            {tab.running && (
-              <button type="button" className="secondary" onClick={onInterrupt} title="Stop the running turn (Esc)">
-                Stop
-              </button>
-            )}
-            <button type="button" disabled={!draft.trim()} onClick={submit}>
-              {tab.running ? "Queue" : "Send"}
-            </button>
-          </>
-        )}
       </div>
-    </footer>
+    </div>
   );
 }

@@ -1,10 +1,12 @@
 import type { FileDiff } from "@agentchainer/protocol";
+import { ArrowLeft, ExternalLink, Undo2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { isDark, onThemeChange } from "./appearance.ts";
 import type { Confirm } from "./Dialog.tsx";
 import { languageFor, monaco } from "./monaco.ts";
 import { request } from "./sidecar.ts";
 
-const dark = () => window.matchMedia("(prefers-color-scheme: dark)").matches;
+const monacoTheme = () => (isDark() ? "vs-dark" : "vs");
 
 /**
  * HEAD vs working tree for one file in a read-only Monaco diff (M1-27), with revert per file or per hunk through
@@ -55,10 +57,13 @@ export default function DiffView({
       useInlineViewWhenSpaceIsLimited: true,
       minimap: { enabled: false },
       scrollBeyondLastLine: false,
-      theme: dark() ? "vs-dark" : "vs",
+      theme: monacoTheme(),
     });
     editor.current = ed;
+    // Monaco's theme is global, so any open diff follows a theme switch.
+    const offTheme = onThemeChange(() => monaco.editor.setTheme(monacoTheme()));
     return () => {
+      offTheme();
       const model = ed.getModel();
       ed.dispose();
       model?.original.dispose();
@@ -129,22 +134,27 @@ export default function DiffView({
   return (
     <div className="diff-view">
       <header className="diff-header">
+        <button type="button" className="ghost small" onClick={onClose} aria-label="Back to the workspace panel">
+          <ArrowLeft size={14} />
+          Back
+        </button>
         <code className="grow diff-path" title={path}>
           {path}
         </code>
         {diff?.status && <span className="badge">{diff.status}</span>}
-        <button type="button" className="link" onClick={() => onOpenInEditor(diff?.hunks[0]?.newStart)}>
+      </header>
+      <div className="diff-actions">
+        <button type="button" className="ghost small" onClick={() => onOpenInEditor(diff?.hunks[0]?.newStart)}>
+          <ExternalLink size={14} />
           Open in editor
         </button>
         {diff?.status && (
-          <button type="button" className="link" onClick={() => void revertFile()}>
+          <button type="button" className="ghost small" onClick={() => void revertFile()}>
+            <Undo2 size={14} />
             Revert file
           </button>
         )}
-        <button type="button" className="link" aria-label="Close diff" onClick={onClose}>
-          Close
-        </button>
-      </header>
+      </div>
       {error && <p className="warn">{error}</p>}
       {diff?.binary && <p className="muted">Binary file: no text diff.</p>}
       {diff?.tooLarge && <p className="muted">This file is too large to diff here. Open it in your editor.</p>}

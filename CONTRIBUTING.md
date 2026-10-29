@@ -31,6 +31,12 @@ pnpm dev             # run the desktop app with hot reload (builds the sidecar e
 
 All commands are listed in [`CLAUDE.md`](CLAUDE.md#commands).
 
+Troubleshooting:
+- **`pnpm dev` fails with `failed to run 'cargo metadata'`**: Rust is installed but `cargo` isn't on your shell's
+  PATH (rustup installed without changing your profile).
+  - Fix it for every new terminal: `echo '. "$HOME/.cargo/env"' >> ~/.zshrc` (or `~/.bashrc`).
+  - Fix it for the current one: `source "$HOME/.cargo/env"`.
+
 ## Making a change
 
 1. Branch from `main`: `feat/<topic>`, `fix/<topic>`, `docs/<topic>`, `chore/<topic>` or `spike/<topic>`.

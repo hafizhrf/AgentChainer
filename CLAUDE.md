@@ -3,15 +3,18 @@
 Open-source desktop app (Tauri v2 + React/TS + Node sidecar on the Claude Agent SDK) that makes repos agent-ready and
 keeps agent work transparent and verified. **Current phase: M2 (workspace bootstrap); M1 awaits its UI click-through and the Windows/Ubuntu exit runs.**
 
-The app has a functional (deliberately plain) M1 UI:
-- readiness check, session tabs with resume, fork and file rewind, tool approvals, subagent cards;
-- workspace files, diff and revert, and a terminal.
+The app has a working M1/M2 UI in a three-column shell (UX-03):
+- a sidebar with sessions and workspaces, and a native menu with shortcuts;
+- readiness check, sessions with resume, fork and file rewind, tool approvals, subagent cards;
+- a right panel with workspace files, diff and revert, git, rules and the setup report; and a terminal.
 
-Packaged builds ship the sidecar as a Node single executable (spike S1). The visual design pass is the UX track in the
-checklist.
+Packaged builds ship the sidecar as a Node single executable (spike S1). The rest of the design pass is the UX track
+in the checklist.
 
 Layout:
-- `apps/desktop`: Tauri app. `src/` is the React UI, `src-tauri/` is the Rust core.
+- `apps/desktop`: Tauri app. `src/` is the React UI, `src-tauri/` is the Rust core (native menu in `menu.rs`).
+  UI building blocks are Radix-based wrappers in `src/ui/`; styles are CSS tokens and files in `src/styles/`, no
+  Tailwind ([ADR-0008](docs/adr/0008-ui-components-and-styling.md)).
 - `packages/protocol`: IPC types.
 - `packages/sidecar`: Node agent runtime.
 - `docs/`: planning docs.

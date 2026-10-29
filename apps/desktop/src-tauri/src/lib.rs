@@ -2,6 +2,7 @@ mod applog;
 mod diagnostics;
 mod editor;
 mod history;
+mod menu;
 mod pty;
 mod settings;
 mod shell_env;
@@ -191,6 +192,8 @@ pub fn run() {
     let app = tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
+        .menu(menu::build)
+        .on_menu_event(menu::on_event)
         .setup(|app| {
             if let Ok(dir) = app.path().app_log_dir() {
                 applog::init(&dir);

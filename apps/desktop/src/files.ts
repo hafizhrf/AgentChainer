@@ -51,6 +51,40 @@ export function buildTree(files: WorkspaceFile[]): TreeNode[] {
   return sort(root.children ?? []);
 }
 
+/** Keeps files whose path contains `query` (case-insensitive), with the folders above them. */
+export function filterTree(nodes: TreeNode[], query: string): TreeNode[] {
+  const q = query.trim().toLowerCase();
+  if (!q) return nodes;
+  const walk = (list: TreeNode[]): TreeNode[] =>
+    list.flatMap((n) => {
+      if (!n.children) return n.path.toLowerCase().includes(q) ? [n] : [];
+      const children = walk(n.children);
+      return children.length ? [{ ...n, children }] : [];
+    });
+  return walk(nodes);
+}
+
+/** Every folder in a tree, e.g. to expand all of a filtered tree. */
+export function folderPaths(nodes: TreeNode[]): string[] {
+  return nodes.flatMap((n) => (n.children ? [n.path, ...folderPaths(n.children)] : []));
+}
+
+export type VisibleRow = { node: TreeNode; depth: number };
+
+/** The rows a tree shows, top to bottom: a folder's children only while it's expanded. */
+export function visibleRows(nodes: TreeNode[], expanded: ReadonlySet<string>, depth = 0): VisibleRow[] {
+  return nodes.flatMap((node) => [
+    { node, depth },
+    ...(node.children && expanded.has(node.path) ? visibleRows(node.children, expanded, depth + 1) : []),
+  ]);
+}
+
+/** `{ dir: "src/app", name: "main.ts" }` for "src/app/main.ts"; works with either separator. */
+export function splitPath(path: string): { dir: string; name: string } {
+  const at = Math.max(path.lastIndexOf("/"), path.lastIndexOf("\\"));
+  return at < 0 ? { dir: "", name: path } : { dir: path.slice(0, at), name: path.slice(at + 1) };
+}
+
 const sep = (dir: string) => (dir.includes("\\") && !dir.includes("/") ? "\\" : "/");
 
 /** Joins a workspace folder and a `/`-separated relative path with the folder's own separator. */

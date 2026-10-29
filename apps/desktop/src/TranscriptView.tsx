@@ -1,4 +1,20 @@
-import { useState } from "react";
+import {
+  Bot,
+  Brain,
+  Check,
+  FilePen,
+  FileText,
+  Globe,
+  ListTodo,
+  Loader2,
+  type LucideIcon,
+  RotateCcw,
+  Search,
+  SquareTerminal,
+  Wrench,
+  X,
+} from "lucide-react";
+import { createContext, useContext, useState } from "react";
 import { Markdown } from "./Markdown.tsx";
 import { editPairs, lineDiff } from "./textdiff.ts";
 import type { AgentItem, Item, ToolItem } from "./transcript.ts";
@@ -7,20 +23,28 @@ import type { AgentItem, Item, ToolItem } from "./transcript.ts";
  * Renders a session transcript. `onRewind` is offered on user messages that have a message id, while no turn is
  * running (M1-23).
  */
+/** The session's workspace, so tool rows can show paths inside it as relative ones. */
+const Workspace = createContext("");
+
 export function TranscriptView({
+  cwd,
   items,
   onRewind,
   onOpenFile,
+  onStarter,
 }: {
+  cwd: string;
   items: Item[];
   onRewind?: (messageId: string) => void;
   onOpenFile?: (file: string) => void;
+  /** Offered before the first message: puts a starter prompt in the composer. */
+  onStarter?: (text: string) => void;
 }) {
   // Long sessions render their latest items only; earlier ones load on demand (M1-10).
   const [shown, setShown] = useState(WINDOW);
   const hidden = Math.max(0, items.length - shown);
   return (
-    <>
+    <Workspace.Provider value={cwd}>
       {hidden > 0 && (
         <button type="button" className="link show-earlier" onClick={() => setShown((n) => n + WINDOW)}>
           Show {Math.min(hidden, WINDOW)} earlier of {hidden} hidden
@@ -29,7 +53,32 @@ export function TranscriptView({
       {items.slice(hidden).map((it) => (
         <ItemView key={`${it.kind}-${it.id}`} item={it} onRewind={onRewind} onOpenFile={onOpenFile} />
       ))}
-    </>
+      {onStarter && !items.some((i) => i.kind === "user") && <Starters onPick={onStarter} />}
+    </Workspace.Provider>
+  );
+}
+
+const STARTERS = [
+  "Explain how this codebase is organized",
+  "Find a bug and propose a fix",
+  "Add tests for the most important module",
+  "Review the uncommitted changes",
+];
+
+function Starters({ onPick }: { onPick: (text: string) => void }) {
+  return (
+    <div className="starters">
+      <Bot size={28} className="starters-icon" aria-hidden />
+      <h2>What should Claude work on?</h2>
+      <p className="muted">Describe a task below, or start from one of these.</p>
+      <div className="starter-chips">
+        {STARTERS.map((text) => (
+          <button key={text} type="button" className="secondary small" onClick={() => onPick(text)}>
+            {text}
+          </button>
+        ))}
+      </div>
+    </div>
   );
 }
 
@@ -50,28 +99,31 @@ function ItemView({
     case "user": {
       const { messageId } = item;
       return (
-        <div className="msg user">
-          {item.images && item.images.length > 0 && (
-            <div className="attachments">
-              {item.images.map((src, i) => (
-                // biome-ignore lint/suspicious/noArrayIndexKey: a message's images never reorder.
-                <img key={i} src={src} alt={`Attachment ${i + 1}`} />
-              ))}
-            </div>
-          )}
-          {!item.images && item.imageCount ? (
-            <div className="muted">
-              [{item.imageCount} image{item.imageCount > 1 ? "s" : ""}]
-            </div>
-          ) : null}
-          {item.text}
+        <div className="msg-user">
+          <div className="msg user">
+            {item.images && item.images.length > 0 && (
+              <div className="attachments">
+                {item.images.map((src, i) => (
+                  // biome-ignore lint/suspicious/noArrayIndexKey: a message's images never reorder.
+                  <img key={i} src={src} alt={`Attachment ${i + 1}`} />
+                ))}
+              </div>
+            )}
+            {!item.images && item.imageCount ? (
+              <div className="muted">
+                [{item.imageCount} image{item.imageCount > 1 ? "s" : ""}]
+              </div>
+            ) : null}
+            {item.text}
+          </div>
           {onRewind && messageId && (
             <button
               type="button"
-              className="link rewind"
+              className="ghost small rewind"
               title="Restore files the agent edited since this message"
               onClick={() => onRewind(messageId)}
             >
+              <RotateCcw size={12} />
               Rewind files to here
             </button>
           )}
@@ -87,8 +139,11 @@ function ItemView({
     case "thinking":
       return (
         <details className="thinking-block">
-          <summary className="muted">{item.open ? "Thinking…" : "Thought"}</summary>
-          <div className="muted">{item.text}</div>
+          <summary>
+            <Brain size={14} aria-hidden />
+            {item.open ? "Thinking…" : "Thought"}
+          </summary>
+          <div>{item.text}</div>
         </details>
       );
     case "notice":
@@ -103,6 +158,7 @@ function ItemView({
 const GUARD = "Blocked by AgentChainer guard: ";
 
 function ToolView({ tool, onOpenFile }: { tool: ToolItem; onOpenFile: OpenFile }) {
+  const cwd = useContext(Workspace);
   const guardAt = tool.output?.indexOf(GUARD) ?? -1;
   const blocked = guardAt >= 0;
   const reason = blocked ? tool.output?.slice(guardAt + GUARD.length).split("\n")[0] : undefined;
@@ -114,15 +170,17 @@ function ToolView({ tool, onOpenFile }: { tool: ToolItem; onOpenFile: OpenFile }
   return (
     <details className={`tool ${tool.status}`} open={blocked}>
       <summary>
-        <StatusIcon status={tool.status} />
-        {tool.name} <code>{toolSummary(tool.input)}</code>
+        <ToolIcon name={tool.name} />
+        <span className="tool-name">{tool.name}</span>
+        <code className="tool-arg">{toolSummary(tool.input, cwd)}</code>
         {diffs && (
           <span className="diffstat">
             <span className="add">+{added}</span> <span className="del">−{removed}</span>
           </span>
         )}
-        {blocked && <span className="badge">blocked by guard</span>}
-        {tool.durationMs !== undefined && <span className="muted">{(tool.durationMs / 1000).toFixed(1)} s</span>}
+        {blocked && <span className="badge danger">blocked by guard</span>}
+        {tool.durationMs !== undefined && <span className="tool-time">{(tool.durationMs / 1000).toFixed(1)} s</span>}
+        <StatusIcon status={tool.status} />
       </summary>
       {reason && <p className="warn guard-reason">Blocked by AgentChainer's guard: {reason}</p>}
       {onOpenFile && typeof file === "string" && (
@@ -161,9 +219,11 @@ function AgentView({ agent, onOpenFile }: { agent: AgentItem; onOpenFile: OpenFi
   return (
     <details className={`agent ${agent.status}`} open={agent.status === "running"}>
       <summary>
+        <Bot size={14} className="tool-icon" aria-hidden />
+        <span className="tool-name">Subagent</span>
+        <span className="tool-arg">{agent.description}</span>
+        {meta.length > 0 && <span className="tool-time">{meta.join(" · ")}</span>}
         <StatusIcon status={agent.status} />
-        <strong>Subagent</strong> {agent.description}
-        {meta.length > 0 && <span className="muted">{meta.join(" · ")}</span>}
       </summary>
       <div className="agent-children">
         {agent.children.map((c) =>
@@ -182,13 +242,40 @@ function AgentView({ agent, onOpenFile }: { agent: AgentItem; onOpenFile: OpenFi
 }
 
 function StatusIcon({ status }: { status: "running" | "done" | "error" }) {
-  return <span className="tool-status">{status === "running" ? "⋯" : status === "done" ? "✓" : "✕"}</span>;
+  if (status === "running") return <Loader2 size={14} className="tool-status spin" aria-label="Running" />;
+  if (status === "done") return <Check size={14} className="tool-status" aria-label="Done" />;
+  return <X size={14} className="tool-status" aria-label="Failed" />;
 }
 
-function toolSummary(input: unknown): string {
+const TOOL_ICONS: Record<string, LucideIcon> = {
+  Read: FileText,
+  Edit: FilePen,
+  MultiEdit: FilePen,
+  Write: FilePen,
+  NotebookEdit: FilePen,
+  Bash: SquareTerminal,
+  BashOutput: SquareTerminal,
+  Grep: Search,
+  Glob: Search,
+  WebFetch: Globe,
+  WebSearch: Globe,
+  Task: Bot,
+  Agent: Bot,
+  TodoWrite: ListTodo,
+};
+
+function ToolIcon({ name }: { name: string }) {
+  const Icon = TOOL_ICONS[name] ?? Wrench;
+  return <Icon size={14} className="tool-icon" aria-hidden />;
+}
+
+/** The one input worth showing in a collapsed tool row; paths inside the workspace are shown relative to it. */
+function toolSummary(input: unknown, cwd: string): string {
   if (input && typeof input === "object") {
     const o = input as Record<string, unknown>;
-    const v = o.command ?? o.file_path ?? o.pattern ?? o.url ?? o.description;
+    let v = o.command ?? o.file_path ?? o.path ?? o.pattern ?? o.url ?? o.description;
+    if (typeof v === "string" && cwd && (v.startsWith(`${cwd}/`) || v.startsWith(`${cwd}\\`)))
+      v = v.slice(cwd.length + 1);
     if (typeof v === "string") return v.length > 80 ? `${v.slice(0, 80)}…` : v;
   }
   return "";

@@ -10,25 +10,35 @@ import {
   RpcErrorCode,
   type SessionInfo,
 } from "@agentchainer/protocol";
+import * as Tooltip from "@radix-ui/react-tooltip";
 import { invoke } from "@tauri-apps/api/core";
 import { save } from "@tauri-apps/plugin-dialog";
-import { useEffect, useRef, useState } from "react";
+import { X } from "lucide-react";
+import { lazy, Suspense, useEffect, useRef, useState } from "react";
+import { Group, Panel, Separator, useDefaultLayout } from "react-resizable-panels";
+import { applyTheme } from "./appearance.ts";
 import type { Attachment } from "./Composer.tsx";
 import { useConfirm } from "./Dialog.tsx";
 import { joinPath } from "./files.ts";
-import { GitInitOffer } from "./GitInitOffer.tsx";
+import { HomeView, pickFolder } from "./HomeView.tsx";
 import { type PermissionAnswer, PermissionDialog } from "./PermissionDialog.tsx";
-import { Readiness } from "./Readiness.tsx";
-import { SessionList } from "./SessionList.tsx";
 import { SessionView } from "./SessionView.tsx";
-import { MODELS, SettingsPanel } from "./SettingsPanel.tsx";
+import { SettingsDialog } from "./SettingsDialog.tsx";
+import { Sidebar } from "./Sidebar.tsx";
 import { quitApp, readSelftestConfig, runSelftest } from "./selftest.ts";
 import { loadSettings, type Settings, saveSettings, withRecent } from "./settings.ts";
+import type { SetupView } from "./setup/SetupPage.tsx";
 import { connect, isRpcError, onExit, onReady, request, requestWithTimeout, subscribe } from "./sidecar.ts";
 import { asMode, folderName, newTab, type Tab, tabEvent, updateTab } from "./tabs.ts";
+import { asTheme } from "./theme.ts";
 import { applyEvent, closeAssistant, type Item, nextId, setMessageId } from "./transcript.ts";
-import { WorkspacePicker } from "./WorkspacePicker.tsx";
-import "./App.css";
+import { IconButton } from "./ui/IconButton.tsx";
+import { layoutStorage, usePersistentFlag } from "./ui/layoutStorage.ts";
+import { useMenuCommands } from "./useMenuCommands.ts";
+import type { PanelTab } from "./WorkspacePanel.tsx";
+
+// The setup page shares the file-type icon set with the workspace panel; both load on first use.
+const SetupPage = lazy(() => import("./setup/SetupPage.tsx").then((m) => ({ default: m.SetupPage })));
 
 /** Guards against React StrictMode running the mount effect twice in dev. */
 let selftestStarted = false;
@@ -37,8 +47,8 @@ const PING_EVERY_MS = 20_000;
 const PING_TIMEOUT_MS = 5_000;
 const NEW_TITLE = "New session";
 
-// App shell (M1-01…M1-07) with one session per tab (M1-06/M1-08) and stored sessions (M1-21…M1-24). The visual
-// design pass is the UX track.
+// App shell (M1-01…M1-07, UX-03): sidebar, then Home or the active session. One live session per tab (M1-06/M1-08),
+// stored sessions (M1-21…M1-24), and the native menu's commands (UX-07).
 
 type Hello = Methods["system.hello"]["result"];
 type TurnCompleted = Extract<AgentEvent, { type: "turn.completed" }>;
@@ -50,13 +60,35 @@ export function App() {
   const [env, setEnv] = useState<EnvCheck | null>(null);
   const [checking, setChecking] = useState(false);
   const [runtimeNotice, setRuntimeNotice] = useState<string | null>(null);
+  const [appVersion, setAppVersion] = useState<string | null>(null);
   const [settings, setSettings] = useState<Settings | null>(null);
   const [cwd, setCwd] = useState("");
   const [model, setModel] = useState("");
+  const [mode, setMode] = useState<PermissionMode>("default");
   const [tabs, setTabs] = useState<Tab[]>([]);
   /** The active tab's session id; null shows the new-session screen. */
   const [active, setActive] = useState<string | null>(null);
   const [confirm, confirmDialog] = useConfirm();
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = usePersistentFlag("agentchainer.sidebar", true);
+  const [rightOpen, setRightOpen] = usePersistentFlag("agentchainer.right", true);
+  /** Sessions whose terminal is open. */
+  const [terminals, setTerminals] = useState<Set<string>>(new Set());
+  /** The workspace setup page, open over the session it came from (or Home when `back` is null). */
+  const [setup, setSetup] = useState<{
+    cwd: string;
+    model: string;
+    back: string | null;
+    view?: SetupView;
+  } | null>(null);
+  /** Self-test screenshots only: the right panel's tab. */
+  const [panelTab, setPanelTab] = useState<PanelTab | undefined>(undefined);
+  const shell = useDefaultLayout({
+    id: "agentchainer.shell",
+    panelIds: sidebarOpen ? ["sidebar", "main"] : ["main"],
+    storage: layoutStorage,
+    onlySaveAfterUserInteractions: true,
+  });
   /** Mirrors `tabs` for async code that outlives a render (the self-test). */
   const tabsRef = useRef(tabs);
   tabsRef.current = tabs;
@@ -71,6 +103,9 @@ export function App() {
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: subscribe once on mount; the handlers only call state setters, which are stable.
   useEffect(() => {
+    void invoke<{ version: string }>("app_info")
+      .then((info) => setAppVersion(info.version))
+      .catch(() => undefined);
     connect()
       .then(() => Promise.all([loadSettings(), handshake()]))
       .then(async ([loaded, checked]) => {
@@ -90,7 +125,20 @@ export function App() {
           tab: (sessionId) => tabsRef.current.find((t) => t.sessionId === sessionId),
         }).catch((err: unknown) => ({ error: String(err) }));
         await request("debug.log", { message: JSON.stringify({ selftest: report }) });
-        await quitApp();
+        if (!cfg.stay) return quitApp();
+        if (cfg.theme) applyTheme(cfg.theme);
+        if (cfg.open === "home") setActive(null);
+        if (cfg.open === "settings") setSettingsOpen(true);
+        const first = tabsRef.current[0];
+        if (cfg.open === "terminal" && first) toggleTerminal(first.sessionId);
+        if (cfg.open === "files" || cfg.open === "git") setPanelTab(cfg.open);
+        if ((cfg.open === "setup" || cfg.open === "plan") && first)
+          setSetup({
+            cwd: first.cwd,
+            model: first.modelAlias,
+            back: first.sessionId,
+            view: cfg.open === "plan" ? "plan" : "overview",
+          });
       })
       .catch((err: unknown) => setRuntimeNotice(String(err)));
 
@@ -175,6 +223,8 @@ export function App() {
   function applySettings(next: Settings) {
     setSettings(next);
     setModel(next.defaultModel ?? "");
+    setMode(asMode(next.defaultMode));
+    applyTheme(asTheme(next.theme));
   }
 
   async function onSaveSettings(next: Settings) {
@@ -250,7 +300,7 @@ export function App() {
         ...(budgetUsd ? { maxBudgetUsd: budgetUsd } : {}),
         showThinking,
       });
-      const items = [notice(`Session started in ${dir}`)];
+      const items = [notice(`Session started in ${folderName(dir)}`)];
       setTabs((ts) => [
         ...ts,
         newTab(sessionId, dir, { title: NEW_TITLE, mode, items, modelAlias, effort, budgetUsd }),
@@ -281,7 +331,7 @@ export function App() {
         showThinking,
       });
       const items = closeAssistant(
-        events.reduce<Item[]>((acc, e) => applyEvent(acc, e), [notice(`Resumed “${title}” in ${dir}`)]),
+        events.reduce<Item[]>((acc, e) => applyEvent(acc, e), [notice(`Resumed “${title}” in ${folderName(dir)}`)]),
       );
       const tab = newTab(sessionId, dir, { title, mode, items, resumed: true, modelAlias, effort, budgetUsd });
       setTabs((ts) => (ts.some((t) => t.sessionId === sessionId) ? updateTab(ts, sessionId, () => tab) : [...ts, tab]));
@@ -436,132 +486,206 @@ export function App() {
     if (tab && !tab.ended) void request("session.close", { sessionId }).catch(() => undefined);
     const rest = tabs.filter((t) => t.sessionId !== sessionId);
     setTabs(rest);
+    setTerminals((open) => withToggled(open, sessionId, false));
     if (active === sessionId) setActive(rest.at(-1)?.sessionId ?? null);
   }
+
+  /** Renames the session in the SDK's session store too, so the stored list shows the same title (M1-24). */
+  async function renameTab(sessionId: string, title: string) {
+    const tab = tabs.find((t) => t.sessionId === sessionId);
+    if (!tab) return;
+    patchTab(sessionId, (t) => ({ ...t, title }));
+    try {
+      await request("session.rename", { cwd: tab.cwd, sessionId, title });
+    } catch (err) {
+      addNotice(sessionId, `The new title is only kept in this window: ${err}`);
+    }
+  }
+
+  /** Forks a session (M1-24) and opens the copy in a new tab. */
+  async function forkTab(sessionId: string) {
+    const tab = tabs.find((t) => t.sessionId === sessionId);
+    if (!tab) return;
+    try {
+      const forked = await request("session.fork", { cwd: tab.cwd, sessionId });
+      await resume(forked.sessionId, tab.cwd, `${tab.title} (fork)`, tab.modelAlias);
+    } catch (err) {
+      addNotice(sessionId, `Couldn't fork: ${err}`);
+    }
+  }
+
+  /** Shows a session, or Home for null; closes the setup page if it's open. */
+  function show(sessionId: string | null) {
+    setSetup(null);
+    setActive(sessionId);
+  }
+
+  function openWorkspace(dir: string) {
+    setCwd(dir);
+    show(null);
+  }
+
+  async function openFolder() {
+    const dir = await pickFolder();
+    if (dir) openWorkspace(dir);
+  }
+
+  async function exportFromMenu() {
+    try {
+      const path = await exportDiagnostics();
+      if (path) setRuntimeNotice(`Diagnostics saved to ${path}. Secrets, emails and your home folder are masked.`);
+    } catch (err) {
+      setRuntimeNotice(`Export failed: ${err}`);
+    }
+  }
+
+  const toggleTerminal = (sessionId: string) =>
+    setTerminals((open) => withToggled(open, sessionId, !open.has(sessionId)));
+
+  useMenuCommands({
+    "new-session": () => show(null),
+    "open-folder": () => void openFolder(),
+    "close-session": () => active && closeTab(active),
+    settings: () => setSettingsOpen(true),
+    "toggle-sidebar": () => setSidebarOpen((v) => !v),
+    "toggle-right-panel": () => setRightOpen((v) => !v),
+    "toggle-terminal": () => active && toggleTerminal(active),
+    "export-diagnostics": () => void exportFromMenu(),
+  });
 
   const activeTab = tabs.find((t) => t.sessionId === active);
   const permission = activeTab?.permissions[0];
   const workspace = cwd.trim();
 
   return (
-    <div className="app">
-      <header className="topbar">
-        <strong>AgentChainer</strong>
-        <span className="muted">
-          {hello
-            ? `${hello.claudeVersion ?? "claude not found"} · SDK ${hello.sdkVersion} · Node ${hello.nodeVersion}`
-            : "Starting the agent runtime…"}
-        </span>
-      </header>
-      {runtimeNotice && <div className="banner">{runtimeNotice}</div>}
-
-      <nav className="tabs" aria-label="Sessions">
-        {tabs.map((t) => (
-          <div key={t.sessionId} className={`tab${t.sessionId === active ? " active" : ""}`}>
-            <button
-              type="button"
-              className="tab-label"
-              aria-current={t.sessionId === active}
-              title={`${t.title}\n${t.cwd}`}
-              onClick={() => setActive(t.sessionId)}
-            >
-              <span className="tab-folder">{folderName(t.cwd)}</span> {t.title}
-              {t.permissions.length > 0 && <span className="tab-dot" title="Waiting for your approval" />}
-              {t.running && <span className="muted"> ⋯</span>}
-            </button>
-            <button
-              type="button"
-              className="tab-close"
-              aria-label={`Close ${t.title}`}
-              onClick={() => closeTab(t.sessionId)}
-            >
-              ×
-            </button>
-          </div>
-        ))}
-        <button
-          type="button"
-          className={`tab new${active === null ? " active" : ""}`}
-          aria-current={active === null}
-          onClick={() => setActive(null)}
+    <Tooltip.Provider delayDuration={400}>
+      <div className="app">
+        <Group
+          orientation="horizontal"
+          className="shell"
+          defaultLayout={shell.defaultLayout}
+          onLayoutChanged={shell.onLayoutChanged}
         >
-          + New session
-        </button>
-      </nav>
+          {sidebarOpen && (
+            <Panel id="sidebar" defaultSize={248} minSize={200} maxSize={400} groupResizeBehavior="preserve-pixel-size">
+              <Sidebar
+                tabs={tabs}
+                active={active}
+                recent={settings?.recentWorkspaces ?? []}
+                ready={env ? env.ready : null}
+                onNew={() => show(null)}
+                onSelect={show}
+                onClose={closeTab}
+                onOpenWorkspace={openWorkspace}
+                onSettings={() => setSettingsOpen(true)}
+              />
+            </Panel>
+          )}
+          {sidebarOpen && <Separator className="resize-handle" />}
+          <Panel id="main" minSize={480}>
+            <main className="main">
+              {runtimeNotice && (
+                <div className="banner" role="status">
+                  <span className="grow">{runtimeNotice}</span>
+                  <IconButton label="Dismiss" onClick={() => setRuntimeNotice(null)}>
+                    <X size={14} />
+                  </IconButton>
+                </div>
+              )}
+              <div className="main-body">
+                {active === null && !setup && (
+                  <HomeView
+                    env={env}
+                    checking={checking}
+                    onRecheck={() => void recheck()}
+                    homeDir={hello?.homeDir ?? null}
+                    connected={hello !== null}
+                    cwd={cwd}
+                    onCwdChange={setCwd}
+                    recent={settings?.recentWorkspaces ?? []}
+                    model={model}
+                    onModelChange={setModel}
+                    mode={mode}
+                    onModeChange={setMode}
+                    canAutonomous={settings?.budgetUsd != null}
+                    onStart={() => void startSession(workspace, model, mode)}
+                    onOpenSetup={() => setSetup({ cwd: workspace, model, back: null })}
+                    openIds={new Set(tabs.filter((t) => !t.ended).map((t) => t.sessionId))}
+                    onOpenStored={openStored}
+                    confirm={confirm}
+                  />
+                )}
+                {tabs.map((t) => (
+                  <SessionView
+                    key={t.sessionId}
+                    tab={t}
+                    hidden={t.sessionId !== active || setup !== null}
+                    panelTab={panelTab}
+                    rightOpen={rightOpen}
+                    terminalOpen={terminals.has(t.sessionId)}
+                    onToggleRight={() => setRightOpen((v) => !v)}
+                    onToggleTerminal={() => toggleTerminal(t.sessionId)}
+                    onSend={(text, images) => void sendText(t.sessionId, text, images)}
+                    onInterrupt={() => void request("session.interrupt", { sessionId: t.sessionId })}
+                    onModeChange={(m) => void changeMode(t.sessionId, m)}
+                    onModelChange={(alias) => void changeModel(t.sessionId, alias)}
+                    onEffortChange={(effort) => void changeEffort(t.sessionId, effort)}
+                    onRewind={(messageId) => void rewind(t.sessionId, messageId)}
+                    onResume={() => void resume(t.sessionId, t.cwd, t.title)}
+                    onRename={(title) => void renameTab(t.sessionId, title)}
+                    onFork={() => void forkTab(t.sessionId)}
+                    onClose={() => closeTab(t.sessionId)}
+                    onOpenFile={(file, line) => void openInEditor(t.sessionId, t.cwd, file, line)}
+                    onOpenSetup={() => setSetup({ cwd: t.cwd, model: t.modelAlias, back: t.sessionId })}
+                    confirm={confirm}
+                  />
+                ))}
+                {setup && (
+                  <Suspense fallback={<div className="setup-page" />}>
+                    <SetupPage
+                      key={setup.cwd}
+                      cwd={setup.cwd}
+                      model={setup.model}
+                      backLabel={setup.back ? "Back to session" : "Back to Home"}
+                      confirm={confirm}
+                      onBack={() => setSetup(null)}
+                      {...(setup.view ? { initialView: setup.view } : {})}
+                    />
+                  </Suspense>
+                )}
+              </div>
+            </main>
+          </Panel>
+        </Group>
 
-      {active === null && (
-        <section className="setup">
-          <h1>Start a session</h1>
-          <Readiness env={env} checking={checking} onRecheck={() => void recheck()} />
-          <WorkspacePicker
-            value={cwd}
-            onChange={setCwd}
-            recent={settings?.recentWorkspaces ?? []}
-            homeDir={hello?.homeDir ?? null}
+        {permission && activeTab && (
+          <PermissionDialog
+            key={permission.requestId}
+            request={permission}
+            canAutonomous={activeTab.budgetUsd !== null}
+            onAnswer={(reply) => void answer(permission, reply)}
           />
-          {hello && workspace && <GitInitOffer cwd={workspace} />}
-          <label>
-            Model
-            <select value={model} onChange={(e) => setModel(e.target.value)}>
-              {MODELS.map((m) => (
-                <option key={m.value} value={m.value}>
-                  {m.label}
-                </option>
-              ))}
-            </select>
-          </label>
-          <button
-            type="button"
-            disabled={!env?.ready || !workspace}
-            onClick={() => void startSession(workspace, model, asMode(settings?.defaultMode))}
-          >
-            Start session
-          </button>
-          {hello && workspace && (
-            <SessionList
-              cwd={workspace}
-              openIds={new Set(tabs.filter((t) => !t.ended).map((t) => t.sessionId))}
-              onOpen={openStored}
-              confirm={confirm}
-            />
-          )}
-          {settings && (
-            <SettingsPanel
-              key={JSON.stringify(settings)}
-              settings={settings}
-              onSave={onSaveSettings}
-              onExportDiagnostics={exportDiagnostics}
-            />
-          )}
-        </section>
-      )}
-
-      {tabs.map((t) => (
-        <SessionView
-          key={t.sessionId}
-          tab={t}
-          hidden={t.sessionId !== active}
-          onSend={(text, images) => void sendText(t.sessionId, text, images)}
-          onInterrupt={() => void request("session.interrupt", { sessionId: t.sessionId })}
-          onModeChange={(mode) => void changeMode(t.sessionId, mode)}
-          onModelChange={(alias) => void changeModel(t.sessionId, alias)}
-          onEffortChange={(effort) => void changeEffort(t.sessionId, effort)}
-          onRewind={(messageId) => void rewind(t.sessionId, messageId)}
-          onResume={() => void resume(t.sessionId, t.cwd, t.title)}
-          onOpenFile={(file, line) => void openInEditor(t.sessionId, t.cwd, file, line)}
-          confirm={confirm}
-        />
-      ))}
-
-      {permission && activeTab && (
-        <PermissionDialog
-          key={permission.requestId}
-          request={permission}
-          canAutonomous={activeTab.budgetUsd !== null}
-          onAnswer={(reply) => void answer(permission, reply)}
-        />
-      )}
-      {confirmDialog}
-    </div>
+        )}
+        {settingsOpen && settings && (
+          <SettingsDialog
+            settings={settings}
+            hello={hello}
+            appVersion={appVersion}
+            onSave={onSaveSettings}
+            onExportDiagnostics={exportDiagnostics}
+            onClose={() => setSettingsOpen(false)}
+          />
+        )}
+        {confirmDialog}
+      </div>
+    </Tooltip.Provider>
   );
+}
+
+/** `open` with `id` added (on) or removed (off). */
+function withToggled(open: Set<string>, id: string, on: boolean): Set<string> {
+  const next = new Set(open);
+  if (on) next.add(id);
+  else next.delete(id);
+  return next;
 }

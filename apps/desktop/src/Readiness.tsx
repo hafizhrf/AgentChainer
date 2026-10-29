@@ -1,5 +1,6 @@
 import type { EnvCheck } from "@agentchainer/protocol";
 import { invoke } from "@tauri-apps/api/core";
+import { CircleCheck, CircleX, RefreshCw, SquareTerminal } from "lucide-react";
 import { useState } from "react";
 
 /**
@@ -15,7 +16,12 @@ export function Readiness({
   checking: boolean;
   onRecheck: () => void;
 }) {
-  if (!env) return <p className="muted">{checking ? "Checking your setup…" : "Waiting for the agent runtime…"}</p>;
+  if (!env)
+    return (
+      <section className="card readiness compact" aria-label="Setup check">
+        <p className="muted">{checking ? "Checking your setup…" : "Waiting for the agent runtime…"}</p>
+      </section>
+    );
   const install =
     env.platform === "win32"
       ? "irm https://claude.ai/install.ps1 | iex"
@@ -58,12 +64,41 @@ export function Readiness({
       : { ok: false, label: "git not found", fix: "Install git from https://git-scm.com/downloads, then re-check." },
   );
 
+  const recheck = (
+    <button type="button" className="ghost small" disabled={checking} onClick={onRecheck}>
+      <RefreshCw size={14} className={checking ? "spin" : undefined} />
+      {checking ? "Checking…" : "Re-check"}
+    </button>
+  );
+
+  // Once everything is in place, one line is enough.
+  if (env.ready)
+    return (
+      <section className="card readiness compact" aria-label="Setup check">
+        <CircleCheck size={18} className="readiness-ok" aria-hidden />
+        <span className="grow">
+          <strong>Ready</strong>
+          <span className="muted">
+            {" "}
+            · Claude CLI {shortVersion(env.claude.version)} · signed in with {authLabel(env)} · git{" "}
+            {shortVersion(env.git.version?.replace(/^git version /, "") ?? null)}
+          </span>
+        </span>
+        {recheck}
+      </section>
+    );
+
   return (
-    <div className="readiness">
+    <section className="card readiness" aria-labelledby="readiness-title">
+      <div className="card-title">
+        <h2 id="readiness-title">Set up Claude</h2>
+        <span className="grow" />
+        {recheck}
+      </div>
       <ul>
         {rows.map((r) => (
           <li key={r.label} className={r.ok ? "ok" : "fail"}>
-            <span>{r.ok ? "✓" : "✕"}</span>
+            {r.ok ? <CircleCheck size={16} aria-label="Done" /> : <CircleX size={16} aria-label="Missing" />}
             <div>
               {r.label}
               {r.fix && <div className="muted">{r.fix}</div>}
@@ -72,23 +107,17 @@ export function Readiness({
           </li>
         ))}
       </ul>
-      {!env.ready && (
-        <p className="muted">
-          Step-by-step guide for each OS: <code>docs/guides/AUTH_SETUP.md</code>. Custom install location? Set the
-          Claude CLI path in Settings below.
-        </p>
-      )}
+      <p className="muted">
+        Step-by-step guide for each OS: Help → Getting Started. Claude installed somewhere unusual? Set the Claude CLI
+        path in Settings.
+      </p>
       <div className="row">
-        {!env.ready && (
-          <button type="button" className="secondary" onClick={() => void invoke("open_terminal", { dir: null })}>
-            Open terminal
-          </button>
-        )}
-        <button type="button" className="secondary" disabled={checking} onClick={onRecheck}>
-          {checking ? "Checking…" : "Re-check"}
+        <button type="button" className="secondary" onClick={() => void invoke("open_terminal", { dir: null })}>
+          <SquareTerminal size={14} />
+          Open terminal
         </button>
       </div>
-    </div>
+    </section>
   );
 }
 
@@ -111,6 +140,11 @@ function CommandLine({ command }: { command: string }) {
       </button>
     </div>
   );
+}
+
+/** "2.1.3" for "2.1.3 (Claude Code)" or "2.50.1 (Apple Git-155)". */
+function shortVersion(version: string | null): string {
+  return version?.split(" ")[0] ?? "";
 }
 
 function authLabel(env: EnvCheck): string {

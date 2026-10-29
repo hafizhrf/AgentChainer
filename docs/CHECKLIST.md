@@ -740,22 +740,42 @@ All of these run on macOS, Windows and Ubuntu against a sample repo in `fixtures
 ## UX — Product design & UI polish (before R1)
 
 **Goal:** turn the functional M1/M2 screens into a polished, trustworthy product before the first public release.
-**Scheduled later by the owner:** start once M1 and M2 work functionally; the spike UI stays deliberately plain until then.
+**Scheduled later by the owner:** start once M1 and M2 work functionally. Pulled forward on 2026-10-29: the owner asked
+for the desktop shell, start screen and session view to be cleaned up (UX-02, UX-03, UX-06, UX-07).
 
 - [ ] **UX-01** Pattern research: review Claude Code Desktop, Cursor, Zed and Conductor for layout, chat, tool, diff and
       approval patterns; write down principles and anti-patterns in `docs/design/ux-principles.md`.
-- [ ] **UX-02** Design system: tokens (color, type, spacing, radius, motion) for light and dark. Pick a component approach
+- [x] **UX-02** Design system: tokens (color, type, spacing, radius, motion) for light and dark. Pick a component approach
       (e.g. Radix/shadcn + Tailwind) and record it in an ADR.
       Owner decisions (2026-10-28):
       - Primary color: a dark pastel green. No orange: it would look like Claude's own apps (see the branding rules
         in ADR-0002).
       - Dark mode stays a first-class theme.
-      - The plain UI already uses green accent tokens (`--accent` in `App.css`) as a placeholder until this item.
+      - Component approach (2026-10-29): Radix Primitives + our own CSS tokens + react-resizable-panels, no Tailwind.
+      — evidence:
+      - [ADR-0008](adr/0008-ui-components-and-styling.md).
+      - Tokens in `apps/desktop/src/styles/tokens.css`; `App.css` is split into `styles/`.
+      - A Light / Dark / System setting (`theme` in `settings.rs`, tested). Monaco and xterm follow theme changes.
+      - Debug-build screenshots of Home, a session, the terminal and Settings, in both themes, reviewed and then deleted.
 - [ ] **UX-03** Information architecture and wireframes:
+  - Owner feedback (2026-10-29, after using the M2 build):
+    - the Setup tab's readiness report and bootstrap plan need more room than the 260 px sidebar;
+    - the settings form is cramped (labels sit on the fields);
+    - the dev UI generally looks unfinished.
   - left sidebar with workspaces and sessions;
   - the main transcript;
   - a right panel for changes/diff and agents;
   - a status bar showing model, mode and cost.
+  - Progress (2026-10-29): built.
+    - Layout: sidebar (sessions, recent workspaces, readiness, Settings) | center (header, transcript, composer,
+      terminal split, status bar) | resizable right panel (Changes, Files, Git, Rules, Setup).
+    - A selected file's diff replaces the tabs and widens the panel to 55%.
+    - Panel sizes are remembered.
+    - Right-panel pass after owner feedback (same day):
+      - Files is an explorer: file-type icons, indent guides, git tints, a filter, keyboard navigation.
+      - Changes and Git use collapsible sections with hover actions.
+      - Git has a branch picker (search, create) and a commit box with Draft with Claude.
+    - Open: owner click-through.
 - [ ] **UX-04** Transcript polish: markdown and code highlighting, grouped and collapsible tool runs, a streaming cursor,
       copy buttons, timestamps, long-session performance.
 - [ ] **UX-05** Approval and mode UX:
@@ -763,7 +783,33 @@ All of these run on macOS, Windows and Ubuntu against a sample repo in `fixtures
   - explain each permission mode in the UI, and show why the guard blocked a call.
 - [ ] **UX-06** Onboarding and empty states: native folder picker instead of a typed path, first-run checklist,
       helpful errors.
+  - Progress (2026-10-29):
+    - The Home screen scrolls at the window edge, with content in a centered column.
+    - Cards, top to bottom:
+      - readiness: one line when ready, otherwise the setup steps;
+      - workspace: "Open folder…" first, recent folders, typed path on request, home-folder and git warnings;
+      - options: model and profile side by side, plus the reason Start is disabled;
+      - previous sessions, with a ⋯ menu.
+    - Settings moved into a dialog.
+    - New sessions offer starter prompts.
+    - Workspace setup is a full page, like an IDE's project settings. It opens from Home, the session menu and the
+      right panel. Sections:
+      - Overview: findings by area, each linked to its fix;
+      - Plan: master/detail, with unavailable items folded and Apply at the bottom;
+      - Commands;
+      - History.
+    - Open: owner click-through, and the in-app guide.
 - [ ] **UX-07** Keyboard shortcuts and a command palette.
+  - Progress (2026-10-29):
+    - Native menu (`src-tauri/src/menu.rs`): App, File, Edit, View, Window and Help.
+    - Shortcuts:
+      - ⌘N new session; ⌘O open folder; ⌘W close session;
+      - ⌘, Settings;
+      - `⌘\` sidebar; ⌘B right panel; ⌘J terminal.
+    - The UI maps menu ids in `useMenuCommands.ts`; a test checks it against the Rust list.
+    - Open:
+      - the command palette;
+      - checking the shortcuts on Windows and Linux, where the menu bar sits in the window **(verify)**.
 - [ ] **UX-08** App icon and visual identity, after naming and branding are settled (M0-01).
 - [ ] **UX-09** Usability test with 3–5 target users on macOS, Windows and Ubuntu; fix the top issues.
 

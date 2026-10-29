@@ -1,0 +1,35 @@
+# Seed item (docs/CATALOG.md §6). Offered once reviewed: see `reviews` and §4.
+id: github
+name: "GitHub (official MCP)"
+kind: plugin
+tier: verified-vendor
+license: "MIT (verify)"
+homepage: https://github.com/github/github-mcp-server
+summary: "GitHub's own MCP server: issues, pull requests, code search and the rest of the GitHub API."
+why: >-
+  Claude can read and update issues and pull requests directly, so tasks can start from an issue and end in a
+  PR.
+source:
+  type: marketplace
+  marketplace: claude-plugins-official
+  repo: anthropics/claude-plugins-official
+  plugin: github
+  reviewedRef: "f8c5e7a1dcb71b10cb74586224b5401f3de5db28"
+platforms: [darwin, linux, win32]
+risk: high
+permissions:
+  - "Acts on GitHub with your personal access token: read and, depending on the token, write repositories, issues and pull requests"
+  - "Talks to api.githubcopilot.com"
+secrets:
+  - "GITHUB_PERSONAL_ACCESS_TOKEN"
+install:
+  scope: project
+  steps:
+    - run: [claude, plugin, install, "github@claude-plugins-official", --scope, project, --json]
+uninstall:
+  steps:
+    - run: [claude, plugin, uninstall, "github@claude-plugins-official", --scope, project, --json]
+reviews: []
+notes: >-
+  The token is read from the environment by the CLI; AgentChainer never stores it (ADR-0002). Use a fine-grained
+  token limited to the repositories you need.

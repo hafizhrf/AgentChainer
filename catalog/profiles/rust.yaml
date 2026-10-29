@@ -1,0 +1,7 @@
+id: rust
+name: "Rust"
+description: "Code intelligence for Rust projects."
+suggest:
+  stacks: [rust]
+items:
+  - rust-analyzer-lsp

@@ -1,0 +1,7 @@
+id: github
+name: "GitHub"
+description: "For repositories hosted on GitHub."
+suggest:
+  remoteHost: github.com
+items:
+  - github

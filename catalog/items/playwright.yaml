@@ -1,0 +1,35 @@
+# Seed item (docs/CATALOG.md §6). Offered once reviewed: see `reviews` and §4.
+id: playwright
+name: "Playwright browser (Microsoft)"
+kind: plugin
+tier: verified-vendor
+license: "Apache-2.0 (verify)"
+homepage: https://github.com/microsoft/playwright-mcp
+summary: "Lets Claude drive a real browser: open pages, click, fill forms and take screenshots."
+why: >-
+  Claude can check a web UI end to end, the way a tester would, instead of only reading the code.
+source:
+  type: marketplace
+  marketplace: claude-plugins-official
+  repo: anthropics/claude-plugins-official
+  plugin: playwright
+  reviewedRef: "f8c5e7a1dcb71b10cb74586224b5401f3de5db28"
+platforms: [darwin, linux, win32]
+requires:
+  - tool: npx
+    hint: "Install Node.js (npx comes with it)"
+risk: medium
+permissions:
+  - "Starts a browser that Claude controls; it can open any URL"
+  - "Runs npx to fetch the Playwright MCP server"
+install:
+  scope: project
+  steps:
+    - run: [claude, plugin, install, "playwright@claude-plugins-official", --scope, project, --json]
+uninstall:
+  steps:
+    - run: [claude, plugin, uninstall, "playwright@claude-plugins-official", --scope, project, --json]
+reviews: []
+notes: >-
+  At the reviewed marketplace commit the plugin runs `npx @playwright/mcp@latest`, an unpinned version. ADR-0005
+  asks for pinned sources, so reviewers should weigh this or prefer a pinned MCP item.

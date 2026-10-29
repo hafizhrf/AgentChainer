@@ -215,6 +215,55 @@ export const FindingSchema = z.object({
 });
 export type Finding = z.infer<typeof FindingSchema>;
 
+/* ---------- Bootstrap plan (M2-11/M2-12) ---------- */
+
+/** What applying an action would do, shown before anything is applied (ADR-0005). */
+export const PlanPreviewSchema = z.discriminatedUnion("type", [
+  /** A file change; `before` is empty for a new file. */
+  z.object({ type: z.literal("diff"), path: z.string(), before: z.string(), after: z.string() }),
+  /** Commands as argv arrays: run without a shell. */
+  z.object({ type: z.literal("commands"), commands: z.array(z.array(z.string())) }),
+  z.object({ type: z.literal("note"), text: z.string() }),
+]);
+export type PlanPreview = z.infer<typeof PlanPreviewSchema>;
+
+export const PlanActionSchema = z.object({
+  /** `fix:<action>`, `item:<catalog id>` or `gen:<action>`. */
+  id: z.string(),
+  kind: z.enum(["fix", "catalog", "generator"]),
+  title: z.string(),
+  why: z.string(),
+  risk: z.enum(["low", "medium", "high"]),
+  scope: z.enum(["project", "user", "local"]),
+  /** Catalog items only. */
+  tier: z.enum(["first-party", "official", "verified-vendor", "community"]).optional(),
+  license: z.string().optional(),
+  /** e.g. "code-review@claude-plugins-official, reviewed v1.0.1 at f8c5e7a". */
+  source: z.string().optional(),
+  profile: z.string().optional(),
+  permissions: z.array(z.string()),
+  /** Env var names the item reads; the user provides them, the app never stores them. */
+  secrets: z.array(z.string()),
+  notes: z.string().optional(),
+  preview: PlanPreviewSchema,
+  /**
+   * recommended: suggested for this workspace; optional: from a profile the user opted into; installed: already set
+   * up; unavailable: can't be applied, see `reason`.
+   */
+  state: z.enum(["recommended", "optional", "installed", "unavailable"]),
+  /** Pre-selected. Never true for community items (ADR-0005). */
+  selected: z.boolean(),
+  reason: z.string().optional(),
+});
+export type PlanAction = z.infer<typeof PlanActionSchema>;
+
+export const BootstrapPlanSchema = z.object({
+  catalogVersion: z.string(),
+  profiles: z.array(z.object({ id: z.string(), name: z.string(), description: z.string(), suggested: z.boolean() })),
+  actions: z.array(PlanActionSchema),
+});
+export type BootstrapPlan = z.infer<typeof BootstrapPlanSchema>;
+
 const WorkspaceRef = z.object({ cwd: z.string().min(1) });
 /** A file inside the workspace; the sidecar rejects absolute paths and `..`. */
 const WorkspacePath = WorkspaceRef.extend({ path: z.string().min(1) });
@@ -458,6 +507,15 @@ export const methodSchemas = {
   },
   /** Writes the profile to `.agentchainer/profile.json`, kept out of git by `.agentchainer/.gitignore` (M2-10). */
   "workspace.saveProfile": { params: WorkspaceRef, result: z.object({ path: z.string() }) },
+
+  /**
+   * The bootstrap plan for a workspace (M2-11): fixes from the audit, catalog items from the suggested profiles plus
+   * any opt-in `profiles`, and generators. Read-only: nothing is applied.
+   */
+  "bootstrap.plan": {
+    params: WorkspaceRef.extend({ profiles: z.array(z.string()).optional() }),
+    result: BootstrapPlanSchema,
+  },
 
   /* Git panel (M1-30). Never force-pushes. */
   "git.branches": {

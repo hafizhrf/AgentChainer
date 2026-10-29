@@ -1,0 +1,30 @@
+# Seed item (docs/CATALOG.md §6). Offered once reviewed: see `reviews` and §4.
+id: context7
+name: "Context7 docs (Upstash)"
+kind: plugin
+tier: verified-vendor
+license: "see plugin (verify)"
+homepage: https://github.com/upstash/context7
+summary: "Up-to-date, version-specific library documentation from Upstash's hosted Context7 service."
+why: >-
+  Claude looks up the current docs of the libraries you use instead of relying on what it remembers, which
+  avoids outdated APIs.
+source:
+  type: marketplace
+  marketplace: claude-plugins-official
+  repo: anthropics/claude-plugins-official
+  plugin: context7
+  reviewedRef: "f8c5e7a1dcb71b10cb74586224b5401f3de5db28"
+platforms: [darwin, linux, win32]
+risk: low
+permissions:
+  - "Sends library names and your questions to Upstash's hosted service (mcp.context7.com)"
+  - "May ask you to sign in to Context7"
+install:
+  scope: project
+  steps:
+    - run: [claude, plugin, install, "context7@claude-plugins-official", --scope, project, --json]
+uninstall:
+  steps:
+    - run: [claude, plugin, uninstall, "context7@claude-plugins-official", --scope, project, --json]
+reviews: []

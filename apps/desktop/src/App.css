@@ -1019,3 +1019,75 @@ button.toggle[aria-pressed="true"] {
   padding-left: 0.6rem;
   font-size: 0.8rem;
 }
+
+/* Bootstrap plan review (M2-12) */
+
+.plan-actions li {
+  display: block;
+  padding: 0.25rem 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.plan-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.plan-action.unavailable .plan-head button,
+.plan-action.installed .plan-head button {
+  color: var(--muted);
+}
+
+.plan-reason {
+  font-size: 0.8rem;
+  padding-left: 1.4rem;
+}
+
+.plan-details {
+  font-size: 0.85rem;
+  padding: 0.3rem 0 0.3rem 1.4rem;
+}
+
+.plan-details dl {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.2rem 0.6rem;
+  margin: 0.4rem 0;
+}
+
+.plan-details dt {
+  color: var(--muted);
+}
+
+.plan-details dd {
+  margin: 0;
+}
+
+.plan-details dd ul {
+  padding-left: 1rem;
+  margin: 0;
+}
+
+.plan-preview {
+  max-height: 14rem;
+  overflow: auto;
+  font-size: 0.8rem;
+}
+
+.opt-in {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+
+.badge.tier-community,
+.badge.risk-high {
+  background: var(--err);
+  color: var(--accent-fg);
+}
+
+.badge.risk-medium {
+  background: var(--warn-bg);
+}

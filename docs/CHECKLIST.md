@@ -488,12 +488,36 @@ All of these run on macOS, Windows and Ubuntu against a sample repo in `fixtures
 
 ### Catalog
 
-- [ ] **M2-01** JSON Schema for catalog items and profiles ([CATALOG §3](CATALOG.md#3-item-schema)); CI validates `catalog/`.
+- [x] **M2-01** JSON Schema for catalog items and profiles ([CATALOG §3](CATALOG.md#3-item-schema)); CI validates `catalog/`.
+      — evidence:
+      - The zod schemas in `src/catalog/schema.ts` are exported as `catalog/schema.json`.
+      - Checks beyond the schemas: unique ids, `<id>.yaml` file names, profile references, first-party/plugin source
+        rules, and full commit SHAs only.
+      - `build-catalog.ts` compiles the snapshot.
+      - `plan.test.ts` fails in CI when `catalog/` is invalid or the compiled files are stale.
 - [ ] **M2-02** Seed the items from [CATALOG §6](CATALOG.md#6-seed-items) with pinned refs, CI-computed hashes and licenses.
       Review each one with the [§4 checklist](CATALOG.md#4-review-checklist-adding-or-updating-an-item).
+      Progress:
+      - 10 marketplace plugins are in `catalog/items/`, their names, versions and configs read from the official
+        marketplace at `f8c5e7a`:
+        - code-review, commit-commands, security-guidance;
+        - the TypeScript, Python, Go and Rust LSPs;
+        - context7, playwright, github.
+      - Findings recorded in the items:
+        - the playwright plugin runs `@playwright/mcp@latest`, unpinned;
+        - github needs `GITHUB_PERSONAL_ACCESS_TOKEN`;
+        - there is no Dart/Flutter LSP plugin.
+      - Remaining:
+        - maintainer reviews (each item is offered once its `reviews` count is met);
+        - git, release-asset and npm items (cloudflare-security-audit, codebase-memory-mcp, gitleaks, actionlint),
+          which need the hashing installer (M2-13/M2-15).
 - [ ] **M2-03** Show trust tiers in the UI. Community items are never pre-selected or auto-applied.
+      Progress: the plan review shows each item's tier (community in red); the builder never pre-selects community
+      items (`plan.test.ts`). Remaining: auto-apply (M2-18) must also exclude them; look at it in the app.
 - [ ] **M2-04** Upstream-update bot: a scheduled workflow that opens PRs bumping refs and hashes, with a diff summary.
-- [ ] **M2-05** Decide whether v0.1 ships a bundled catalog snapshot only, or can also fetch signed catalog updates from Releases.
+- [x] **M2-05** Decide whether v0.1 ships a bundled catalog snapshot only, or can also fetch signed catalog updates from Releases.
+      — evidence: [ADR-0007](adr/0007-catalog-distribution.md) (Proposed): a bundled snapshot only. The sidecar
+      imports the compiled `catalog.json`; verified in the packaged executable, where `bootstrap.plan` answers from it.
 
 ### Detection & audit
 
@@ -535,12 +559,23 @@ All of these run on macOS, Windows and Ubuntu against a sample repo in `fixtures
 
 ### Plan & apply
 
-- [ ] **M2-11** BootstrapPlan builder: profile + catalog + audit → actions, each with reason, risk, scope and a preview
+- [x] **M2-11** BootstrapPlan builder: profile + catalog + audit → actions, each with reason, risk, scope and a preview
       (file diff or command list).
+      — evidence: `src/bootstrap/plan.ts`, with `bootstrap.plan` over JSON-RPC.
+      - Fixes come with exact previews: the `.gitignore` diff, `git rm --cached`, `git init`, the AGENTS.md import.
+      - Catalog items come from the suggested and opted-in profiles, with tier, license, source, permissions, secrets
+        and commands.
+      - Generators are listed as not available yet.
+      - Items are unavailable, with the reason shown, when they're unreviewed, need a missing tool, don't support the
+        platform, or are already enabled.
+      - `plan.test.ts` (17 tests) includes a plan snapshot per fixture.
 - [ ] **M2-12** Review UI:
   - toggle actions on and off;
   - inspect each preview, the permissions an item needs, and its license;
   - "Apply selected".
+      Progress: the Setup tab's plan lists actions with checkboxes, tier/risk badges, why, license, scope,
+      permissions, secrets, notes, and a diff or command preview, plus opt-in profile toggles. "Apply selected" is
+      disabled until the installers land (M2-13…M2-17).
 - [ ] **M2-13** Skill installer: fetch the pinned source → verify sha256 → copy to `.claude/skills/<name>` (project) or `~/.claude/skills` (user).
 - [ ] **M2-14** Plugin installer: `claude plugin marketplace add` + `claude plugin install … --scope project -y --json`;
       record the installed version.
@@ -593,8 +628,8 @@ All of these run on macOS, Windows and Ubuntu against a sample repo in `fixtures
       - The fixtures carry manifests and a little code, not dependencies. Tests add per-fixture git state on temp
         copies.
 - [ ] **M2-28** Automated bootstrap tests per fixture: detector and plan snapshots; installer and rollback run on temp copies.
-      Progress: detector and audit snapshots per fixture (`test/snapshots/*.json`, regenerated with
-      `UPDATE_SNAPSHOTS=1`). Remaining: plan snapshots, and installer and rollback runs (M2-11…M2-17).
+      Progress: detector, audit and plan snapshots per fixture (`test/snapshots/*.json`, `*.plan.json`, regenerated
+      with `UPDATE_SNAPSHOTS=1`). Remaining: installer and rollback runs on temp copies (M2-13…M2-17).
 
 ### Exit criteria
 

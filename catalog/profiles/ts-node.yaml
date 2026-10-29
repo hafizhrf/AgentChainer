@@ -1,0 +1,7 @@
+id: ts-node
+name: "TypeScript / JavaScript"
+description: "Code intelligence for Node projects."
+suggest:
+  stacks: [node]
+items:
+  - typescript-lsp

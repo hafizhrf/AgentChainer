@@ -1,0 +1,31 @@
+# Seed item (docs/CATALOG.md §6). Offered once reviewed: see `reviews` and §4.
+id: gopls-lsp
+name: "Go language server (gopls)"
+kind: plugin
+tier: official
+license: "Apache-2.0 (marketplace repo)"
+summary: "Gives Claude Go code intelligence and refactoring through gopls."
+why: >-
+  Claude can navigate Go packages and see compiler errors as it edits.
+source:
+  type: marketplace
+  marketplace: claude-plugins-official
+  repo: anthropics/claude-plugins-official
+  plugin: gopls-lsp
+  reviewedVersion: "1.0.0"
+  reviewedRef: "f8c5e7a1dcb71b10cb74586224b5401f3de5db28"
+platforms: [darwin, linux, win32]
+requires:
+  - tool: gopls
+    hint: "go install golang.org/x/tools/gopls@latest"
+risk: low
+permissions:
+  - "Starts gopls in the project"
+install:
+  scope: project
+  steps:
+    - run: [claude, plugin, install, "gopls-lsp@claude-plugins-official", --scope, project, --json]
+uninstall:
+  steps:
+    - run: [claude, plugin, uninstall, "gopls-lsp@claude-plugins-official", --scope, project, --json]
+reviews: []

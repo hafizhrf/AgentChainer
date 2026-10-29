@@ -21,7 +21,13 @@ safely, and **why** it's worth it. The catalog lives in `catalog/` as data, so i
 
 ## 3. Item schema
 
-Each item is one YAML file in `catalog/items/`, validated against `catalog/schema.json` in CI. Annotated examples:
+Each item is one YAML file in `catalog/items/`, named `<id>.yaml`, and validated in CI.
+- The schemas are zod, in `packages/sidecar/src/catalog/schema.ts`.
+- `catalog/schema.json` is their JSON Schema export, for editors.
+- `node packages/sidecar/scripts/build-catalog.ts` validates `catalog/` and compiles it into the snapshot the app ships
+  ([ADR-0007](adr/0007-catalog-distribution.md)). A test fails while the compiled files are stale.
+
+Annotated examples:
 
 ```yaml
 # catalog/items/cloudflare-security-audit.yaml
@@ -116,6 +122,11 @@ notes: >-
 | `risk`, `permissions` | yes | Shown in the review UI |
 | `install`, `uninstall` | yes | Declarative steps only: `copy`, `remove`, `run` (argv array, no shell), `download-binary`, `merge-json`, `write-file` |
 | `secrets` | no | Env var names the item needs (e.g. `GITHUB_TOKEN`). The installer references them and never writes values to files |
+| `reviews` | no | `{by, date, ref, notes}` per maintainer review against §4. An item is offered only once its tier's count is met: first-party 0, official 1, verified-vendor 1, community 2. Until then the plan shows it as "not reviewed yet" |
+| `notes` | no | Caveats for reviewers and users, shown in the plan |
+
+Marketplace plugins can't be pinned by the CLI (spike S6). Their `source` records the version that was reviewed
+(`reviewedVersion`) and the marketplace commit it was read at (`reviewedRef`).
 
 ## 4. Review checklist (adding or updating an item)
 
@@ -134,26 +145,30 @@ Profiles group items. The detector picks profiles; the user can add or remove it
 | Profile | When suggested | Items |
 |---|---|---|
 | `baseline` | Every workspace | AgentChainer first-party skills (`ac-*`), `code-review`, `security-guidance`, `commit-commands` (official plugins), `gitleaks` pre-commit hook |
-| `ts-node` | `package.json` | TypeScript LSP plugin **(verify exact name)**; `playwright` when a web UI is detected |
-| `python` | `pyproject.toml` / `requirements*.txt` | Python LSP plugin **(verify)** |
-| `flutter` | `pubspec.yaml` | Dart/Flutter LSP plugin if available **(verify)**; `firebase` plugin if Firebase config is detected |
-| `go` | `go.mod` | Go LSP plugin **(verify)** |
-| `github` | Git remote on github.com | `github` plugin/MCP (needs a token the user provides via env) |
-| `knowledge` (opt-in) | Large repos (> N files) or on request | `codebase-memory-mcp`, `context7` |
-| `security` (opt-in) | Before release, or on request | `cloudflare-security-audit`, `semgrep` (CLI), `trivy` (CLI) |
+| `ts-node` | Node stack | `typescript-lsp` (needs `typescript-language-server`) |
+| `python` | Python stack | `pyright-lsp` (needs `pyright-langserver`) |
+| `go` | Go stack | `gopls-lsp` (needs `gopls`) |
+| `rust` | Rust stack | `rust-analyzer-lsp` (needs `rust-analyzer`) |
+| `flutter` | `pubspec.yaml` | None yet: the official marketplace has no Dart/Flutter LSP plugin (checked at `f8c5e7a`). `firebase` if Firebase config is detected **(later)** |
+| `github` | Git remote on github.com, including SSH host aliases such as `github-personal.com` | `github` plugin (reads `GITHUB_PERSONAL_ACCESS_TOKEN` from your environment) |
+| `knowledge` (opt-in) | On request | `context7`; `codebase-memory-mcp` later |
+| `web-testing` (opt-in) | On request | `playwright` |
+| `security` (opt-in) | Before release, or on request | `cloudflare-security-audit`, `semgrep` (CLI), `trivy` (CLI) **(later: needs the hashing installer)** |
+
+Profiles live in `catalog/profiles/<id>.yaml` with `suggest: {always | stacks | remoteHost | optIn}`.
 
 ## 6. Seed items
 
 | ID | Kind | Tier | License | Install method | Status |
 |---|---|---|---|---|---|
 | `ac-write-claude-md`, `ac-setup-hooks`, `ac-scaffold-tests`, `ac-generate-ci`, `ac-smoke-test` | skill | first-party | Apache-2.0 | Copied from `skills/` | To build (M2-19) |
-| `code-review` | plugin | official | per plugin | `claude plugin install code-review@claude-plugins-official --scope project` | Seed |
-| `security-guidance` | plugin | official | per plugin | same pattern | Seed |
-| `commit-commands` | plugin | official | per plugin | same pattern | Seed |
-| `*-lsp` (per stack) | plugin | official | per plugin | same pattern | **(verify names)** |
-| `context7` | plugin or MCP | verified-vendor | MIT | Partner plugin in the official marketplace, or remote MCP `https://mcp.context7.com/mcp` | Seed **(verify key requirement)** |
-| `playwright` | plugin or MCP | verified-vendor | Apache-2.0 | Partner plugin, or `npx @playwright/mcp@<pinned>` | Seed |
-| `github` | plugin or MCP | verified-vendor | MIT | Partner plugin, or remote MCP `https://api.githubcopilot.com/mcp` with a user-provided token | Seed |
+| `code-review` (1.0.1) | plugin | official | Apache-2.0 (marketplace repo) | `claude plugin install code-review@claude-plugins-official --scope project` | In `catalog/`, awaiting review |
+| `security-guidance` (2.0.17) | plugin | official | Apache-2.0 (marketplace repo) | same pattern | In `catalog/`, awaiting review |
+| `commit-commands` (1.0.1) | plugin | official | Apache-2.0 (marketplace repo) | same pattern | In `catalog/`, awaiting review |
+| `typescript-lsp`, `pyright-lsp`, `gopls-lsp`, `rust-analyzer-lsp` (1.0.0) | plugin | official | Apache-2.0 (marketplace repo) | same pattern; each needs its language server on PATH | In `catalog/`, awaiting review |
+| `context7` | plugin | verified-vendor | **(verify)** | Partner plugin: the hosted MCP at `mcp.context7.com`, may ask you to sign in | In `catalog/`, awaiting review |
+| `playwright` | plugin | verified-vendor | Apache-2.0 **(verify)** | Partner plugin. **It runs `npx @playwright/mcp@latest`, which is unpinned**, so prefer a pinned MCP item | In `catalog/`, awaiting review |
+| `github` | plugin | verified-vendor | MIT **(verify)** | Partner plugin: the remote MCP `api.githubcopilot.com` with `GITHUB_PERSONAL_ACCESS_TOKEN` from your environment | In `catalog/`, awaiting review |
 | `firebase` | plugin | verified-vendor | per plugin | Partner plugin | Seed **(verify)** |
 | `cloudflare-security-audit` | skill | verified-vendor | MIT | Copy `skills/security-audit/` at a pinned SHA | Seed |
 | `codebase-memory-mcp` | mcp | community | MIT | Pinned release binary + `claude mcp add --scope local` | Seed (needs 2 reviews) |
@@ -205,7 +220,8 @@ Sources: [cloudflare/security-audit-skill](https://github.com/cloudflare/securit
 
 - **Upstream changes:** a scheduled workflow checks every item's upstream, then opens a PR that bumps ref and hash, with an
   upstream diff summary. A human reviews it using §4.
-- **App releases** ship a catalog snapshot. Whether newer signed catalogs can be fetched between releases is decided in M2-05.
+- **App releases** ship a catalog snapshot, and v0.1 never fetches catalog updates
+  ([ADR-0007](adr/0007-catalog-distribution.md), M2-05).
 - **Installed items:** the app shows "update available" with the changelog. Updates are applied like any other action:
   preview, apply, verify, record.
 - **Rollback:** per item or per bootstrap run. It uses `uninstall` steps and backups, and is verified by comparing hashes

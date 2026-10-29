@@ -50,7 +50,7 @@ Prerequisites:
 | Lint + format check (Biome, what CI runs) / auto-fix | `pnpm lint` / `pnpm format` |
 | Build the desktop app (installers) | `pnpm build` |
 | Fast debug build, no installers | `pnpm --filter @agentchainer/desktop tauri build --debug --no-bundle` |
-| Build the sidecar single executable (Node SEA; needed before `cargo clippy/test`, done automatically by `pnpm dev/build`) | `pnpm --filter @agentchainer/sidecar build:sea [-- --force]` |
+| Build the sidecar single executable (Node SEA; needed before `cargo clippy/test`, done automatically by `pnpm dev/build`) | `pnpm --filter @agentchainer/sidecar build:sea [--force]` |
 | Packaged sidecar smoke: first-run SDK download + verify, then cache | `node scripts/sidecar-smoke.mjs` |
 | Re-pin the Agent SDK after bumping it (updates `sdk-pin.json` from the lockfile) | `node packages/sidecar/scripts/pin-sdk.ts` |
 | Regenerate the protocol JSON Schema after changing `packages/protocol/src/index.ts` | `pnpm --filter @agentchainer/protocol export-schema` |
@@ -61,7 +61,8 @@ Prerequisites:
 | Rust tests | `cargo test --workspace` |
 | Spike harness: real model calls with your own `claude` login (haiku, a few cents) | `node packages/sidecar/scripts/spike-host.ts --cwd <empty scratch dir> [--scenario basic\|mode\|interrupt\|guard\|auto\|subagents\|sessions\|approvals\|plan\|fixtures\|image\|all] [--record raw.jsonl]` |
 | M1 exit criteria E1–E5 on `fixtures/sample-app` (real model calls; a few cents to ~$0.30) | `node packages/sidecar/scripts/spike-host.ts --cwd <empty dir> --scenario exit` |
-| Regenerate the detector/audit snapshots of `fixtures/` after changing detection | `UPDATE_SNAPSHOTS=1 node --test packages/sidecar/src/detect/detect.test.ts` |
+| Validate `catalog/` and compile the snapshot the app ships (after changing catalog items or profiles) | `node packages/sidecar/scripts/build-catalog.ts` |
+| Regenerate the detector/audit/plan snapshots of `fixtures/` after changing detection, the plan or the catalog | `UPDATE_SNAPSHOTS=1 node --test packages/sidecar/src/detect/detect.test.ts packages/sidecar/src/bootstrap/plan.test.ts` |
 | Regenerate the event snapshots the UI tests replay, after re-recording a fixture | `UPDATE_FIXTURES=1 node --test packages/sidecar/src/normalize.test.ts` |
 | Turn a raw recording into a committable fixture (fails if anything identifying survives) | `node packages/sidecar/scripts/make-fixture.ts raw.jsonl packages/sidecar/test/fixtures/<name>.jsonl --cwd <recording workspace>` |
 | Plugin/MCP install spike (installs and removes again, in a throwaway project) | `node packages/sidecar/scripts/spike-install.ts --cwd <empty scratch dir>` |

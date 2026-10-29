@@ -1,0 +1,102 @@
+/*
+ * Design tokens (UX-02). Light is the default; dark applies with data-theme="dark", or with data-theme="system"
+ * when the OS prefers dark. The dark block is repeated for those two cases: plain CSS can't share it.
+ * Accent: a dark pastel green (owner decision: no orange, it reads as Claude's own look).
+ */
+:root {
+  color-scheme: light;
+  --bg: #f4f6f5;
+  --surface: #ffffff;
+  --surface-2: #eef1ef;
+  --surface-3: #e4e9e6;
+  --fg: #1b1f1d;
+  --muted: #646e69;
+  --border: #dbe1dd;
+  --border-strong: #c3ccc7;
+  --accent: #3f6b52;
+  --accent-hover: #345a45;
+  --accent-fg: #ffffff;
+  --accent-soft: #e2eee7;
+  --user: #e6efe9;
+  --ok: #2e7a4e;
+  --warn: #a16207;
+  --warn-bg: #fdf5e1;
+  --err: #b42318;
+  --err-bg: #fdecea;
+  --focus: #5f9d7c;
+  --shadow-sm: 0 1px 2px rgb(16 24 20 / 6%);
+  --shadow-lg: 0 12px 40px rgb(16 24 20 / 18%);
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --radius-sm: 4px;
+  --radius: 6px;
+  --radius-lg: 10px;
+  --radius-full: 999px;
+  --font-sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --text-xs: 11px;
+  --text-sm: 12px;
+  --text-base: 13px;
+  --text-md: 14px;
+  --text-lg: 16px;
+  --text-xl: 20px;
+  --duration: 120ms;
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #151816;
+  --surface: #1c201e;
+  --surface-2: #191c1a;
+  --surface-3: #262b28;
+  --fg: #e6ebe8;
+  --muted: #98a29d;
+  --border: #2c322f;
+  --border-strong: #3b4440;
+  --accent: #7fb89a;
+  --accent-hover: #95c8ac;
+  --accent-fg: #0f1d15;
+  --accent-soft: #22332a;
+  --user: #24312a;
+  --ok: #6fcf97;
+  --warn: #e3b341;
+  --warn-bg: #30281a;
+  --err: #f28b82;
+  --err-bg: #3a2120;
+  --focus: #7fb89a;
+  --shadow-sm: 0 1px 2px rgb(0 0 0 / 30%);
+  --shadow-lg: 0 16px 48px rgb(0 0 0 / 50%);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --bg: #151816;
+    --surface: #1c201e;
+    --surface-2: #191c1a;
+    --surface-3: #262b28;
+    --fg: #e6ebe8;
+    --muted: #98a29d;
+    --border: #2c322f;
+    --border-strong: #3b4440;
+    --accent: #7fb89a;
+    --accent-hover: #95c8ac;
+    --accent-fg: #0f1d15;
+    --accent-soft: #22332a;
+    --user: #24312a;
+    --ok: #6fcf97;
+    --warn: #e3b341;
+    --warn-bg: #30281a;
+    --err: #f28b82;
+    --err-bg: #3a2120;
+    --focus: #7fb89a;
+    --shadow-sm: 0 1px 2px rgb(0 0 0 / 30%);
+    --shadow-lg: 0 16px 48px rgb(0 0 0 / 50%);
+  }
+}

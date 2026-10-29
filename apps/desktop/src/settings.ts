@@ -13,6 +13,8 @@ export type Settings = {
   budgetUsd: number | null;
   /** Stream summaries of Claude's thinking (M1-10); null means on. */
   showThinking: boolean | null;
+  /** "light" or "dark"; null follows the OS (UX-02). */
+  theme: string | null;
   recentWorkspaces: string[];
 };
 

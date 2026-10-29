@@ -68,7 +68,7 @@ export function SetupReport({ cwd, model, confirm }: { cwd: string; model: strin
             <h4>{AREA[area]}</h4>
             <ul className="findings">
               {items.map((f) => (
-                <li key={f.id} className={`finding ${f.status}`} title={f.detail}>
+                <li key={f.id} className={`finding finding-${f.status}`} title={f.detail}>
                   <span className="finding-icon">{ICON[f.status]}</span>
                   <span>
                     {f.title}

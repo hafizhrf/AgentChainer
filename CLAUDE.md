@@ -11,7 +11,9 @@ Packaged builds ship the sidecar as a Node single executable (spike S1). The vis
 checklist.
 
 Layout:
-- `apps/desktop`: Tauri app. `src/` is the React UI, `src-tauri/` is the Rust core.
+- `apps/desktop`: Tauri app. `src/` is the React UI, `src-tauri/` is the Rust core (native menu in `menu.rs`).
+  UI building blocks are Radix-based wrappers in `src/ui/`; styles are CSS tokens and files in `src/styles/`, no
+  Tailwind ([ADR-0008](docs/adr/0008-ui-components-and-styling.md)).
 - `packages/protocol`: IPC types.
 - `packages/sidecar`: Node agent runtime.
 - `docs/`: planning docs.

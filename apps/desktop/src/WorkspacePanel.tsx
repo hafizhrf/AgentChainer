@@ -1,4 +1,6 @@
 import type { WorkspaceFiles } from "@agentchainer/protocol";
+import * as Tabs from "@radix-ui/react-tabs";
+import { ChevronDown, ChevronRight, RefreshCw } from "lucide-react";
 import { type CSSProperties, useCallback, useEffect, useMemo, useState } from "react";
 import type { Confirm } from "./Dialog.tsx";
 import { agentEdits, buildTree, STATUS_LETTER, type TreeNode } from "./files.ts";
@@ -6,10 +8,14 @@ import { GitPanel } from "./GitPanel.tsx";
 import { SetupReport } from "./SetupReport.tsx";
 import { request } from "./sidecar.ts";
 import type { Item } from "./transcript.ts";
+import { IconButton } from "./ui/IconButton.tsx";
+
+type View = "changes" | "files" | "git" | "permissions" | "setup";
 
 /**
- * Sidebar of a session tab: the workspace file tree with git status (M1-25), and the changes panel (M1-26) with the
- * agent's edits per turn plus everything git sees as changed.
+ * The right panel of a session (UX-03): the changes panel (M1-26) with the agent's edits per turn plus everything git
+ * sees as changed, the file tree with git status (M1-25), git (M1-30), saved permission rules (M1-20) and the setup
+ * report (M2-08).
  */
 export function WorkspacePanel({
   cwd,
@@ -33,7 +39,7 @@ export function WorkspacePanel({
   onSelect: (path: string) => void;
   onRefresh: () => void;
 }) {
-  const [view, setView] = useState<"files" | "changes" | "git" | "permissions" | "setup">("changes");
+  const [view, setView] = useState<View>("changes");
   const [initError, setInitError] = useState<string | null>(null);
   const changed = files?.files.filter((f) => f.status) ?? [];
 
@@ -47,54 +53,55 @@ export function WorkspacePanel({
   }
 
   return (
-    <div className="workspace-panel">
-      <div className="panel-tabs" role="tablist">
-        <button type="button" role="tab" aria-selected={view === "changes"} onClick={() => setView("changes")}>
-          Changes{changed.length > 0 ? ` (${changed.length})` : ""}
-        </button>
-        <button type="button" role="tab" aria-selected={view === "files"} onClick={() => setView("files")}>
-          Files
-        </button>
-        <button type="button" role="tab" aria-selected={view === "git"} onClick={() => setView("git")}>
-          Git
-        </button>
-        <button type="button" role="tab" aria-selected={view === "permissions"} onClick={() => setView("permissions")}>
-          Rules
-        </button>
-        <button type="button" role="tab" aria-selected={view === "setup"} onClick={() => setView("setup")}>
-          Setup
-        </button>
-        <button type="button" className="refresh" title="Refresh" aria-label="Refresh files" onClick={onRefresh}>
-          ↻
-        </button>
+    <Tabs.Root className="workspace-panel" value={view} onValueChange={(v) => setView(v as View)}>
+      <div className="panel-tabbar">
+        <Tabs.List className="panel-tabs" aria-label="Workspace">
+          <Tabs.Trigger value="changes">
+            Changes{changed.length > 0 && <span className="count">{changed.length}</span>}
+          </Tabs.Trigger>
+          <Tabs.Trigger value="files">Files</Tabs.Trigger>
+          <Tabs.Trigger value="git">Git</Tabs.Trigger>
+          <Tabs.Trigger value="permissions">Rules</Tabs.Trigger>
+          <Tabs.Trigger value="setup">Setup</Tabs.Trigger>
+        </Tabs.List>
+        <IconButton label="Refresh" onClick={onRefresh}>
+          <RefreshCw size={14} />
+        </IconButton>
       </div>
-      {files?.branch && <div className="muted branch">⎇ {files.branch}</div>}
-      {(error || initError) && <p className="warn">{error ?? initError}</p>}
-      {files && !files.isGitRepo && (
-        <div className="notice">
-          This folder isn't a git repository, so changes can't be reviewed or reverted.{" "}
-          <button type="button" className="link" onClick={() => void initGit()}>
-            Initialize git
-          </button>
-        </div>
-      )}
-      {view === "changes" && (
-        <ChangesView files={changed} items={items} cwd={cwd} selected={selected} onSelect={onSelect} />
-      )}
-      {view === "files" && <FileTree files={files} selected={selected} onSelect={onSelect} />}
-      {view === "git" && (
-        <GitPanel
-          cwd={cwd}
-          files={files}
-          selected={selected}
-          confirm={confirm}
-          onSelect={onSelect}
-          onRefresh={onRefresh}
-        />
-      )}
-      {view === "permissions" && <PermissionRules cwd={cwd} confirm={confirm} />}
-      {view === "setup" && <SetupReport cwd={cwd} model={model} confirm={confirm} />}
-    </div>
+      <div className="panel-body">
+        {(error || initError) && <p className="warn">{error ?? initError}</p>}
+        {files && !files.isGitRepo && (
+          <p className="warn">
+            This folder isn't a git repository, so changes can't be reviewed or reverted.{" "}
+            <button type="button" className="link" onClick={() => void initGit()}>
+              Initialize git
+            </button>
+          </p>
+        )}
+        <Tabs.Content value="changes">
+          <ChangesView files={changed} items={items} cwd={cwd} selected={selected} onSelect={onSelect} />
+        </Tabs.Content>
+        <Tabs.Content value="files">
+          <FileTree files={files} selected={selected} onSelect={onSelect} />
+        </Tabs.Content>
+        <Tabs.Content value="git">
+          <GitPanel
+            cwd={cwd}
+            files={files}
+            selected={selected}
+            confirm={confirm}
+            onSelect={onSelect}
+            onRefresh={onRefresh}
+          />
+        </Tabs.Content>
+        <Tabs.Content value="permissions">
+          <PermissionRules cwd={cwd} confirm={confirm} />
+        </Tabs.Content>
+        <Tabs.Content value="setup">
+          <SetupReport cwd={cwd} model={model} confirm={confirm} />
+        </Tabs.Content>
+      </div>
+    </Tabs.Root>
   );
 }
 
@@ -181,7 +188,7 @@ function FileTree({
   const render = (nodes: TreeNode[], depth: number) =>
     nodes.map((n) =>
       n.children ? (
-        <li key={n.path}>
+        <li key={n.path} className="tree-folder">
           <button
             type="button"
             className="tree-row folder"
@@ -189,7 +196,8 @@ function FileTree({
             aria-expanded={expanded.has(n.path)}
             onClick={() => toggle(n.path)}
           >
-            {expanded.has(n.path) ? "▾" : "▸"} {n.name}
+            {expanded.has(n.path) ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+            {n.name}
             {n.changes > 0 && <span className="status modified">{n.changes}</span>}
           </button>
           {expanded.has(n.path) && <ul>{render(n.children, depth + 1)}</ul>}

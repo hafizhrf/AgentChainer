@@ -25,6 +25,8 @@ pub struct Settings {
     pub budget_usd: Option<f64>,
     /// Stream summaries of Claude's thinking (M1-10). `None` means on.
     pub show_thinking: Option<bool>,
+    /// `light`, `dark` or `system` (UX-02). `None` follows the OS.
+    pub theme: Option<String>,
     /// Most recent first.
     pub recent_workspaces: Vec<String>,
 }
@@ -38,6 +40,7 @@ impl Settings {
         self.default_mode = clean(self.default_mode);
         self.editor = clean(self.editor);
         self.default_effort = clean(self.default_effort);
+        self.theme = clean(self.theme).filter(|t| t == "light" || t == "dark");
         self.budget_usd = self.budget_usd.filter(|b| b.is_finite() && *b > 0.0);
         let mut seen = Vec::new();
         for dir in self.recent_workspaces {
@@ -98,6 +101,7 @@ mod tests {
             default_effort: None,
             budget_usd: Some(-1.0),
             show_thinking: None,
+            theme: Some(" dark ".into()),
             recent_workspaces: (0..12)
                 .map(|i| format!("/p/{}", i % 10))
                 .chain([" ".into()])
@@ -108,6 +112,7 @@ mod tests {
         assert_eq!(s.default_model.as_deref(), Some("haiku"));
         assert_eq!(s.editor.as_deref(), Some("vscode"));
         assert_eq!(s.budget_usd, None, "a non-positive budget means no cap");
+        assert_eq!(s.theme.as_deref(), Some("dark"));
         assert_eq!(s.recent_workspaces.len(), MAX_RECENT_WORKSPACES);
         assert_eq!(s.recent_workspaces[0], "/p/0");
     }
@@ -117,5 +122,17 @@ mod tests {
         let s: Settings = serde_json::from_str(r#"{"defaultModel":"opus"}"#).unwrap();
         assert_eq!(s.default_model.as_deref(), Some("opus"));
         assert!(s.recent_workspaces.is_empty());
+    }
+
+    #[test]
+    fn unknown_themes_follow_the_system() {
+        for theme in ["system", "sepia", ""] {
+            let s = Settings {
+                theme: Some(theme.into()),
+                ..Default::default()
+            }
+            .normalized();
+            assert_eq!(s.theme, None, "{theme}");
+        }
     }
 }

@@ -8,9 +8,19 @@ import type { Tab } from "./tabs.ts";
  * Dev-only self-test (spike S2). When the app is launched with `AGENTCHAINER_SELFTEST='{"cwd","model","prompt"}'`
  * (and `AGENTCHAINER_METRICS=1`), the UI runs one turn on its own, logs latency stats through the sidecar, and quits.
  * With `"resume": true` it then closes the session, resumes it the way the session list does, and runs a second turn
- * (M1-22). Driven by scripts/selftest-latency.mjs. Null in normal runs.
+ * (M1-22). With `"stay": true` the app stays open afterwards, in `theme` and with `open` shown (UX screenshots).
+ * Driven by scripts/selftest-latency.mjs. Null in normal runs.
  */
-export type SelftestConfig = { cwd: string; model?: string; prompt: string; resume?: boolean };
+export type SelftestConfig = {
+  cwd: string;
+  model?: string;
+  prompt: string;
+  resume?: boolean;
+  /** Keep the app open afterwards, optionally in a theme and with a view open: for screenshots. */
+  stay?: boolean;
+  theme?: "light" | "dark";
+  open?: "home" | "settings" | "terminal";
+};
 
 export async function readSelftestConfig(): Promise<SelftestConfig | null> {
   const raw = await invoke<string | null>("selftest_config");
@@ -22,6 +32,9 @@ export async function readSelftestConfig(): Promise<SelftestConfig | null> {
     prompt: cfg.prompt,
     ...(cfg.model ? { model: cfg.model } : {}),
     ...(cfg.resume ? { resume: true } : {}),
+    ...(cfg.stay ? { stay: true } : {}),
+    ...(cfg.theme === "light" || cfg.theme === "dark" ? { theme: cfg.theme } : {}),
+    ...(cfg.open === "home" || cfg.open === "settings" || cfg.open === "terminal" ? { open: cfg.open } : {}),
   };
 }
 

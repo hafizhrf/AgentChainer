@@ -1,0 +1,248 @@
+/* Feature styles: readiness commands, markdown, git, setup report and bootstrap. Moved from App.css. */
+
+.command {
+  display: inline-block;
+  margin-top: 0.3rem;
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  user-select: all;
+}
+
+.command-line {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  margin-top: 0.3rem;
+}
+
+.command-line .command {
+  margin-top: 0;
+}
+
+/* Files listed in the rewind confirmation (M1-23) */
+
+.file-list {
+  max-height: 12rem;
+  overflow-y: auto;
+  padding-left: 1.2rem;
+}
+
+/* Markdown (M1-10), git panel (M1-30) */
+
+.markdown {
+  white-space: normal;
+}
+
+.markdown > :first-child {
+  margin-top: 0;
+}
+
+.markdown > :last-child {
+  margin-bottom: 0;
+}
+
+.markdown pre {
+  white-space: pre;
+  overflow-x: auto;
+  padding: 0.6rem 0.75rem;
+  border-radius: 6px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+}
+
+.markdown :not(pre) > code {
+  padding: 0.05rem 0.3rem;
+  border-radius: 4px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  font-size: 0.9em;
+}
+
+.markdown table {
+  border-collapse: collapse;
+}
+
+.markdown th,
+.markdown td {
+  border: 1px solid var(--border);
+  padding: 0.25rem 0.5rem;
+}
+
+.markdown a {
+  color: var(--accent);
+}
+
+.git-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.git-branch {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.git-branch select {
+  flex: 1;
+  min-width: 0;
+}
+
+.git-panel .row input {
+  min-width: 0;
+}
+
+.commit-message {
+  width: 100%;
+  font-size: 0.85rem;
+}
+
+/* Readiness report (M2-08/M2-09) */
+
+.setup-report h4 {
+  margin: 0.5rem 0 0.2rem;
+  font-size: 0.8rem;
+}
+
+.findings li,
+.commands li {
+  align-items: flex-start;
+  gap: 0.35rem;
+  padding: 0.1rem 0;
+}
+
+.finding-icon {
+  width: 1rem;
+  flex-shrink: 0;
+  text-align: center;
+}
+
+.finding-ok .finding-icon {
+  color: var(--ok);
+}
+
+.finding-warn .finding-icon,
+.finding-missing .finding-icon {
+  color: var(--err);
+}
+
+.finding .fix {
+  display: block;
+  font-size: 0.8rem;
+  color: var(--accent);
+}
+
+.package {
+  margin: 0.4rem 0;
+}
+
+.commands {
+  padding-left: 0.6rem;
+  font-size: 0.8rem;
+}
+
+/* Bootstrap plan review (M2-12) */
+
+.plan-actions li {
+  display: block;
+  padding: 0.25rem 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.plan-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.plan-action.unavailable .plan-head button,
+.plan-action.installed .plan-head button {
+  color: var(--muted);
+}
+
+.plan-reason {
+  font-size: 0.8rem;
+  padding-left: 1.4rem;
+}
+
+.plan-details {
+  font-size: 0.85rem;
+  padding: 0.3rem 0 0.3rem 1.4rem;
+}
+
+.plan-details dl {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.2rem 0.6rem;
+  margin: 0.4rem 0;
+}
+
+.plan-details dt {
+  color: var(--muted);
+}
+
+.plan-details dd {
+  margin: 0;
+}
+
+.plan-details dd ul {
+  padding-left: 1rem;
+  margin: 0;
+}
+
+.plan-preview {
+  max-height: 14rem;
+  overflow: auto;
+  font-size: 0.8rem;
+}
+
+.opt-in {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+
+/* Bootstrap apply and history (M2-13…M2-17) */
+
+.plan-outcome,
+.runs {
+  font-size: 0.85rem;
+}
+
+.run-actions {
+  padding-left: 0.6rem;
+}
+
+.outcome.applied,
+.outcome.rolled-back {
+  color: var(--ok);
+}
+
+.outcome.failed,
+.outcome.conflict {
+  color: var(--err);
+}
+
+/* Generator proposals (M2-19…M2-26) */
+
+.checks {
+  font-size: 0.8rem;
+  padding-left: 0.2rem;
+  margin: 0.3rem 0;
+}
+
+.checks li {
+  white-space: pre-wrap;
+}
+
+.check-pass {
+  color: var(--ok);
+}
+
+.check-fail {
+  color: var(--err);
+}

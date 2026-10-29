@@ -21,10 +21,13 @@ type RollbackResult = Methods["bootstrap.rollback"]["result"]["results"][number]
  */
 export function BootstrapPlanView({
   cwd,
+  model,
   confirm,
   onChanged,
 }: {
   cwd: string;
+  /** Model alias for generators ("" = the CLI's default). */
+  model: string;
   confirm: Confirm;
   /** The workspace changed (applied or rolled back): the readiness report should rescan. */
   onChanged: () => void;
@@ -37,6 +40,30 @@ export function BootstrapPlanView({
   const [runs, setRuns] = useState<BootstrapRun[]>([]);
   const [busy, setBusy] = useState(false);
   const [outcome, setOutcome] = useState<(ApplyResult | RollbackResult)[] | null>(null);
+  const [generating, setGenerating] = useState<string | null>(null);
+  const [generated, setGenerated] = useState<string | null>(null);
+
+  /** Runs a generator: a read-only Claude session proposes files, which then show up in the plan for review. */
+  async function generateProposal(action: PlanAction) {
+    setGenerating(action.id);
+    setGenerated(null);
+    setError(null);
+    try {
+      const r = await request("bootstrap.generate", { cwd, action: action.id, ...(model ? { model } : {}) });
+      const failing = r.checks.filter((c) => c.status === "fail").length;
+      setGenerated(
+        `${action.title}: proposed ${r.files.join(", ")} in ${r.attempts} attempt${r.attempts > 1 ? "s" : ""} (≈$${r.costUsd.toFixed(4)})${
+          failing ? `; ${failing} check(s) still fail, see below` : ""
+        }.`,
+      );
+      setOpen(action.id);
+      await load();
+    } catch (err) {
+      setError(String(err));
+    } finally {
+      setGenerating(null);
+    }
+  }
 
   const load = useCallback(async () => {
     try {
@@ -194,6 +221,17 @@ export function BootstrapPlanView({
                       {a.tier && <span className={`badge tier-${a.tier}`}>{a.tier}</span>}
                       <span className={`badge risk-${a.risk}`}>{a.risk} risk</span>
                       {a.state !== "recommended" && <span className="muted">{STATE_LABEL[a.state]}</span>}
+                      {a.generatable && (
+                        <button
+                          type="button"
+                          className="link"
+                          disabled={generating !== null || busy}
+                          title="Claude reads the project (read-only) and proposes files; costs a model call"
+                          onClick={() => void generateProposal(a)}
+                        >
+                          {generating === a.id ? "Generating…" : a.preview.type === "files" ? "Regenerate" : "Generate"}
+                        </button>
+                      )}
                     </div>
                     {a.reason && <div className="muted plan-reason">{a.reason}</div>}
                     {open === a.id && <ActionDetails action={a} />}
@@ -214,6 +252,7 @@ export function BootstrapPlanView({
         </button>
       </div>
 
+      {generated && <p className="muted">{generated}</p>}
       {outcome && (
         <ul className="plan-outcome">
           {outcome.map((r) => (
@@ -226,6 +265,7 @@ export function BootstrapPlanView({
                     {w}
                   </div>
                 ))}
+              {"checks" in r && r.checks && <Checks checks={r.checks} />}
             </li>
           ))}
         </ul>
@@ -332,28 +372,35 @@ function ActionDetails({ action: a }: { action: PlanAction }) {
           </>
         )}
       </dl>
-      {a.notes && <p className="warn">{a.notes}</p>}
+      {a.notes && <p className={a.kind === "generator" ? "muted" : "warn"}>{a.notes}</p>}
+      {a.checks && <Checks checks={a.checks} />}
       <Preview preview={a.preview} />
     </div>
   );
 }
 
-function Preview({ preview }: { preview: PlanPreview }) {
-  if (preview.type === "note") return <p className="muted">{preview.text}</p>;
-  if (preview.type === "commands") {
-    return (
-      <pre className="plan-preview">
-        {preview.commands
-          .map((argv) => argv.map((a) => (/[\s"']/.test(a) ? JSON.stringify(a) : a)).join(" "))
-          .join("\n")}
-      </pre>
-    );
-  }
+function Checks({ checks }: { checks: NonNullable<PlanAction["checks"]> }) {
+  return (
+    <ul className="checks">
+      {checks.map((c) => (
+        <li key={c.name} className={`check-${c.status}`}>
+          {c.status === "pass" ? "✓" : c.status === "fail" ? "✕" : "–"} {c.name}
+          <span className="muted"> {c.detail}</span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function FileDiff({ path, before, after }: { path: string; before: string; after: string }) {
   return (
     <>
-      <code>{preview.path}</code>
+      <code>
+        {path}
+        {before ? "" : " (new)"}
+      </code>
       <pre className="plan-preview inline-diff">
-        {lineDiff(preview.before, preview.after).map((l, i) => (
+        {lineDiff(before, after).map((l, i) => (
           // biome-ignore lint/suspicious/noArrayIndexKey: lines of a fixed diff.
           <span key={i} className={l.op === "+" ? "add" : l.op === "-" ? "del" : ""}>
             {l.op} {l.text}
@@ -363,4 +410,27 @@ function Preview({ preview }: { preview: PlanPreview }) {
       </pre>
     </>
   );
+}
+
+function Preview({ preview }: { preview: PlanPreview }) {
+  if (preview.type === "note") return <p className="muted">{preview.text}</p>;
+  if (preview.type === "files") {
+    return (
+      <>
+        {preview.files.map((f) => (
+          <FileDiff key={f.path} {...f} />
+        ))}
+      </>
+    );
+  }
+  if (preview.type === "commands") {
+    return (
+      <pre className="plan-preview">
+        {preview.commands
+          .map((argv) => argv.map((a) => (/[\s"']/.test(a) ? JSON.stringify(a) : a)).join(" "))
+          .join("\n")}
+      </pre>
+    );
+  }
+  return <FileDiff path={preview.path} before={preview.before} after={preview.after} />;
 }

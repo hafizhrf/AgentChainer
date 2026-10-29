@@ -3,6 +3,7 @@ import path from "node:path";
 import type { BootstrapPlan, Finding, PlanAction, WorkspaceProfile } from "@agentchainer/protocol";
 import { type Catalog, type Item, type Profile, REQUIRED_REVIEWS } from "../catalog/schema.ts";
 import { git, repoOf } from "../workspace.ts";
+import { GENERATORS, type Proposal } from "./generate.ts";
 
 /**
  * The BootstrapPlan builder (M2-11): workspace profile + audit findings + catalog → actions, each with why, risk,
@@ -23,7 +24,7 @@ export type PlanEnv = {
 /** The block "Ignore env and secret files" appends to .gitignore. */
 export const GITIGNORE_ENV_BLOCK = "\n# Env files can hold secrets (keep examples)\n.env\n.env.*\n!.env.example\n";
 
-const GENERATORS: Record<string, { title: string; why: string }> = {
+const GENERATOR_TEXT: Record<string, { title: string; why: string }> = {
   "generate-claude-md": {
     title: "Generate CLAUDE.md",
     why: "Gives Claude your real commands, an architecture map and conventions at the start of every session.",
@@ -56,6 +57,8 @@ export function buildPlan(
   catalog: Catalog,
   env: PlanEnv,
   optIn: string[] = [],
+  /** Generator proposals waiting for review, by action. */
+  proposals: Map<string, Proposal> = new Map(),
 ): BootstrapPlan {
   const fixes = new Set(findings.filter((f) => f.status !== "ok" && f.fix).map((f) => f.fix?.action ?? ""));
   const actions: PlanAction[] = [...fixActions(root, fixes)];
@@ -78,22 +81,48 @@ export function buildPlan(
     }
   }
 
-  for (const [action, gen] of Object.entries(GENERATORS)) {
+  for (const [action, gen] of Object.entries(GENERATOR_TEXT)) {
     if (!fixes.has(action)) continue;
-    actions.push({
+    const base = {
       id: `gen:${action}`,
-      kind: "generator",
+      kind: "generator" as const,
       title: gen.title,
       why: gen.why,
-      risk: "medium",
-      scope: "project",
-      permissions: ["Runs a Claude session restricted to this workspace; its changes come back as a diff to review"],
+      risk: "medium" as const,
+      scope: "project" as const,
+      permissions: [
+        "Generating runs a Claude session that can only read this workspace and run its test, lint, typecheck and build commands",
+        "It proposes files; nothing is written until you apply the proposal",
+      ],
       secrets: [],
-      preview: { type: "note", text: "A diff to review is produced when the generator runs." },
-      state: "unavailable",
-      selected: false,
-      reason: "Agent-driven generators arrive with M2-19…M2-26.",
-    });
+    };
+    const proposal = proposals.get(action);
+    if (proposal) {
+      const failing = proposal.checks.filter((c) => c.status === "fail").length;
+      actions.push({
+        ...base,
+        notes: proposal.summary,
+        preview: { type: "files", files: proposal.files },
+        checks: proposal.checks,
+        state: "recommended",
+        // A proposal that failed its checks after the repair attempts is shown, not pre-selected.
+        selected: failing === 0,
+        generatable: true,
+      });
+    } else {
+      const available = action in GENERATORS;
+      actions.push({
+        ...base,
+        preview: {
+          type: "note",
+          text: "Generate a proposal to see the exact files. Claude reads the project and proposes them; you review the diff here.",
+        },
+        state: "unavailable",
+        selected: false,
+        reason: available ? "Generate a proposal first (it costs a model call)." : "This generator comes later.",
+        generatable: available,
+      });
+    }
   }
 
   return {

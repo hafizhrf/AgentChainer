@@ -7,8 +7,10 @@ import { auditWorkspace } from "../detect/audit.ts";
 import { detectWorkspace } from "../detect/detect.ts";
 import type { CliResult } from "../installer.ts";
 import { git } from "../workspace.ts";
+import { type Check, GENERATORS, type Proposal } from "./generate.ts";
 import { type FetchTree, fetchGitHubTree, listFiles, treeHash } from "./git-source.ts";
 import { buildPlan, type PlanEnv } from "./plan.ts";
+import { verifyApplied } from "./verify.ts";
 
 /**
  * The bootstrap apply engine (M2-13…M2-17):
@@ -33,6 +35,8 @@ export type ApplyContext = {
   cli: Cli | null;
   fetchTree?: FetchTree;
   optIn?: string[];
+  /** Generator proposals waiting for review, by action. */
+  proposals?: Map<string, Proposal>;
   now?: () => Date;
 };
 
@@ -49,7 +53,8 @@ type ActionRecord = {
   warnings: string[];
   files: FileRecord[];
   undo: Undo[];
-  lock?: LockItem | LockFix;
+  checks?: Check[];
+  lock?: LockItem | LockFix | LockGenerated;
 };
 export type RunRecord = {
   runId: string;
@@ -65,6 +70,7 @@ export type ActionResult = {
   status: "applied" | "failed" | "skipped";
   message?: string;
   warnings: string[];
+  checks?: Check[];
 };
 export type RollbackResult = { id: string; status: "rolled-back" | "conflict" | "failed" | "kept"; message?: string };
 
@@ -79,13 +85,15 @@ type LockItem = {
   files?: string[];
 };
 type LockFix = { id: string; appliedAt: string; files: string[] };
+/** Generated files (docs/CATALOG.md §7): which generator wrote them and whether verification passed. */
+type LockGenerated = { id: string; generator: string; appliedAt: string; files: string[]; verified: boolean };
 type Lock = {
   lockfileVersion: 1;
   generatedBy: string;
   catalogVersion: string;
   items: LockItem[];
   fixes: LockFix[];
-  generated: unknown[];
+  generated: LockGenerated[];
 };
 
 const AC_DIR = ".agentchainer";
@@ -194,7 +202,8 @@ export async function applyActions(
 ): Promise<{ runId: string; results: ActionResult[] }> {
   const now = ctx.now ?? (() => new Date());
   const profile = detectWorkspace(root);
-  const plan = buildPlan(root, profile, auditWorkspace(root, profile), ctx.catalog, ctx.env, ctx.optIn ?? []);
+  const findings = auditWorkspace(root, profile);
+  const plan = buildPlan(root, profile, findings, ctx.catalog, ctx.env, ctx.optIn ?? [], ctx.proposals ?? new Map());
   const wanted = new Set(ids);
   const results: ActionResult[] = [];
   const toApply: PlanAction[] = [];
@@ -246,7 +255,12 @@ export async function applyActions(
     try {
       await applyOne(root, action, rec, tracker, ctx, now);
       tracker.settle(rec.files);
-      results.push({ id: action.id, status: "applied", warnings: rec.warnings });
+      results.push({
+        id: action.id,
+        status: "applied",
+        warnings: rec.warnings,
+        ...(rec.checks ? { checks: rec.checks } : {}),
+      });
     } catch (err) {
       rec.status = "failed";
       rec.error = err instanceof Error ? err.message : String(err);
@@ -263,9 +277,11 @@ export async function applyActions(
     lock.catalogVersion = ctx.catalog.version;
     lock.generatedBy = GENERATED_BY;
     for (const a of applied) {
-      if (!a.lock) continue;
-      if ("kind" in a.lock) lock.items = [...lock.items.filter((i) => i.id !== a.lock?.id), a.lock];
-      else lock.fixes = [...lock.fixes.filter((f) => f.id !== a.lock?.id), a.lock as LockFix];
+      const entry = a.lock;
+      if (!entry) continue;
+      if ("kind" in entry) lock.items = [...lock.items.filter((i) => i.id !== entry.id), entry];
+      else if ("generator" in entry) lock.generated = [...lock.generated.filter((g) => g.id !== entry.id), entry];
+      else lock.fixes = [...lock.fixes.filter((f) => f.id !== entry.id), entry];
     }
     tracker.write(run.meta, LOCK, lockText(lock));
     const ignore = existsSync(abs(root, AC_IGNORE)) ? readFileSync(abs(root, AC_IGNORE), "utf8") : "";
@@ -319,7 +335,34 @@ async function applyOne(
     }
     throw new Error(`No applier for ${action.id}`);
   }
-  if (action.kind !== "catalog") throw new Error("Generators aren't available yet.");
+  if (action.kind === "generator") {
+    const name = action.id.slice(4);
+    const proposal = ctx.proposals?.get(name);
+    if (!proposal) throw new Error("Generate a proposal first.");
+    for (const f of proposal.files) {
+      const file = insideRoot(root, f.path);
+      const current = existsSync(file) ? readFileSync(file, "utf8") : "";
+      if (current !== f.before) throw new Error(`${f.path} changed since the proposal was made. Generate it again.`);
+    }
+    for (const f of proposal.files) tracker.write(rec.files, f.path, f.after);
+    const verification = await verifyApplied(
+      root,
+      name,
+      proposal.files.map((f) => f.path),
+    );
+    rec.checks = [...proposal.checks, ...verification];
+    const failed = verification.filter((c) => c.status === "fail");
+    for (const c of failed) rec.warnings.push(`Verification failed (${c.name}): ${c.detail}`);
+    rec.lock = {
+      id: name,
+      generator: GENERATORS[name]?.skill ?? name,
+      appliedAt: now().toISOString(),
+      files: proposal.files.map((f) => f.path),
+      verified: failed.length === 0 && !proposal.checks.some((c) => c.status === "fail"),
+    };
+    return;
+  }
+  if (action.kind !== "catalog") throw new Error(`Can't apply ${action.kind} actions.`);
 
   const item = ctx.catalog.items.find((i) => `item:${i.id}` === action.id);
   if (!item) throw new Error(`Unknown catalog item ${action.id}`);
@@ -529,6 +572,7 @@ export function rollback(
       const gone = new Set(run.actions.filter((a) => a.status === "rolled-back").map((a) => a.lock?.id));
       lock.items = (lock.items ?? []).filter((i) => !gone.has(i.id));
       lock.fixes = (lock.fixes ?? []).filter((f) => !gone.has(f.id));
+      lock.generated = (lock.generated ?? []).filter((g) => !gone.has(g.id));
       writeFileSync(lockFile, lockText(lock));
     }
     writeFileSync(runFile, `${JSON.stringify(run, null, 2)}\n`);

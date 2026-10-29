@@ -30,6 +30,22 @@ export function readCatalogSource(dir: string): Catalog {
   return parsed.data;
 }
 
+/** First-party skills (the SKILL.md of each folder in `skills/`), by name, for the generators (M2-19). */
+export function readSkills(dir: string): Record<string, string> {
+  const skills: Record<string, string> = {};
+  for (const name of readdirSync(dir).sort()) {
+    const file = path.join(dir, name, "SKILL.md");
+    try {
+      skills[name] = readFileSync(file, "utf8");
+    } catch {
+      // not a skill folder
+    }
+  }
+  return skills;
+}
+
+export const skillsJsonText = (skills: Record<string, string>) => `${JSON.stringify(skills, null, 2)}\n`;
+
 /** The compiled catalog the sidecar imports. */
 export const catalogJsonText = (catalog: Catalog) => `${JSON.stringify(catalog, null, 2)}\n`;
 

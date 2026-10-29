@@ -1112,3 +1112,23 @@ button.toggle[aria-pressed="true"] {
 .outcome.conflict {
   color: var(--err);
 }
+
+/* Generator proposals (M2-19…M2-26) */
+
+.checks {
+  font-size: 0.8rem;
+  padding-left: 0.2rem;
+  margin: 0.3rem 0;
+}
+
+.checks li {
+  white-space: pre-wrap;
+}
+
+.check-pass {
+  color: var(--ok);
+}
+
+.check-fail {
+  color: var(--err);
+}

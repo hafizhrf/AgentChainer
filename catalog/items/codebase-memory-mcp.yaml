@@ -1,0 +1,50 @@
+# Seed item (docs/CATALOG.md §6). Community tier: offered after two maintainer reviews (§2, §4).
+id: codebase-memory-mcp
+name: "Codebase memory (code graph MCP)"
+kind: mcp
+tier: community
+license: MIT
+homepage: https://github.com/DeusData/codebase-memory-mcp
+summary: "A local knowledge graph of the codebase that Claude queries instead of reading files one by one."
+why: >-
+  Claude answers "who calls this?" or "what breaks if I change it?" from an index of the code, which is faster and
+  uses far fewer tokens than searching file by file.
+source:
+  type: release-asset
+  repo: https://github.com/DeusData/codebase-memory-mcp
+  version: "0.11.0"
+  assets:
+    darwin-arm64:
+      url: https://github.com/DeusData/codebase-memory-mcp/releases/download/v0.11.0/codebase-memory-mcp-darwin-arm64.tar.gz
+      sha256: 4dee7f38b63740e6751d7a7ed7eb10291c1f2a3ea2415f599dc68370ca0a2d18
+    darwin-x64:
+      url: https://github.com/DeusData/codebase-memory-mcp/releases/download/v0.11.0/codebase-memory-mcp-darwin-amd64.tar.gz
+      sha256: dbf1c73bfcbde64e7dde4cd1320da7afc02e2c972ee1789ae039521411f5132e
+    linux-x64:
+      url: https://github.com/DeusData/codebase-memory-mcp/releases/download/v0.11.0/codebase-memory-mcp-linux-amd64-portable.tar.gz
+      sha256: 1f9e8293eb2bc5c05cfa27a7e8fc033da6d729ffad525ccfcdaa3fd606306683
+    linux-arm64:
+      url: https://github.com/DeusData/codebase-memory-mcp/releases/download/v0.11.0/codebase-memory-mcp-linux-arm64-portable.tar.gz
+      sha256: d62eeb224d5ee3eba3070938ec62cf1033f10b041ec1c4b2fb67f7aef390cc7b
+    win32-x64:
+      url: https://github.com/DeusData/codebase-memory-mcp/releases/download/v0.11.0/codebase-memory-mcp-windows-amd64.zip
+      sha256: 6eb6beaf261b19e419766e78baf93cbc3cf1c6338cff8fb7c0234859f96d1685
+platforms: [darwin, linux, win32]
+risk: medium
+permissions:
+  - "Indexes the workspace into a local graph database in its own cache folder"
+  - "Starts a background daemon that watches indexed git projects for changes"
+  - "Runs locally; the project states it makes no network requests and collects no telemetry"
+install:
+  # The binary's path is specific to this machine, so the server is registered privately.
+  scope: local
+  steps:
+    - download-binary: { binary: codebase-memory-mcp }
+    - mcp-add: { name: codebase-memory, command: ["{binary}"] }
+uninstall:
+  steps:
+    - run: [claude, mcp, remove, --scope, local, codebase-memory]
+reviews: []
+notes: >-
+  AgentChainer never runs the project's install script: it edits the global config of every coding agent it finds
+  and adds hooks, agents and skills. Only the binary is used, registered for this workspace.

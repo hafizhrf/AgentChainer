@@ -98,9 +98,11 @@ describe("proposal validation", () => {
 });
 
 describe("deterministic checks", () => {
+  const tools = { actionlint: { path: null } };
+
   it("CLAUDE.md: length, the test command, no personal paths", () => {
     const spec = GENERATORS["generate-claude-md"];
-    const md = (after: string) => spec?.check(root, [{ path: "CLAUDE.md", before: "", after }], profile) ?? [];
+    const md = (after: string) => spec?.check(root, [{ path: "CLAUDE.md", before: "", after }], profile, tools) ?? [];
     assert.ok(md("# App\n\nRun `pnpm test`.\n").every((c) => c.status === "pass"));
     const bad = md(`${"x\n".repeat(310)}/Users/jane/app`);
     assert.deepEqual(
@@ -117,7 +119,7 @@ describe("deterministic checks", () => {
       hooks: { PostToolUse: [{ hooks: [{ command: "node .claude/hooks/fmt.mjs" }] }] },
     });
     const checks = (after: string, extra: { path: string; before: string; after: string }[] = []) =>
-      spec?.check(root, [{ path: ".claude/settings.json", before, after }, ...extra], profile) ?? [];
+      spec?.check(root, [{ path: ".claude/settings.json", before, after }, ...extra], profile, tools) ?? [];
     assert.ok(
       checks(good, [{ path: ".claude/hooks/fmt.mjs", before: "", after: "//" }]).every((c) => c.status === "pass"),
     );
@@ -149,7 +151,15 @@ describe("deterministic checks", () => {
 });
 
 describe("generator proposals in the plan and apply engine", () => {
-  const env: PlanEnv = { platform: "linux", hasTool: () => true, remoteHost: null, enabledPlugins: new Set() };
+  const env: PlanEnv = {
+    platform: "linux",
+    arch: "x64",
+    hasTool: () => true,
+    remoteHost: null,
+    enabledPlugins: new Set(),
+    toolsDir: null,
+    installedItems: new Set(),
+  };
   const catalog = { version: "2026.10.29", items: [], profiles: [] };
 
   it("asks for a proposal first, then offers it as files to review", () => {

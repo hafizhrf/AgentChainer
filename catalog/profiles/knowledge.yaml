@@ -1,7 +1,8 @@
 id: knowledge
 name: "Knowledge"
-description: "Up-to-date library docs, on request."
+description: "Up-to-date library docs and a code graph, on request."
 suggest:
   optIn: true
 items:
   - context7
+  - codebase-memory-mcp

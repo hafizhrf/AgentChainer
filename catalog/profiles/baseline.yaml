@@ -7,3 +7,4 @@ items:
   - code-review
   - commit-commands
   - security-guidance
+  - gitleaks

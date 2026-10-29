@@ -20,9 +20,12 @@ after(removeFixtureCopies);
 
 const env = (over: Partial<PlanEnv> = {}): PlanEnv => ({
   platform: "linux",
+  arch: "x64",
   hasTool: () => true,
   remoteHost: null,
   enabledPlugins: new Set(),
+  toolsDir: null,
+  installedItems: new Set(),
   ...over,
 });
 

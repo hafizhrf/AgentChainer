@@ -22,7 +22,7 @@
     {
       "id": "knowledge",
       "name": "Knowledge",
-      "description": "Up-to-date library docs, on request.",
+      "description": "Up-to-date library docs and a code graph, on request.",
       "suggested": false
     },
     {
@@ -173,6 +173,32 @@
             "--json"
           ]
         ]
+      },
+      "state": "unavailable",
+      "selected": false,
+      "reason": "Not reviewed yet: needs 1 more maintainer review(s) against docs/CATALOG.md §4."
+    },
+    {
+      "id": "item:gitleaks",
+      "kind": "catalog",
+      "title": "Secret scan before each commit (gitleaks)",
+      "why": "Agents write and commit a lot of code quickly. A key pasted into a config file is caught before it reaches the repository, where removing it later means rewriting history and rotating the key.",
+      "risk": "low",
+      "scope": "project",
+      "tier": "verified-vendor",
+      "license": "MIT",
+      "source": "https://github.com/gitleaks/gitleaks 8.30.1",
+      "profile": "baseline",
+      "permissions": [
+        "Reads the staged changes of each commit, locally; nothing is sent anywhere",
+        "Stops a commit that contains a secret (skip one check with SKIP=gitleaks, or git commit --no-verify)",
+        "Downloads gitleaks 8.30.1 for linux-x64 from github.com (sha256 551f6fc83ea4…) into AgentChainer's tools folder; it stays there after a rollback"
+      ],
+      "secrets": [],
+      "notes": "Teammates without gitleaks (or AgentChainer) aren't blocked: the committed hook prints a hint and lets the commit through.",
+      "preview": {
+        "type": "note",
+        "text": "download-binary, pre-commit-hook"
       },
       "state": "unavailable",
       "selected": false,

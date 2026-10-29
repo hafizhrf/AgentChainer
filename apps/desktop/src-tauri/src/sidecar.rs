@@ -5,6 +5,7 @@
 //!   gets `AGENTCHAINER_DATA_DIR`, where it downloads and verifies the pinned Agent SDK on first use.
 //! - **Debug builds:** `node packages/sidecar/src/main.ts` from the source tree, using the SDK in node_modules.
 //! - `AGENTCHAINER_SIDECAR_BIN=<path>` overrides both, e.g. to try a packaged sidecar in a debug build.
+//! - Both get `AGENTCHAINER_TOOLS_DIR` (`<app data>/tools`), where catalog tools are downloaded and verified (M2-15).
 //!
 //! Supervision:
 //! - If the process exits, it is restarted with exponential backoff (0.5 s → 30 s, reset after a minute of uptime).
@@ -248,18 +249,23 @@ fn command(app: &AppHandle) -> Result<(Command, String), String> {
                 .flatten()
         });
 
-    let Some(bin) = packaged else {
-        let mut cmd = Command::new("node");
-        cmd.arg(SIDECAR_ENTRY);
-        return Ok((cmd, format!("node {SIDECAR_ENTRY}")));
-    };
-
     let data_dir = app
         .path()
         .app_data_dir()
         .map_err(|e| format!("no app data dir: {e}"))?;
+    // Downloaded catalog tools (M2-15) live here in dev builds too.
+    let tools_dir = data_dir.join("tools");
+
+    let Some(bin) = packaged else {
+        let mut cmd = Command::new("node");
+        cmd.arg(SIDECAR_ENTRY)
+            .env("AGENTCHAINER_TOOLS_DIR", &tools_dir);
+        return Ok((cmd, format!("node {SIDECAR_ENTRY}")));
+    };
+
     let mut cmd = Command::new(&bin);
     cmd.env("AGENTCHAINER_DATA_DIR", data_dir)
+        .env("AGENTCHAINER_TOOLS_DIR", &tools_dir)
         // Let the SDK download honour HTTP(S)_PROXY / NO_PROXY like other tools on the machine.
         .env("NODE_USE_ENV_PROXY", "1");
     Ok((cmd, bin.display().to_string()))

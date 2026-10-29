@@ -1,52 +1,26 @@
 import assert from "node:assert/strict";
-import { execFileSync } from "node:child_process";
-import { cpSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { after, describe, it } from "node:test";
 import type { Finding, WorkspaceProfile } from "@agentchainer/protocol";
 import { auditWorkspace, saveProfile } from "./audit.ts";
 import { detectWorkspace } from "./detect.ts";
+import { copyFixture, FIXTURE_SETUPS, removeFixtureCopies } from "./fixture-copy.ts";
 import { makeTargets, requirementNames, tomlArray, tomlDependencyNames, yamlList } from "./manifests.ts";
 
 /**
  * Detector and audit snapshots per fixture repo (M2-28). Each fixture is copied outside this repo and given the git
  * state its scenario needs, so git checks don't see AgentChainer's own repo. Regenerate with UPDATE_SNAPSHOTS=1.
  */
-const FIXTURES = new URL("../../../../fixtures/", import.meta.url);
 const temps: string[] = [];
 after(() => {
+  removeFixtureCopies();
   for (const t of temps) rmSync(t, { recursive: true, force: true });
 });
 
-const git = (cwd: string, ...args: string[]) =>
-  execFileSync("git", ["-c", "user.name=t", "-c", "user.email=t@example.invalid", ...args], { cwd, stdio: "ignore" });
-
-type Setup = { git: boolean; remote?: boolean; files?: Record<string, string> };
-const SETUPS: Record<string, Setup> = {
-  "ts-pnpm-vite": { git: true, remote: true },
-  "python-uv-fastapi": { git: true },
-  "flutter-app": { git: true },
-  "go-service": { git: true },
-  empty: { git: false },
-  "legacy-messy": { git: true, files: { ".env": "DEBUG=1\n" } },
-  "monorepo-pnpm": { git: true },
-  "sample-app": { git: true },
-};
-
 function scan(name: string): { profile: WorkspaceProfile; findings: Finding[] } {
-  const setup = SETUPS[name];
-  assert.ok(setup, `no setup for fixture ${name}`);
-  const dir = realpathSync(mkdtempSync(join(tmpdir(), `ac-detect-${name}-`)));
-  temps.push(dir);
-  cpSync(new URL(name, FIXTURES), dir, { recursive: true });
-  for (const [file, text] of Object.entries(setup.files ?? {})) writeFileSync(join(dir, file), text);
-  if (setup.git) {
-    git(dir, "init", "-q", "-b", "main");
-    git(dir, "add", "-A", "-f");
-    git(dir, "commit", "-q", "-m", "fixture");
-    if (setup.remote) git(dir, "remote", "add", "origin", "https://example.invalid/repo.git");
-  }
+  const dir = copyFixture(name);
   const profile = detectWorkspace(dir);
   return { profile, findings: auditWorkspace(dir, profile) };
 }
@@ -58,7 +32,7 @@ const cmd = (p: WorkspaceProfile, path: string, kind: string) => {
 };
 
 describe("fixture snapshots", () => {
-  for (const name of Object.keys(SETUPS)) {
+  for (const name of Object.keys(FIXTURE_SETUPS)) {
     it(`${name} matches test/snapshots/${name}.json`, () => {
       const file = new URL(`../../test/snapshots/${name}.json`, import.meta.url);
       const text = `${JSON.stringify(scan(name), null, 2)}\n`;

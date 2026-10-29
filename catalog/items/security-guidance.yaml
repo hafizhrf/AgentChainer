@@ -1,0 +1,31 @@
+# Seed item (docs/CATALOG.md §6). Offered once reviewed: see `reviews` and §4.
+id: security-guidance
+name: "Security Guidance"
+kind: plugin
+tier: official
+license: "Apache-2.0 (marketplace repo)"
+summary: "Flags insecure patterns in Claude's edits and reviews the diff for vulnerabilities."
+why: >-
+  Catches injection, XSS, SSRF, hardcoded secrets and similar mistakes while Claude writes the code, not after
+  it ships.
+source:
+  type: marketplace
+  marketplace: claude-plugins-official
+  repo: anthropics/claude-plugins-official
+  plugin: security-guidance
+  reviewedVersion: "2.0.17"
+  reviewedRef: "f8c5e7a1dcb71b10cb74586224b5401f3de5db28"
+platforms: [darwin, linux, win32]
+risk: medium
+permissions:
+  - "Adds hooks that check every edit Claude makes for risky patterns"
+  - "Runs an extra model review of the diff when Claude stops (uses your Claude plan)"
+  - "Adds a commit reviewer agent"
+install:
+  scope: project
+  steps:
+    - run: [claude, plugin, install, "security-guidance@claude-plugins-official", --scope, project, --json]
+uninstall:
+  steps:
+    - run: [claude, plugin, uninstall, "security-guidance@claude-plugins-official", --scope, project, --json]
+reviews: []

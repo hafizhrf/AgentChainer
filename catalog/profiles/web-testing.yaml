@@ -1,0 +1,7 @@
+id: web-testing
+name: "Web testing"
+description: "Browser automation for web UIs, on request."
+suggest:
+  optIn: true
+items:
+  - playwright

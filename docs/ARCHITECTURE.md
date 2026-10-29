@@ -112,6 +112,7 @@ Planned surface (v0.1):
 | request | `git.draftMessage` | Commit message from the staged diff: a one-shot haiku `query()` with `tools: []`, `settingSources: []`, `persistSession: false` |
 | request | `workspace.scan` | Detect stack, commands, and audit the setup → `WorkspaceProfile` + findings (read-only) |
 | request | `workspace.saveProfile` | Write the profile to `.agentchainer/profile.json` |
+| request | `bootstrap.plan` | Fixes + catalog items + generators for the workspace, each with a preview (read-only; M2-11) |
 | request | `bootstrap.plan` / `bootstrap.apply` / `bootstrap.rollback` | Bootstrap engine |
 | notification | `agent.event` | `{sessionId, event}`: a normalized `AgentEvent` (see §5.2) |
 | notification | `permission.request` | `{sessionId, …}`: ask the user to approve a tool call |

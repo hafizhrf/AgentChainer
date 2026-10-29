@@ -1,0 +1,7 @@
+id: knowledge
+name: "Knowledge"
+description: "Up-to-date library docs, on request."
+suggest:
+  optIn: true
+items:
+  - context7

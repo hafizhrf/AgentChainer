@@ -1,0 +1,7 @@
+id: python
+name: "Python"
+description: "Code intelligence for Python projects."
+suggest:
+  stacks: [python]
+items:
+  - pyright-lsp

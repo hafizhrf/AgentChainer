@@ -1,0 +1,30 @@
+# Seed item (docs/CATALOG.md §6). Offered once reviewed: see `reviews` and §4.
+id: commit-commands
+name: "Commit Commands"
+kind: plugin
+tier: official
+license: "Apache-2.0 (marketplace repo)"
+summary: "Commands for committing, pushing and opening pull requests."
+why: >-
+  Turns the usual git routine into one command: Claude writes the commit message, pushes and can open the pull
+  request.
+source:
+  type: marketplace
+  marketplace: claude-plugins-official
+  repo: anthropics/claude-plugins-official
+  plugin: commit-commands
+  reviewedVersion: "1.0.1"
+  reviewedRef: "f8c5e7a1dcb71b10cb74586224b5401f3de5db28"
+platforms: [darwin, linux, win32]
+risk: medium
+permissions:
+  - "Adds /commit, /commit-push-pr and /clean_gone commands"
+  - "When you run them: runs git, and gh for pull requests"
+install:
+  scope: project
+  steps:
+    - run: [claude, plugin, install, "commit-commands@claude-plugins-official", --scope, project, --json]
+uninstall:
+  steps:
+    - run: [claude, plugin, uninstall, "commit-commands@claude-plugins-official", --scope, project, --json]
+reviews: []

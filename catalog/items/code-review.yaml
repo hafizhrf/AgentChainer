@@ -1,0 +1,30 @@
+# Seed item (docs/CATALOG.md §6). Offered once reviewed: see `reviews` and §4.
+id: code-review
+name: "Code Review"
+kind: plugin
+tier: official
+license: "Apache-2.0 (marketplace repo)"
+summary: "Reviews a pull request with several specialized agents and keeps only confident findings."
+why: >-
+  A second pair of eyes on every pull request: separate agents look at bugs, conventions and history, and only
+  findings they are confident about are reported.
+source:
+  type: marketplace
+  marketplace: claude-plugins-official
+  repo: anthropics/claude-plugins-official
+  plugin: code-review
+  reviewedVersion: "1.0.1"
+  reviewedRef: "f8c5e7a1dcb71b10cb74586224b5401f3de5db28"
+platforms: [darwin, linux, win32]
+risk: low
+permissions:
+  - "Adds a /code-review command"
+  - "When you run it: reads the pull request and the repository, and runs several review agents"
+install:
+  scope: project
+  steps:
+    - run: [claude, plugin, install, "code-review@claude-plugins-official", --scope, project, --json]
+uninstall:
+  steps:
+    - run: [claude, plugin, uninstall, "code-review@claude-plugins-official", --scope, project, --json]
+reviews: []

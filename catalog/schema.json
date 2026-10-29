@@ -1,0 +1,695 @@
+{
+  "$comment": "Generated from packages/sidecar/src/catalog/schema.ts by packages/sidecar/scripts/build-catalog.ts.",
+  "item": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "id": {
+        "type": "string",
+        "pattern": "^[a-z0-9][a-z0-9-]*$"
+      },
+      "name": {
+        "type": "string"
+      },
+      "kind": {
+        "type": "string",
+        "enum": [
+          "skill",
+          "plugin",
+          "mcp",
+          "hook",
+          "agent",
+          "tool"
+        ]
+      },
+      "tier": {
+        "type": "string",
+        "enum": [
+          "first-party",
+          "official",
+          "verified-vendor",
+          "community"
+        ]
+      },
+      "license": {
+        "type": "string"
+      },
+      "homepage": {
+        "type": "string",
+        "format": "uri"
+      },
+      "summary": {
+        "type": "string"
+      },
+      "why": {
+        "type": "string"
+      },
+      "source": {
+        "oneOf": [
+          {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "const": "marketplace"
+              },
+              "marketplace": {
+                "type": "string"
+              },
+              "repo": {
+                "type": "string"
+              },
+              "plugin": {
+                "type": "string"
+              },
+              "reviewedVersion": {
+                "type": "string"
+              },
+              "reviewedRef": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{40}$"
+              }
+            },
+            "required": [
+              "type",
+              "marketplace",
+              "repo",
+              "plugin",
+              "reviewedRef"
+            ]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "const": "git"
+              },
+              "repo": {
+                "type": "string",
+                "format": "uri"
+              },
+              "ref": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{40}$"
+              },
+              "path": {
+                "type": "string"
+              },
+              "sha256": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              }
+            },
+            "required": [
+              "type",
+              "repo",
+              "ref",
+              "path",
+              "sha256"
+            ]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "const": "release-asset"
+              },
+              "repo": {
+                "type": "string",
+                "format": "uri"
+              },
+              "version": {
+                "type": "string"
+              },
+              "assets": {
+                "type": "object",
+                "propertyNames": {
+                  "type": "string",
+                  "enum": [
+                    "darwin-arm64",
+                    "darwin-x64",
+                    "linux-x64",
+                    "linux-arm64",
+                    "win32-x64"
+                  ]
+                },
+                "additionalProperties": {
+                  "type": "object",
+                  "properties": {
+                    "url": {
+                      "type": "string",
+                      "format": "uri"
+                    },
+                    "sha256": {
+                      "type": "string",
+                      "pattern": "^[0-9a-f]{64}$"
+                    }
+                  },
+                  "required": [
+                    "url",
+                    "sha256"
+                  ]
+                },
+                "required": [
+                  "darwin-arm64",
+                  "darwin-x64",
+                  "linux-x64",
+                  "linux-arm64",
+                  "win32-x64"
+                ]
+              }
+            },
+            "required": [
+              "type",
+              "repo",
+              "version",
+              "assets"
+            ]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "const": "npm"
+              },
+              "name": {
+                "type": "string"
+              },
+              "version": {
+                "type": "string",
+                "pattern": "^\\d+\\.\\d+\\.\\d+(-[\\w.]+)?$"
+              },
+              "integrity": {
+                "type": "string",
+                "format": "starts_with",
+                "pattern": "^sha512-.*"
+              }
+            },
+            "required": [
+              "type",
+              "name",
+              "version",
+              "integrity"
+            ]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "const": "first-party"
+              },
+              "path": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "type",
+              "path"
+            ]
+          }
+        ]
+      },
+      "platforms": {
+        "minItems": 1,
+        "type": "array",
+        "items": {
+          "type": "string",
+          "enum": [
+            "darwin",
+            "linux",
+            "win32"
+          ]
+        }
+      },
+      "requires": {
+        "default": [],
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "tool": {
+              "type": "string"
+            },
+            "hint": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "tool",
+            "hint"
+          ]
+        }
+      },
+      "risk": {
+        "type": "string",
+        "enum": [
+          "low",
+          "medium",
+          "high"
+        ]
+      },
+      "permissions": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "secrets": {
+        "default": [],
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "install": {
+        "type": "object",
+        "properties": {
+          "scope": {
+            "type": "string",
+            "enum": [
+              "project",
+              "user",
+              "local"
+            ]
+          },
+          "steps": {
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "anyOf": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "copy": {
+                      "type": "object",
+                      "properties": {
+                        "from": {
+                          "type": "string"
+                        },
+                        "to": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "from",
+                        "to"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "copy"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "remove": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "remove"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "run": {
+                      "minItems": 1,
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  },
+                  "required": [
+                    "run"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "download-binary": {
+                      "type": "object",
+                      "properties": {
+                        "to": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "to"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "download-binary"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "merge-json": {
+                      "type": "object",
+                      "properties": {
+                        "path": {
+                          "type": "string"
+                        },
+                        "value": {
+                          "type": "object",
+                          "propertyNames": {
+                            "type": "string"
+                          },
+                          "additionalProperties": {}
+                        }
+                      },
+                      "required": [
+                        "path",
+                        "value"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "merge-json"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "write-file": {
+                      "type": "object",
+                      "properties": {
+                        "path": {
+                          "type": "string"
+                        },
+                        "content": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "path",
+                        "content"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "write-file"
+                  ],
+                  "additionalProperties": false
+                }
+              ]
+            }
+          }
+        },
+        "required": [
+          "scope",
+          "steps"
+        ]
+      },
+      "uninstall": {
+        "type": "object",
+        "properties": {
+          "steps": {
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "anyOf": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "copy": {
+                      "type": "object",
+                      "properties": {
+                        "from": {
+                          "type": "string"
+                        },
+                        "to": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "from",
+                        "to"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "copy"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "remove": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "remove"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "run": {
+                      "minItems": 1,
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  },
+                  "required": [
+                    "run"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "download-binary": {
+                      "type": "object",
+                      "properties": {
+                        "to": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "to"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "download-binary"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "merge-json": {
+                      "type": "object",
+                      "properties": {
+                        "path": {
+                          "type": "string"
+                        },
+                        "value": {
+                          "type": "object",
+                          "propertyNames": {
+                            "type": "string"
+                          },
+                          "additionalProperties": {}
+                        }
+                      },
+                      "required": [
+                        "path",
+                        "value"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "merge-json"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "write-file": {
+                      "type": "object",
+                      "properties": {
+                        "path": {
+                          "type": "string"
+                        },
+                        "content": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "path",
+                        "content"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "write-file"
+                  ],
+                  "additionalProperties": false
+                }
+              ]
+            }
+          }
+        },
+        "required": [
+          "steps"
+        ]
+      },
+      "reviews": {
+        "default": [],
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "by": {
+              "type": "string"
+            },
+            "date": {
+              "type": "string",
+              "format": "date",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+            },
+            "ref": {
+              "type": "string"
+            },
+            "notes": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "by",
+            "date",
+            "ref"
+          ]
+        }
+      },
+      "notes": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "id",
+      "name",
+      "kind",
+      "tier",
+      "license",
+      "summary",
+      "why",
+      "source",
+      "platforms",
+      "risk",
+      "permissions",
+      "install",
+      "uninstall"
+    ],
+    "additionalProperties": false
+  },
+  "profile": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "id": {
+        "type": "string",
+        "pattern": "^[a-z0-9][a-z0-9-]*$"
+      },
+      "name": {
+        "type": "string"
+      },
+      "description": {
+        "type": "string"
+      },
+      "suggest": {
+        "anyOf": [
+          {
+            "type": "object",
+            "properties": {
+              "always": {
+                "type": "boolean",
+                "const": true
+              }
+            },
+            "required": [
+              "always"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "stacks": {
+                "minItems": 1,
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            },
+            "required": [
+              "stacks"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "remoteHost": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "remoteHost"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "optIn": {
+                "type": "boolean",
+                "const": true
+              }
+            },
+            "required": [
+              "optIn"
+            ],
+            "additionalProperties": false
+          }
+        ]
+      },
+      "items": {
+        "minItems": 1,
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      }
+    },
+    "required": [
+      "id",
+      "name",
+      "description",
+      "suggest",
+      "items"
+    ],
+    "additionalProperties": false
+  }
+}

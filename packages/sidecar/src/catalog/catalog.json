@@ -1,0 +1,741 @@
+{
+  "version": "2026.10.29",
+  "items": [
+    {
+      "id": "code-review",
+      "name": "Code Review",
+      "kind": "plugin",
+      "tier": "official",
+      "license": "Apache-2.0 (marketplace repo)",
+      "summary": "Reviews a pull request with several specialized agents and keeps only confident findings.",
+      "why": "A second pair of eyes on every pull request: separate agents look at bugs, conventions and history, and only findings they are confident about are reported.",
+      "source": {
+        "type": "marketplace",
+        "marketplace": "claude-plugins-official",
+        "repo": "anthropics/claude-plugins-official",
+        "plugin": "code-review",
+        "reviewedVersion": "1.0.1",
+        "reviewedRef": "f8c5e7a1dcb71b10cb74586224b5401f3de5db28"
+      },
+      "platforms": [
+        "darwin",
+        "linux",
+        "win32"
+      ],
+      "requires": [],
+      "risk": "low",
+      "permissions": [
+        "Adds a /code-review command",
+        "When you run it: reads the pull request and the repository, and runs several review agents"
+      ],
+      "secrets": [],
+      "install": {
+        "scope": "project",
+        "steps": [
+          {
+            "run": [
+              "claude",
+              "plugin",
+              "install",
+              "code-review@claude-plugins-official",
+              "--scope",
+              "project",
+              "--json"
+            ]
+          }
+        ]
+      },
+      "uninstall": {
+        "steps": [
+          {
+            "run": [
+              "claude",
+              "plugin",
+              "uninstall",
+              "code-review@claude-plugins-official",
+              "--scope",
+              "project",
+              "--json"
+            ]
+          }
+        ]
+      },
+      "reviews": []
+    },
+    {
+      "id": "commit-commands",
+      "name": "Commit Commands",
+      "kind": "plugin",
+      "tier": "official",
+      "license": "Apache-2.0 (marketplace repo)",
+      "summary": "Commands for committing, pushing and opening pull requests.",
+      "why": "Turns the usual git routine into one command: Claude writes the commit message, pushes and can open the pull request.",
+      "source": {
+        "type": "marketplace",
+        "marketplace": "claude-plugins-official",
+        "repo": "anthropics/claude-plugins-official",
+        "plugin": "commit-commands",
+        "reviewedVersion": "1.0.1",
+        "reviewedRef": "f8c5e7a1dcb71b10cb74586224b5401f3de5db28"
+      },
+      "platforms": [
+        "darwin",
+        "linux",
+        "win32"
+      ],
+      "requires": [],
+      "risk": "medium",
+      "permissions": [
+        "Adds /commit, /commit-push-pr and /clean_gone commands",
+        "When you run them: runs git, and gh for pull requests"
+      ],
+      "secrets": [],
+      "install": {
+        "scope": "project",
+        "steps": [
+          {
+            "run": [
+              "claude",
+              "plugin",
+              "install",
+              "commit-commands@claude-plugins-official",
+              "--scope",
+              "project",
+              "--json"
+            ]
+          }
+        ]
+      },
+      "uninstall": {
+        "steps": [
+          {
+            "run": [
+              "claude",
+              "plugin",
+              "uninstall",
+              "commit-commands@claude-plugins-official",
+              "--scope",
+              "project",
+              "--json"
+            ]
+          }
+        ]
+      },
+      "reviews": []
+    },
+    {
+      "id": "context7",
+      "name": "Context7 docs (Upstash)",
+      "kind": "plugin",
+      "tier": "verified-vendor",
+      "license": "see plugin (verify)",
+      "homepage": "https://github.com/upstash/context7",
+      "summary": "Up-to-date, version-specific library documentation from Upstash's hosted Context7 service.",
+      "why": "Claude looks up the current docs of the libraries you use instead of relying on what it remembers, which avoids outdated APIs.",
+      "source": {
+        "type": "marketplace",
+        "marketplace": "claude-plugins-official",
+        "repo": "anthropics/claude-plugins-official",
+        "plugin": "context7",
+        "reviewedRef": "f8c5e7a1dcb71b10cb74586224b5401f3de5db28"
+      },
+      "platforms": [
+        "darwin",
+        "linux",
+        "win32"
+      ],
+      "requires": [],
+      "risk": "low",
+      "permissions": [
+        "Sends library names and your questions to Upstash's hosted service (mcp.context7.com)",
+        "May ask you to sign in to Context7"
+      ],
+      "secrets": [],
+      "install": {
+        "scope": "project",
+        "steps": [
+          {
+            "run": [
+              "claude",
+              "plugin",
+              "install",
+              "context7@claude-plugins-official",
+              "--scope",
+              "project",
+              "--json"
+            ]
+          }
+        ]
+      },
+      "uninstall": {
+        "steps": [
+          {
+            "run": [
+              "claude",
+              "plugin",
+              "uninstall",
+              "context7@claude-plugins-official",
+              "--scope",
+              "project",
+              "--json"
+            ]
+          }
+        ]
+      },
+      "reviews": []
+    },
+    {
+      "id": "github",
+      "name": "GitHub (official MCP)",
+      "kind": "plugin",
+      "tier": "verified-vendor",
+      "license": "MIT (verify)",
+      "homepage": "https://github.com/github/github-mcp-server",
+      "summary": "GitHub's own MCP server: issues, pull requests, code search and the rest of the GitHub API.",
+      "why": "Claude can read and update issues and pull requests directly, so tasks can start from an issue and end in a PR.",
+      "source": {
+        "type": "marketplace",
+        "marketplace": "claude-plugins-official",
+        "repo": "anthropics/claude-plugins-official",
+        "plugin": "github",
+        "reviewedRef": "f8c5e7a1dcb71b10cb74586224b5401f3de5db28"
+      },
+      "platforms": [
+        "darwin",
+        "linux",
+        "win32"
+      ],
+      "requires": [],
+      "risk": "high",
+      "permissions": [
+        "Acts on GitHub with your personal access token: read and, depending on the token, write repositories, issues and pull requests",
+        "Talks to api.githubcopilot.com"
+      ],
+      "secrets": [
+        "GITHUB_PERSONAL_ACCESS_TOKEN"
+      ],
+      "install": {
+        "scope": "project",
+        "steps": [
+          {
+            "run": [
+              "claude",
+              "plugin",
+              "install",
+              "github@claude-plugins-official",
+              "--scope",
+              "project",
+              "--json"
+            ]
+          }
+        ]
+      },
+      "uninstall": {
+        "steps": [
+          {
+            "run": [
+              "claude",
+              "plugin",
+              "uninstall",
+              "github@claude-plugins-official",
+              "--scope",
+              "project",
+              "--json"
+            ]
+          }
+        ]
+      },
+      "reviews": [],
+      "notes": "The token is read from the environment by the CLI; AgentChainer never stores it (ADR-0002). Use a fine-grained token limited to the repositories you need."
+    },
+    {
+      "id": "gopls-lsp",
+      "name": "Go language server (gopls)",
+      "kind": "plugin",
+      "tier": "official",
+      "license": "Apache-2.0 (marketplace repo)",
+      "summary": "Gives Claude Go code intelligence and refactoring through gopls.",
+      "why": "Claude can navigate Go packages and see compiler errors as it edits.",
+      "source": {
+        "type": "marketplace",
+        "marketplace": "claude-plugins-official",
+        "repo": "anthropics/claude-plugins-official",
+        "plugin": "gopls-lsp",
+        "reviewedVersion": "1.0.0",
+        "reviewedRef": "f8c5e7a1dcb71b10cb74586224b5401f3de5db28"
+      },
+      "platforms": [
+        "darwin",
+        "linux",
+        "win32"
+      ],
+      "requires": [
+        {
+          "tool": "gopls",
+          "hint": "go install golang.org/x/tools/gopls@latest"
+        }
+      ],
+      "risk": "low",
+      "permissions": [
+        "Starts gopls in the project"
+      ],
+      "secrets": [],
+      "install": {
+        "scope": "project",
+        "steps": [
+          {
+            "run": [
+              "claude",
+              "plugin",
+              "install",
+              "gopls-lsp@claude-plugins-official",
+              "--scope",
+              "project",
+              "--json"
+            ]
+          }
+        ]
+      },
+      "uninstall": {
+        "steps": [
+          {
+            "run": [
+              "claude",
+              "plugin",
+              "uninstall",
+              "gopls-lsp@claude-plugins-official",
+              "--scope",
+              "project",
+              "--json"
+            ]
+          }
+        ]
+      },
+      "reviews": []
+    },
+    {
+      "id": "playwright",
+      "name": "Playwright browser (Microsoft)",
+      "kind": "plugin",
+      "tier": "verified-vendor",
+      "license": "Apache-2.0 (verify)",
+      "homepage": "https://github.com/microsoft/playwright-mcp",
+      "summary": "Lets Claude drive a real browser: open pages, click, fill forms and take screenshots.",
+      "why": "Claude can check a web UI end to end, the way a tester would, instead of only reading the code.",
+      "source": {
+        "type": "marketplace",
+        "marketplace": "claude-plugins-official",
+        "repo": "anthropics/claude-plugins-official",
+        "plugin": "playwright",
+        "reviewedRef": "f8c5e7a1dcb71b10cb74586224b5401f3de5db28"
+      },
+      "platforms": [
+        "darwin",
+        "linux",
+        "win32"
+      ],
+      "requires": [
+        {
+          "tool": "npx",
+          "hint": "Install Node.js (npx comes with it)"
+        }
+      ],
+      "risk": "medium",
+      "permissions": [
+        "Starts a browser that Claude controls; it can open any URL",
+        "Runs npx to fetch the Playwright MCP server"
+      ],
+      "secrets": [],
+      "install": {
+        "scope": "project",
+        "steps": [
+          {
+            "run": [
+              "claude",
+              "plugin",
+              "install",
+              "playwright@claude-plugins-official",
+              "--scope",
+              "project",
+              "--json"
+            ]
+          }
+        ]
+      },
+      "uninstall": {
+        "steps": [
+          {
+            "run": [
+              "claude",
+              "plugin",
+              "uninstall",
+              "playwright@claude-plugins-official",
+              "--scope",
+              "project",
+              "--json"
+            ]
+          }
+        ]
+      },
+      "reviews": [],
+      "notes": "At the reviewed marketplace commit the plugin runs `npx @playwright/mcp@latest`, an unpinned version. ADR-0005 asks for pinned sources, so reviewers should weigh this or prefer a pinned MCP item."
+    },
+    {
+      "id": "pyright-lsp",
+      "name": "Python language server (Pyright)",
+      "kind": "plugin",
+      "tier": "official",
+      "license": "Apache-2.0 (marketplace repo)",
+      "summary": "Gives Claude Python type checking and code intelligence through Pyright.",
+      "why": "Claude sees type errors and definitions in Python code like an editor does.",
+      "source": {
+        "type": "marketplace",
+        "marketplace": "claude-plugins-official",
+        "repo": "anthropics/claude-plugins-official",
+        "plugin": "pyright-lsp",
+        "reviewedVersion": "1.0.0",
+        "reviewedRef": "f8c5e7a1dcb71b10cb74586224b5401f3de5db28"
+      },
+      "platforms": [
+        "darwin",
+        "linux",
+        "win32"
+      ],
+      "requires": [
+        {
+          "tool": "pyright-langserver",
+          "hint": "npm install -g pyright (or pip install pyright)"
+        }
+      ],
+      "risk": "low",
+      "permissions": [
+        "Starts pyright-langserver in the project"
+      ],
+      "secrets": [],
+      "install": {
+        "scope": "project",
+        "steps": [
+          {
+            "run": [
+              "claude",
+              "plugin",
+              "install",
+              "pyright-lsp@claude-plugins-official",
+              "--scope",
+              "project",
+              "--json"
+            ]
+          }
+        ]
+      },
+      "uninstall": {
+        "steps": [
+          {
+            "run": [
+              "claude",
+              "plugin",
+              "uninstall",
+              "pyright-lsp@claude-plugins-official",
+              "--scope",
+              "project",
+              "--json"
+            ]
+          }
+        ]
+      },
+      "reviews": []
+    },
+    {
+      "id": "rust-analyzer-lsp",
+      "name": "Rust language server (rust-analyzer)",
+      "kind": "plugin",
+      "tier": "official",
+      "license": "Apache-2.0 (marketplace repo)",
+      "summary": "Gives Claude Rust code intelligence through rust-analyzer.",
+      "why": "Claude sees Rust type and borrow errors and definitions as it edits.",
+      "source": {
+        "type": "marketplace",
+        "marketplace": "claude-plugins-official",
+        "repo": "anthropics/claude-plugins-official",
+        "plugin": "rust-analyzer-lsp",
+        "reviewedVersion": "1.0.0",
+        "reviewedRef": "f8c5e7a1dcb71b10cb74586224b5401f3de5db28"
+      },
+      "platforms": [
+        "darwin",
+        "linux",
+        "win32"
+      ],
+      "requires": [
+        {
+          "tool": "rust-analyzer",
+          "hint": "rustup component add rust-analyzer"
+        }
+      ],
+      "risk": "low",
+      "permissions": [
+        "Starts rust-analyzer in the project"
+      ],
+      "secrets": [],
+      "install": {
+        "scope": "project",
+        "steps": [
+          {
+            "run": [
+              "claude",
+              "plugin",
+              "install",
+              "rust-analyzer-lsp@claude-plugins-official",
+              "--scope",
+              "project",
+              "--json"
+            ]
+          }
+        ]
+      },
+      "uninstall": {
+        "steps": [
+          {
+            "run": [
+              "claude",
+              "plugin",
+              "uninstall",
+              "rust-analyzer-lsp@claude-plugins-official",
+              "--scope",
+              "project",
+              "--json"
+            ]
+          }
+        ]
+      },
+      "reviews": []
+    },
+    {
+      "id": "security-guidance",
+      "name": "Security Guidance",
+      "kind": "plugin",
+      "tier": "official",
+      "license": "Apache-2.0 (marketplace repo)",
+      "summary": "Flags insecure patterns in Claude's edits and reviews the diff for vulnerabilities.",
+      "why": "Catches injection, XSS, SSRF, hardcoded secrets and similar mistakes while Claude writes the code, not after it ships.",
+      "source": {
+        "type": "marketplace",
+        "marketplace": "claude-plugins-official",
+        "repo": "anthropics/claude-plugins-official",
+        "plugin": "security-guidance",
+        "reviewedVersion": "2.0.17",
+        "reviewedRef": "f8c5e7a1dcb71b10cb74586224b5401f3de5db28"
+      },
+      "platforms": [
+        "darwin",
+        "linux",
+        "win32"
+      ],
+      "requires": [],
+      "risk": "medium",
+      "permissions": [
+        "Adds hooks that check every edit Claude makes for risky patterns",
+        "Runs an extra model review of the diff when Claude stops (uses your Claude plan)",
+        "Adds a commit reviewer agent"
+      ],
+      "secrets": [],
+      "install": {
+        "scope": "project",
+        "steps": [
+          {
+            "run": [
+              "claude",
+              "plugin",
+              "install",
+              "security-guidance@claude-plugins-official",
+              "--scope",
+              "project",
+              "--json"
+            ]
+          }
+        ]
+      },
+      "uninstall": {
+        "steps": [
+          {
+            "run": [
+              "claude",
+              "plugin",
+              "uninstall",
+              "security-guidance@claude-plugins-official",
+              "--scope",
+              "project",
+              "--json"
+            ]
+          }
+        ]
+      },
+      "reviews": []
+    },
+    {
+      "id": "typescript-lsp",
+      "name": "TypeScript language server",
+      "kind": "plugin",
+      "tier": "official",
+      "license": "Apache-2.0 (marketplace repo)",
+      "summary": "Gives Claude TypeScript/JavaScript code intelligence through typescript-language-server.",
+      "why": "Claude can jump to definitions and see type errors like an editor does, instead of guessing from text search.",
+      "source": {
+        "type": "marketplace",
+        "marketplace": "claude-plugins-official",
+        "repo": "anthropics/claude-plugins-official",
+        "plugin": "typescript-lsp",
+        "reviewedVersion": "1.0.0",
+        "reviewedRef": "f8c5e7a1dcb71b10cb74586224b5401f3de5db28"
+      },
+      "platforms": [
+        "darwin",
+        "linux",
+        "win32"
+      ],
+      "requires": [
+        {
+          "tool": "typescript-language-server",
+          "hint": "npm install -g typescript-language-server typescript"
+        }
+      ],
+      "risk": "low",
+      "permissions": [
+        "Starts typescript-language-server in the project"
+      ],
+      "secrets": [],
+      "install": {
+        "scope": "project",
+        "steps": [
+          {
+            "run": [
+              "claude",
+              "plugin",
+              "install",
+              "typescript-lsp@claude-plugins-official",
+              "--scope",
+              "project",
+              "--json"
+            ]
+          }
+        ]
+      },
+      "uninstall": {
+        "steps": [
+          {
+            "run": [
+              "claude",
+              "plugin",
+              "uninstall",
+              "typescript-lsp@claude-plugins-official",
+              "--scope",
+              "project",
+              "--json"
+            ]
+          }
+        ]
+      },
+      "reviews": []
+    }
+  ],
+  "profiles": [
+    {
+      "id": "baseline",
+      "name": "Baseline",
+      "description": "Every workspace: review, commit and security help that pays off in any project.",
+      "suggest": {
+        "always": true
+      },
+      "items": [
+        "code-review",
+        "commit-commands",
+        "security-guidance"
+      ]
+    },
+    {
+      "id": "github",
+      "name": "GitHub",
+      "description": "For repositories hosted on GitHub.",
+      "suggest": {
+        "remoteHost": "github.com"
+      },
+      "items": [
+        "github"
+      ]
+    },
+    {
+      "id": "go",
+      "name": "Go",
+      "description": "Code intelligence for Go projects.",
+      "suggest": {
+        "stacks": [
+          "go"
+        ]
+      },
+      "items": [
+        "gopls-lsp"
+      ]
+    },
+    {
+      "id": "knowledge",
+      "name": "Knowledge",
+      "description": "Up-to-date library docs, on request.",
+      "suggest": {
+        "optIn": true
+      },
+      "items": [
+        "context7"
+      ]
+    },
+    {
+      "id": "python",
+      "name": "Python",
+      "description": "Code intelligence for Python projects.",
+      "suggest": {
+        "stacks": [
+          "python"
+        ]
+      },
+      "items": [
+        "pyright-lsp"
+      ]
+    },
+    {
+      "id": "rust",
+      "name": "Rust",
+      "description": "Code intelligence for Rust projects.",
+      "suggest": {
+        "stacks": [
+          "rust"
+        ]
+      },
+      "items": [
+        "rust-analyzer-lsp"
+      ]
+    },
+    {
+      "id": "ts-node",
+      "name": "TypeScript / JavaScript",
+      "description": "Code intelligence for Node projects.",
+      "suggest": {
+        "stacks": [
+          "node"
+        ]
+      },
+      "items": [
+        "typescript-lsp"
+      ]
+    },
+    {
+      "id": "web-testing",
+      "name": "Web testing",
+      "description": "Browser automation for web UIs, on request.",
+      "suggest": {
+        "optIn": true
+      },
+      "items": [
+        "playwright"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,7 @@
+id: go
+name: "Go"
+description: "Code intelligence for Go projects."
+suggest:
+  stacks: [go]
+items:
+  - gopls-lsp

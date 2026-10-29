@@ -1,0 +1,323 @@
+{
+  "catalogVersion": "2026.10.29",
+  "profiles": [
+    {
+      "id": "baseline",
+      "name": "Baseline",
+      "description": "Every workspace: review, commit and security help that pays off in any project.",
+      "suggested": true
+    },
+    {
+      "id": "github",
+      "name": "GitHub",
+      "description": "For repositories hosted on GitHub.",
+      "suggested": false
+    },
+    {
+      "id": "go",
+      "name": "Go",
+      "description": "Code intelligence for Go projects.",
+      "suggested": false
+    },
+    {
+      "id": "knowledge",
+      "name": "Knowledge",
+      "description": "Up-to-date library docs, on request.",
+      "suggested": false
+    },
+    {
+      "id": "python",
+      "name": "Python",
+      "description": "Code intelligence for Python projects.",
+      "suggested": false
+    },
+    {
+      "id": "rust",
+      "name": "Rust",
+      "description": "Code intelligence for Rust projects.",
+      "suggested": false
+    },
+    {
+      "id": "ts-node",
+      "name": "TypeScript / JavaScript",
+      "description": "Code intelligence for Node projects.",
+      "suggested": true
+    },
+    {
+      "id": "web-testing",
+      "name": "Web testing",
+      "description": "Browser automation for web UIs, on request.",
+      "suggested": false
+    }
+  ],
+  "actions": [
+    {
+      "kind": "fix",
+      "risk": "low",
+      "scope": "project",
+      "permissions": [],
+      "secrets": [],
+      "id": "fix:fix-gitignore",
+      "title": "Ignore env and secret files",
+      "why": "A secret dropped into .env won't be committed by the next `git add .`.",
+      "preview": {
+        "type": "diff",
+        "path": ".gitignore",
+        "before": "",
+        "after": "# Env files can hold secrets (keep examples)\n.env\n.env.*\n!.env.example\n"
+      },
+      "state": "recommended",
+      "selected": true
+    },
+    {
+      "id": "item:code-review",
+      "kind": "catalog",
+      "title": "Code Review",
+      "why": "A second pair of eyes on every pull request: separate agents look at bugs, conventions and history, and only findings they are confident about are reported.",
+      "risk": "low",
+      "scope": "project",
+      "tier": "official",
+      "license": "Apache-2.0 (marketplace repo)",
+      "source": "code-review@claude-plugins-official, reviewed v1.0.1 at f8c5e7a",
+      "profile": "baseline",
+      "permissions": [
+        "Adds a /code-review command",
+        "When you run it: reads the pull request and the repository, and runs several review agents"
+      ],
+      "secrets": [],
+      "preview": {
+        "type": "commands",
+        "commands": [
+          [
+            "claude",
+            "plugin",
+            "install",
+            "code-review@claude-plugins-official",
+            "--scope",
+            "project",
+            "--json"
+          ]
+        ]
+      },
+      "state": "unavailable",
+      "selected": false,
+      "reason": "Not reviewed yet: needs 1 more maintainer review(s) against docs/CATALOG.md §4."
+    },
+    {
+      "id": "item:commit-commands",
+      "kind": "catalog",
+      "title": "Commit Commands",
+      "why": "Turns the usual git routine into one command: Claude writes the commit message, pushes and can open the pull request.",
+      "risk": "medium",
+      "scope": "project",
+      "tier": "official",
+      "license": "Apache-2.0 (marketplace repo)",
+      "source": "commit-commands@claude-plugins-official, reviewed v1.0.1 at f8c5e7a",
+      "profile": "baseline",
+      "permissions": [
+        "Adds /commit, /commit-push-pr and /clean_gone commands",
+        "When you run them: runs git, and gh for pull requests"
+      ],
+      "secrets": [],
+      "preview": {
+        "type": "commands",
+        "commands": [
+          [
+            "claude",
+            "plugin",
+            "install",
+            "commit-commands@claude-plugins-official",
+            "--scope",
+            "project",
+            "--json"
+          ]
+        ]
+      },
+      "state": "unavailable",
+      "selected": false,
+      "reason": "Not reviewed yet: needs 1 more maintainer review(s) against docs/CATALOG.md §4."
+    },
+    {
+      "id": "item:security-guidance",
+      "kind": "catalog",
+      "title": "Security Guidance",
+      "why": "Catches injection, XSS, SSRF, hardcoded secrets and similar mistakes while Claude writes the code, not after it ships.",
+      "risk": "medium",
+      "scope": "project",
+      "tier": "official",
+      "license": "Apache-2.0 (marketplace repo)",
+      "source": "security-guidance@claude-plugins-official, reviewed v2.0.17 at f8c5e7a",
+      "profile": "baseline",
+      "permissions": [
+        "Adds hooks that check every edit Claude makes for risky patterns",
+        "Runs an extra model review of the diff when Claude stops (uses your Claude plan)",
+        "Adds a commit reviewer agent"
+      ],
+      "secrets": [],
+      "preview": {
+        "type": "commands",
+        "commands": [
+          [
+            "claude",
+            "plugin",
+            "install",
+            "security-guidance@claude-plugins-official",
+            "--scope",
+            "project",
+            "--json"
+          ]
+        ]
+      },
+      "state": "unavailable",
+      "selected": false,
+      "reason": "Not reviewed yet: needs 1 more maintainer review(s) against docs/CATALOG.md §4."
+    },
+    {
+      "id": "item:typescript-lsp",
+      "kind": "catalog",
+      "title": "TypeScript language server",
+      "why": "Claude can jump to definitions and see type errors like an editor does, instead of guessing from text search.",
+      "risk": "low",
+      "scope": "project",
+      "tier": "official",
+      "license": "Apache-2.0 (marketplace repo)",
+      "source": "typescript-lsp@claude-plugins-official, reviewed v1.0.0 at f8c5e7a",
+      "profile": "ts-node",
+      "permissions": [
+        "Starts typescript-language-server in the project"
+      ],
+      "secrets": [],
+      "preview": {
+        "type": "commands",
+        "commands": [
+          [
+            "claude",
+            "plugin",
+            "install",
+            "typescript-lsp@claude-plugins-official",
+            "--scope",
+            "project",
+            "--json"
+          ]
+        ]
+      },
+      "state": "unavailable",
+      "selected": false,
+      "reason": "Not reviewed yet: needs 1 more maintainer review(s) against docs/CATALOG.md §4."
+    },
+    {
+      "id": "gen:generate-claude-md",
+      "kind": "generator",
+      "title": "Generate CLAUDE.md",
+      "why": "Gives Claude your real commands, an architecture map and conventions at the start of every session.",
+      "risk": "medium",
+      "scope": "project",
+      "permissions": [
+        "Runs a Claude session restricted to this workspace; its changes come back as a diff to review"
+      ],
+      "secrets": [],
+      "preview": {
+        "type": "note",
+        "text": "A diff to review is produced when the generator runs."
+      },
+      "state": "unavailable",
+      "selected": false,
+      "reason": "Agent-driven generators arrive with M2-19…M2-26."
+    },
+    {
+      "id": "gen:setup-hooks",
+      "kind": "generator",
+      "title": "Add format and lint hooks",
+      "why": "Formats and lints every file Claude edits, so mistakes surface while Claude can still fix them.",
+      "risk": "medium",
+      "scope": "project",
+      "permissions": [
+        "Runs a Claude session restricted to this workspace; its changes come back as a diff to review"
+      ],
+      "secrets": [],
+      "preview": {
+        "type": "note",
+        "text": "A diff to review is produced when the generator runs."
+      },
+      "state": "unavailable",
+      "selected": false,
+      "reason": "Agent-driven generators arrive with M2-19…M2-26."
+    },
+    {
+      "id": "gen:add-linter",
+      "kind": "generator",
+      "title": "Add a linter",
+      "why": "Catches common mistakes in Claude's edits automatically.",
+      "risk": "medium",
+      "scope": "project",
+      "permissions": [
+        "Runs a Claude session restricted to this workspace; its changes come back as a diff to review"
+      ],
+      "secrets": [],
+      "preview": {
+        "type": "note",
+        "text": "A diff to review is produced when the generator runs."
+      },
+      "state": "unavailable",
+      "selected": false,
+      "reason": "Agent-driven generators arrive with M2-19…M2-26."
+    },
+    {
+      "id": "gen:add-formatter",
+      "kind": "generator",
+      "title": "Add a formatter",
+      "why": "Keeps edits in one style, so diffs show only real changes.",
+      "risk": "medium",
+      "scope": "project",
+      "permissions": [
+        "Runs a Claude session restricted to this workspace; its changes come back as a diff to review"
+      ],
+      "secrets": [],
+      "preview": {
+        "type": "note",
+        "text": "A diff to review is produced when the generator runs."
+      },
+      "state": "unavailable",
+      "selected": false,
+      "reason": "Agent-driven generators arrive with M2-19…M2-26."
+    },
+    {
+      "id": "gen:generate-ci",
+      "kind": "generator",
+      "title": "Generate a CI workflow",
+      "why": "Checks every change on GitHub Actions: install, lint, typecheck, test, build.",
+      "risk": "medium",
+      "scope": "project",
+      "permissions": [
+        "Runs a Claude session restricted to this workspace; its changes come back as a diff to review"
+      ],
+      "secrets": [],
+      "preview": {
+        "type": "note",
+        "text": "A diff to review is produced when the generator runs."
+      },
+      "state": "unavailable",
+      "selected": false,
+      "reason": "Agent-driven generators arrive with M2-19…M2-26."
+    },
+    {
+      "id": "gen:smoke-test",
+      "kind": "generator",
+      "title": "Add a smoke test",
+      "why": "A quick check that the app still starts after a change.",
+      "risk": "medium",
+      "scope": "project",
+      "permissions": [
+        "Runs a Claude session restricted to this workspace; its changes come back as a diff to review"
+      ],
+      "secrets": [],
+      "preview": {
+        "type": "note",
+        "text": "A diff to review is produced when the generator runs."
+      },
+      "state": "unavailable",
+      "selected": false,
+      "reason": "Agent-driven generators arrive with M2-19…M2-26."
+    }
+  ]
+}

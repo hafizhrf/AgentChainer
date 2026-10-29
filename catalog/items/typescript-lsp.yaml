@@ -1,0 +1,31 @@
+# Seed item (docs/CATALOG.md §6). Offered once reviewed: see `reviews` and §4.
+id: typescript-lsp
+name: "TypeScript language server"
+kind: plugin
+tier: official
+license: "Apache-2.0 (marketplace repo)"
+summary: "Gives Claude TypeScript/JavaScript code intelligence through typescript-language-server."
+why: >-
+  Claude can jump to definitions and see type errors like an editor does, instead of guessing from text search.
+source:
+  type: marketplace
+  marketplace: claude-plugins-official
+  repo: anthropics/claude-plugins-official
+  plugin: typescript-lsp
+  reviewedVersion: "1.0.0"
+  reviewedRef: "f8c5e7a1dcb71b10cb74586224b5401f3de5db28"
+platforms: [darwin, linux, win32]
+requires:
+  - tool: typescript-language-server
+    hint: "npm install -g typescript-language-server typescript"
+risk: low
+permissions:
+  - "Starts typescript-language-server in the project"
+install:
+  scope: project
+  steps:
+    - run: [claude, plugin, install, "typescript-lsp@claude-plugins-official", --scope, project, --json]
+uninstall:
+  steps:
+    - run: [claude, plugin, uninstall, "typescript-lsp@claude-plugins-official", --scope, project, --json]
+reviews: []

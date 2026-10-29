@@ -7,6 +7,8 @@
       "!**/*.md",
       "!pnpm-lock.yaml",
       "!packages/protocol/schema",
+      "!catalog/schema.json",
+      "!packages/sidecar/src/catalog/catalog.json",
       "!**/src-tauri/gen",
       "!**/test/fixtures",
       "!**/test/snapshots",

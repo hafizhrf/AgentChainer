@@ -13,12 +13,14 @@
   },
   "dependencies": {
     "@agentchainer/protocol": "workspace:*",
-    "@anthropic-ai/claude-agent-sdk": "0.3.311"
+    "@anthropic-ai/claude-agent-sdk": "0.3.311",
+    "zod": "catalog:"
   },
   "devDependencies": {
     "@types/node": "catalog:",
     "esbuild": "0.28.2",
     "postject": "1.0.0-alpha.6",
-    "typescript": "catalog:"
+    "typescript": "catalog:",
+    "yaml": "2.9.1"
   }
 }

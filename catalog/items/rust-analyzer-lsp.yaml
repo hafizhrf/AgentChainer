@@ -1,0 +1,31 @@
+# Seed item (docs/CATALOG.md §6). Offered once reviewed: see `reviews` and §4.
+id: rust-analyzer-lsp
+name: "Rust language server (rust-analyzer)"
+kind: plugin
+tier: official
+license: "Apache-2.0 (marketplace repo)"
+summary: "Gives Claude Rust code intelligence through rust-analyzer."
+why: >-
+  Claude sees Rust type and borrow errors and definitions as it edits.
+source:
+  type: marketplace
+  marketplace: claude-plugins-official
+  repo: anthropics/claude-plugins-official
+  plugin: rust-analyzer-lsp
+  reviewedVersion: "1.0.0"
+  reviewedRef: "f8c5e7a1dcb71b10cb74586224b5401f3de5db28"
+platforms: [darwin, linux, win32]
+requires:
+  - tool: rust-analyzer
+    hint: "rustup component add rust-analyzer"
+risk: low
+permissions:
+  - "Starts rust-analyzer in the project"
+install:
+  scope: project
+  steps:
+    - run: [claude, plugin, install, "rust-analyzer-lsp@claude-plugins-official", --scope, project, --json]
+uninstall:
+  steps:
+    - run: [claude, plugin, uninstall, "rust-analyzer-lsp@claude-plugins-official", --scope, project, --json]
+reviews: []

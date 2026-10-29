@@ -1,0 +1,9 @@
+id: baseline
+name: "Baseline"
+description: "Every workspace: review, commit and security help that pays off in any project."
+suggest:
+  always: true
+items:
+  - code-review
+  - commit-commands
+  - security-guidance

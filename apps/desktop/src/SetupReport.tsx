@@ -1,5 +1,6 @@
 import type { Finding, Methods } from "@agentchainer/protocol";
 import { useCallback, useEffect, useState } from "react";
+import { BootstrapPlanView } from "./BootstrapPlanView.tsx";
 import { request } from "./sidecar.ts";
 
 type Scan = Methods["workspace.scan"]["result"];
@@ -79,7 +80,7 @@ export function SetupReport({ cwd }: { cwd: string }) {
           </div>
         );
       })}
-      {gaps.length > 0 && <p className="muted">Applying fixes comes with the bootstrap plan.</p>}
+      <BootstrapPlanView cwd={cwd} />
 
       <h3>Packages and commands</h3>
       {profile.packages.length === 0 && <p className="muted">No manifests found.</p>}

@@ -21,6 +21,7 @@ pub const UI_COMMANDS: &[&str] = &[
     "toggle-right-panel",
     "toggle-terminal",
     "export-diagnostics",
+    "check-updates",
 ];
 
 /// Help items that open a page instead of reaching the UI.
@@ -106,6 +107,7 @@ pub fn build<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
             "Export Diagnostics…",
             None,
         )?)
+        .item(&item(app, "check-updates", "Check for Updates…", None)?)
         .build()?;
 
     let menu = MenuBuilder::new(app);

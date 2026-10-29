@@ -11,6 +11,7 @@ export const MENU_COMMANDS = [
   "toggle-right-panel",
   "toggle-terminal",
   "export-diagnostics",
+  "check-updates",
 ] as const;
 
 export type MenuCommand = (typeof MENU_COMMANDS)[number];

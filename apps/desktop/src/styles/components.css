@@ -267,6 +267,32 @@
   font-size: var(--text-sm);
 }
 
+/* Update dialog */
+
+.update {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.update .dialog-error {
+  margin: 0;
+}
+
+.update-notes {
+  max-height: 40vh;
+  overflow: auto;
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface-2);
+}
+
+.update-progress {
+  width: 100%;
+  accent-color: var(--accent);
+}
+
 /* Approvals and the plan review */
 
 .tool-input {

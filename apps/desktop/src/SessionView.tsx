@@ -46,6 +46,7 @@ export function SessionView({
   onClose,
   onOpenSetup,
   panelTab,
+  showFirstChange = false,
   onOpenFile,
   confirm,
 }: {
@@ -69,6 +70,8 @@ export function SessionView({
   onOpenSetup: () => void;
   /** The right panel's tab when it opens (self-test screenshots). */
   panelTab?: PanelTab | undefined;
+  /** Shows the first changed file's diff once the listing arrives (self-test screenshots). */
+  showFirstChange?: boolean;
   /** Opens a workspace-relative or absolute path in the user's editor (M1-28). */
   onOpenFile: (path: string, line?: number) => void;
   confirm: Confirm;
@@ -96,6 +99,11 @@ export function SessionView({
     storage: layoutStorage,
     onlySaveAfterUserInteractions: true,
   });
+
+  const firstChange = showFirstChange ? workspace.files?.files.find((f) => f.status)?.path : undefined;
+  useEffect(() => {
+    if (firstChange) setSelected((s) => s ?? firstChange);
+  }, [firstChange]);
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: scroll to the bottom whenever the transcript changes.
   useEffect(() => bottomRef.current?.scrollIntoView({ block: "end" }), [tab.items]);

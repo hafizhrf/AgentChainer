@@ -1,5 +1,6 @@
 import { EFFORTS, type Methods, PERMISSION_MODES } from "@agentchainer/protocol";
-import { Download } from "lucide-react";
+import { openUrl } from "@tauri-apps/plugin-opener";
+import { Download, RefreshCw } from "lucide-react";
 import { useState } from "react";
 import { applyTheme } from "./appearance.ts";
 import { Modal } from "./Dialog.tsx";
@@ -12,6 +13,8 @@ import { Select } from "./ui/Select.tsx";
 
 type Hello = Methods["system.hello"]["result"];
 
+const PRIVACY = "https://github.com/hafizhrf/AgentChainer/blob/main/docs/PRIVACY.md";
+
 /**
  * App settings (M1-07, UX-02) in a dialog. The theme previews while picking and reverts on Cancel. Saving a new Claude
  * CLI path restarts the agent runtime so it takes effect.
@@ -22,6 +25,7 @@ export function SettingsDialog({
   appVersion,
   onSave,
   onExportDiagnostics,
+  onCheckUpdates,
   onClose,
 }: {
   settings: Settings;
@@ -30,6 +34,7 @@ export function SettingsDialog({
   onSave: (next: Settings) => Promise<void>;
   /** Returns where the bundle was saved, or null when cancelled. */
   onExportDiagnostics: () => Promise<string | null>;
+  onCheckUpdates: () => void;
   onClose: () => void;
 }) {
   const [draft, setDraft] = useState(settings);
@@ -208,13 +213,22 @@ export function SettingsDialog({
             <dd>{hello?.nodeVersion ?? "…"}</dd>
           </dl>
           <div className="row">
+            <button type="button" className="secondary" onClick={onCheckUpdates}>
+              <RefreshCw size={14} />
+              Check for updates…
+            </button>
             <button type="button" className="secondary" onClick={() => void exportBundle()}>
               <Download size={14} />
               Export diagnostics…
             </button>
           </div>
           <p className="field-help">
-            Versions, settings, the setup check and recent logs, for bug reports. No credentials or account details.
+            Diagnostics hold versions, settings, the setup check and recent logs, for bug reports. No credentials or
+            account details. AgentChainer sends no telemetry; see the{" "}
+            <button type="button" className="link" onClick={() => void openUrl(PRIVACY)}>
+              privacy statement
+            </button>
+            .
           </p>
           {exported && <p className="field-help">{exported}</p>}
         </section>

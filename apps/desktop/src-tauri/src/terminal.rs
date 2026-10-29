@@ -20,9 +20,11 @@ pub fn open(dir: Option<String>) -> Result<(), String> {
 
     #[cfg(windows)]
     let attempts: Vec<Command> = {
-        // `start` needs cmd; prefer Windows Terminal, fall back to a plain console.
+        // `start` needs cmd; prefer Windows Terminal, fall back to a plain console. The folder is only ever the working
+        // directory, never on cmd's command line, where a name like "R&D" would be parsed as two commands.
         let mut wt = Command::new("cmd");
-        wt.args(["/C", "start", "", "wt", "-d"]).arg(&dir);
+        wt.args(["/C", "start", "", "wt", "-d", "."])
+            .current_dir(&dir);
         let mut console = Command::new("cmd");
         console
             .args(["/C", "start", "", "cmd", "/K"])

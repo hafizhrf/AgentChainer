@@ -641,7 +641,49 @@ export function listRuns(root: string): RunRecord[] {
     .filter((d) => existsSync(path.join(dir, d, "run.json")))
     .sort()
     .reverse()
-    .map((d) => JSON.parse(readFileSync(path.join(dir, d, "run.json"), "utf8")) as RunRecord);
+    .flatMap((d) => {
+      try {
+        const run = JSON.parse(readFileSync(path.join(dir, d, "run.json"), "utf8")) as RunRecord;
+        return runProblem(root, run) ? [] : [run];
+      } catch {
+        return [];
+      }
+    });
+}
+
+/**
+ * Why a run record can't be trusted, or null. `.agentchainer/backups/` lives in the workspace, so a cloned repo or an
+ * archive could ship a forged run.json; rollback writes and deletes the paths in it. Every file and backup path must
+ * stay inside the workspace and the run's folder, and every CLI undo must name a plugin or server, nothing else.
+ */
+function runProblem(root: string, run: RunRecord): string | null {
+  if (!/^[\w-]+$/.test(run.runId ?? "")) return "bad run id";
+  const files = [...(run.meta ?? []), ...(run.actions ?? []).flatMap((a) => a.files ?? [])];
+  for (const f of files) {
+    try {
+      insideRoot(root, f.path);
+    } catch {
+      return `file outside the workspace: ${f.path}`;
+    }
+    if (f.backup !== undefined && (!f.backup.startsWith("files/") || f.backup.split(/[\\/]+/).includes(".."))) {
+      return `backup outside the run: ${f.backup}`;
+    }
+  }
+  const scopes = new Set(["project", "user", "local"]);
+  for (const u of (run.actions ?? []).flatMap((a) => a.undo ?? [])) {
+    if (u.type === "plugin" && !(/^[\w.-]+@[\w.-]+$/.test(u.pluginId) && scopes.has(u.scope))) return "bad plugin undo";
+    if (u.type === "mcp" && !(/^[\w-]+$/.test(u.name) && scopes.has(u.scope))) return "bad MCP undo";
+    if (u.type === "git-unstage-removal") {
+      for (const p of u.paths) {
+        try {
+          insideRoot(root, p);
+        } catch {
+          return `path outside the workspace: ${p}`;
+        }
+      }
+    }
+  }
+  return null;
 }
 
 /**
@@ -659,6 +701,8 @@ export function rollback(
   const runFile = path.join(runDir, "run.json");
   if (!existsSync(runFile)) throw new Error(`No bootstrap run ${runId} in this workspace.`);
   const run = JSON.parse(readFileSync(runFile, "utf8")) as RunRecord;
+  const problem = runProblem(root, run);
+  if (problem) throw new Error(`Run ${runId} wasn't recorded by AgentChainer (${problem}), so nothing was changed.`);
   const force = opts.force ?? false;
   const results: RollbackResult[] = [];
   const targets = run.actions.filter((a) => a.status === "applied" && (!opts.actionId || a.id === opts.actionId));

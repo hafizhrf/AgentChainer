@@ -21,6 +21,9 @@ tauri-build = { version = "2", features = [] }
 tauri = { version = "2", features = [] }
 tauri-plugin-opener = "2"
 tauri-plugin-dialog = "=2.8.3"
+# Updates from signed GitHub Releases (R1-04); process relaunches after installing one.
+tauri-plugin-updater = "=2.14.0"
+tauri-plugin-process = "=2.4.0"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 regex = "1"

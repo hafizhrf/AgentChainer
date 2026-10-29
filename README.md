@@ -19,8 +19,20 @@ workspace and keeps the agent's work transparent and verifiable:
   - deterministic quality gates;
   - an evidence report for every task.
 
-> **Status: pre-alpha (M0, foundations).** The design docs and a bare monorepo scaffold exist; there are no agent features yet.
-> See the [checklist](docs/CHECKLIST.md) for progress.
+> **Status: v0.1 in preparation.** Agent sessions (M1) and workspace bootstrap (M2) work; installers and the release
+> pipeline are being finished. There's no published release yet. See the [checklist](docs/CHECKLIST.md) for progress.
+
+## Quickstart
+
+1. **Install AgentChainer** from the [latest release](https://github.com/hafizhrf/AgentChainer/releases/latest) and
+   check it against `SHA256SUMS`. v0.1 isn't code-signed: [docs/guides/INSTALL.md](docs/guides/INSTALL.md) shows how to
+   open it on macOS and Windows.
+2. **Install the Claude Code CLI and sign in yourself**, in your own terminal: `claude auth login`. See
+   [docs/guides/AUTH_SETUP.md](docs/guides/AUTH_SETUP.md). The app checks this on start and walks you through it.
+3. **Open a project folder.** Start a session, or open **Set up workspace** to see what AgentChainer would add. Nothing
+   changes until you approve the plan, and every applied setup can be rolled back.
+
+To build from source instead, see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Principles
 
@@ -28,7 +40,8 @@ workspace and keeps the agent's work transparent and verifiable:
 2. **Preview before apply.** Nothing is installed or changed without showing you first.
 3. **Pinned and reversible.** Every change is in a lockfile and can be rolled back.
 4. **Least privilege by default.** Autonomy is opt-in and budget-capped.
-5. **Your credentials stay yours.** AgentChainer never logs you in and never stores tokens or API keys.
+5. **Your credentials and data stay yours.** AgentChainer never logs you in, never stores tokens or API keys, and has
+   no telemetry ([privacy](docs/PRIVACY.md)).
 
 ## How sign-in works
 
@@ -48,13 +61,17 @@ You need a Claude Pro, Max, Team, Enterprise or Console account, or Bedrock/Vert
 | [Catalog](docs/CATALOG.md) | How skills, plugins and MCP servers are curated, pinned and installed |
 | [Risks](docs/RISKS.md) | Risk register with mitigations |
 | [ADRs](docs/adr/) | Architecture decision records |
+| [Install guide](docs/guides/INSTALL.md) | Downloading, checking and opening the installers on each OS |
 | [Auth setup guide](docs/guides/AUTH_SETUP.md) | User-facing tutorial for installing and signing in to Claude Code |
+| [Privacy](docs/PRIVACY.md) | What stays on your machine, and every time the app uses the network |
+| [Threat model](docs/THREAT_MODEL.md) | Trust boundaries, threats, mitigations and the latest security review |
+| [Releasing](docs/RELEASING.md) | How releases are built, checked and published (maintainers) |
 
-## Planned stack
+## Stack
 
-Tauri v2 (Rust core) · React + TypeScript UI · Node sidecar running the
-[Claude Agent SDK](https://code.claude.com/docs/en/agent-sdk/overview) · React Flow · Monaco · xterm.js.
-See [ADR-0001](docs/adr/0001-desktop-stack.md).
+Tauri v2 (Rust core) · React + TypeScript UI with Radix primitives · Node sidecar running the
+[Claude Agent SDK](https://code.claude.com/docs/en/agent-sdk/overview) · Monaco · xterm.js. React Flow comes with the
+agent graph in v0.2. See [ADR-0001](docs/adr/0001-desktop-stack.md) and [ADR-0008](docs/adr/0008-ui-components-and-styling.md).
 
 ## Roadmap
 

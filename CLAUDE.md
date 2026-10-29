@@ -7,7 +7,9 @@ M1 awaits its UI click-through and the Windows/Ubuntu exit runs; M2-E2 is deferr
 The app has a working M1/M2 UI in a three-column shell (UX-03):
 - a sidebar with sessions and workspaces, and a native menu with shortcuts;
 - readiness check, sessions with resume, fork and file rewind, tool approvals, subagent cards;
-- a right panel with workspace files, diff and revert, git, rules and the setup report; and a terminal.
+- a right panel with changes, workspace files, diff and revert, git and the setup report (tabs can be hidden); a
+  terminal;
+- a full-page Workspace settings (`src/setup/`): readiness, setup plan, commands, permission rules, history.
 
 Packaged builds ship the sidecar as a Node single executable (spike S1). The rest of the design pass is the UX track
 in the checklist.

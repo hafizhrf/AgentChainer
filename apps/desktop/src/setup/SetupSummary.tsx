@@ -56,7 +56,7 @@ export function SetupSummary({ cwd, onOpen }: { cwd: string; onOpen: () => void 
         </ul>
       )}
       <button type="button" onClick={onOpen}>
-        Open workspace setup
+        Open workspace settings
         <ArrowRight size={14} />
       </button>
       <p className="muted small-print">

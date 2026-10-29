@@ -29,7 +29,7 @@ workspace and keeps the agent's work transparent and verifiable:
    open it on macOS and Windows.
 2. **Install the Claude Code CLI and sign in yourself**, in your own terminal: `claude auth login`. See
    [docs/guides/AUTH_SETUP.md](docs/guides/AUTH_SETUP.md). The app checks this on start and walks you through it.
-3. **Open a project folder.** Start a session, or open **Set up workspace** to see what AgentChainer would add. Nothing
+3. **Open a project folder.** Start a session, or open **Workspace settings** to see what AgentChainer would add. Nothing
    changes until you approve the plan, and every applied setup can be rolled back.
 
 To build from source instead, see [CONTRIBUTING.md](CONTRIBUTING.md).

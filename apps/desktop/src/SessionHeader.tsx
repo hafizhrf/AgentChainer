@@ -85,7 +85,7 @@ export function SessionHeader({
           items={[
             { label: "Rename", onSelect: () => setEditing(tab.title) },
             { label: "Fork into a new session", onSelect: onFork },
-            { label: "Workspace setup…", onSelect: onOpenSetup },
+            { label: "Workspace settings…", onSelect: onOpenSetup },
             { label: "Close session", shortcut: shortcut("W"), onSelect: onClose },
           ]}
         />

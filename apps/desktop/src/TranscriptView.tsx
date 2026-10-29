@@ -31,14 +31,11 @@ export function TranscriptView({
   items,
   onRewind,
   onOpenFile,
-  onStarter,
 }: {
   cwd: string;
   items: Item[];
   onRewind?: (messageId: string) => void;
   onOpenFile?: (file: string) => void;
-  /** Offered before the first message: puts a starter prompt in the composer. */
-  onStarter?: (text: string) => void;
 }) {
   // Long sessions render their latest items only; earlier ones load on demand (M1-10).
   const [shown, setShown] = useState(WINDOW);
@@ -53,32 +50,7 @@ export function TranscriptView({
       {items.slice(hidden).map((it) => (
         <ItemView key={`${it.kind}-${it.id}`} item={it} onRewind={onRewind} onOpenFile={onOpenFile} />
       ))}
-      {onStarter && !items.some((i) => i.kind === "user") && <Starters onPick={onStarter} />}
     </Workspace.Provider>
-  );
-}
-
-const STARTERS = [
-  "Explain how this codebase is organized",
-  "Find a bug and propose a fix",
-  "Add tests for the most important module",
-  "Review the uncommitted changes",
-];
-
-function Starters({ onPick }: { onPick: (text: string) => void }) {
-  return (
-    <div className="starters">
-      <Bot size={28} className="starters-icon" aria-hidden />
-      <h2>What should Claude work on?</h2>
-      <p className="muted">Describe a task below, or start from one of these.</p>
-      <div className="starter-chips">
-        {STARTERS.map((text) => (
-          <button key={text} type="button" className="secondary small" onClick={() => onPick(text)}>
-            {text}
-          </button>
-        ))}
-      </div>
-    </div>
   );
 }
 

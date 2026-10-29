@@ -22,6 +22,7 @@ import { useConfirm } from "./Dialog.tsx";
 import { joinPath } from "./files.ts";
 import { HomeView, pickFolder } from "./HomeView.tsx";
 import { type PermissionAnswer, PermissionDialog } from "./PermissionDialog.tsx";
+import { type PanelTab, parseHidden, serializeHidden } from "./panelTabs.ts";
 import { SessionView } from "./SessionView.tsx";
 import { SettingsDialog } from "./SettingsDialog.tsx";
 import { Sidebar } from "./Sidebar.tsx";
@@ -34,9 +35,8 @@ import { asTheme } from "./theme.ts";
 import { applyEvent, closeAssistant, type Item, nextId, setMessageId } from "./transcript.ts";
 import { UpdateDialog } from "./UpdateDialog.tsx";
 import { IconButton } from "./ui/IconButton.tsx";
-import { layoutStorage, usePersistentFlag } from "./ui/layoutStorage.ts";
+import { layoutStorage, usePersistentFlag, usePersistentValue } from "./ui/layoutStorage.ts";
 import { useMenuCommands } from "./useMenuCommands.ts";
-import type { PanelTab } from "./WorkspacePanel.tsx";
 
 // The setup page shares the file-type icon set with the workspace panel; both load on first use.
 const SetupPage = lazy(() => import("./setup/SetupPage.tsx").then((m) => ({ default: m.SetupPage })));
@@ -74,9 +74,15 @@ export function App() {
   const [updatesOpen, setUpdatesOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = usePersistentFlag("agentchainer.sidebar", true);
   const [rightOpen, setRightOpen] = usePersistentFlag("agentchainer.right", true);
+  const [hiddenTabs, setHiddenTabs] = usePersistentValue<PanelTab[]>(
+    "agentchainer.panelTabs.hidden",
+    [],
+    parseHidden,
+    serializeHidden,
+  );
   /** Sessions whose terminal is open. */
   const [terminals, setTerminals] = useState<Set<string>>(new Set());
-  /** The workspace setup page, open over the session it came from (or Home when `back` is null). */
+  /** The Workspace settings page, open over the session it came from (or Home when `back` is null). */
   const [setup, setSetup] = useState<{
     cwd: string;
     model: string;
@@ -139,13 +145,15 @@ export function App() {
           setPanelTab("changes");
           setShowFirstChange(true);
         }
-        if ((cfg.open === "setup" || cfg.open === "plan") && first)
+        if ((cfg.open === "setup" || cfg.open === "plan" || cfg.open === "permissions") && first)
           setSetup({
             cwd: first.cwd,
             model: first.modelAlias,
             back: first.sessionId,
-            view: cfg.open === "plan" ? "plan" : "overview",
+            view: cfg.open === "setup" ? "overview" : cfg.open,
           });
+        // A second session with nothing sent: no model call.
+        if (cfg.open === "fresh") await startSession(cfg.cwd, cfg.model ?? "", "default");
       })
       .catch((err: unknown) => setRuntimeNotice(String(err)));
 
@@ -309,7 +317,7 @@ export function App() {
       const applied = results.filter((r) => r.status === "applied").map((r) => titles.get(r.id) ?? r.id);
       return [
         ...(applied.length
-          ? [`Applied automatically: ${applied.join(", ")}. Roll back in Workspace setup → History.`]
+          ? [`Applied automatically: ${applied.join(", ")}. Roll back in Workspace settings → History.`]
           : []),
         ...results
           .filter((r) => r.status === "failed")
@@ -655,6 +663,8 @@ export function App() {
                     tab={t}
                     hidden={t.sessionId !== active || setup !== null}
                     panelTab={panelTab}
+                    hiddenTabs={hiddenTabs}
+                    onHiddenTabsChange={(next) => setHiddenTabs(() => next)}
                     showFirstChange={showFirstChange}
                     rightOpen={rightOpen}
                     terminalOpen={terminals.has(t.sessionId)}

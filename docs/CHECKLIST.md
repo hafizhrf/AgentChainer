@@ -771,6 +771,10 @@ for the desktop shell, start screen and session view to be cleaned up (UX-02, UX
       terminal split, status bar) | resizable right panel (Changes, Files, Git, Rules, Setup).
     - A selected file's diff replaces the tabs and widens the panel to 55%.
     - Panel sizes are remembered.
+    - Right-panel pass after owner feedback (same day):
+      - Files is an explorer: file-type icons, indent guides, git tints, a filter, keyboard navigation.
+      - Changes and Git use collapsible sections with hover actions.
+      - Git has a branch picker (search, create) and a commit box with Draft with Claude.
     - Open: owner click-through.
 - [ ] **UX-04** Transcript polish: markdown and code highlighting, grouped and collapsible tool runs, a streaming cursor,
       copy buttons, timestamps, long-session performance.
@@ -788,6 +792,12 @@ for the desktop shell, start screen and session view to be cleaned up (UX-02, UX
       - previous sessions, with a ⋯ menu.
     - Settings moved into a dialog.
     - New sessions offer starter prompts.
+    - Workspace setup is a full page, like an IDE's project settings. It opens from Home, the session menu and the
+      right panel. Sections:
+      - Overview: findings by area, each linked to its fix;
+      - Plan: master/detail, with unavailable items folded and Apply at the bottom;
+      - Commands;
+      - History.
     - Open: owner click-through, and the in-app guide.
 - [ ] **UX-07** Keyboard shortcuts and a command palette.
   - Progress (2026-10-29):

@@ -570,7 +570,7 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
-  padding: var(--space-3);
+  padding: var(--space-2);
 }
 
 .panel-body [role="tabpanel"] {
@@ -578,101 +578,6 @@
   flex-direction: column;
   gap: var(--space-2);
   outline: none;
-}
-
-.workspace-panel ul {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-}
-
-.workspace-panel li {
-  display: flex;
-  align-items: center;
-}
-
-/* A folder's children go below it, not beside it. */
-.workspace-panel li.tree-folder {
-  display: block;
-}
-
-.workspace-panel h3 {
-  margin: var(--space-2) 0 var(--space-1);
-  color: var(--muted);
-  font-size: var(--text-xs);
-  font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-}
-
-.workspace-panel h3:first-child {
-  margin-top: 0;
-}
-
-.tree-row {
-  flex: 1;
-  min-width: 0;
-  min-height: 26px;
-  justify-content: flex-start;
-  gap: 4px;
-  padding: 0 var(--space-2);
-  overflow: hidden;
-  border: none;
-  border-radius: var(--radius-sm);
-  background: transparent;
-  color: var(--fg);
-  font-weight: 400;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.tree-row:hover {
-  background: var(--surface-3);
-}
-
-.tree-row.selected {
-  background: var(--accent-soft);
-}
-
-.tree-row.folder svg {
-  flex-shrink: 0;
-  color: var(--muted);
-}
-
-.status {
-  padding: 0 var(--space-1);
-  color: var(--accent);
-  font-family: var(--font-mono);
-  font-size: var(--text-xs);
-}
-
-.status.untracked,
-.status.added {
-  color: var(--ok);
-}
-
-.status.deleted,
-.status.conflicted {
-  color: var(--err);
-}
-
-.turn-prompt {
-  margin-top: var(--space-1);
-  overflow: hidden;
-  font-size: var(--text-xs);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.rules li {
-  gap: var(--space-2);
-}
-
-.rule-text {
-  overflow: hidden;
-  font-size: var(--text-xs);
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 /* ---------- Diff ---------- */

@@ -105,6 +105,11 @@ a {
   background-clip: content-box;
 }
 
+/* Set briefly while the theme changes (appearance.ts). */
+:root.theme-switching * {
+  transition: none;
+}
+
 /* ---------- Form controls ---------- */
 
 input,

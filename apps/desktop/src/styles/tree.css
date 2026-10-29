@@ -1,0 +1,513 @@
+/*
+ * File rows, trees and sections of the right panel (UX-03), styled after editor explorers and source control views:
+ * dense 24px rows, file-type icons, indent guides, git status tints, actions on hover.
+ */
+
+/* ---------- Sections ---------- */
+
+.section + .section {
+  margin-top: var(--space-2);
+}
+
+.section-header {
+  display: flex;
+  align-items: center;
+  min-height: 26px;
+  border-radius: var(--radius-sm);
+}
+
+.section-header:hover {
+  background: var(--surface-3);
+}
+
+.section-toggle {
+  flex: 1;
+  min-width: 0;
+  min-height: 26px;
+  justify-content: flex-start;
+  gap: 4px;
+  padding: 0 var(--space-1);
+  border: none;
+  background: none;
+  color: var(--muted);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.section-toggle:hover {
+  background: none;
+  color: var(--fg);
+}
+
+.section-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.section-count {
+  margin-left: 2px;
+  padding: 0 6px;
+  border-radius: var(--radius-full);
+  background: var(--surface-3);
+  color: var(--muted);
+  font-size: var(--text-xs);
+  font-weight: 500;
+  letter-spacing: 0;
+}
+
+.section-header:hover .section-count {
+  background: var(--border);
+}
+
+.section-actions {
+  display: flex;
+  padding-right: 2px;
+  opacity: 0;
+}
+
+.section-header:hover .section-actions,
+.section-header:focus-within .section-actions {
+  opacity: 1;
+}
+
+.section-body {
+  padding: 2px 0 var(--space-1);
+}
+
+.empty-state {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  color: var(--muted);
+  font-size: var(--text-sm);
+}
+
+.empty-state > svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+/* ---------- Rows ---------- */
+
+.tree-item {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  min-height: 24px;
+  padding-right: var(--space-2);
+  border-radius: var(--radius-sm);
+}
+
+.tree-item:hover {
+  background: var(--surface-3);
+}
+
+.tree-item.selected {
+  background: var(--accent-soft);
+}
+
+.tree-item.dimmed {
+  opacity: 0.6;
+}
+
+.tree-main {
+  flex: 1;
+  min-width: 0;
+  min-height: 24px;
+  justify-content: flex-start;
+  text-align: left;
+  gap: 6px;
+  padding: 0 var(--space-1) 0 calc(var(--space-2) + var(--depth, 0) * 12px);
+  border: none;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--fg);
+  font-weight: 400;
+}
+
+.tree-main:hover,
+.tree-main:disabled {
+  background: none;
+  opacity: 1;
+}
+
+.tree-main:disabled {
+  cursor: default;
+}
+
+.tree-main:focus-visible {
+  outline-offset: -2px;
+}
+
+/* Indent guides: one faint line per level, under the folder that owns the row. */
+.tree .tree-item::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: calc(var(--space-2) + 7px);
+  width: calc(var(--depth, 0) * 12px);
+  background-image: repeating-linear-gradient(to right, var(--border) 0 1px, transparent 1px 12px);
+  pointer-events: none;
+}
+
+.tree-chevron {
+  display: inline-flex;
+  flex-shrink: 0;
+  width: 14px;
+  color: var(--muted);
+}
+
+.file-icon {
+  flex-shrink: 0;
+}
+
+.tree-name {
+  flex-shrink: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tree-detail {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--muted);
+  font-size: var(--text-xs);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tree-actions {
+  display: flex;
+  flex-shrink: 0;
+  opacity: 0;
+}
+
+.tree-actions button.icon {
+  width: 22px;
+  min-height: 22px;
+}
+
+.tree-item:hover .tree-actions,
+.tree-item:focus-within .tree-actions {
+  opacity: 1;
+}
+
+.tree-status {
+  flex-shrink: 0;
+  width: 14px;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  text-align: center;
+}
+
+.tree-dot {
+  flex-shrink: 0;
+  width: 6px;
+  height: 6px;
+  margin: 0 4px;
+  border-radius: 50%;
+  background: var(--warn);
+}
+
+/* Git status tints, as in most editors. */
+.status-modified,
+.status-renamed {
+  color: var(--warn);
+}
+
+.status-added,
+.status-untracked {
+  color: var(--ok);
+}
+
+.status-deleted,
+.status-conflicted {
+  color: var(--err);
+}
+
+.tree-name.status-deleted {
+  text-decoration: line-through;
+}
+
+/* ---------- Files ---------- */
+
+.files-content {
+  min-height: 0;
+}
+
+.file-tree {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.tree-toolbar {
+  position: sticky;
+  top: calc(-1 * var(--space-2));
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  margin: calc(-1 * var(--space-2)) 0 0;
+  padding: var(--space-2) 0 var(--space-1);
+  background: var(--surface);
+}
+
+.tree-filter {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 4px 0 var(--space-2);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  background: var(--surface-2);
+  color: var(--muted);
+}
+
+.tree-filter:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+.tree-filter input {
+  flex: 1;
+  min-width: 0;
+  min-height: 26px;
+  padding: 0;
+  border: none;
+  background: none;
+  font-size: var(--text-sm);
+}
+
+.tree-filter input:focus {
+  box-shadow: none;
+}
+
+/* ---------- Changes ---------- */
+
+.turn-group + .turn-group {
+  margin-top: var(--space-1);
+}
+
+.turn-label {
+  padding: 2px var(--space-2);
+  overflow: hidden;
+  color: var(--muted);
+  font-size: var(--text-xs);
+  font-style: italic;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rule-text {
+  flex: 1;
+  min-width: 0;
+  padding: 0 var(--space-2);
+  overflow: hidden;
+  font-size: var(--text-xs);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ---------- Git ---------- */
+
+.git-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.branch-button {
+  width: 100%;
+  justify-content: flex-start;
+  gap: 6px;
+  padding: 0 var(--space-2);
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--fg);
+  font-weight: 500;
+}
+
+.branch-button:hover:not(:disabled),
+.branch-button[data-state="open"] {
+  border-color: var(--border-strong);
+  background: var(--surface-3);
+}
+
+.branch-icon {
+  flex-shrink: 0;
+  color: var(--accent);
+}
+
+.branch-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-align: left;
+  text-overflow: ellipsis;
+}
+
+.branch-sync {
+  display: inline-flex;
+  gap: 6px;
+  color: var(--muted);
+  font-size: var(--text-xs);
+  font-weight: 400;
+}
+
+.branch-sync span {
+  display: inline-flex;
+  align-items: center;
+  gap: 1px;
+}
+
+.branch-chevron {
+  flex-shrink: 0;
+  color: var(--muted);
+}
+
+.branch-popover {
+  z-index: 60;
+  width: max(var(--radix-popover-trigger-width), 260px);
+  max-height: min(420px, var(--radix-popover-content-available-height));
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: var(--shadow-lg);
+}
+
+.branch-search {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 var(--space-3);
+  border-bottom: 1px solid var(--border);
+  color: var(--muted);
+}
+
+.branch-search input {
+  flex: 1;
+  min-height: 36px;
+  padding: 0;
+  border: none;
+  background: none;
+}
+
+.branch-search input:focus {
+  box-shadow: none;
+}
+
+.branch-list {
+  flex: 1;
+  min-height: 0;
+  margin: 0;
+  padding: var(--space-1);
+  overflow-y: auto;
+  list-style: none;
+}
+
+.branch-item {
+  width: 100%;
+  min-height: 28px;
+  justify-content: flex-start;
+  gap: var(--space-2);
+  padding: 0 var(--space-2);
+  border: none;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--fg);
+  font-weight: 400;
+}
+
+.branch-item:hover,
+.branch-item:focus-visible {
+  background: var(--accent-soft);
+  outline: none;
+}
+
+.branch-item svg {
+  flex-shrink: 0;
+  color: var(--accent);
+}
+
+.branch-check {
+  width: 14px;
+  flex-shrink: 0;
+}
+
+.branch-none {
+  padding: var(--space-2);
+  font-size: var(--text-sm);
+}
+
+.branch-new {
+  border-top: 1px solid var(--border);
+  border-radius: 0;
+  min-height: 34px;
+  padding: 0 var(--space-3);
+}
+
+.branch-create-hint {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  font-size: var(--text-sm);
+}
+
+.commit-box {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding-bottom: var(--space-2);
+  border-bottom: 1px solid var(--border);
+}
+
+.commit-input {
+  position: relative;
+}
+
+.commit-input textarea {
+  width: 100%;
+  padding-right: 34px;
+  font-size: var(--text-sm);
+  resize: vertical;
+}
+
+.commit-draft {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+}
+
+.commit-actions {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.git-status {
+  margin: 0;
+  color: var(--muted);
+  font-size: var(--text-xs);
+}
+
+.git-status.error {
+  color: var(--err);
+}

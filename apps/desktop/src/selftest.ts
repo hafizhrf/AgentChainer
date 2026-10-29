@@ -11,6 +11,9 @@ import type { Tab } from "./tabs.ts";
  * (M1-22). With `"stay": true` the app stays open afterwards, in `theme` and with `open` shown (UX screenshots).
  * Driven by scripts/selftest-latency.mjs. Null in normal runs.
  */
+/** Views a screenshot run can open: Home, Settings, a session's terminal or right-panel tab, or the setup page. */
+const OPEN_VIEWS = ["home", "settings", "terminal", "files", "git", "setup", "plan"] as const;
+
 export type SelftestConfig = {
   cwd: string;
   model?: string;
@@ -19,7 +22,7 @@ export type SelftestConfig = {
   /** Keep the app open afterwards, optionally in a theme and with a view open: for screenshots. */
   stay?: boolean;
   theme?: "light" | "dark";
-  open?: "home" | "settings" | "terminal";
+  open?: (typeof OPEN_VIEWS)[number];
 };
 
 export async function readSelftestConfig(): Promise<SelftestConfig | null> {
@@ -34,7 +37,7 @@ export async function readSelftestConfig(): Promise<SelftestConfig | null> {
     ...(cfg.resume ? { resume: true } : {}),
     ...(cfg.stay ? { stay: true } : {}),
     ...(cfg.theme === "light" || cfg.theme === "dark" ? { theme: cfg.theme } : {}),
-    ...(cfg.open === "home" || cfg.open === "settings" || cfg.open === "terminal" ? { open: cfg.open } : {}),
+    ...(OPEN_VIEWS.find((v) => v === cfg.open) ? { open: cfg.open } : {}),
   };
 }
 

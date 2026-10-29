@@ -14,7 +14,7 @@ import * as Tooltip from "@radix-ui/react-tooltip";
 import { invoke } from "@tauri-apps/api/core";
 import { save } from "@tauri-apps/plugin-dialog";
 import { X } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { Group, Panel, Separator, useDefaultLayout } from "react-resizable-panels";
 import { applyTheme } from "./appearance.ts";
 import type { Attachment } from "./Composer.tsx";
@@ -27,6 +27,7 @@ import { SettingsDialog } from "./SettingsDialog.tsx";
 import { Sidebar } from "./Sidebar.tsx";
 import { quitApp, readSelftestConfig, runSelftest } from "./selftest.ts";
 import { loadSettings, type Settings, saveSettings, withRecent } from "./settings.ts";
+import type { SetupView } from "./setup/SetupPage.tsx";
 import { connect, isRpcError, onExit, onReady, request, requestWithTimeout, subscribe } from "./sidecar.ts";
 import { asMode, folderName, newTab, type Tab, tabEvent, updateTab } from "./tabs.ts";
 import { asTheme } from "./theme.ts";
@@ -34,6 +35,10 @@ import { applyEvent, closeAssistant, type Item, nextId, setMessageId } from "./t
 import { IconButton } from "./ui/IconButton.tsx";
 import { layoutStorage, usePersistentFlag } from "./ui/layoutStorage.ts";
 import { useMenuCommands } from "./useMenuCommands.ts";
+import type { PanelTab } from "./WorkspacePanel.tsx";
+
+// The setup page shares the file-type icon set with the workspace panel; both load on first use.
+const SetupPage = lazy(() => import("./setup/SetupPage.tsx").then((m) => ({ default: m.SetupPage })));
 
 /** Guards against React StrictMode running the mount effect twice in dev. */
 let selftestStarted = false;
@@ -69,6 +74,15 @@ export function App() {
   const [rightOpen, setRightOpen] = usePersistentFlag("agentchainer.right", true);
   /** Sessions whose terminal is open. */
   const [terminals, setTerminals] = useState<Set<string>>(new Set());
+  /** The workspace setup page, open over the session it came from (or Home when `back` is null). */
+  const [setup, setSetup] = useState<{
+    cwd: string;
+    model: string;
+    back: string | null;
+    view?: SetupView;
+  } | null>(null);
+  /** Self-test screenshots only: the right panel's tab. */
+  const [panelTab, setPanelTab] = useState<PanelTab | undefined>(undefined);
   const shell = useDefaultLayout({
     id: "agentchainer.shell",
     panelIds: sidebarOpen ? ["sidebar", "main"] : ["main"],
@@ -117,6 +131,14 @@ export function App() {
         if (cfg.open === "settings") setSettingsOpen(true);
         const first = tabsRef.current[0];
         if (cfg.open === "terminal" && first) toggleTerminal(first.sessionId);
+        if (cfg.open === "files" || cfg.open === "git") setPanelTab(cfg.open);
+        if ((cfg.open === "setup" || cfg.open === "plan") && first)
+          setSetup({
+            cwd: first.cwd,
+            model: first.modelAlias,
+            back: first.sessionId,
+            view: cfg.open === "plan" ? "plan" : "overview",
+          });
       })
       .catch((err: unknown) => setRuntimeNotice(String(err)));
 
@@ -492,9 +514,15 @@ export function App() {
     }
   }
 
+  /** Shows a session, or Home for null; closes the setup page if it's open. */
+  function show(sessionId: string | null) {
+    setSetup(null);
+    setActive(sessionId);
+  }
+
   function openWorkspace(dir: string) {
     setCwd(dir);
-    setActive(null);
+    show(null);
   }
 
   async function openFolder() {
@@ -515,7 +543,7 @@ export function App() {
     setTerminals((open) => withToggled(open, sessionId, !open.has(sessionId)));
 
   useMenuCommands({
-    "new-session": () => setActive(null),
+    "new-session": () => show(null),
     "open-folder": () => void openFolder(),
     "close-session": () => active && closeTab(active),
     settings: () => setSettingsOpen(true),
@@ -545,8 +573,8 @@ export function App() {
                 active={active}
                 recent={settings?.recentWorkspaces ?? []}
                 ready={env ? env.ready : null}
-                onNew={() => setActive(null)}
-                onSelect={setActive}
+                onNew={() => show(null)}
+                onSelect={show}
                 onClose={closeTab}
                 onOpenWorkspace={openWorkspace}
                 onSettings={() => setSettingsOpen(true)}
@@ -565,7 +593,7 @@ export function App() {
                 </div>
               )}
               <div className="main-body">
-                {active === null && (
+                {active === null && !setup && (
                   <HomeView
                     env={env}
                     checking={checking}
@@ -581,6 +609,7 @@ export function App() {
                     onModeChange={setMode}
                     canAutonomous={settings?.budgetUsd != null}
                     onStart={() => void startSession(workspace, model, mode)}
+                    onOpenSetup={() => setSetup({ cwd: workspace, model, back: null })}
                     openIds={new Set(tabs.filter((t) => !t.ended).map((t) => t.sessionId))}
                     onOpenStored={openStored}
                     confirm={confirm}
@@ -590,7 +619,8 @@ export function App() {
                   <SessionView
                     key={t.sessionId}
                     tab={t}
-                    hidden={t.sessionId !== active}
+                    hidden={t.sessionId !== active || setup !== null}
+                    panelTab={panelTab}
                     rightOpen={rightOpen}
                     terminalOpen={terminals.has(t.sessionId)}
                     onToggleRight={() => setRightOpen((v) => !v)}
@@ -606,9 +636,23 @@ export function App() {
                     onFork={() => void forkTab(t.sessionId)}
                     onClose={() => closeTab(t.sessionId)}
                     onOpenFile={(file, line) => void openInEditor(t.sessionId, t.cwd, file, line)}
+                    onOpenSetup={() => setSetup({ cwd: t.cwd, model: t.modelAlias, back: t.sessionId })}
                     confirm={confirm}
                   />
                 ))}
+                {setup && (
+                  <Suspense fallback={<div className="setup-page" />}>
+                    <SetupPage
+                      key={setup.cwd}
+                      cwd={setup.cwd}
+                      model={setup.model}
+                      backLabel={setup.back ? "Back to session" : "Back to Home"}
+                      confirm={confirm}
+                      onBack={() => setSetup(null)}
+                      {...(setup.view ? { initialView: setup.view } : {})}
+                    />
+                  </Suspense>
+                )}
               </div>
             </main>
           </Panel>

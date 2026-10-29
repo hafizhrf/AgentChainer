@@ -22,20 +22,23 @@ export const layoutStorage: LayoutStorage = {
   },
 };
 
-/** A remembered on/off UI preference (panel open or closed), with the same fallbacks as `layoutStorage`. */
+/**
+ * A remembered on/off UI preference (panel open or closed), with the same fallbacks as `layoutStorage`. A null key
+ * keeps the flag for this mount only.
+ */
 export function usePersistentFlag(
-  key: string,
+  key: string | null,
   initial: boolean,
 ): [boolean, (update: (value: boolean) => boolean) => void] {
   const [value, setValue] = useState(() => {
-    const saved = layoutStorage.getItem(key);
+    const saved = key === null ? null : layoutStorage.getItem(key);
     return saved === null ? initial : saved === "1";
   });
   const update = useCallback(
     (fn: (value: boolean) => boolean) =>
       setValue((prev) => {
         const next = fn(prev);
-        layoutStorage.setItem(key, next ? "1" : "0");
+        if (key !== null) layoutStorage.setItem(key, next ? "1" : "0");
         return next;
       }),
     [key],

@@ -10,11 +10,13 @@ import { TranscriptView } from "./TranscriptView.tsx";
 import { budgetWarning, type Cost, type Tab } from "./tabs.ts";
 import { layoutStorage } from "./ui/layoutStorage.ts";
 import { useWorkspace } from "./useWorkspace.ts";
-import { WorkspacePanel } from "./WorkspacePanel.tsx";
+import type { PanelTab } from "./WorkspacePanel.tsx";
 
 // Monaco and xterm are large; load them when first used.
 const DiffView = lazy(() => import("./DiffView.tsx"));
 const TerminalPanel = lazy(() => import("./TerminalPanel.tsx"));
+// The workspace panel carries the file-type icon set; it loads with the first session, not at app start.
+const WorkspacePanel = lazy(() => import("./WorkspacePanel.tsx").then((m) => ({ default: m.WorkspacePanel })));
 
 /** True while a dialog, menu or select list is open: Esc belongs to it then. */
 const layerOpen = () =>
@@ -42,6 +44,8 @@ export function SessionView({
   onRename,
   onFork,
   onClose,
+  onOpenSetup,
+  panelTab,
   onOpenFile,
   confirm,
 }: {
@@ -61,6 +65,10 @@ export function SessionView({
   onRename: (title: string) => void;
   onFork: () => void;
   onClose: () => void;
+  /** Opens the workspace setup page (M2-08…M2-17) for this session's folder. */
+  onOpenSetup: () => void;
+  /** The right panel's tab when it opens (self-test screenshots). */
+  panelTab?: PanelTab | undefined;
   /** Opens a workspace-relative or absolute path in the user's editor (M1-28). */
   onOpenFile: (path: string, line?: number) => void;
   confirm: Confirm;
@@ -143,6 +151,7 @@ export function SessionView({
               onRename={onRename}
               onFork={onFork}
               onClose={onClose}
+              onOpenSetup={onOpenSetup}
             />
             {warning && <div className="banner">{warning}</div>}
             <Group
@@ -212,17 +221,22 @@ export function SessionView({
           >
             <aside className="right-panel" aria-label="Workspace">
               <div className="right-tabs" hidden={selected !== null}>
-                <WorkspacePanel
-                  cwd={tab.cwd}
-                  files={workspace.files}
-                  error={workspace.error}
-                  items={tab.items}
-                  selected={selected}
-                  model={tab.modelAlias}
-                  confirm={confirm}
-                  onSelect={setSelected}
-                  onRefresh={() => void refresh()}
-                />
+                <Suspense fallback={<p className="muted panel-loading">Loading…</p>}>
+                  <WorkspacePanel
+                    key={panelTab}
+                    {...(panelTab ? { initialTab: panelTab } : {})}
+                    cwd={tab.cwd}
+                    files={workspace.files}
+                    error={workspace.error}
+                    items={tab.items}
+                    selected={selected}
+                    confirm={confirm}
+                    onSelect={setSelected}
+                    onOpenFile={(path) => onOpenFile(path)}
+                    onRefresh={() => void refresh()}
+                    onOpenSetup={onOpenSetup}
+                  />
+                </Suspense>
               </div>
               {selected && (
                 <Suspense fallback={<p className="muted">Loading diff viewer…</p>}>

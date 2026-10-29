@@ -1,6 +1,6 @@
 import { type EnvCheck, PERMISSION_MODES, type PermissionMode, type SessionInfo } from "@agentchainer/protocol";
 import { open } from "@tauri-apps/plugin-dialog";
-import { Folder, FolderOpen, Play, X } from "lucide-react";
+import { Folder, FolderOpen, Play, Wrench, X } from "lucide-react";
 import { type ReactNode, useState } from "react";
 import type { Confirm } from "./Dialog.tsx";
 import { GitInitOffer } from "./GitInitOffer.tsx";
@@ -36,6 +36,7 @@ export function HomeView({
   onModeChange,
   canAutonomous,
   onStart,
+  onOpenSetup,
   openIds,
   onOpenStored,
   confirm,
@@ -55,6 +56,8 @@ export function HomeView({
   onModeChange: (mode: PermissionMode) => void;
   canAutonomous: boolean;
   onStart: () => void;
+  /** Opens the workspace setup page for the chosen folder. */
+  onOpenSetup: () => void;
   openIds: Set<string>;
   onOpenStored: (session: SessionInfo) => void;
   confirm: Confirm;
@@ -80,6 +83,15 @@ export function HomeView({
 
         <WorkspaceCard cwd={cwd} onChange={onCwdChange} recent={recent} homeDir={homeDir}>
           {connected && workspace && <GitInitOffer cwd={workspace} />}
+          {connected && workspace && (
+            <div className="workspace-setup">
+              <span className="muted">See what this project needs for agent work, and set it up with previews.</span>
+              <button type="button" className="secondary small" onClick={onOpenSetup}>
+                <Wrench size={14} />
+                Set up workspace…
+              </button>
+            </div>
+          )}
         </WorkspaceCard>
 
         <section className="card" aria-labelledby="options-title">

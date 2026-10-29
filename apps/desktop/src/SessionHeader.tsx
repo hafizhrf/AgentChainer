@@ -16,6 +16,7 @@ export function SessionHeader({
   onRename,
   onFork,
   onClose,
+  onOpenSetup,
 }: {
   tab: Tab;
   branch: string | null;
@@ -26,6 +27,7 @@ export function SessionHeader({
   onRename: (title: string) => void;
   onFork: () => void;
   onClose: () => void;
+  onOpenSetup: () => void;
 }) {
   const [editing, setEditing] = useState<string | null>(null);
 
@@ -83,6 +85,7 @@ export function SessionHeader({
           items={[
             { label: "Rename", onSelect: () => setEditing(tab.title) },
             { label: "Fork into a new session", onSelect: onFork },
+            { label: "Workspace setup…", onSelect: onOpenSetup },
             { label: "Close session", shortcut: shortcut("W"), onSelect: onClose },
           ]}
         />

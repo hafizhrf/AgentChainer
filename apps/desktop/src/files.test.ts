@@ -1,6 +1,15 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { agentEdits, buildTree, joinPath, relativeTo } from "./files.ts";
+import {
+  agentEdits,
+  buildTree,
+  filterTree,
+  folderPaths,
+  joinPath,
+  relativeTo,
+  splitPath,
+  visibleRows,
+} from "./files.ts";
 import type { Item, ToolItem } from "./transcript.ts";
 
 describe("buildTree", () => {
@@ -25,6 +34,41 @@ describe("buildTree", () => {
       src.map((n) => n.path),
       ["src/lib", "src/a.ts", "src/b.ts"],
     );
+  });
+});
+
+describe("tree views", () => {
+  const tree = buildTree([
+    { path: "src/app/main.ts" },
+    { path: "src/app/view.css" },
+    { path: "src/util.ts" },
+    { path: "docs/guide.md" },
+    { path: "README.md" },
+  ]);
+
+  it("filters files by path and keeps only the folders above matches", () => {
+    const hits = filterTree(tree, "MAIN");
+    assert.deepEqual(folderPaths(hits), ["src", "src/app"]);
+    assert.deepEqual(
+      visibleRows(hits, new Set(folderPaths(hits))).map((r) => r.node.path),
+      ["src", "src/app", "src/app/main.ts"],
+    );
+    assert.equal(filterTree(tree, "  "), tree, "an empty query keeps the tree as is");
+    assert.deepEqual(filterTree(tree, "nothing"), []);
+  });
+
+  it("lists the visible rows with their depth, skipping collapsed folders", () => {
+    const rows = visibleRows(tree, new Set(["src"]));
+    assert.deepEqual(
+      rows.map((r) => `${r.depth}:${r.node.path}`),
+      ["0:docs", "0:src", "1:src/app", "1:src/util.ts", "0:README.md"],
+    );
+  });
+
+  it("splits a path into folder and name", () => {
+    assert.deepEqual(splitPath("src/app/main.ts"), { dir: "src/app", name: "main.ts" });
+    assert.deepEqual(splitPath("README.md"), { dir: "", name: "README.md" });
+    assert.deepEqual(splitPath("C:\\code\\a.ts"), { dir: "C:\\code", name: "a.ts" });
   });
 });
 

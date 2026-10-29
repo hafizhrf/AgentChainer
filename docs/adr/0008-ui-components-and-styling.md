@@ -39,6 +39,14 @@ The existing CSS already uses custom properties, and the owner chose a dark past
 Licenses: Radix and react-resizable-panels are MIT; lucide-react is ISC. All are pinned to exact versions at least
 two weeks old.
 
+### Addendum (2026-10-29): file icons and the branch picker
+
+- **File-type icons:** `@react-symbols/icons` (MIT), a React port of the "Symbols" icon theme for VS Code. The owner
+  asked for an explorer like VS Code's, with icons.
+  - It is about 550 kB of JS, so it loads in a shared lazy chunk with the right panel and the setup page, not at app
+    start.
+- **Branch picker:** `@radix-ui/react-popover` (MIT), for a searchable list instead of a native `<select>`.
+
 ## Alternatives considered
 
 | Option | Pros | Cons | Why not chosen |

@@ -84,7 +84,8 @@ whose signature doesn't match. On Linux, a `.deb` or `.rpm` update asks for your
 
 - **macOS:** move AgentChainer from Applications to the Trash.
 - **Windows:** Settings → Apps → AgentChainer → Uninstall.
-- **Linux:** `sudo apt remove agentchainer` or `sudo dnf remove agentchainer`, or delete the AppImage.
+- **Linux:** `sudo apt remove agent-chainer` or `sudo dnf remove agent-chainer` **(verify the .rpm name)**, or delete
+  the AppImage.
 
 Settings, logs and downloaded tools stay behind. [PRIVACY.md](../PRIVACY.md#what-stays-on-your-machine) lists their
 folders.

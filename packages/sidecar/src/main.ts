@@ -2,12 +2,14 @@ import { existsSync } from "node:fs";
 import { homedir } from "node:os";
 import { PROTOCOL_VERSION, RpcErrorCode } from "@agentchainer/protocol";
 import pkg from "../package.json" with { type: "json" };
+import { applyActions, type Cli, listRuns, rollback } from "./bootstrap/apply.ts";
 import { buildPlan, planEnv } from "./bootstrap/plan.ts";
 import { catalog } from "./catalog/index.ts";
 import { checkEnvironment, claudeVersion, findClaude } from "./claude.ts";
 import { auditWorkspace, saveProfile } from "./detect/audit.ts";
 import { detectWorkspace } from "./detect/detect.ts";
 import { branches, commit, draftMessage, push, stage, switchBranch, unstage } from "./git.ts";
+import { installPlugin, listMarketplaces, listPlugins, uninstallPlugin } from "./installer.ts";
 import { listRules, removeRule } from "./permissions.ts";
 import { log, notify, RpcFailure, serve } from "./rpc.ts";
 import { loadSdk } from "./sdk-loader.ts";
@@ -24,6 +26,22 @@ function requireSession(sessionId: string): Session {
     throw new RpcFailure(RpcErrorCode.noSession, "This session isn't running. Resume it from the session list.");
   }
   return session;
+}
+
+/** The user's own CLI for plugin installs (spike S6), or null when it isn't found. */
+function cliFor(cwd: string): Cli | null {
+  const claude = findClaude();
+  if (!claude) return null;
+  return {
+    installPlugin: (id, scope) => installPlugin(claude, id, scope, cwd),
+    uninstallPlugin: (id, scope) => uninstallPlugin(claude, id, scope, cwd),
+    listPlugins: () => listPlugins(claude, cwd),
+    listMarketplaces: () => listMarketplaces(claude, cwd),
+  };
+}
+
+function requireFolder(cwd: string): void {
+  if (!existsSync(cwd)) throw new RpcFailure(RpcErrorCode.invalidParams, `Folder not found: ${cwd}`);
 }
 
 function rejectIfOpen(sessionId: string, action: string): void {
@@ -219,8 +237,48 @@ serve(
 
     "workspace.saveProfile": ({ cwd }) => ({ path: saveProfile(cwd, detectWorkspace(cwd)) }),
 
+    "bootstrap.apply": async ({ cwd, actions, profiles }) => {
+      requireFolder(cwd);
+      return applyActions(cwd, actions, {
+        catalog,
+        env: planEnv(cwd),
+        cli: cliFor(cwd),
+        optIn: profiles ?? [],
+      });
+    },
+
+    "bootstrap.runs": ({ cwd }) => {
+      requireFolder(cwd);
+      return {
+        runs: listRuns(cwd).map(({ runId, startedAt, catalogVersion, actions }) => ({
+          runId,
+          startedAt,
+          catalogVersion,
+          actions: actions.map(({ id, title, status, error, warnings }) => ({
+            id,
+            title,
+            status,
+            warnings,
+            ...(error ? { error } : {}),
+          })),
+        })),
+      };
+    },
+
+    "bootstrap.rollback": ({ cwd, runId, actionId, force }) => {
+      requireFolder(cwd);
+      return {
+        results: rollback(
+          cwd,
+          runId,
+          { cli: cliFor(cwd) },
+          { ...(actionId ? { actionId } : {}), ...(force ? { force } : {}) },
+        ),
+      };
+    },
+
     "bootstrap.plan": ({ cwd, profiles }) => {
-      if (!existsSync(cwd)) throw new RpcFailure(RpcErrorCode.invalidParams, `Folder not found: ${cwd}`);
+      requireFolder(cwd);
       const profile = detectWorkspace(cwd);
       return buildPlan(cwd, profile, auditWorkspace(cwd, profile), catalog, planEnv(cwd), profiles ?? []);
     },

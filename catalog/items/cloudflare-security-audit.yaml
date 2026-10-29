@@ -1,0 +1,38 @@
+# Seed item (docs/CATALOG.md §6). Offered once reviewed: see `reviews` and §4.
+id: cloudflare-security-audit
+name: "Security Audit (Cloudflare)"
+kind: skill
+tier: verified-vendor
+license: "MIT"
+homepage: https://github.com/cloudflare/security-audit-skill
+summary: "Six-phase security audit that produces machine-readable findings."
+why: >-
+  Finds real vulnerabilities, each with steps to validate it, instead of generic advice. It's thorough and slow, so
+  run it on demand (before a release), not on every change.
+source:
+  type: git
+  repo: https://github.com/cloudflare/security-audit-skill
+  ref: "c1c8a8c1471069fb0e188eeaff69b8e8db6564a8"
+  path: skills/security-audit
+  sha256: "5db66b10cb1d1120eded16e443dd47ba8a54dfc40432afe9eb94a21b13351899"
+platforms: [darwin, linux, win32]
+requires:
+  - tool: node
+    hint: "Install Node.js 18 or later"
+risk: medium
+permissions:
+  - "Spawns several subagents during an audit"
+  - "Runs the project's build and test commands while validating findings"
+  - "Runs node to check its own report files (the validators use only the file system)"
+install:
+  scope: project
+  steps:
+    - copy: { from: ".", to: ".claude/skills/security-audit" }
+uninstall:
+  steps:
+    - remove: ".claude/skills/security-audit"
+reviews: []
+notes: >-
+  Pre-review scan at c1c8a8c (20 files): the two validator scripts require only fs, path and util; their tests spawn
+  node locally; eval/exec appear only as text in ATTACK-CLASSES.md. No network calls found. A maintainer still has
+  to read every file (docs/CATALOG.md §4).

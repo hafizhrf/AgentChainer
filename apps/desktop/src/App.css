@@ -1091,3 +1091,24 @@ button.toggle[aria-pressed="true"] {
 .badge.risk-medium {
   background: var(--warn-bg);
 }
+
+/* Bootstrap apply and history (M2-13…M2-17) */
+
+.plan-outcome,
+.runs {
+  font-size: 0.85rem;
+}
+
+.run-actions {
+  padding-left: 0.6rem;
+}
+
+.outcome.applied,
+.outcome.rolled-back {
+  color: var(--ok);
+}
+
+.outcome.failed,
+.outcome.conflict {
+  color: var(--err);
+}

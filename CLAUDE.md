@@ -61,6 +61,7 @@ Prerequisites:
 | Rust tests | `cargo test --workspace` |
 | Spike harness: real model calls with your own `claude` login (haiku, a few cents) | `node packages/sidecar/scripts/spike-host.ts --cwd <empty scratch dir> [--scenario basic\|mode\|interrupt\|guard\|auto\|subagents\|sessions\|approvals\|plan\|fixtures\|image\|all] [--record raw.jsonl]` |
 | M1 exit criteria E1–E5 on `fixtures/sample-app` (real model calls; a few cents to ~$0.30) | `node packages/sidecar/scripts/spike-host.ts --cwd <empty dir> --scenario exit` |
+| Re-download every pinned git source in `catalog/` and check its sha256 (network) | `node packages/sidecar/scripts/verify-catalog-sources.ts` |
 | Validate `catalog/` and compile the snapshot the app ships (after changing catalog items or profiles) | `node packages/sidecar/scripts/build-catalog.ts` |
 | Regenerate the detector/audit/plan snapshots of `fixtures/` after changing detection, the plan or the catalog | `UPDATE_SNAPSHOTS=1 node --test packages/sidecar/src/detect/detect.test.ts packages/sidecar/src/bootstrap/plan.test.ts` |
 | Regenerate the event snapshots the UI tests replay, after re-recording a fixture | `UPDATE_FIXTURES=1 node --test packages/sidecar/src/normalize.test.ts` |

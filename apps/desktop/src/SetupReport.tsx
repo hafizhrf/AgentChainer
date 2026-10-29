@@ -1,6 +1,7 @@
 import type { Finding, Methods } from "@agentchainer/protocol";
 import { useCallback, useEffect, useState } from "react";
 import { BootstrapPlanView } from "./BootstrapPlanView.tsx";
+import type { Confirm } from "./Dialog.tsx";
 import { request } from "./sidecar.ts";
 
 type Scan = Methods["workspace.scan"]["result"];
@@ -17,7 +18,7 @@ const AREA: Record<Finding["area"], string> = {
  * Readiness report (M2-08/M2-09): what the workspace is made of, the commands found for it, and what it lacks for
  * agent work. Every gap names its fix; applying fixes arrives with the bootstrap plan (M2-11).
  */
-export function SetupReport({ cwd }: { cwd: string }) {
+export function SetupReport({ cwd, confirm }: { cwd: string; confirm: Confirm }) {
   const [scan, setScan] = useState<Scan | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState<string | null>(null);
@@ -80,7 +81,7 @@ export function SetupReport({ cwd }: { cwd: string }) {
           </div>
         );
       })}
-      <BootstrapPlanView cwd={cwd} />
+      <BootstrapPlanView cwd={cwd} confirm={confirm} onChanged={() => void load()} />
 
       <h3>Packages and commands</h3>
       {profile.packages.length === 0 && <p className="muted">No manifests found.</p>}

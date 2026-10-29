@@ -90,7 +90,7 @@ export function WorkspacePanel({
         />
       )}
       {view === "permissions" && <PermissionRules cwd={cwd} confirm={confirm} />}
-      {view === "setup" && <SetupReport cwd={cwd} />}
+      {view === "setup" && <SetupReport cwd={cwd} confirm={confirm} />}
     </div>
   );
 }

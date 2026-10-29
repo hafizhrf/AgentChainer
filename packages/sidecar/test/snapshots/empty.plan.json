@@ -38,6 +38,12 @@
       "suggested": false
     },
     {
+      "id": "security",
+      "name": "Security",
+      "description": "A deep security audit, on request (before a release).",
+      "suggested": false
+    },
+    {
       "id": "ts-node",
       "name": "TypeScript / JavaScript",
       "description": "Code intelligence for Node projects.",

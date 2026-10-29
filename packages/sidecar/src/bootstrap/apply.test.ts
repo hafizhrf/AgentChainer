@@ -7,8 +7,8 @@ import { join } from "node:path";
 import { after, describe, it } from "node:test";
 import type { Catalog, Item } from "../catalog/schema.ts";
 import { copyFixture, removeFixtureCopies } from "../detect/fixture-copy.ts";
-import type { CliResult } from "../installer.ts";
-import { type ApplyContext, applyActions, type Cli, listRuns, pluginVersion, rollback } from "./apply.ts";
+import { type ApplyContext, applyActions, listRuns, pluginVersion, rollback } from "./apply.ts";
+import { fakeCli } from "./fake-cli.ts";
 import { type FetchTree, treeHash } from "./git-source.ts";
 import { installedItems, type PlanEnv } from "./plan.ts";
 import { systemTar } from "./tools.ts";
@@ -60,47 +60,6 @@ const catalogOf = (items: Item[]): Catalog => ({
   items,
   profiles: [{ id: "base", name: "Base", description: "d", suggest: { always: true }, items: items.map((i) => i.id) }],
 });
-
-const ok = (json: unknown = null): CliResult => ({ ok: true, status: 0, json, stdout: "", stderr: "" });
-
-/** A CLI stand-in that edits .claude/settings.json the way `claude plugin install/uninstall` does. */
-function fakeCli(root: string, opts: { marketplaces?: string[]; version?: string } = {}): Cli & { calls: string[] } {
-  const settings = join(root, ".claude", "settings.json");
-  const calls: string[] = [];
-  const edit = (fn: (s: { enabledPlugins?: Record<string, boolean> }) => void) => {
-    const s = existsSync(settings) ? JSON.parse(readFileSync(settings, "utf8")) : {};
-    fn(s);
-    mkdirSync(join(root, ".claude"), { recursive: true });
-    writeFileSync(settings, JSON.stringify(s));
-  };
-  return {
-    calls,
-    installPlugin: (id) => {
-      calls.push(`install ${id}`);
-      edit((s) => {
-        s.enabledPlugins = { ...s.enabledPlugins, [id]: true };
-      });
-      return ok({ outcome: "ok" });
-    },
-    uninstallPlugin: (id) => {
-      calls.push(`uninstall ${id}`);
-      edit((s) => {
-        delete s.enabledPlugins?.[id];
-      });
-      return ok();
-    },
-    listPlugins: () => ok([{ id: "demo@mkt", version: opts.version ?? "1.0.1", scope: "project" }]),
-    listMarketplaces: () => ok((opts.marketplaces ?? ["mkt"]).map((name) => ({ name }))),
-    addMcp: (name, scope, command, args) => {
-      calls.push(`mcp add ${scope} ${name} ${[command, ...args].join(" ")}`);
-      return ok();
-    },
-    removeMcp: (name, scope) => {
-      calls.push(`mcp remove ${scope} ${name}`);
-      return ok();
-    },
-  };
-}
 
 const ctx = (root: string, over: Partial<ApplyContext> = {}): ApplyContext => ({
   catalog: catalogOf([]),
@@ -247,6 +206,32 @@ describe("apply catalog items", () => {
     } finally {
       rmSync(src, { recursive: true, force: true });
     }
+  });
+
+  it("restores a file several actions of one run changed, byte for byte (found by the M2 exit test)", async () => {
+    const dir = copyFixture("ts-pnpm-vite");
+    mkdirSync(join(dir, ".claude"), { recursive: true });
+    const settings = '{\n  "permissions": { "allow": ["Read"] }\n}\n';
+    writeFileSync(join(dir, ".claude", "settings.json"), settings);
+    git(dir, "add", "-A");
+    git(dir, "-c", "user.name=t", "-c", "user.email=t@example.invalid", "commit", "-qm", "settings");
+    const second: Item = {
+      ...pluginItem,
+      id: "demo-two",
+      source: { ...pluginItem.source, plugin: "demo-two" } as Item["source"],
+    };
+    const c = ctx(dir, { catalog: catalogOf([pluginItem, second]) });
+    const { runId, results } = await applyActions(dir, ["item:demo", "item:demo-two"], c);
+    assert.deepEqual(
+      results.map((r) => r.status),
+      ["applied", "applied"],
+    );
+    assert.deepEqual(
+      rollback(dir, runId, c).map((r) => r.status),
+      ["rolled-back", "rolled-back"],
+    );
+    assert.equal(read(dir, ".claude/settings.json"), settings);
+    assert.equal(git(dir, "status", "--porcelain"), "");
   });
 
   it("rolls back one action and keeps the rest of the run in the lockfile", async () => {

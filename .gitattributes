@@ -1,0 +1,2 @@
+# LF everywhere, also in Windows checkouts: Biome, the compiled catalog, snapshots and fixtures compare exact text.
+* text=auto eol=lf

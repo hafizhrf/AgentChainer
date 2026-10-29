@@ -176,6 +176,44 @@ describe("the shipped catalog", () => {
     }
   });
 
+  it("previews every action that can be applied, in every fixture (M2-E4)", () => {
+    // With every item reviewed and every profile on, so each kind of action is in some plan.
+    const reviewed = {
+      ...shipped,
+      items: shipped.items.map((i) => ({
+        ...i,
+        reviews: [
+          { by: "a", date: "2026-10-29", ref: "t" },
+          { by: "b", date: "2026-10-29", ref: "t" },
+        ],
+      })),
+    };
+    const kinds = new Set<string>();
+    for (const name of Object.keys(FIXTURE_SETUPS)) {
+      const dir = copyFixture(name);
+      const p = detectWorkspace(dir);
+      const plan = buildPlan(
+        dir,
+        p,
+        auditWorkspace(dir, p),
+        reviewed,
+        env({ toolsDir: "/tools" }),
+        reviewed.profiles.map((x) => x.id),
+      );
+      for (const a of plan.actions.filter((x) => x.state === "recommended" || x.state === "optional")) {
+        const pv = a.preview;
+        kinds.add(pv.type);
+        const concrete =
+          pv.type === "diff" ||
+          (pv.type === "files" && pv.files.length > 0) ||
+          (pv.type === "commands" && pv.commands.length > 0) ||
+          (pv.type === "note" && /^Copies .+ into .+sha256/.test(pv.text));
+        assert.ok(concrete, `${name} ${a.id}: ${JSON.stringify(pv).slice(0, 120)}`);
+      }
+    }
+    assert.deepEqual([...kinds].sort(), ["commands", "diff", "files", "note"], "every preview kind is exercised");
+  });
+
   for (const name of Object.keys(FIXTURE_SETUPS)) {
     it(`plan snapshot: ${name}`, () => {
       const plan = planFor(name, shipped, env({ remoteHost: name === "ts-pnpm-vite" ? "github.com" : null }));

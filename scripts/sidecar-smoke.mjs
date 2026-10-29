@@ -33,7 +33,11 @@ function run(methods) {
     };
     createInterface({ input: child.stdout }).on("line", (line) => {
       const frame = JSON.parse(line);
-      if (frame.error) return fail(new Error(`${methods[results.length]}: ${frame.error.message}`));
+      if (frame.error) {
+        // Stop the sidecar, or its open pipes keep this script alive.
+        child.kill();
+        return fail(new Error(`${methods[results.length]}: ${frame.error.message}`));
+      }
       results.push({ method: methods[results.length], ms: Math.round(performance.now() - t0), result: frame.result });
       next();
     });
@@ -44,6 +48,12 @@ function run(methods) {
     next();
   });
 }
+
+// A hung sidecar fails the check instead of the whole CI job.
+setTimeout(() => {
+  console.error("FAIL: no answer within 5 minutes");
+  process.exit(1);
+}, 300_000).unref();
 
 try {
   console.log(`sidecar: ${bin}`);
@@ -71,3 +81,5 @@ try {
 } finally {
   rmSync(dataDir, { recursive: true, force: true });
 }
+// Exit now: a sidecar that didn't stop (or its children) must not keep this script alive.
+process.exit();

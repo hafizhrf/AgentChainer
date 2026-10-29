@@ -164,6 +164,7 @@ jobs:
       # Install smoke (R1-09, on the runner): install the real artifact, launch the installed app, and check the
       # installed sidecar's first-run SDK download. Clean machines are checked by hand before publishing.
       - name: Install and launch (macOS, .dmg)
+        timeout-minutes: 15
         if: runner.os == 'macOS'
         run: |
           mnt="$(mktemp -d)"
@@ -174,6 +175,7 @@ jobs:
           node scripts/smoke-launch.mjs "$app/Contents/MacOS/$(defaults read "$app/Contents/Info.plist" CFBundleExecutable)"
           node scripts/sidecar-smoke.mjs "$(ls "$app"/Contents/MacOS/agentchainer-sidecar*)"
       - name: Install (Windows, .msi)
+        timeout-minutes: 10
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
@@ -182,6 +184,7 @@ jobs:
           $p = Start-Process msiexec.exe -ArgumentList @("/i", "`"$msi`"", "/qn", "/l*v", "`"$log`"") -Wait -PassThru
           if ($p.ExitCode -ne 0) { Get-Content $log -Tail 80; exit $p.ExitCode }
       - name: Launch (Windows)
+        timeout-minutes: 15
         if: runner.os == 'Windows'
         shell: bash
         run: |
@@ -190,6 +193,7 @@ jobs:
           node scripts/smoke-launch.mjs "$(ls "$dir"/*.exe | grep -v -i -e sidecar -e uninstall | head -1)"
           node scripts/sidecar-smoke.mjs "$(ls "$dir"/agentchainer-sidecar*.exe)"
       - name: Install and launch (Linux, .deb)
+        timeout-minutes: 15
         if: runner.os == 'Linux'
         run: |
           deb="$(ls "$PWD"/release-assets/*.deb | head -1)"

@@ -156,7 +156,7 @@ export function SettingsDialog({
           <p className="field-help">
             Only reviewed first-party and official catalog items, plus fixes that only add lines (env rules in
             .gitignore, importing AGENTS.md). Never generators, git changes, or vendor and community items. What was
-            applied shows in the session, and Workspace setup → History can roll it back.
+            applied shows in the session, and Workspace settings → History can roll it back.
           </p>
         </section>
 

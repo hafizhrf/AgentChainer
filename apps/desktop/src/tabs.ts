@@ -48,6 +48,9 @@ export type Cost = {
 export const asMode = (value: string | null | undefined): PermissionMode =>
   PERMISSION_MODES.find((m) => m === value) ?? "default";
 
+/** A session with nothing sent yet (UX-06): its composer sits in the middle with starter prompts below. */
+export const isFresh = (tab: Tab) => !tab.running && !tab.ended && !tab.items.some((i) => i.kind === "user");
+
 export function newTab(
   sessionId: string,
   cwd: string,

@@ -23,25 +23,38 @@ export const layoutStorage: LayoutStorage = {
 };
 
 /**
- * A remembered on/off UI preference (panel open or closed), with the same fallbacks as `layoutStorage`. A null key
- * keeps the flag for this mount only.
+ * A remembered UI preference (a panel open or closed, the hidden panel tabs), with the same fallbacks as
+ * `layoutStorage`. A null key keeps the value for this mount only. `parse` and `serialize` must be stable (module-level).
  */
+export function usePersistentValue<T>(
+  key: string | null,
+  initial: T,
+  parse: (raw: string) => T,
+  serialize: (value: T) => string,
+): [T, (update: (value: T) => T) => void] {
+  const [value, setValue] = useState(() => {
+    const saved = key === null ? null : layoutStorage.getItem(key);
+    return saved === null ? initial : parse(saved);
+  });
+  const update = useCallback(
+    (fn: (value: T) => T) =>
+      setValue((prev) => {
+        const next = fn(prev);
+        if (key !== null) layoutStorage.setItem(key, serialize(next));
+        return next;
+      }),
+    [key, serialize],
+  );
+  return [value, update];
+}
+
+const parseFlag = (raw: string) => raw === "1";
+const serializeFlag = (value: boolean) => (value ? "1" : "0");
+
+/** A remembered on/off UI preference, such as a panel being open. */
 export function usePersistentFlag(
   key: string | null,
   initial: boolean,
 ): [boolean, (update: (value: boolean) => boolean) => void] {
-  const [value, setValue] = useState(() => {
-    const saved = key === null ? null : layoutStorage.getItem(key);
-    return saved === null ? initial : saved === "1";
-  });
-  const update = useCallback(
-    (fn: (value: boolean) => boolean) =>
-      setValue((prev) => {
-        const next = fn(prev);
-        if (key !== null) layoutStorage.setItem(key, next ? "1" : "0");
-        return next;
-      }),
-    [key],
-  );
-  return [value, update];
+  return usePersistentValue(key, initial, parseFlag, serializeFlag);
 }

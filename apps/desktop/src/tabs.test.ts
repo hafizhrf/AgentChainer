@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import type { AgentEvent } from "@agentchainer/protocol";
-import { budgetWarning, folderName, newTab, type Tab, tabEvent, updateTab } from "./tabs.ts";
+import { budgetWarning, folderName, isFresh, newTab, type Tab, tabEvent, updateTab } from "./tabs.ts";
 
 const done = (totalCostUsd: number): AgentEvent => ({
   type: "turn.completed",
@@ -87,5 +87,15 @@ describe("tabs: tokens and budget", () => {
     assert.match(budgetWarning(tab) ?? "", /reached/);
     assert.equal(tab.lastSubtype, "error_max_budget_usd");
     assert.equal(budgetWarning(newTab("s", "/r", { title: "t", mode: "default" })), null, "no cap, no warning");
+  });
+});
+
+describe("isFresh", () => {
+  it("is true until the first message, and never for a resumed, running or ended session", () => {
+    const tab = newTab("s1", "/repo", { title: "t", mode: "default" });
+    assert.equal(isFresh(tab), true);
+    assert.equal(isFresh({ ...tab, items: [{ kind: "user", id: 1, text: "hi" }] }), false);
+    assert.equal(isFresh({ ...tab, running: true }), false);
+    assert.equal(isFresh({ ...tab, ended: true }), false);
   });
 });

@@ -56,7 +56,7 @@ export function HomeView({
   onModeChange: (mode: PermissionMode) => void;
   canAutonomous: boolean;
   onStart: () => void;
-  /** Opens the workspace setup page for the chosen folder. */
+  /** Opens Workspace settings for the chosen folder. */
   onOpenSetup: () => void;
   openIds: Set<string>;
   onOpenStored: (session: SessionInfo) => void;
@@ -88,7 +88,7 @@ export function HomeView({
               <span className="muted">See what this project needs for agent work, and set it up with previews.</span>
               <button type="button" className="secondary small" onClick={onOpenSetup}>
                 <Wrench size={14} />
-                Set up workspace…
+                Workspace settings…
               </button>
             </div>
           )}

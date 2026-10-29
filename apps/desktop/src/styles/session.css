@@ -301,26 +301,38 @@
   color: var(--muted);
 }
 
-.starters {
-  max-width: 560px;
-  margin: var(--space-8) auto var(--space-4);
+/* A new session (UX-06): the heading, the composer and the starter chips sit together mid-screen, like a chat app's
+   first screen. The transcript (its "Session started" notice) and a spacer share the free space above and below. */
+.chat.fresh .transcript-scroll,
+.fresh-spacer {
+  flex: 1 1 0;
+}
+
+.fresh-heading {
+  width: 100%;
+  max-width: 848px;
+  margin: 0 auto;
+  padding: 0 var(--space-6) var(--space-3);
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: var(--space-2);
+  gap: var(--space-1);
   text-align: center;
 }
 
-.starters-icon {
-  color: var(--accent);
+.fresh-heading h2 {
+  font-size: var(--text-xl);
 }
 
 .starter-chips {
+  width: 100%;
+  max-width: 848px;
+  margin: 0 auto;
+  padding: 0 var(--space-6);
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
   gap: var(--space-2);
-  margin-top: var(--space-2);
 }
 
 .starter-chips button {
@@ -523,6 +535,9 @@
   min-height: 52px;
   padding: 0 var(--space-2) 0 var(--space-1);
   border-bottom: 1px solid var(--border);
+  /* A right-click opens the tabs menu; it shouldn't select a tab's label first. */
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 .panel-tabs {

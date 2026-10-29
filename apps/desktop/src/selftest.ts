@@ -13,9 +13,20 @@ import type { Tab } from "./tabs.ts";
  */
 /**
  * Views a screenshot run can open: Home, Settings, a session's terminal or right-panel tab, the first changed file's
- * diff, or the setup page.
+ * diff, a section of Workspace settings, or a new session with nothing sent yet.
  */
-const OPEN_VIEWS = ["home", "settings", "terminal", "files", "git", "diff", "setup", "plan"] as const;
+const OPEN_VIEWS = [
+  "home",
+  "settings",
+  "terminal",
+  "files",
+  "git",
+  "diff",
+  "setup",
+  "plan",
+  "permissions",
+  "fresh",
+] as const;
 
 export type SelftestConfig = {
   cwd: string;

@@ -1,22 +1,25 @@
 import type { WorkspaceFiles } from "@agentchainer/protocol";
+import * as Menu from "@radix-ui/react-dropdown-menu";
 import * as Tabs from "@radix-ui/react-tabs";
 import {
   Bot,
+  Check,
   ChevronDown,
   ChevronRight,
   ChevronsDownUp,
   CircleCheck,
   ExternalLink,
+  MoreHorizontal,
   RefreshCw,
   Search,
-  ShieldCheck,
-  Trash2,
   X,
 } from "lucide-react";
-import { type KeyboardEvent, type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { type KeyboardEvent, type ReactNode, useMemo, useRef, useState } from "react";
 import type { Confirm } from "./Dialog.tsx";
 import { agentEdits, buildTree, filterTree, folderPaths, visibleRows } from "./files.ts";
 import { GitPanel } from "./GitPanel.tsx";
+import { shortcut } from "./options.ts";
+import { PANEL_TAB_LABEL, PANEL_TABS, type PanelTab, pickTab, toggleHidden, visibleTabs } from "./panelTabs.ts";
 import { SetupSummary } from "./setup/SetupSummary.tsx";
 import { request } from "./sidecar.ts";
 import type { Item } from "./transcript.ts";
@@ -25,12 +28,13 @@ import { IconButton } from "./ui/IconButton.tsx";
 import { EmptyState, Section } from "./ui/Section.tsx";
 import { FileRow, TreeRow } from "./ui/TreeRow.tsx";
 
-export type PanelTab = "changes" | "files" | "git" | "permissions" | "setup";
+export type { PanelTab } from "./panelTabs.ts";
 
 /**
  * The right panel of a session (UX-03): the changes panel (M1-26) with the agent's edits per turn plus everything git
- * sees as changed, the file tree with git status (M1-25), git (M1-30), saved permission rules (M1-20) and a summary of
- * the workspace setup (M2-08), whose full page opens in the main area. Loaded lazily: the file icons are large.
+ * sees as changed, the file tree with git status (M1-25), git (M1-30) and a summary of the workspace setup (M2-08),
+ * whose full page (Workspace settings) opens in the main area. Tabs can be hidden from the ⋯ menu or by right-clicking
+ * the tab bar (`panelTabs.ts`). Loaded lazily: the file icons are large.
  */
 export function WorkspacePanel({
   cwd,
@@ -43,6 +47,9 @@ export function WorkspacePanel({
   onOpenFile,
   onRefresh,
   onOpenSetup,
+  hiddenTabs,
+  onHiddenTabsChange,
+  onHidePanel,
   initialTab = "changes",
 }: {
   cwd: string;
@@ -56,9 +63,16 @@ export function WorkspacePanel({
   onOpenFile: (path: string) => void;
   onRefresh: () => void;
   onOpenSetup: () => void;
+  /** Tabs the user hid; shared by every session's panel. */
+  hiddenTabs: readonly PanelTab[];
+  onHiddenTabsChange: (hidden: PanelTab[]) => void;
+  onHidePanel: () => void;
   initialTab?: PanelTab;
 }) {
   const [view, setView] = useState<PanelTab>(initialTab);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const visible = visibleTabs(hiddenTabs);
+  const active = pickTab(view, visible);
   const [initError, setInitError] = useState<string | null>(null);
   const changed = files?.files.filter((f) => f.status) ?? [];
 
@@ -78,20 +92,33 @@ export function WorkspacePanel({
   );
 
   return (
-    <Tabs.Root className="workspace-panel" value={view} onValueChange={(v) => setView(v as PanelTab)}>
+    <Tabs.Root className="workspace-panel" value={active} onValueChange={(v) => setView(v as PanelTab)}>
       <div className="panel-tabbar">
-        <Tabs.List className="panel-tabs" aria-label="Workspace">
-          <Tabs.Trigger value="changes">
-            Changes{changed.length > 0 && <span className="count">{changed.length}</span>}
-          </Tabs.Trigger>
-          <Tabs.Trigger value="files">Files</Tabs.Trigger>
-          <Tabs.Trigger value="git">Git</Tabs.Trigger>
-          <Tabs.Trigger value="permissions">Rules</Tabs.Trigger>
-          <Tabs.Trigger value="setup">Setup</Tabs.Trigger>
+        <Tabs.List
+          className="panel-tabs"
+          aria-label="Workspace"
+          onContextMenu={(e) => {
+            e.preventDefault();
+            setMenuOpen(true);
+          }}
+        >
+          {visible.map((t) => (
+            <Tabs.Trigger key={t} value={t}>
+              {PANEL_TAB_LABEL[t]}
+              {t === "changes" && changed.length > 0 && <span className="count">{changed.length}</span>}
+            </Tabs.Trigger>
+          ))}
         </Tabs.List>
         <IconButton label="Refresh" onClick={onRefresh}>
           <RefreshCw size={14} />
         </IconButton>
+        <TabsMenu
+          open={menuOpen}
+          onOpenChange={setMenuOpen}
+          hidden={hiddenTabs}
+          onChange={onHiddenTabsChange}
+          onHidePanel={onHidePanel}
+        />
       </div>
       <div className="panel-body">
         {(error || initError) && <p className="warn">{error ?? initError}</p>}
@@ -103,38 +130,105 @@ export function WorkspacePanel({
             </button>
           </p>
         )}
-        <Tabs.Content value="changes">
-          <ChangesView
-            files={changed}
-            items={items}
-            cwd={cwd}
-            selected={selected}
-            onSelect={onSelect}
-            openAction={openAction}
-          />
-        </Tabs.Content>
-        <Tabs.Content value="files" className="files-content">
-          <FileTree files={files} selected={selected} onSelect={onSelect} openAction={openAction} />
-        </Tabs.Content>
-        <Tabs.Content value="git">
-          <GitPanel
-            cwd={cwd}
-            files={files}
-            selected={selected}
-            confirm={confirm}
-            onSelect={onSelect}
-            onRefresh={onRefresh}
-            openAction={openAction}
-          />
-        </Tabs.Content>
-        <Tabs.Content value="permissions">
-          <PermissionRules cwd={cwd} confirm={confirm} />
-        </Tabs.Content>
-        <Tabs.Content value="setup">
-          <SetupSummary cwd={cwd} onOpen={onOpenSetup} />
-        </Tabs.Content>
+        {visible.includes("changes") && (
+          <Tabs.Content value="changes">
+            <ChangesView
+              files={changed}
+              items={items}
+              cwd={cwd}
+              selected={selected}
+              onSelect={onSelect}
+              openAction={openAction}
+            />
+          </Tabs.Content>
+        )}
+        {visible.includes("files") && (
+          <Tabs.Content value="files" className="files-content">
+            <FileTree files={files} selected={selected} onSelect={onSelect} openAction={openAction} />
+          </Tabs.Content>
+        )}
+        {visible.includes("git") && (
+          <Tabs.Content value="git">
+            <GitPanel
+              cwd={cwd}
+              files={files}
+              selected={selected}
+              confirm={confirm}
+              onSelect={onSelect}
+              onRefresh={onRefresh}
+              openAction={openAction}
+            />
+          </Tabs.Content>
+        )}
+        {visible.includes("setup") && (
+          <Tabs.Content value="setup">
+            <SetupSummary cwd={cwd} onOpen={onOpenSetup} />
+          </Tabs.Content>
+        )}
       </div>
     </Tabs.Root>
+  );
+}
+
+/**
+ * Which tabs the panel shows (UX-03), like right-clicking VS Code's view bar. Opens from the ⋯ button or a right-click
+ * on the tab bar; it stays open while tabs are toggled. The last visible tab can't be hidden.
+ */
+function TabsMenu({
+  open,
+  onOpenChange,
+  hidden,
+  onChange,
+  onHidePanel,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  hidden: readonly PanelTab[];
+  onChange: (hidden: PanelTab[]) => void;
+  onHidePanel: () => void;
+}) {
+  const shown = visibleTabs(hidden);
+  return (
+    <Menu.Root open={open} onOpenChange={onOpenChange}>
+      <Menu.Trigger asChild>
+        <button type="button" className="ghost icon" aria-label="Customize tabs" title="Customize tabs">
+          <MoreHorizontal size={14} />
+        </button>
+      </Menu.Trigger>
+      <Menu.Portal>
+        <Menu.Content className="menu-content" align="end" sideOffset={4}>
+          <Menu.Label className="menu-label">Show tabs</Menu.Label>
+          {PANEL_TABS.map((t) => {
+            const checked = !hidden.includes(t);
+            return (
+              <Menu.CheckboxItem
+                key={t}
+                className="menu-item menu-check"
+                checked={checked}
+                disabled={checked && shown.length === 1}
+                onSelect={(e) => e.preventDefault()}
+                onCheckedChange={() => onChange(toggleHidden(hidden, t))}
+              >
+                <span className="menu-check-box">
+                  <Menu.ItemIndicator>
+                    <Check size={13} />
+                  </Menu.ItemIndicator>
+                </span>
+                {PANEL_TAB_LABEL[t]}
+              </Menu.CheckboxItem>
+            );
+          })}
+          <Menu.Separator className="menu-separator" />
+          <Menu.Item className="menu-item" disabled={hidden.length === 0} onSelect={() => onChange([])}>
+            Show all tabs
+          </Menu.Item>
+          <Menu.Item className="menu-item" onSelect={onHidePanel}>
+            Hide panel
+            <kbd>{shortcut("B")}</kbd>
+          </Menu.Item>
+        </Menu.Content>
+      </Menu.Portal>
+    </Menu.Root>
   );
 }
 
@@ -368,81 +462,6 @@ function FileTree({
           })}
         </div>
       )}
-    </div>
-  );
-}
-
-type Behavior = "allow" | "ask" | "deny";
-const BEHAVIOR_LABEL: Record<Behavior, string> = { allow: "Always allowed", ask: "Always ask", deny: "Always denied" };
-
-/**
- * Permission rules saved by "Always allow" (M1-20), from `.claude/settings.local.json`. Removing one asks first; a
- * running session may keep using a rule it already loaded, so the change is certain from the next session on.
- */
-function PermissionRules({ cwd, confirm }: { cwd: string; confirm: Confirm }) {
-  const [rules, setRules] = useState<Record<Behavior, string[]> | null>(null);
-  const [error, setError] = useState<string | null>(null);
-
-  const load = useCallback(async () => {
-    try {
-      setRules(await request("permissions.list", { cwd }));
-      setError(null);
-    } catch (err) {
-      setError(String(err));
-    }
-  }, [cwd]);
-
-  useEffect(() => {
-    void load();
-  }, [load]);
-
-  async function remove(behavior: Behavior, rule: string) {
-    const ok = await confirm({
-      title: "Remove this rule?",
-      body: (
-        <p>
-          <code>{rule}</code> is removed from <code>.claude/settings.local.json</code>. Claude will ask again for it,
-          certainly in new sessions.
-        </p>
-      ),
-      confirmLabel: "Remove rule",
-    });
-    if (!ok) return;
-    try {
-      await request("permissions.remove", { cwd, behavior, rule });
-      await load();
-    } catch (err) {
-      setError(String(err));
-    }
-  }
-
-  if (error) return <p className="warn">{error}</p>;
-  if (!rules) return <p className="muted">Loading…</p>;
-  const behaviors = (["allow", "ask", "deny"] as const).filter((b) => rules[b].length > 0);
-  return (
-    <div className="rules">
-      {behaviors.length === 0 && (
-        <EmptyState icon={<ShieldCheck size={14} />}>
-          No saved rules. "Always allow" on an approval saves one here, in <code>.claude/settings.local.json</code> (not
-          committed).
-        </EmptyState>
-      )}
-      {behaviors.map((b) => (
-        <Section key={b} id={`rules.${b}`} title={BEHAVIOR_LABEL[b]} count={rules[b].length}>
-          {rules[b].map((rule) => (
-            <div key={rule} className="tree-item">
-              <code className="rule-text" title={rule}>
-                {rule}
-              </code>
-              <span className="tree-actions">
-                <IconButton label="Remove rule" onClick={() => void remove(b, rule)}>
-                  <Trash2 size={13} />
-                </IconButton>
-              </span>
-            </div>
-          ))}
-        </Section>
-      ))}
     </div>
   );
 }

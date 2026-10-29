@@ -1,5 +1,14 @@
 import type { Methods } from "@agentchainer/protocol";
-import { ArrowLeft, ClipboardList, History as HistoryIcon, ListChecks, RefreshCw, Save, Terminal } from "lucide-react";
+import {
+  ArrowLeft,
+  ClipboardList,
+  History as HistoryIcon,
+  ListChecks,
+  RefreshCw,
+  Save,
+  ShieldCheck,
+  Terminal,
+} from "lucide-react";
 import { type ReactNode, useCallback, useEffect, useState } from "react";
 import type { Confirm } from "../Dialog.tsx";
 import { request } from "../sidecar.ts";
@@ -8,16 +17,17 @@ import { IconButton } from "../ui/IconButton.tsx";
 import { Commands } from "./Commands.tsx";
 import { History } from "./History.tsx";
 import { gapsOf, Overview } from "./Overview.tsx";
+import { Permissions } from "./Permissions.tsx";
 import { PlanView } from "./PlanView.tsx";
 import { useBootstrap } from "./useBootstrap.tsx";
 
 type Scan = Methods["workspace.scan"]["result"];
-export type SetupView = "overview" | "plan" | "commands" | "history";
+export type SetupView = "overview" | "plan" | "commands" | "permissions" | "history";
 
 /**
- * Workspace setup as a full page (UX-06), laid out like an IDE's project settings: what the workspace is made of at
- * the top, sections on the left (readiness, the bootstrap plan, detected commands, past runs), and the section's
- * content on the right. Opens over the session or Home; Back returns there.
+ * Workspace settings as a full page (UX-06), laid out like an IDE's project settings: what the workspace is made of at
+ * the top, sections on the left (readiness, the setup plan, detected commands, saved permission rules, past runs), and
+ * the section's content on the right. Opens over the session or Home; Back returns there.
  */
 export function SetupPage({
   cwd,
@@ -69,11 +79,12 @@ export function SetupPage({
     { id: "overview", label: "Overview", icon: <ListChecks size={16} className="nav-icon" />, count: gaps || null },
     {
       id: "plan",
-      label: "Plan",
+      label: "Setup plan",
       icon: <ClipboardList size={16} className="nav-icon" />,
       count: bootstrap.selected.size || null,
     },
     { id: "commands", label: "Commands", icon: <Terminal size={16} className="nav-icon" /> },
+    { id: "permissions", label: "Permissions", icon: <ShieldCheck size={16} className="nav-icon" /> },
     {
       id: "history",
       label: "History",
@@ -91,7 +102,7 @@ export function SetupPage({
           {backLabel}
         </button>
         <div className="setup-title">
-          <h1>Workspace setup</h1>
+          <h1>Workspace settings</h1>
           <span className="muted" title={cwd}>
             {folderName(cwd)}
           </span>
@@ -163,6 +174,7 @@ export function SetupPage({
           )}
           {view === "plan" && <PlanView bootstrap={bootstrap} focus={focus} onFocus={setFocus} />}
           {scan && view === "commands" && <Commands profile={scan.profile} />}
+          {view === "permissions" && <Permissions cwd={cwd} confirm={confirm} />}
           {view === "history" && <History bootstrap={bootstrap} />}
         </main>
       </div>

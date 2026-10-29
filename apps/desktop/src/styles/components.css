@@ -67,6 +67,27 @@
   margin-left: auto;
 }
 
+.menu-label {
+  padding: var(--space-1) var(--space-2);
+  color: var(--muted);
+  font-size: var(--text-xs);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.menu-separator {
+  height: 1px;
+  margin: var(--space-1) 0;
+  background: var(--border);
+}
+
+/* A check mark column, so checked and unchecked labels line up. */
+.menu-check-box {
+  display: inline-flex;
+  width: 14px;
+  color: var(--accent);
+}
+
 /* Label on top, hint below, check mark on the right. */
 .select-item {
   display: grid;

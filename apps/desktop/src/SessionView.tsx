@@ -5,12 +5,12 @@ import { Group, Panel, Separator, useDefaultLayout, usePanelRef } from "react-re
 import { type Attachment, Composer } from "./Composer.tsx";
 import type { Confirm } from "./Dialog.tsx";
 import { MODE_NAMES } from "./options.ts";
+import type { PanelTab } from "./panelTabs.ts";
 import { SessionHeader } from "./SessionHeader.tsx";
 import { TranscriptView } from "./TranscriptView.tsx";
-import { budgetWarning, type Cost, type Tab } from "./tabs.ts";
+import { budgetWarning, type Cost, isFresh, type Tab } from "./tabs.ts";
 import { layoutStorage } from "./ui/layoutStorage.ts";
 import { useWorkspace } from "./useWorkspace.ts";
-import type { PanelTab } from "./WorkspacePanel.tsx";
 
 // Monaco and xterm are large; load them when first used.
 const DiffView = lazy(() => import("./DiffView.tsx"));
@@ -46,6 +46,8 @@ export function SessionView({
   onClose,
   onOpenSetup,
   panelTab,
+  hiddenTabs,
+  onHiddenTabsChange,
   showFirstChange = false,
   onOpenFile,
   confirm,
@@ -66,10 +68,13 @@ export function SessionView({
   onRename: (title: string) => void;
   onFork: () => void;
   onClose: () => void;
-  /** Opens the workspace setup page (M2-08…M2-17) for this session's folder. */
+  /** Opens Workspace settings (M2-08…M2-17) for this session's folder. */
   onOpenSetup: () => void;
   /** The right panel's tab when it opens (self-test screenshots). */
   panelTab?: PanelTab | undefined;
+  /** Right-panel tabs the user hid (`panelTabs.ts`). */
+  hiddenTabs: readonly PanelTab[];
+  onHiddenTabsChange: (hidden: PanelTab[]) => void;
   /** Shows the first changed file's diff once the listing arrives (self-test screenshots). */
   showFirstChange?: boolean;
   /** Opens a workspace-relative or absolute path in the user's editor (M1-28). */
@@ -87,6 +92,9 @@ export function SessionView({
   const { refresh } = workspace;
   const paths = useMemo(() => workspace.files?.files.map((f) => f.path) ?? [], [workspace.files]);
   const warning = budgetWarning(tab);
+  // Until the first message, the composer sits mid-screen with starters below; the children of `.chat` keep their
+  // positions either way, so the composer never remounts and keeps its draft.
+  const fresh = isFresh(tab);
   const split = useDefaultLayout({
     id: "agentchainer.session",
     panelIds: rightOpen ? ["center", "right"] : ["center"],
@@ -169,14 +177,14 @@ export function SessionView({
               onLayoutChanged={vsplit.onLayoutChanged}
             >
               <Panel id="chat" minSize={200}>
-                <div className="chat">
+                <div className={`chat${fresh ? " fresh" : ""}`}>
                   <div className="transcript-scroll">
                     <div className="transcript">
                       <TranscriptView
                         cwd={tab.cwd}
                         items={tab.items}
                         onOpenFile={(file) => onOpenFile(file)}
-                        {...(tab.running || tab.ended ? {} : { onRewind, onStarter: (text) => setSeed({ text }) })}
+                        {...(tab.running || tab.ended ? {} : { onRewind })}
                       />
                       {tab.running && (
                         <div className="working">
@@ -187,6 +195,12 @@ export function SessionView({
                       <div ref={bottomRef} />
                     </div>
                   </div>
+                  {fresh ? (
+                    <div className="fresh-heading">
+                      <h2>What should Claude work on?</h2>
+                      <p className="muted">Describe a task, or start from one of these.</p>
+                    </div>
+                  ) : null}
                   <Composer
                     tab={tab}
                     files={paths}
@@ -198,6 +212,8 @@ export function SessionView({
                     onModelChange={onModelChange}
                     onEffortChange={onEffortChange}
                   />
+                  {fresh ? <StarterChips onPick={(text) => setSeed({ text })} /> : null}
+                  {fresh ? <div className="fresh-spacer" /> : null}
                 </div>
               </Panel>
               {terminalOpen && <Separator className="resize-handle" />}
@@ -243,6 +259,9 @@ export function SessionView({
                     onOpenFile={(path) => onOpenFile(path)}
                     onRefresh={() => void refresh()}
                     onOpenSetup={onOpenSetup}
+                    hiddenTabs={hiddenTabs}
+                    onHiddenTabsChange={onHiddenTabsChange}
+                    onHidePanel={onToggleRight}
                   />
                 </Suspense>
               </div>
@@ -262,6 +281,26 @@ export function SessionView({
           </Panel>
         )}
       </Group>
+    </div>
+  );
+}
+
+const STARTERS = [
+  "Explain how this codebase is organized",
+  "Find a bug and propose a fix",
+  "Add tests for the most important module",
+  "Review the uncommitted changes",
+];
+
+/** Starter prompts under a new session's composer (UX-06); picking one fills the composer. */
+function StarterChips({ onPick }: { onPick: (text: string) => void }) {
+  return (
+    <div className="starter-chips">
+      {STARTERS.map((text) => (
+        <button key={text} type="button" className="secondary small" onClick={() => onPick(text)}>
+          {text}
+        </button>
+      ))}
     </div>
   );
 }

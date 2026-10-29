@@ -348,9 +348,10 @@
         auto modes.
       - The tool card names the guard and shows its reason.
 - [ ] **M1-20** "Always allow" rules go to `.claude/settings.local.json` and can be viewed and removed in a Permissions panel.
-      Progress: "Always allow" saves the CLI's suggested rules with destination `localSettings`; the sidebar's Rules
-      tab lists and removes them (`permissions.list/remove`, which touch only the `permissions` lists). Verified live
-      (`--scenario approvals`). Remaining: click through in the app.
+      Progress: "Always allow" saves the CLI's suggested rules with destination `localSettings`; **Workspace settings →
+      Permissions** lists and removes them (`permissions.list/remove`, which touch only the `permissions` lists). It
+      was a right-panel tab until the owner's 2026-10-29 notes. Verified live (`--scenario approvals`). Remaining:
+      click through in the app.
 
 ### Sessions & checkpoints
 
@@ -870,7 +871,13 @@ for the desktop shell, start screen and session view to be cleaned up (UX-02, UX
       - Files is an explorer: file-type icons, indent guides, git tints, a filter, keyboard navigation.
       - Changes and Git use collapsible sections with hover actions.
       - Git has a branch picker (search, create) and a commit box with Draft with Claude.
-    - Open: owner click-through.
+    - Owner notes (2026-10-29, after R1 prep):
+      - Rules took a whole tab: they moved to Workspace settings → Permissions.
+      - The right panel's tabs can be hidden, VS Code style: the ⋯ menu or a right-click on the tab bar, remembered
+        per device. The last tab can't be hidden; ⌘B still hides the whole panel.
+    - Open:
+      - owner click-through;
+      - overall polish "to the level of the big IDEs". The owner wants it later, once the features exist.
 - [ ] **UX-04** Transcript polish: markdown and code highlighting, grouped and collapsible tool runs, a streaming cursor,
       copy buttons, timestamps, long-session performance.
 - [ ] **UX-05** Approval and mode UX:
@@ -893,6 +900,10 @@ for the desktop shell, start screen and session view to be cleaned up (UX-02, UX
       - Plan: master/detail, with unavailable items folded and Apply at the bottom;
       - Commands;
       - History.
+    - Owner notes (2026-10-29):
+      - The setup page is now **Workspace settings**: Overview, Setup plan, Commands, Permissions, History.
+      - A new session shows its composer mid-screen with the starter prompts below it, like a chat app's first
+        screen; after the first message the composer moves to the bottom.
     - Open: owner click-through, and the in-app guide.
 - [ ] **UX-07** Keyboard shortcuts and a command palette.
   - Progress (2026-10-29):
@@ -904,7 +915,15 @@ for the desktop shell, start screen and session view to be cleaned up (UX-02, UX
     - The UI maps menu ids in `useMenuCommands.ts`; a test checks it against the Rust list.
     - Open:
       - the command palette;
-      - checking the shortcuts on Windows and Linux, where the menu bar sits in the window **(verify)**.
+      - checking the shortcuts on Windows and Linux, where the menu bar sits in the window **(verify)**;
+      - a full menu bar like VS Code's (owner note, 2026-10-29: later, once the features exist):
+        - **File:** New Session, Open Folder, Open Recent ▸, Close Session, Close Window;
+        - **Edit:** standard items, plus Find;
+        - **View:** Command Palette, Appearance ▸ (sidebar, panel, terminal, panel tabs), Theme ▸, Zoom, Full Screen;
+        - **Session:** stop, resume, fork, rewind, mode ▸, model ▸;
+        - **Workspace:** Workspace Settings, Permissions, Git ▸, Open in Editor, Reveal in Finder;
+        - **Terminal** and **Window**;
+        - **Help:** docs, install guide, shortcuts, privacy, release notes, updates, About.
 - [ ] **UX-08** App icon and visual identity, after naming and branding are settled (M0-01).
 - [ ] **UX-09** Usability test with 3–5 target users on macOS, Windows and Ubuntu; fix the top issues.
 

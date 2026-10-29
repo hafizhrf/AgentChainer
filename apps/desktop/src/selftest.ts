@@ -11,8 +11,11 @@ import type { Tab } from "./tabs.ts";
  * (M1-22). With `"stay": true` the app stays open afterwards, in `theme` and with `open` shown (UX screenshots).
  * Driven by scripts/selftest-latency.mjs. Null in normal runs.
  */
-/** Views a screenshot run can open: Home, Settings, a session's terminal or right-panel tab, or the setup page. */
-const OPEN_VIEWS = ["home", "settings", "terminal", "files", "git", "setup", "plan"] as const;
+/**
+ * Views a screenshot run can open: Home, Settings, a session's terminal or right-panel tab, the first changed file's
+ * diff, or the setup page.
+ */
+const OPEN_VIEWS = ["home", "settings", "terminal", "files", "git", "diff", "setup", "plan"] as const;
 
 export type SelftestConfig = {
   cwd: string;

@@ -263,6 +263,38 @@ describe("pluginVersion", () => {
   });
 });
 
+describe("forged run records", () => {
+  it("refuses to roll back, and doesn't list, a run.json that points outside the workspace", () => {
+    const dir = copyFixture("go-service");
+    const outside = join(dir, "..", `ac-forged-${Date.now()}.txt`);
+    const runDir = join(dir, ".agentchainer", "backups", "2026-10-29T00-00-00-000Z-forged");
+    mkdirSync(join(runDir, "files"), { recursive: true });
+    writeFileSync(join(runDir, "files", "payload"), "echo pwned\n");
+    const forged = {
+      runId: "2026-10-29T00-00-00-000Z-forged",
+      startedAt: "2026-10-29T00:00:00.000Z",
+      catalogVersion: "x",
+      meta: [],
+      actions: [
+        {
+          id: "fix:fix-gitignore",
+          title: "Ignore env files",
+          status: "applied",
+          warnings: [],
+          undo: [],
+          files: [
+            { path: `../${outside.split(/[\\/]/).at(-1)}`, existed: true, backup: "files/payload", afterSha256: null },
+          ],
+        },
+      ],
+    };
+    writeFileSync(join(runDir, "run.json"), JSON.stringify(forged));
+    assert.throws(() => rollback(dir, forged.runId, { cli: null }), /wasn't recorded by AgentChainer/);
+    assert.ok(!existsSync(outside), "nothing written outside the workspace");
+    assert.deepEqual(listRuns(dir), [], "the forged run isn't listed");
+  });
+});
+
 describe("release binaries, MCP servers and hooks (M2-15)", () => {
   const work = mkdtempSync(join(tmpdir(), "ac-apply-tools-"));
   after(() => rmSync(work, { recursive: true, force: true }));

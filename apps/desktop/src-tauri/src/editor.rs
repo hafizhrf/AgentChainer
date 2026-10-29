@@ -50,9 +50,125 @@ pub fn check_file(file: &str) -> Result<(), String> {
     Ok(())
 }
 
+/// Kinds of file the OS default app runs instead of showing: apps, installers, scripts and shortcuts. On Windows that
+/// includes `.js` and `.vbs` (Windows Script Host).
+const RUNNABLE: &[&str] = &[
+    "app",
+    "appimage",
+    "applescript",
+    "appx",
+    "appxbundle",
+    "bash",
+    "bat",
+    "cmd",
+    "com",
+    "command",
+    "cpl",
+    "csh",
+    "deb",
+    "desktop",
+    "dmg",
+    "exe",
+    "fish",
+    "hta",
+    "inf",
+    "jar",
+    "js",
+    "jse",
+    "ksh",
+    "lnk",
+    "mpkg",
+    "msc",
+    "msi",
+    "msix",
+    "pkg",
+    "ps1",
+    "psm1",
+    "reg",
+    "rpm",
+    "run",
+    "scpt",
+    "scr",
+    "sh",
+    "terminal",
+    "tool",
+    "url",
+    "vb",
+    "vbe",
+    "vbs",
+    "webloc",
+    "workflow",
+    "ws",
+    "wsf",
+    "wsh",
+    "zsh",
+];
+
+/// "system" opens a file with whatever the OS associates with it. Workspace files and paths in a transcript can come
+/// from an untrusted repo, so it refuses anything the OS would run rather than show; an editor opens those as text.
+pub fn check_openable(file: &str) -> Result<(), String> {
+    let path = Path::new(file);
+    let ext = path
+        .extension()
+        .map(|e| e.to_string_lossy().to_ascii_lowercase())
+        .unwrap_or_default();
+    #[cfg(unix)]
+    let executable = {
+        use std::os::unix::fs::PermissionsExt;
+        path.metadata()
+            .is_ok_and(|m| m.is_file() && m.permissions().mode() & 0o111 != 0)
+    };
+    #[cfg(not(unix))]
+    let executable = false;
+    if RUNNABLE.contains(&ext.as_str()) || executable {
+        return Err(
+            "the default app would run it instead of showing it. Choose an editor in Settings to open it as text."
+                .into(),
+        );
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::command;
+
+    #[test]
+    fn the_default_app_never_runs_a_file() {
+        let dir = std::env::temp_dir().join(format!("ac-openable-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let file = |name: &str| {
+            let p = dir.join(name);
+            std::fs::write(&p, "x").unwrap();
+            p.to_string_lossy().into_owned()
+        };
+        assert!(super::check_openable(&file("main.ts")).is_ok());
+        assert!(super::check_openable(&file("README.md")).is_ok());
+        for runnable in [
+            "run.command",
+            "setup.EXE",
+            "x.ps1",
+            "Evil.app",
+            "a.js",
+            "build.sh",
+        ] {
+            assert!(
+                super::check_openable(&file(runnable)).is_err(),
+                "{runnable}"
+            );
+        }
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let script = file("gradlew");
+            std::fs::set_permissions(&script, std::fs::Permissions::from_mode(0o755)).unwrap();
+            assert!(
+                super::check_openable(&script).is_err(),
+                "executable without an extension"
+            );
+        }
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
 
     #[test]
     fn builds_goto_arguments_per_editor() {

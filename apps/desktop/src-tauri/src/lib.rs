@@ -94,10 +94,12 @@ fn open_in_editor(
         Some(mut cmd) => cmd.spawn().map(|_| ()).map_err(|e| {
             format!("couldn't start {editor}: {e}. Is its command-line launcher installed?")
         }),
-        None => app
-            .opener()
-            .open_path(&file, None::<&str>)
-            .map_err(|e| e.to_string()),
+        None => {
+            editor::check_openable(&file)?;
+            app.opener()
+                .open_path(&file, None::<&str>)
+                .map_err(|e| e.to_string())
+        }
     }
 }
 
@@ -158,10 +160,38 @@ fn cost_summary(
     history.get()?.summary(&cwd, now)
 }
 
-/// Writes the redacted diagnostics bundle (M1-35) to a path the user picked.
+/// Writes the redacted diagnostics bundle (M1-35) to a path the user picked. Only a `.json` file in an existing
+/// folder: the webview can't use this to write anything else.
 #[tauri::command]
 fn diagnostics_export(app: AppHandle, path: String, ui: serde_json::Value) -> Result<(), String> {
-    diagnostics::export(&app, std::path::Path::new(&path), ui)
+    let target = std::path::Path::new(&path);
+    let is_json = target
+        .extension()
+        .is_some_and(|e| e.eq_ignore_ascii_case("json"));
+    if !is_json || !target.parent().is_some_and(|d| d.is_dir()) {
+        return Err("Choose a .json file in an existing folder.".into());
+    }
+    diagnostics::export(&app, target, ui)
+}
+
+/// Whether this build can check for updates (R1-04): release builds carry the update key's public half.
+#[tauri::command]
+fn updater_ready(app: AppHandle) -> bool {
+    app.config()
+        .plugins
+        .0
+        .get("updater")
+        .and_then(|u| u.get("pubkey"))
+        .and_then(|k| k.as_str())
+        .is_some_and(|k| !k.trim().is_empty())
+}
+
+/// Ends the agent runtime and the terminals before an update installs (R1-04): Windows can't replace a running
+/// executable, and nothing should be writing to a workspace while the app restarts.
+#[tauri::command]
+fn update_prepare(sidecar: State<'_, Sidecar>, ptys: State<'_, Ptys>) {
+    sidecar.stop();
+    ptys.close_all();
 }
 
 /// The cost history, or why it couldn't be opened (the app works without it).
@@ -192,6 +222,8 @@ pub fn run() {
     let app = tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_process::init())
         .menu(menu::build)
         .on_menu_event(menu::on_event)
         .setup(|app| {
@@ -236,7 +268,9 @@ pub fn run() {
             cost_record,
             cost_sessions,
             cost_summary,
-            diagnostics_export
+            diagnostics_export,
+            updater_ready,
+            update_prepare
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application");

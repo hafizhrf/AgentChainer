@@ -32,6 +32,7 @@ import { connect, isRpcError, onExit, onReady, request, requestWithTimeout, subs
 import { asMode, folderName, newTab, type Tab, tabEvent, updateTab } from "./tabs.ts";
 import { asTheme } from "./theme.ts";
 import { applyEvent, closeAssistant, type Item, nextId, setMessageId } from "./transcript.ts";
+import { UpdateDialog } from "./UpdateDialog.tsx";
 import { IconButton } from "./ui/IconButton.tsx";
 import { layoutStorage, usePersistentFlag } from "./ui/layoutStorage.ts";
 import { useMenuCommands } from "./useMenuCommands.ts";
@@ -70,6 +71,7 @@ export function App() {
   const [active, setActive] = useState<string | null>(null);
   const [confirm, confirmDialog] = useConfirm();
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [updatesOpen, setUpdatesOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = usePersistentFlag("agentchainer.sidebar", true);
   const [rightOpen, setRightOpen] = usePersistentFlag("agentchainer.right", true);
   /** Sessions whose terminal is open. */
@@ -83,6 +85,7 @@ export function App() {
   } | null>(null);
   /** Self-test screenshots only: the right panel's tab. */
   const [panelTab, setPanelTab] = useState<PanelTab | undefined>(undefined);
+  const [showFirstChange, setShowFirstChange] = useState(false);
   const shell = useDefaultLayout({
     id: "agentchainer.shell",
     panelIds: sidebarOpen ? ["sidebar", "main"] : ["main"],
@@ -132,6 +135,10 @@ export function App() {
         const first = tabsRef.current[0];
         if (cfg.open === "terminal" && first) toggleTerminal(first.sessionId);
         if (cfg.open === "files" || cfg.open === "git") setPanelTab(cfg.open);
+        if (cfg.open === "diff") {
+          setPanelTab("changes");
+          setShowFirstChange(true);
+        }
         if ((cfg.open === "setup" || cfg.open === "plan") && first)
           setSetup({
             cwd: first.cwd,
@@ -577,6 +584,7 @@ export function App() {
     "toggle-right-panel": () => setRightOpen((v) => !v),
     "toggle-terminal": () => active && toggleTerminal(active),
     "export-diagnostics": () => void exportFromMenu(),
+    "check-updates": () => setUpdatesOpen(true),
   });
 
   const activeTab = tabs.find((t) => t.sessionId === active);
@@ -647,6 +655,7 @@ export function App() {
                     tab={t}
                     hidden={t.sessionId !== active || setup !== null}
                     panelTab={panelTab}
+                    showFirstChange={showFirstChange}
                     rightOpen={rightOpen}
                     terminalOpen={terminals.has(t.sessionId)}
                     onToggleRight={() => setRightOpen((v) => !v)}
@@ -699,9 +708,11 @@ export function App() {
             appVersion={appVersion}
             onSave={onSaveSettings}
             onExportDiagnostics={exportDiagnostics}
+            onCheckUpdates={() => setUpdatesOpen(true)}
             onClose={() => setSettingsOpen(false)}
           />
         )}
+        {updatesOpen && <UpdateDialog appVersion={appVersion} onClose={() => setUpdatesOpen(false)} />}
         {confirmDialog}
       </div>
     </Tooltip.Provider>

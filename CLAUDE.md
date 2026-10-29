@@ -1,7 +1,8 @@
 # AgentChainer — agent context
 
 Open-source desktop app (Tauri v2 + React/TS + Node sidecar on the Claude Agent SDK) that makes repos agent-ready and
-keeps agent work transparent and verified. **Current phase: M2 (workspace bootstrap); M1 awaits its UI click-through and the Windows/Ubuntu exit runs.**
+keeps agent work transparent and verified. **Current phase: R1 (v0.1 release prep; publishing waits for M0-01 and M0-22).
+M1 awaits its UI click-through and the Windows/Ubuntu exit runs; M2-E2 is deferred.**
 
 The app has a working M1/M2 UI in a three-column shell (UX-03):
 - a sidebar with sessions and workspaces, and a native menu with shortcuts;
@@ -26,6 +27,8 @@ Layout:
 - Decisions: `docs/adr/`. Don't contradict an Accepted ADR; propose a new ADR instead (copy `docs/adr/0000-template.md`).
 - Work plan: `docs/CHECKLIST.md` (task IDs like `M1-08`)
 - Catalog rules: `docs/CATALOG.md`; risks: `docs/RISKS.md`; user auth guide: `docs/guides/AUTH_SETUP.md`
+- Security: `docs/THREAT_MODEL.md` (update it with any new command, capability or network call); privacy promises:
+  `docs/PRIVACY.md`; releases: `docs/RELEASING.md`
 
 ## Rules
 
@@ -70,6 +73,7 @@ Prerequisites:
 | Regenerate the event snapshots the UI tests replay, after re-recording a fixture | `UPDATE_FIXTURES=1 node --test packages/sidecar/src/normalize.test.ts` |
 | Turn a raw recording into a committable fixture (fails if anything identifying survives) | `node packages/sidecar/scripts/make-fixture.ts raw.jsonl packages/sidecar/test/fixtures/<name>.jsonl --cwd <recording workspace>` |
 | Plugin/MCP install spike (installs and removes again, in a throwaway project) | `node packages/sidecar/scripts/spike-install.ts --cwd <empty scratch dir>` |
+| Release asset script tests (collect, SHA256SUMS, latest.json) | `node --test scripts/release-assets.test.mjs` |
 | Launch smoke test (after a debug build) | `node scripts/smoke-launch.mjs target/debug/agentchainer [--seconds N]` |
 | Streaming latency + CPU self-test (after a debug build; one real haiku turn, opens a window briefly) | `node scripts/selftest-latency.mjs --cwd <empty scratch dir> [--resume]` |
 

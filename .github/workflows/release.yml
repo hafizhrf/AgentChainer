@@ -1,0 +1,246 @@
+name: Release
+
+# Releases (R1-01, R1-02, R1-03, R1-08; docs/RELEASING.md).
+# - On main, release-please keeps a release PR open: the next version and its changelog, from Conventional Commit
+#   titles. Merging it creates a *draft* GitHub release and its tag.
+# - The build job then builds the installers on every OS, installs each one on its runner and launches it, and uploads
+#   them to the run. The finalize job adds SHA256SUMS and the updater manifest (latest.json), and uploads everything to
+#   the draft; it's the only job that can write to the repository.
+# - A maintainer checks the draft and publishes it by hand. Only a published release reaches the updater: its
+#   endpoint is releases/latest/download/latest.json, and drafts are never "latest".
+# - Pull requests that touch the release setup get the same builds as a dry run, signed with a throwaway update key,
+#   with the results attached to the run. Nothing is published, and no release secret reaches a PR.
+# - workflow_dispatch rebuilds the assets of an existing draft release from its tag.
+#
+# Release builds don't use the Rust cache, so nothing written by another run can end up in an installer.
+on:
+  push:
+    branches: [main]
+  pull_request:
+    paths:
+      - .github/workflows/release.yml
+      - release-please-config.json
+      - .release-please-manifest.json
+      - scripts/release-assets.mjs
+      - scripts/smoke-launch.mjs
+      - scripts/sidecar-smoke.mjs
+      - apps/desktop/src-tauri/tauri.conf.json
+      - apps/desktop/src-tauri/Cargo.toml
+      - apps/desktop/src-tauri/capabilities/**
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: The draft release to rebuild, e.g. v0.1.0
+        required: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  release-please:
+    name: Release PR
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      pull-requests: write
+    outputs:
+      created: ${{ steps.release.outputs.release_created }}
+      tag: ${{ steps.release.outputs.tag_name }}
+    steps:
+      # A RELEASE_PLEASE_TOKEN secret (fine-grained: contents and pull-requests write) lets CI run on the release PR;
+      # PRs opened with the default token don't start other workflows.
+      - uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
+        id: release
+        with:
+          token: ${{ secrets.RELEASE_PLEASE_TOKEN || github.token }}
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
+
+  build:
+    name: Installers (${{ matrix.name }})
+    needs: release-please
+    if: >-
+      !cancelled() && (
+        github.event_name == 'pull_request' ||
+        github.event_name == 'workflow_dispatch' ||
+        needs.release-please.outputs.created == 'true')
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: macOS arm64
+            os: macos-latest
+          - name: macOS x64
+            os: macos-15-intel
+          - name: Windows x64
+            os: windows-latest
+          - name: Linux x64
+            os: ubuntu-22.04
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.release-please.outputs.tag || inputs.tag || '' }}
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .node-version
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+        with:
+          cache: true
+      - name: Install Tauri system dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev patchelf xvfb
+      - name: Install Rust toolchain (from rust-toolchain.toml)
+        run: rustup toolchain install && rustc --version
+      - run: pnpm install --frozen-lockfile
+
+      - name: Throwaway update key (dry run)
+        if: github.event_name == 'pull_request'
+        shell: bash
+        run: |
+          pnpm --filter @agentchainer/desktop tauri signer generate --ci -p "" -w "$RUNNER_TEMP/dry-run.key"
+          {
+            echo "DRY_RUN_PRIVATE_KEY=$(cat "$RUNNER_TEMP/dry-run.key")"
+            echo "DRY_RUN_PUBKEY=$(cat "$RUNNER_TEMP/dry-run.key.pub")"
+          } >> "$GITHUB_ENV"
+
+      - name: Build installers
+        shell: bash
+        env:
+          # Release secrets only outside pull requests. The updater needs the public key (a repository variable) and
+          # the private key together; with neither, the build has no updater and the app says so.
+          UPDATER_PUBKEY: >-
+            ${{ github.event_name == 'pull_request' && env.DRY_RUN_PUBKEY ||
+            github.event_name != 'pull_request' && vars.TAURI_UPDATER_PUBKEY || '' }}
+          TAURI_SIGNING_PRIVATE_KEY: >-
+            ${{ github.event_name == 'pull_request' && env.DRY_RUN_PRIVATE_KEY ||
+            github.event_name != 'pull_request' && secrets.TAURI_SIGNING_PRIVATE_KEY || '' }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ github.event_name != 'pull_request' && secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD || '' }}
+          # macOS code signing and notarization, read by the Tauri CLI when set (not set up for v0.1).
+          APPLE_CERTIFICATE: ${{ github.event_name != 'pull_request' && secrets.APPLE_CERTIFICATE || '' }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ github.event_name != 'pull_request' && secrets.APPLE_CERTIFICATE_PASSWORD || '' }}
+          APPLE_SIGNING_IDENTITY: ${{ github.event_name != 'pull_request' && secrets.APPLE_SIGNING_IDENTITY || '' }}
+          APPLE_ID: ${{ github.event_name != 'pull_request' && secrets.APPLE_ID || '' }}
+          APPLE_PASSWORD: ${{ github.event_name != 'pull_request' && secrets.APPLE_PASSWORD || '' }}
+          APPLE_TEAM_ID: ${{ github.event_name != 'pull_request' && secrets.APPLE_TEAM_ID || '' }}
+        run: |
+          for v in APPLE_CERTIFICATE APPLE_CERTIFICATE_PASSWORD APPLE_SIGNING_IDENTITY APPLE_ID APPLE_PASSWORD APPLE_TEAM_ID \
+            TAURI_SIGNING_PRIVATE_KEY TAURI_SIGNING_PRIVATE_KEY_PASSWORD; do
+            [ -n "${!v}" ] || unset "$v"
+          done
+          conf="$PWD/release.conf.json"
+          if [ -n "$UPDATER_PUBKEY" ] && [ -n "${TAURI_SIGNING_PRIVATE_KEY:-}" ]; then
+            node -e 'console.log(JSON.stringify({ bundle: { createUpdaterArtifacts: true }, plugins: { updater: { pubkey: process.env.UPDATER_PUBKEY } } }))' > "$conf"
+          elif [ -n "$UPDATER_PUBKEY" ] || [ -n "${TAURI_SIGNING_PRIVATE_KEY:-}" ]; then
+            echo "::error::Updates need both the TAURI_UPDATER_PUBKEY variable and the TAURI_SIGNING_PRIVATE_KEY secret (docs/RELEASING.md)."
+            exit 1
+          else
+            echo "::notice::No update key: these installers can't update themselves."
+            echo '{}' > "$conf"
+          fi
+          pnpm --filter @agentchainer/desktop tauri build --ci --config "$conf"
+          node scripts/release-assets.mjs collect target/release/bundle release-assets
+
+      # Install smoke (R1-09, on the runner): install the real artifact, launch the installed app, and check the
+      # installed sidecar's first-run SDK download. Clean machines are checked by hand before publishing.
+      - name: Install and launch (macOS, .dmg)
+        if: runner.os == 'macOS'
+        run: |
+          mnt="$(mktemp -d)"
+          hdiutil attach -nobrowse -readonly -mountpoint "$mnt" release-assets/*.dmg
+          cp -R "$mnt"/*.app "$RUNNER_TEMP/"
+          hdiutil detach "$mnt"
+          app="$(ls -d "$RUNNER_TEMP"/*.app | head -1)"
+          node scripts/smoke-launch.mjs "$app/Contents/MacOS/$(defaults read "$app/Contents/Info.plist" CFBundleExecutable)"
+          node scripts/sidecar-smoke.mjs "$(ls "$app"/Contents/MacOS/agentchainer-sidecar*)"
+      - name: Install (Windows, .msi)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $msi = (Get-ChildItem release-assets\*.msi | Select-Object -First 1).FullName
+          $log = Join-Path $env:RUNNER_TEMP "msi.log"
+          $p = Start-Process msiexec.exe -ArgumentList @("/i", "`"$msi`"", "/qn", "/l*v", "`"$log`"") -Wait -PassThru
+          if ($p.ExitCode -ne 0) { Get-Content $log -Tail 80; exit $p.ExitCode }
+      - name: Launch (Windows)
+        if: runner.os == 'Windows'
+        shell: bash
+        run: |
+          dir="$PROGRAMFILES/AgentChainer"
+          ls "$dir"
+          node scripts/smoke-launch.mjs "$(ls "$dir"/*.exe | grep -v -i -e sidecar -e uninstall | head -1)"
+          node scripts/sidecar-smoke.mjs "$(ls "$dir"/agentchainer-sidecar*.exe)"
+      - name: Install and launch (Linux, .deb)
+        if: runner.os == 'Linux'
+        run: |
+          deb="$(ls "$PWD"/release-assets/*.deb | head -1)"
+          sudo apt-get install -y "$deb"
+          files="$(dpkg -L "$(dpkg-deb -f "$deb" Package)")"
+          echo "$files" | grep '^/usr/bin/'
+          xvfb-run -a -s "-screen 0 1440x900x24" node scripts/smoke-launch.mjs "$(echo "$files" | grep '^/usr/bin/' | grep -v sidecar | head -1)"
+          node scripts/sidecar-smoke.mjs "$(echo "$files" | grep '^/usr/bin/.*sidecar' | head -1)"
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: installers-${{ matrix.os }}
+          path: release-assets/
+          if-no-files-found: error
+          retention-days: 7
+
+  finalize:
+    name: Checksums and update manifest
+    needs: [release-please, build]
+    if: >-
+      !cancelled() && needs.build.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    env:
+      TAG: ${{ needs.release-please.outputs.tag || inputs.tag || 'v0.0.0-dry-run' }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .node-version
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: installers-*
+          path: assets
+          merge-multiple: true
+      - name: Release notes (the update dialog shows them)
+        if: github.event_name != 'pull_request'
+        run: gh release view "$TAG" --json body --jq .body --repo "$GITHUB_REPOSITORY" > "$RUNNER_TEMP/notes.md"
+      - name: Write SHA256SUMS and latest.json
+        run: |
+          touch "$RUNNER_TEMP/notes.md"
+          node scripts/release-assets.mjs finalize assets "$TAG" --notes "$RUNNER_TEMP/notes.md" --repo "$GITHUB_REPOSITORY"
+          cat assets/SHA256SUMS
+          if [ -f assets/latest.json ]; then cat assets/latest.json; fi
+      - name: Upload everything to the draft release
+        if: github.event_name != 'pull_request'
+        run: gh release upload "$TAG" assets/* --clobber --repo "$GITHUB_REPOSITORY"
+      - name: Attach to the run (dry run)
+        if: github.event_name == 'pull_request'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: release-manifest
+          path: |
+            assets/SHA256SUMS
+            assets/latest.json
+          retention-days: 7

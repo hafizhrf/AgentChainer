@@ -19,10 +19,10 @@
 | Milestone | Release | Theme | Status |
 |---|---|---|---|
 | [M0](#m0--foundations--spikes) | — | Foundations & spikes | ◐ Exit criteria met. Owner items left: M0-01, M0-05, M0-07, M0-13, M0-14, M0-22 |
-| [M1](#m1--agent-session-core-v01-a) | v0.1 | Agent session core | ◐ In progress (app shell M1-01…M1-04 done) |
-| [M2](#m2--workspace-bootstrap-v01-b) | v0.1 | Workspace bootstrap | ☐ Not started |
-| [UX](#ux--product-design--ui-polish-before-r1) | v0.1 | Product design & UI polish (after M1/M2 work functionally) | ☐ Later |
-| [R1](#r1--v01-release) | v0.1 | Packaging & release | ☐ Not started |
+| [M1](#m1--agent-session-core-v01-a) | v0.1 | Agent session core | ◐ Built. Exit criteria wait for the UI click-through and the Windows/Ubuntu runs |
+| [M2](#m2--workspace-bootstrap-v01-b) | v0.1 | Workspace bootstrap | ◐ Built. E1, E3, E4 pass; E2 (real repositories) deferred by the owner |
+| [UX](#ux--product-design--ui-polish-before-r1) | v0.1 | Product design & UI polish (after M1/M2 work functionally) | ◐ Design system done; desktop shell, panels and setup page in place |
+| [R1](#r1--v01-release) | v0.1 | Packaging & release | ◐ Pipeline, updater, security review and docs in place; publishing waits for M0-01 and M0-22 |
 | [M3](#m3--adaptive-planner--task-contracts-v02) | v0.2 | Adaptive planner, contracts, evidence | ☐ Not started |
 | [M4](#m4--agent-observability-v02v03) | v0.2–0.3 | Agent observability graph | ☐ Not started |
 | [M5](#m5--git-workflow-pr--quality-gates-v03) | v0.3 | Git workflow, PRs, gates | ☐ Not started |
@@ -917,21 +917,50 @@ for the desktop shell, start screen and session view to be cleaned up (UX-02, UX
 
 ## R1 — v0.1 release
 
+Decisions: [ADR-0009](adr/0009-release-signing-and-updates.md). Maintainer steps: [RELEASING.md](RELEASING.md).
+
 - [ ] **R1-01** Bundles: macOS dmg, Windows msi/nsis, Linux AppImage + deb + rpm.
+      - `.github/workflows/release.yml` builds them on macOS arm64, macOS x64 (`macos-15-intel`), Windows x64 and
+        Ubuntu 22.04. It installs the `.dmg`, `.msi` and `.deb` on their runners and launches them.
+      - `scripts/release-assets.mjs` gives the assets names that don't collide, and writes `SHA256SUMS`.
+      - Remaining: a green dry run on a PR as evidence.
 - [ ] **R1-02** Ship the sidecar per target triple via `bundle.externalBin`. No Claude binary is bundled. M0-03 is resolved.
+      - Each release runner builds its own sidecar (`build:sea` in `beforeBuildCommand`). The install smoke runs the
+        installed sidecar's first-run SDK download.
+      - Remaining: the same dry run as evidence.
 - [ ] **R1-03** Signing:
   - macOS: Developer ID + notarization, with every embedded binary signed.
   - Windows: Azure Artifact Signing, or unsigned with SmartScreen guidance.
   - Linux: checksums (+ GPG).
   - Record the budget decision.
+
+      **Decided for v0.1** ([ADR-0009](adr/0009-release-signing-and-updates.md)): no budget yet, so installers are
+      unsigned. [INSTALL.md](guides/INSTALL.md) covers opening them and checking `SHA256SUMS`. The workflow passes
+      Apple signing secrets through once they exist. Open: macOS Developer ID, Windows signing, GPG.
 - [ ] **R1-04** Auto-updater (`tauri-plugin-updater`) with signed manifests on GitHub Releases.
-- [ ] **R1-05** Privacy statement: no telemetry by default; what data stays local.
-- [ ] **R1-06** Security review:
+      - Built in: **Help → Check for Updates** and **Settings → About**, which check only when clicked and install
+        after confirmation. `requireSignedVersion` is on. The finalize job writes `latest.json` from the `.sig` files.
+      - The key is the owner's: [RELEASING.md](RELEASING.md#update-key). Dry runs sign with a throwaway key.
+      - Remaining: the owner sets up the key, then an update from one real release to the next is checked.
+- [x] **R1-05** Privacy statement: no telemetry by default; what data stays local.
+      — evidence: [PRIVACY.md](PRIVACY.md) (PR #27), linked from Settings → About and the README.
+- [x] **R1-06** Security review:
   - update the threat model (X-01);
   - review Tauri capabilities and the IPC surface;
   - run the `cloudflare-security-audit` skill on this repo, then fix or document the findings.
+
+      — evidence: [THREAT_MODEL.md](THREAT_MODEL.md#security-review-of-2026-10-29) (PR #27):
+      - **CSP:** set, instead of `null`.
+      - **Capabilities:** narrowed to what the UI calls.
+      - **Audit:** its confirmed finding is fixed (forged rollback records), and two manual findings are fixed
+        (opening runnable files with the default app; folder names on Windows' `cmd`).
+      - **Coverage:** the areas the audit didn't reach are listed.
 - [ ] **R1-07** README quickstart, screenshots, and a short demo GIF or video. AUTH_SETUP is linked from both the app and the README.
+      - The quickstart is in the README. Remaining: screenshots and a GIF from a clean profile.
 - [ ] **R1-08** Changelog and release automation (release-please or changesets).
+      - release-please v5 (`release-please-config.json`) bumps `Cargo.toml`, `Cargo.lock` and `package.json`. Its
+        `Cargo.lock` filter was checked against release-please 17.6.0. It creates draft releases, with tags.
+      - Remaining: the first release PR on `main`.
 - [ ] **R1-09** Install the release artifacts on clean VMs (macOS, Windows 11, Ubuntu LTS) and smoke-test them.
 
 ### Exit criteria
@@ -1049,6 +1078,7 @@ for the desktop shell, start screen and session view to be cleaned up (UX-02, UX
 ### Security & privacy
 
 - [ ] **X-01** Threat model doc (`docs/THREAT_MODEL.md`), updated every milestone.
+      - Written for v0.1 (R1-06). Next review: end of M3.
 - [ ] **X-02** Least-privilege Tauri capabilities, a sidecar argument allowlist, and IPC validation on both ends.
       Replace the scaffold's `"csp": null` (Tauri template default) with a strict Content Security Policy.
 - [ ] **X-03** Secrets never appear in logs or the UI: a redaction filter covers logs, displayed tool output and diagnostics.

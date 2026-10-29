@@ -2,6 +2,8 @@
 // Loaded lazily with the diff viewer (M1-27), so app start-up doesn't pay for it.
 import * as monaco from "monaco-editor/editor/editor.api";
 import "monaco-editor/basic-languages/monaco.contribution";
+// The icon font of the diff gutter and widgets; `editor.api` alone doesn't include it.
+import "monaco-editor/features/codicon/register";
 import EditorWorker from "monaco-editor/editor/editor.worker?worker";
 
 window.MonacoEnvironment = { getWorker: () => new EditorWorker() };

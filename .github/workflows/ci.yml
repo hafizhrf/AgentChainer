@@ -47,6 +47,8 @@ jobs:
             | node packages/sidecar/src/main.ts | tee /dev/stderr | grep -q '"protocolVersion":2'
       - name: Unit tests with coverage (all packages)
         run: pnpm test:coverage
+      - name: Release script tests
+        run: node --test scripts/release-assets.test.mjs
       - name: Build frontend (tauri::generate_context! embeds it)
         run: pnpm --filter @agentchainer/desktop build
       - name: Build sidecar executable (tauri-build requires bundle.externalBin)

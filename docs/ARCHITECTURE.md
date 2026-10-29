@@ -108,6 +108,8 @@ Planned surface (v0.1):
 | request | `workspace.diff` | HEAD vs working tree for one file, with its `-U0` hunks |
 | request | `workspace.revert` | Revert a file to HEAD (new files are deleted) or one hunk (`git apply -R`), worktree only |
 | request | `workspace.gitInit` | `git init`, offered when the workspace isn't a repository |
+| request | `git.branches` / `git.switch` / `git.stage` / `git.unstage` / `git.commit` / `git.push` | Git panel (M1-30). Push is never forced and runs with `GIT_TERMINAL_PROMPT=0` |
+| request | `git.draftMessage` | Commit message from the staged diff: a one-shot haiku `query()` with `tools: []`, `settingSources: []`, `persistSession: false` |
 | request | `workspace.scan` | Detect stack, commands, and audit the setup → `WorkspaceProfile` + findings |
 | request | `bootstrap.plan` / `bootstrap.apply` / `bootstrap.rollback` | Bootstrap engine |
 | notification | `agent.event` | `{sessionId, event}`: a normalized `AgentEvent` (see §5.2) |
@@ -121,6 +123,8 @@ Workspace paths are relative to `cwd`; the sidecar rejects absolute paths and `.
 | `workspace_watch` / `workspace_unwatch` | `notify` watcher; emits `workspace://changed {cwd}` debounced to 300 ms. Ignores `node_modules`, `target`, `.git/objects` and similar; on Linux those folders aren't watched at all (inotify needs one watch per folder) |
 | `pty_open` / `pty_write` / `pty_resize` / `pty_close` | Integrated terminal: the user's login shell (PowerShell on Windows) in a `portable-pty` PTY; output as `pty://data {id, data}`, `pty://exit {id}` |
 | `open_in_editor` | `code`/`cursor --goto file:line`, `zed file:line`, `idea --line N file`, or the OS default app |
+| `cost_record` / `cost_sessions` / `cost_summary` | Local cost history in SQLite (§7) |
+| `diagnostics_export` | Redacted diagnostics bundle (versions, settings, readiness, recent log, crash logs) to a user-picked file |
 
 **Multi-session (protocol v2, M1-08):** live-session methods and both notifications carry the SDK session id, so one
 sidecar runs every tab's session. The sidecar picks the id of a new session itself (the SDK's `sessionId` option), so
@@ -250,15 +254,23 @@ sequenceDiagram
   - Verified live (`spike-host --scenario sessions`): rewinding restores the file to its state before that message,
     rewinding past a file's creation deletes it, and checkpoints still rewind after the session is closed and resumed.
   - `forkSession` copies the conversation but not its checkpoints (SDK docs).
-- **App DB** (SQLite, owned by the Rust core; migrations versioned):
+- **App DB**: `agentchainer.db`, SQLite via `rusqlite` (bundled), owned by the Rust core. The schema version is
+  `PRAGMA user_version`. Status per table:
 
-| Table | Contents |
-|---|---|
-| `workspaces` | path, display name, last opened, profile hash |
-| `session_meta` | sessionId ↔ workspace, created-in (app/cli), pinned |
-| `turn_costs` | sessionId, turn index, costUsd, tokens by model, duration |
-| `bootstrap_runs` | run ID, workspace, plan summary, result, lockfile hash |
-| `settings` | app settings (no secrets) |
+| Table | Contents | Status |
+|---|---|---|
+| `turns` | one row per completed turn: sessionId, cwd, time, running total and this turn's cost, tokens, duration, model, result subtype | Built (M1-33) |
+| `workspaces` | path, display name, last opened, profile hash | Planned. Recent workspaces are in `settings.json` for now |
+| `session_meta` | sessionId ↔ workspace, created-in (app/cli), pinned | Planned |
+| `bootstrap_runs` | run ID, workspace, plan summary, result, lockfile hash | Planned (M2) |
+
+- Settings stay in `settings.json` (no secrets, atomic writes). A table adds nothing for a handful of values.
+- A turn's own cost is the difference between consecutive running totals. When the UI doesn't know it (the first
+  turn after a resume), the core takes it from the session's last recorded total. Turns of sessions first seen in
+  the app after a resume from the terminal stay uncounted, and the UI says so.
+- **App log:** `agentchainer.log` in the app log dir, one JSON object per line (`ts`, `level`, `source`, `msg`),
+  rotated at 5 MB. It holds core events and the sidecar's stderr. "Export diagnostics" bundles its tail with the
+  crash logs after redaction (M1-35).
 
 ## 8. Workspace bootstrap engine
 

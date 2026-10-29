@@ -11,6 +11,7 @@ import {
   type SessionInfo,
 } from "@agentchainer/protocol";
 import { invoke } from "@tauri-apps/api/core";
+import { save } from "@tauri-apps/plugin-dialog";
 import { useEffect, useRef, useState } from "react";
 import { useConfirm } from "./Dialog.tsx";
 import { joinPath } from "./files.ts";
@@ -125,6 +126,7 @@ export function App() {
         return;
       }
       const { sessionId, event } = n.params;
+      if (event.type === "turn.completed") recordCost(sessionId, event);
       if (event.type === "turn.completed") {
         turnWaiters.current.get(sessionId)?.(event);
         turnWaiters.current.delete(sessionId);
@@ -183,6 +185,43 @@ export function App() {
       alive.current = false;
       await invoke("sidecar_restart");
     }
+  }
+
+  /** Local cost history (M1-33); the turn's own cost is known unless the session was resumed in this tab. */
+  function recordCost(sessionId: string, e: TurnCompleted) {
+    const tab = tabsRef.current.find((t) => t.sessionId === sessionId);
+    if (!tab) return;
+    const prevTokens = tab.cost.totalTokens;
+    const tokens = e.usage
+      ? {
+          input: e.usage.inputTokens + e.usage.cacheReadTokens + e.usage.cacheCreationTokens,
+          output: e.usage.outputTokens,
+        }
+      : null;
+    const turn = {
+      sessionId,
+      cwd: tab.cwd,
+      at: Date.now(),
+      totalCostUsd: e.totalCostUsd,
+      deltaUsd: tab.cost.totalUsd === null ? null : Math.max(0, e.totalCostUsd - tab.cost.totalUsd),
+      durationMs: Math.round(e.durationMs),
+      inputTokens: tokens && prevTokens ? tokens.input - prevTokens.input : null,
+      outputTokens: tokens && prevTokens ? tokens.output - prevTokens.output : null,
+      model: tab.model ?? null,
+      subtype: e.subtype,
+    };
+    void invoke("cost_record", { turn }).catch((err: unknown) => console.warn(`cost history: ${err}`));
+  }
+
+  /** "Export diagnostics" (M1-35): the core redacts and writes; the UI adds its handshake and readiness check. */
+  async function exportDiagnostics(): Promise<string | null> {
+    const path = await save({
+      defaultPath: "agentchainer-diagnostics.json",
+      filters: [{ name: "JSON", extensions: ["json"] }],
+    });
+    if (!path) return null;
+    await invoke("diagnostics_export", { path, ui: { hello, env } });
+    return path;
   }
 
   async function rememberWorkspace(dir: string) {
@@ -476,7 +515,14 @@ export function App() {
               confirm={confirm}
             />
           )}
-          {settings && <SettingsPanel key={JSON.stringify(settings)} settings={settings} onSave={onSaveSettings} />}
+          {settings && (
+            <SettingsPanel
+              key={JSON.stringify(settings)}
+              settings={settings}
+              onSave={onSaveSettings}
+              onExportDiagnostics={exportDiagnostics}
+            />
+          )}
         </section>
       )}
 

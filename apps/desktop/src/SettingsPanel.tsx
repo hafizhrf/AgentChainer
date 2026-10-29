@@ -40,9 +40,28 @@ export const MODE_HELP: Record<(typeof PERMISSION_MODES)[number], string> = {
 const asModeOrDefault = (m: string | null) => PERMISSION_MODES.find((x) => x === m) ?? "default";
 
 /** App settings (checklist M1-07). Saving a new Claude CLI path restarts the agent runtime so it takes effect. */
-export function SettingsPanel({ settings, onSave }: { settings: Settings; onSave: (next: Settings) => Promise<void> }) {
+export function SettingsPanel({
+  settings,
+  onSave,
+  onExportDiagnostics,
+}: {
+  settings: Settings;
+  onSave: (next: Settings) => Promise<void>;
+  /** Returns where the bundle was saved, or null when cancelled. */
+  onExportDiagnostics: () => Promise<string | null>;
+}) {
   const [draft, setDraft] = useState(settings);
   const [saving, setSaving] = useState(false);
+  const [exported, setExported] = useState<string | null>(null);
+
+  async function exportBundle() {
+    try {
+      const path = await onExportDiagnostics();
+      if (path) setExported(`Saved to ${path}. Secrets, emails and your home folder are masked; check before sharing.`);
+    } catch (err) {
+      setExported(`Export failed: ${err}`);
+    }
+  }
   const dirty = JSON.stringify(draft) !== JSON.stringify(settings);
 
   async function save() {
@@ -131,6 +150,14 @@ export function SettingsPanel({ settings, onSave }: { settings: Settings; onSave
       <button type="button" disabled={!dirty || saving} onClick={() => void save()}>
         {saving ? "Saving…" : "Save settings"}
       </button>
+      <hr />
+      <button type="button" className="secondary" onClick={() => void exportBundle()}>
+        Export diagnostics…
+      </button>
+      <span className="muted">
+        Versions, settings, the readiness check and recent logs, for bug reports. No credentials or account details.
+      </span>
+      {exported && <p className="muted">{exported}</p>}
     </details>
   );
 }

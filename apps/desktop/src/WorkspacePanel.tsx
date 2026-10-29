@@ -2,6 +2,7 @@ import type { WorkspaceFiles } from "@agentchainer/protocol";
 import { type CSSProperties, useCallback, useEffect, useMemo, useState } from "react";
 import type { Confirm } from "./Dialog.tsx";
 import { agentEdits, buildTree, STATUS_LETTER, type TreeNode } from "./files.ts";
+import { GitPanel } from "./GitPanel.tsx";
 import { request } from "./sidecar.ts";
 import type { Item } from "./transcript.ts";
 
@@ -28,7 +29,7 @@ export function WorkspacePanel({
   onSelect: (path: string) => void;
   onRefresh: () => void;
 }) {
-  const [view, setView] = useState<"files" | "changes" | "permissions">("changes");
+  const [view, setView] = useState<"files" | "changes" | "git" | "permissions">("changes");
   const [initError, setInitError] = useState<string | null>(null);
   const changed = files?.files.filter((f) => f.status) ?? [];
 
@@ -49,6 +50,9 @@ export function WorkspacePanel({
         </button>
         <button type="button" role="tab" aria-selected={view === "files"} onClick={() => setView("files")}>
           Files
+        </button>
+        <button type="button" role="tab" aria-selected={view === "git"} onClick={() => setView("git")}>
+          Git
         </button>
         <button type="button" role="tab" aria-selected={view === "permissions"} onClick={() => setView("permissions")}>
           Rules
@@ -71,6 +75,16 @@ export function WorkspacePanel({
         <ChangesView files={changed} items={items} cwd={cwd} selected={selected} onSelect={onSelect} />
       )}
       {view === "files" && <FileTree files={files} selected={selected} onSelect={onSelect} />}
+      {view === "git" && (
+        <GitPanel
+          cwd={cwd}
+          files={files}
+          selected={selected}
+          confirm={confirm}
+          onSelect={onSelect}
+          onRefresh={onRefresh}
+        />
+      )}
       {view === "permissions" && <PermissionRules cwd={cwd} confirm={confirm} />}
     </div>
   );

@@ -1,7 +1,14 @@
 import type { SessionInfo } from "@agentchainer/protocol";
+import { invoke } from "@tauri-apps/api/core";
 import { useCallback, useEffect, useState } from "react";
 import type { Confirm } from "./Dialog.tsx";
 import { request } from "./sidecar.ts";
+
+/** From the local cost history (M1-33), kept by the Rust core. */
+type SessionCost = { sessionId: string; totalCostUsd: number };
+type Summary = { todayUsd: number; last7Usd: number; last30Usd: number; uncountedTurns: number };
+
+const usd = (v: number) => `≈$${v.toFixed(v < 1 ? 4 : 2)}`;
 
 type Editing = { sessionId: string; field: "title" | "tag"; value: string };
 
@@ -23,15 +30,25 @@ export function SessionList({
 }) {
   const [sessions, setSessions] = useState<SessionInfo[] | null>(null);
   const [retention, setRetention] = useState<{ days: number; source: string } | null>(null);
+  const [costs, setCosts] = useState<Map<string, number>>(new Map());
+  const [summary, setSummary] = useState<Summary | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [editing, setEditing] = useState<Editing | null>(null);
 
   const refresh = useCallback(async () => {
     if (!cwd) return;
     try {
-      const [list, kept] = await Promise.all([request("session.list", { cwd }), request("session.retention", { cwd })]);
+      const [list, kept, sessionCosts, spend] = await Promise.all([
+        request("session.list", { cwd }),
+        request("session.retention", { cwd }),
+        // The history is optional: without it the list still works.
+        invoke<SessionCost[]>("cost_sessions", { cwd }).catch(() => []),
+        invoke<Summary>("cost_summary", { cwd, now: Date.now() }).catch(() => null),
+      ]);
       setSessions(list.sessions);
       setRetention(kept);
+      setCosts(new Map(sessionCosts.map((c) => [c.sessionId, c.totalCostUsd])));
+      setSummary(spend);
       setError(null);
     } catch (err) {
       setError(String(err));
@@ -128,6 +145,7 @@ export function SessionList({
                   <span className="muted">
                     {new Date(s.lastModified).toLocaleString()}
                     {s.gitBranch ? ` · ${s.gitBranch}` : ""}
+                    {costs.has(s.sessionId) ? ` · ${usd(costs.get(s.sessionId) ?? 0)}` : ""}
                   </span>
                   {s.tag && <span className="badge">{s.tag}</span>}
                   {open && <span className="badge">open</span>}
@@ -167,6 +185,14 @@ export function SessionList({
             );
           })}
         </ul>
+      )}
+      {summary && summary.last30Usd + summary.uncountedTurns > 0 && (
+        <p className="muted">
+          Spent in this folder (estimates, sessions run in AgentChainer): today {usd(summary.todayUsd)} · 7 days{" "}
+          {usd(summary.last7Usd)} · 30 days {usd(summary.last30Usd)}
+          {summary.uncountedTurns > 0 &&
+            ` · ${summary.uncountedTurns} turn(s) of sessions started elsewhere aren't counted`}
+        </p>
       )}
       {retention && (
         <p className="muted retention">

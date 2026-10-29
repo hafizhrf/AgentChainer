@@ -34,7 +34,8 @@ const read = (root: string, rel: string) => {
 export function hookSetup(root: string): HookSetup {
   const repo = repoOf(root);
   if (!repo) return { manager: null, reason: "Not a git repository: initialize git first." };
-  if (realpathSync(repo.top) !== realpathSync(root)) {
+  // The native realpath also expands Windows 8.3 short names (C:\Users\RUNNER~1), which git never prints.
+  if (realpathSync.native(repo.top) !== realpathSync.native(root)) {
     return { manager: null, reason: "Open the repository's top folder to add commit hooks." };
   }
   if (LEFTHOOK.some((f) => existsSync(path.join(root, f)))) return { manager: "lefthook" };

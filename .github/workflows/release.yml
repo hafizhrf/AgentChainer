@@ -81,6 +81,7 @@ jobs:
             os: macos-latest
           - name: macOS x64
             os: macos-15-intel
+            pnpm-from-npm: true
           - name: Windows x64
             os: windows-latest
           - name: Linux x64
@@ -96,8 +97,14 @@ jobs:
         with:
           node-version-file: .node-version
       - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+        if: ${{ !matrix.pnpm-from-npm }}
         with:
           cache: true
+      # On Intel macOS, action-setup's switch from its bootstrap pnpm to ours fails: the self-update can't verify
+      # @pnpm/exe.darwin-x64 (ERR_PNPM_PNPM_ENGINE_IDENTITY_UNVERIFIABLE). npm installs the exact version instead.
+      - name: Install pnpm with npm
+        if: ${{ matrix.pnpm-from-npm }}
+        run: npm install -g "$(node -p 'require("./package.json").packageManager')" && pnpm --version
       - name: Install Tauri system dependencies
         if: runner.os == 'Linux'
         run: |

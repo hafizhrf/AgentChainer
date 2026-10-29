@@ -7,8 +7,8 @@ For maintainers. The decisions behind this are in [ADR-0009](adr/0009-release-si
 
 1. **release-please keeps a release PR open on `main`.** It's titled `chore(main): release X.Y.Z`. Each merged PR
    updates it with:
-   - the next version, from Conventional Commit titles. Before 1.0, `feat` bumps the minor version and `fix` the patch
-     version;
+   - the next version, from Conventional Commit titles. The first release is 0.1.0 (`initial-version`; without it,
+     release-please starts at 1.0.0). Before 1.0, `feat` bumps the minor version and `fix` the patch version;
    - `CHANGELOG.md`;
    - the version in `apps/desktop/src-tauri/Cargo.toml`, `Cargo.lock` and `apps/desktop/package.json`.
      `tauri.conf.json` has no version, so Tauri uses the crate's.

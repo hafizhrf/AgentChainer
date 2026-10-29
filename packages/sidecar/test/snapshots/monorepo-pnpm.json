@@ -1,0 +1,187 @@
+{
+  "profile": {
+    "stacks": [
+      "node"
+    ],
+    "monorepo": "pnpm-workspace",
+    "packages": [
+      {
+        "path": ".",
+        "name": "monorepo-pnpm",
+        "stack": "node",
+        "packageManager": "pnpm",
+        "frameworks": [],
+        "testFrameworks": [],
+        "commands": {
+          "install": {
+            "run": "pnpm install",
+            "source": "lockfile",
+            "confidence": "high"
+          },
+          "lint": {
+            "run": "pnpm run lint",
+            "source": "package.json#scripts.lint",
+            "confidence": "high"
+          },
+          "test": {
+            "run": "pnpm test",
+            "source": "package.json#scripts.test",
+            "confidence": "high"
+          },
+          "format": {
+            "run": "pnpm exec biome format --write .",
+            "source": "biome.json",
+            "confidence": "medium"
+          }
+        }
+      },
+      {
+        "path": "apps/web",
+        "name": "web",
+        "stack": "node",
+        "packageManager": "pnpm",
+        "frameworks": [
+          "next",
+          "react"
+        ],
+        "testFrameworks": [],
+        "commands": {
+          "install": {
+            "run": "pnpm install",
+            "source": "lockfile",
+            "confidence": "high"
+          },
+          "build": {
+            "run": "pnpm run build",
+            "source": "package.json#scripts.build",
+            "confidence": "high"
+          },
+          "dev": {
+            "run": "pnpm run dev",
+            "source": "package.json#scripts.dev",
+            "confidence": "high"
+          }
+        }
+      },
+      {
+        "path": "packages/ui",
+        "name": "@repo/ui",
+        "stack": "node",
+        "packageManager": "pnpm",
+        "frameworks": [],
+        "testFrameworks": [
+          "vitest"
+        ],
+        "commands": {
+          "install": {
+            "run": "pnpm install",
+            "source": "lockfile",
+            "confidence": "high"
+          },
+          "test": {
+            "run": "pnpm test",
+            "source": "package.json#scripts.test",
+            "confidence": "high"
+          }
+        }
+      }
+    ],
+    "ci": []
+  },
+  "findings": [
+    {
+      "id": "claude-md.missing",
+      "area": "agent",
+      "status": "missing",
+      "title": "No CLAUDE.md",
+      "detail": "Claude starts every session without your commands, architecture or conventions.",
+      "fix": {
+        "action": "generate-claude-md",
+        "label": "Generate CLAUDE.md"
+      }
+    },
+    {
+      "id": "hooks.missing",
+      "area": "agent",
+      "status": "missing",
+      "title": "No format/lint hook on edits",
+      "detail": "Claude's edits aren't formatted or linted until someone runs the tools by hand.",
+      "fix": {
+        "action": "setup-hooks",
+        "label": "Add format/lint hooks"
+      }
+    },
+    {
+      "id": "claude-dir.inventory",
+      "area": "agent",
+      "status": "info",
+      "title": "Project skills, agents and MCP servers",
+      "detail": "0 skill(s), 0 agent(s), 0 MCP server(s)."
+    },
+    {
+      "id": "tests.ok",
+      "area": "quality",
+      "status": "ok",
+      "title": "Test command found",
+      "detail": "`pnpm test`"
+    },
+    {
+      "id": "lint.ok",
+      "area": "quality",
+      "status": "ok",
+      "title": "Lint command found",
+      "detail": "`pnpm run lint`"
+    },
+    {
+      "id": "format.ok",
+      "area": "quality",
+      "status": "ok",
+      "title": "Format command found",
+      "detail": "`pnpm exec biome format --write .`"
+    },
+    {
+      "id": "ci.missing",
+      "area": "quality",
+      "status": "missing",
+      "title": "No CI",
+      "detail": "Nothing checks a change once it leaves your machine.",
+      "fix": {
+        "action": "generate-ci",
+        "label": "Generate a CI workflow"
+      }
+    },
+    {
+      "id": "smoke.missing",
+      "area": "quality",
+      "status": "missing",
+      "title": "No smoke test",
+      "detail": "There's no quick check that the app still starts after a change.",
+      "fix": {
+        "action": "smoke-test",
+        "label": "Add a smoke test"
+      }
+    },
+    {
+      "id": "gitignore.env",
+      "area": "hygiene",
+      "status": "missing",
+      "title": ".env isn't ignored",
+      "detail": "A secret dropped into .env would be committed with the next `git add .`.",
+      "fix": {
+        "action": "fix-gitignore",
+        "label": "Ignore env and secret files"
+      }
+    },
+    {
+      "id": "remote.missing",
+      "area": "git",
+      "status": "info",
+      "title": "No git remote",
+      "detail": "Pushing, pull requests and hosted CI need one.",
+      "fix": {
+        "action": "add-remote",
+        "label": "Add a git remote (manual)"
+      }
+    }
+  ]
+}

@@ -9,6 +9,8 @@
       "!packages/protocol/schema",
       "!**/src-tauri/gen",
       "!**/test/fixtures",
+      "!**/test/snapshots",
+      "!fixtures",
       "!**/dist"
     ]
   },

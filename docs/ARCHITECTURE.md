@@ -110,7 +110,8 @@ Planned surface (v0.1):
 | request | `workspace.gitInit` | `git init`, offered when the workspace isn't a repository |
 | request | `git.branches` / `git.switch` / `git.stage` / `git.unstage` / `git.commit` / `git.push` | Git panel (M1-30). Push is never forced and runs with `GIT_TERMINAL_PROMPT=0` |
 | request | `git.draftMessage` | Commit message from the staged diff: a one-shot haiku `query()` with `tools: []`, `settingSources: []`, `persistSession: false` |
-| request | `workspace.scan` | Detect stack, commands, and audit the setup → `WorkspaceProfile` + findings |
+| request | `workspace.scan` | Detect stack, commands, and audit the setup → `WorkspaceProfile` + findings (read-only) |
+| request | `workspace.saveProfile` | Write the profile to `.agentchainer/profile.json` |
 | request | `bootstrap.plan` / `bootstrap.apply` / `bootstrap.rollback` | Bootstrap engine |
 | notification | `agent.event` | `{sessionId, event}`: a normalized `AgentEvent` (see §5.2) |
 | notification | `permission.request` | `{sessionId, …}`: ask the user to approve a tool call |
@@ -291,8 +292,28 @@ flowchart LR
   - languages, package managers, frameworks, packages (monorepo-aware);
   - commands (install/build/lint/format/typecheck/test/dev), each with a confidence;
   - existing CI and test framework.
+  - Built (M2-06/M2-07, `packages/sidecar/src/detect/`). It reads manifests only and runs nothing.
+  - Packages come from workspace configs when there are any; all of them combine, so a pnpm UI plus a Cargo core
+    is one profile. Configs read: `pnpm-workspace.yaml`, `workspaces` in package.json, `go.work`, Cargo
+    `[workspace]`.
+  - Without a workspace config, the detector does a shallow scan (depth 2) that skips `fixtures/`, `examples/`,
+    `test/` and similar.
+  - One folder can yield several stacks (a legacy repo can be Node and Python at once).
+  - Commands run in their package's folder. Each has a source (`package.json#scripts.test`, `Makefile`, `go.mod`, …)
+    and a confidence.
+  - Ranking: the project's own scripts first, then make/just targets, then conventions. npm's placeholder test
+    script doesn't count, and bun always goes through `bun run` (`bun test` is bun's own runner).
+  - Manifests are read with small purpose-built readers rather than TOML/YAML dependencies.
 - **Auditor** checks CLAUDE.md/AGENTS.md, `.claude/` (settings, skills, agents, hooks), `.mcp.json`, CI,
   `.gitignore` hygiene and the git remote. Each finding maps to an action.
+  - Built (M2-08/M2-09). Statuses are `ok`, `info`, `warn` or `missing`; anything not `ok` carries a fix action
+    id (`generate-claude-md`, `setup-hooks`, `scaffold-tests`, `generate-ci`, `smoke-test`, `fix-gitignore`,
+    `untrack-env`, …) for the bootstrap plan.
+  - CLAUDE.md staleness signals: over 300 lines, or not mentioning the detected test command.
+  - `.env` coverage uses `git check-ignore --no-index`, so it works before any `.env` exists. A committed `.env` is
+    flagged.
+- **Profile file** (M2-10): `.agentchainer/profile.json`, written on request. It is derived from the repo, so
+  `.agentchainer/.gitignore` keeps it out of git. The bootstrap lockfile next to it will be committed.
 - **Actions:** `install-skill`, `install-plugin`, `add-mcp`, `write-file`, `merge-file`, `run-command`. Each implements
   `preview()`, `apply()`, `verify()` and `rollback()`.
 - **Generators** are agent sessions:

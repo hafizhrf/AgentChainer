@@ -1,0 +1,146 @@
+{
+  "profile": {
+    "stacks": [
+      "flutter"
+    ],
+    "monorepo": null,
+    "packages": [
+      {
+        "path": ".",
+        "name": "flutter_app",
+        "stack": "flutter",
+        "packageManager": "pub",
+        "frameworks": [
+          "flutter"
+        ],
+        "testFrameworks": [
+          "flutter_test"
+        ],
+        "commands": {
+          "install": {
+            "run": "flutter pub get",
+            "source": "pubspec.yaml",
+            "confidence": "high"
+          },
+          "test": {
+            "run": "flutter test",
+            "source": "test/",
+            "confidence": "high"
+          },
+          "lint": {
+            "run": "flutter analyze",
+            "source": "pubspec.yaml",
+            "confidence": "high"
+          },
+          "format": {
+            "run": "dart format .",
+            "source": "pubspec.yaml",
+            "confidence": "high"
+          },
+          "dev": {
+            "run": "flutter run",
+            "source": "pubspec.yaml",
+            "confidence": "medium"
+          }
+        }
+      }
+    ],
+    "ci": []
+  },
+  "findings": [
+    {
+      "id": "claude-md.missing",
+      "area": "agent",
+      "status": "missing",
+      "title": "No CLAUDE.md",
+      "detail": "Claude starts every session without your commands, architecture or conventions.",
+      "fix": {
+        "action": "generate-claude-md",
+        "label": "Generate CLAUDE.md"
+      }
+    },
+    {
+      "id": "hooks.missing",
+      "area": "agent",
+      "status": "missing",
+      "title": "No format/lint hook on edits",
+      "detail": "Claude's edits aren't formatted or linted until someone runs the tools by hand.",
+      "fix": {
+        "action": "setup-hooks",
+        "label": "Add format/lint hooks"
+      }
+    },
+    {
+      "id": "claude-dir.inventory",
+      "area": "agent",
+      "status": "info",
+      "title": "Project skills, agents and MCP servers",
+      "detail": "0 skill(s), 0 agent(s), 0 MCP server(s)."
+    },
+    {
+      "id": "tests.ok",
+      "area": "quality",
+      "status": "ok",
+      "title": "Test command found",
+      "detail": "`flutter test`"
+    },
+    {
+      "id": "lint.ok",
+      "area": "quality",
+      "status": "ok",
+      "title": "Lint command found",
+      "detail": "`flutter analyze`"
+    },
+    {
+      "id": "format.ok",
+      "area": "quality",
+      "status": "ok",
+      "title": "Format command found",
+      "detail": "`dart format .`"
+    },
+    {
+      "id": "ci.missing",
+      "area": "quality",
+      "status": "missing",
+      "title": "No CI",
+      "detail": "Nothing checks a change once it leaves your machine.",
+      "fix": {
+        "action": "generate-ci",
+        "label": "Generate a CI workflow"
+      }
+    },
+    {
+      "id": "smoke.missing",
+      "area": "quality",
+      "status": "missing",
+      "title": "No smoke test",
+      "detail": "There's no quick check that the app still starts after a change.",
+      "fix": {
+        "action": "smoke-test",
+        "label": "Add a smoke test"
+      }
+    },
+    {
+      "id": "gitignore.env",
+      "area": "hygiene",
+      "status": "missing",
+      "title": ".env isn't ignored",
+      "detail": "A secret dropped into .env would be committed with the next `git add .`.",
+      "fix": {
+        "action": "fix-gitignore",
+        "label": "Ignore env and secret files"
+      }
+    },
+    {
+      "id": "remote.missing",
+      "area": "git",
+      "status": "info",
+      "title": "No git remote",
+      "detail": "Pushing, pull requests and hosted CI need one.",
+      "fix": {
+        "action": "add-remote",
+        "label": "Add a git remote (manual)"
+      }
+    }
+  ]
+}

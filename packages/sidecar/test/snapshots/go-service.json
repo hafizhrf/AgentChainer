@@ -1,0 +1,151 @@
+{
+  "profile": {
+    "stacks": [
+      "go"
+    ],
+    "monorepo": null,
+    "packages": [
+      {
+        "path": ".",
+        "name": "example.com/go-service",
+        "stack": "go",
+        "packageManager": "go",
+        "frameworks": [
+          "chi"
+        ],
+        "testFrameworks": [
+          "go test"
+        ],
+        "commands": {
+          "install": {
+            "run": "go mod download",
+            "source": "go.mod",
+            "confidence": "high"
+          },
+          "build": {
+            "run": "go build ./...",
+            "source": "go.mod",
+            "confidence": "high"
+          },
+          "test": {
+            "run": "make test",
+            "source": "Makefile",
+            "confidence": "high"
+          },
+          "lint": {
+            "run": "make lint",
+            "source": "Makefile",
+            "confidence": "high"
+          },
+          "format": {
+            "run": "gofmt -w .",
+            "source": "go.mod",
+            "confidence": "high"
+          },
+          "dev": {
+            "run": "go run .",
+            "source": "package main",
+            "confidence": "medium"
+          }
+        }
+      }
+    ],
+    "ci": []
+  },
+  "findings": [
+    {
+      "id": "claude-md.missing",
+      "area": "agent",
+      "status": "missing",
+      "title": "No CLAUDE.md",
+      "detail": "Claude starts every session without your commands, architecture or conventions.",
+      "fix": {
+        "action": "generate-claude-md",
+        "label": "Generate CLAUDE.md"
+      }
+    },
+    {
+      "id": "hooks.missing",
+      "area": "agent",
+      "status": "missing",
+      "title": "No format/lint hook on edits",
+      "detail": "Claude's edits aren't formatted or linted until someone runs the tools by hand.",
+      "fix": {
+        "action": "setup-hooks",
+        "label": "Add format/lint hooks"
+      }
+    },
+    {
+      "id": "claude-dir.inventory",
+      "area": "agent",
+      "status": "info",
+      "title": "Project skills, agents and MCP servers",
+      "detail": "0 skill(s), 0 agent(s), 0 MCP server(s)."
+    },
+    {
+      "id": "tests.ok",
+      "area": "quality",
+      "status": "ok",
+      "title": "Test command found",
+      "detail": "`make test`"
+    },
+    {
+      "id": "lint.ok",
+      "area": "quality",
+      "status": "ok",
+      "title": "Lint command found",
+      "detail": "`make lint`"
+    },
+    {
+      "id": "format.ok",
+      "area": "quality",
+      "status": "ok",
+      "title": "Format command found",
+      "detail": "`gofmt -w .`"
+    },
+    {
+      "id": "ci.missing",
+      "area": "quality",
+      "status": "missing",
+      "title": "No CI",
+      "detail": "Nothing checks a change once it leaves your machine.",
+      "fix": {
+        "action": "generate-ci",
+        "label": "Generate a CI workflow"
+      }
+    },
+    {
+      "id": "smoke.missing",
+      "area": "quality",
+      "status": "missing",
+      "title": "No smoke test",
+      "detail": "There's no quick check that the app still starts after a change.",
+      "fix": {
+        "action": "smoke-test",
+        "label": "Add a smoke test"
+      }
+    },
+    {
+      "id": "gitignore.env",
+      "area": "hygiene",
+      "status": "missing",
+      "title": ".env isn't ignored",
+      "detail": "A secret dropped into .env would be committed with the next `git add .`.",
+      "fix": {
+        "action": "fix-gitignore",
+        "label": "Ignore env and secret files"
+      }
+    },
+    {
+      "id": "remote.missing",
+      "area": "git",
+      "status": "info",
+      "title": "No git remote",
+      "detail": "Pushing, pull requests and hosted CI need one.",
+      "fix": {
+        "action": "add-remote",
+        "label": "Add a git remote (manual)"
+      }
+    }
+  ]
+}

@@ -1664,6 +1664,381 @@
         "additionalProperties": false
       }
     },
+    "workspace.scan": {
+      "params": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "cwd": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "cwd"
+        ],
+        "additionalProperties": false
+      },
+      "result": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "profile": {
+            "type": "object",
+            "properties": {
+              "stacks": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "monorepo": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "packages": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "path": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "stack": {
+                      "type": "string",
+                      "enum": [
+                        "node",
+                        "python",
+                        "flutter",
+                        "dart",
+                        "go",
+                        "rust"
+                      ]
+                    },
+                    "packageManager": {
+                      "type": "string"
+                    },
+                    "frameworks": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "testFrameworks": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "commands": {
+                      "type": "object",
+                      "properties": {
+                        "install": {
+                          "type": "object",
+                          "properties": {
+                            "run": {
+                              "type": "string"
+                            },
+                            "source": {
+                              "type": "string"
+                            },
+                            "confidence": {
+                              "type": "string",
+                              "enum": [
+                                "high",
+                                "medium",
+                                "low"
+                              ]
+                            }
+                          },
+                          "required": [
+                            "run",
+                            "source",
+                            "confidence"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "build": {
+                          "type": "object",
+                          "properties": {
+                            "run": {
+                              "type": "string"
+                            },
+                            "source": {
+                              "type": "string"
+                            },
+                            "confidence": {
+                              "type": "string",
+                              "enum": [
+                                "high",
+                                "medium",
+                                "low"
+                              ]
+                            }
+                          },
+                          "required": [
+                            "run",
+                            "source",
+                            "confidence"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "lint": {
+                          "type": "object",
+                          "properties": {
+                            "run": {
+                              "type": "string"
+                            },
+                            "source": {
+                              "type": "string"
+                            },
+                            "confidence": {
+                              "type": "string",
+                              "enum": [
+                                "high",
+                                "medium",
+                                "low"
+                              ]
+                            }
+                          },
+                          "required": [
+                            "run",
+                            "source",
+                            "confidence"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "format": {
+                          "type": "object",
+                          "properties": {
+                            "run": {
+                              "type": "string"
+                            },
+                            "source": {
+                              "type": "string"
+                            },
+                            "confidence": {
+                              "type": "string",
+                              "enum": [
+                                "high",
+                                "medium",
+                                "low"
+                              ]
+                            }
+                          },
+                          "required": [
+                            "run",
+                            "source",
+                            "confidence"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "typecheck": {
+                          "type": "object",
+                          "properties": {
+                            "run": {
+                              "type": "string"
+                            },
+                            "source": {
+                              "type": "string"
+                            },
+                            "confidence": {
+                              "type": "string",
+                              "enum": [
+                                "high",
+                                "medium",
+                                "low"
+                              ]
+                            }
+                          },
+                          "required": [
+                            "run",
+                            "source",
+                            "confidence"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "test": {
+                          "type": "object",
+                          "properties": {
+                            "run": {
+                              "type": "string"
+                            },
+                            "source": {
+                              "type": "string"
+                            },
+                            "confidence": {
+                              "type": "string",
+                              "enum": [
+                                "high",
+                                "medium",
+                                "low"
+                              ]
+                            }
+                          },
+                          "required": [
+                            "run",
+                            "source",
+                            "confidence"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "dev": {
+                          "type": "object",
+                          "properties": {
+                            "run": {
+                              "type": "string"
+                            },
+                            "source": {
+                              "type": "string"
+                            },
+                            "confidence": {
+                              "type": "string",
+                              "enum": [
+                                "high",
+                                "medium",
+                                "low"
+                              ]
+                            }
+                          },
+                          "required": [
+                            "run",
+                            "source",
+                            "confidence"
+                          ],
+                          "additionalProperties": false
+                        }
+                      },
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "path",
+                    "stack",
+                    "packageManager",
+                    "frameworks",
+                    "testFrameworks",
+                    "commands"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "ci": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            },
+            "required": [
+              "stacks",
+              "monorepo",
+              "packages",
+              "ci"
+            ],
+            "additionalProperties": false
+          },
+          "findings": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "area": {
+                  "type": "string",
+                  "enum": [
+                    "agent",
+                    "quality",
+                    "hygiene",
+                    "git"
+                  ]
+                },
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "ok",
+                    "info",
+                    "warn",
+                    "missing"
+                  ]
+                },
+                "title": {
+                  "type": "string"
+                },
+                "detail": {
+                  "type": "string"
+                },
+                "fix": {
+                  "type": "object",
+                  "properties": {
+                    "action": {
+                      "type": "string"
+                    },
+                    "label": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "action",
+                    "label"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "required": [
+                "id",
+                "area",
+                "status",
+                "title",
+                "detail"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "profile",
+          "findings"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "workspace.saveProfile": {
+      "params": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "cwd": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "cwd"
+        ],
+        "additionalProperties": false
+      },
+      "result": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "path"
+        ],
+        "additionalProperties": false
+      }
+    },
     "git.branches": {
       "params": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",

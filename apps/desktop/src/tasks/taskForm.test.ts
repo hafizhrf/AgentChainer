@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import type { TaskContract } from "@agentchainer/protocol";
-import { approveBlocker, checkLabel, checkOptions, contractChanged, tidyContract } from "./taskForm.ts";
+import { approveBlocker, checkLabel, checkOptions, contractChanged, signalLabel, tidyContract } from "./taskForm.ts";
 
 const contract: TaskContract = {
   task: "Fix total()",
@@ -24,6 +24,12 @@ describe("task form", () => {
     assert.equal(options.find((o) => o.value === "gate:lint")?.disabled, true);
     assert.ok(options.some((o) => o.value === "manual"));
     assert.equal(checkLabel("gate:typecheck"), "Gate: Typecheck");
+  });
+
+  it("names triage signals in sentence case", () => {
+    assert.equal(signalLabel("risk-keywords"), "Risk keywords");
+    assert.equal(signalLabel("repo-size"), "Repository size");
+    assert.equal(signalLabel("some-new-signal"), "Some new signal");
   });
 
   it("tidies the form: trims, drops blank rows and duplicates, numbers criteria again", () => {

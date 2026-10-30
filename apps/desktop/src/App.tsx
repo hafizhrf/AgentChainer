@@ -35,6 +35,7 @@ import { loadSettings, type Settings, saveSettings, withRecent } from "./setting
 import type { SetupView } from "./setup/SetupPage.tsx";
 import { connect, isRpcError, onExit, onReady, request, requestWithTimeout, subscribe } from "./sidecar.ts";
 import { asMode, folderName, newTab, type Tab, tabEvent, updateTab } from "./tabs.ts";
+import { WorkspaceStep } from "./tasks/WorkspaceStep.tsx";
 import { asTheme } from "./theme.ts";
 import { applyEvent, closeAssistant, type Item, nextId, setMessageId } from "./transcript.ts";
 import { UpdateDialog } from "./UpdateDialog.tsx";
@@ -101,7 +102,8 @@ export function App() {
   /** Task step sessions' running cost totals, for each turn's spend in cost history. */
   const stepTotals = useRef(new Map<string, number>());
   /** The task page (M3 preview), open over the session it came from (or Home when `back` is null). */
-  const [taskView, setTaskView] = useState<{ cwd: string; model: string; back: string | null } | null>(null);
+  /** The task page; `cwd` is null while New task asks for the workspace first. */
+  const [taskView, setTaskView] = useState<{ cwd: string | null; model: string; back: string | null } | null>(null);
   /** Self-test screenshots only: the right panel's tab. */
   const [panelTab, setPanelTab] = useState<PanelTab | undefined>(undefined);
   const [showFirstChange, setShowFirstChange] = useState(false);
@@ -655,18 +657,22 @@ export function App() {
     }
   }
 
-  /** Opens the task page for the active session's folder, or Home's; only with the Tasks preview on. */
+  /**
+   * Opens the task page for the active session's folder, or Home's; with neither, the page asks for the folder first.
+   * Only with the Tasks preview on.
+   */
   function newTask() {
     if (settings?.tasksPreview !== true) return;
     const t = tabs.find((x) => x.sessionId === active);
-    const dir = t?.cwd ?? cwd.trim();
-    if (!dir) {
-      show(null);
-      setRuntimeNotice("Choose a workspace folder first, then start a task.");
-      return;
-    }
     setSetup(null);
-    setTaskView({ cwd: dir, model: t?.modelAlias ?? model, back: t?.sessionId ?? null });
+    setTaskView({ cwd: t?.cwd ?? (cwd.trim() || null), model: t?.modelAlias ?? model, back: t?.sessionId ?? null });
+  }
+
+  /** The folder New task asked for: it becomes Home's workspace too, and a recent one. */
+  function chooseTaskWorkspace(dir: string) {
+    setCwd(dir);
+    void rememberWorkspace(dir);
+    setTaskView((view) => view && { ...view, cwd: dir });
   }
 
   const toggleTerminal = (sessionId: string) =>
@@ -895,7 +901,16 @@ export function App() {
                     />
                   </Suspense>
                 )}
-                {taskView && !setup && (
+                {taskView && !setup && taskView.cwd === null && (
+                  <WorkspaceStep
+                    recent={settings?.recentWorkspaces ?? []}
+                    homeDir={hello?.homeDir ?? null}
+                    backLabel={taskView.back ? "Back to session" : "Back to Home"}
+                    onBack={() => setTaskView(null)}
+                    onChoose={chooseTaskWorkspace}
+                  />
+                )}
+                {taskView?.cwd && !setup && (
                   <Suspense fallback={<div className="setup-page" />}>
                     <TaskPage
                       key={taskView.cwd}

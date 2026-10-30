@@ -23,11 +23,12 @@
 | [M2](#m2--workspace-bootstrap-v01-b) | v0.1 | Workspace bootstrap | ◐ Built. E1, E3, E4 pass; E2 (real repositories) deferred by the owner |
 | [UX](#ux--product-design--ui-polish-before-r1) | v0.1 | Product design & UI polish (after M1/M2 work functionally) | ◐ Design system done; desktop shell, panels and setup page in place |
 | [R1](#r1--v01-release) | v0.1 | Packaging & release | ◐ Pipeline, updater, security review and docs in place; publishing waits for M0-01 and M0-22 |
-| [M3](#m3--adaptive-planner--task-contracts-v02) | v0.2 | Adaptive planner, contracts, evidence | ☐ Not started |
+| [M3](#m3--adaptive-planner--task-contracts-v02) | v0.2 | Adaptive planner, contracts, evidence | ◐ S, M and L run, with gates, evidence and accepted risk (preview); XL and the exit runs left |
 | [M4](#m4--agent-observability-v02v03) | v0.2–0.3 | Agent observability graph | ☐ Not started |
 | [M5](#m5--git-workflow-pr--quality-gates-v03) | v0.3 | Git workflow, PRs, gates | ☐ Not started |
 | [M6](#m6--deployment--workflow-canvas-v04) | v0.4 | Deploy adapters, workflow canvas | ☐ Not started |
 | [M7](#m7--evals--analytics-v05) | v0.5 | Evals & analytics | ☐ Not started |
+| [M8](#m8--multi-folder-workspaces--agent-fleet-proposed) | later | Multi-folder workspaces, agent fleet | ☐ Proposed (owner, 2026-10-30) |
 | [X](#cross-cutting-tracks-ongoing) | all | Security, quality, compatibility, docs, a11y | ☐ Ongoing |
 
 ---
@@ -959,6 +960,8 @@ for the desktop shell, start screen and session view to be cleaned up (UX-02, UX
     - Owner note (2026-10-30): Workspace settings' section list looked like a second app sidebar next to the real
       one. It now has the page's surface with an accent bar on the active section, and the sidebar marks no session
       while a page is open over it.
+    - Owner note (2026-10-30): New task with no workspace showed a banner ("Choose a workspace folder first") that
+      stayed after a folder was picked. New task now opens on a workspace step (Home's card, then Continue).
     - Open: owner click-through, and the in-app guide.
 - [ ] **UX-07** Keyboard shortcuts and a command palette.
   - Progress (2026-10-30), the command palette (⇧⌘P / Ctrl+Shift+P, View → Command Palette…):
@@ -996,6 +999,19 @@ for the desktop shell, start screen and session view to be cleaned up (UX-02, UX
   - It lists the reviewed catalog **and the whole official marketplace**; unreviewed plugins are clearly marked.
     That changes ADR-0005's trust model, so a new ADR comes first.
   - Plugins keep installing through the Claude CLI, from their original marketplace.
+- [ ] **UX-11** Task pages pass. Owner feedback, 2026-10-30, with screenshots: "still messy".
+  - Found:
+    - content sat left-aligned with empty space on the right;
+    - criteria and list items were one-line fields cut off mid-sentence, in three narrow columns;
+    - the approved view joined lists with " · " into run-on lines, with a different label column per card;
+    - triage labels like "Risk Keywords".
+  - Progress (2026-10-30):
+    - one centered frame (a 960 px reading column, a 1180 px draft grid);
+    - list rows that wrap and grow with their text, with the criteria's checks in a fixed column;
+    - Constraints, Out of scope and Risks stacked full width, and areas two per line;
+    - one Contract card on a shared label column, with bullet lists, folding to its objective once the task has run;
+    - triage signals stacked, in sentence case.
+  - Open: owner click-through in light and dark.
 
 ### Exit criteria
 
@@ -1095,7 +1111,9 @@ Decisions: [ADR-0009](adr/0009-release-signing-and-updates.md). Maintainer steps
   Progress (step 1): signals and floors in `tasks/triage.ts` (planner.md §4), haiku classification with structured
   output (checked live: it arrives with `tools: []`), proposal = the higher of the two. The triage card shows the
   signals and the rationale; another tier needs a reason, recorded in `triage.json`. An edited contract must be
-  triaged again before approval. Remaining: owner click-through, and tuning after the labels (M3-E1).
+  triaged again before approval. Owner note (2026-10-30): "theme tokens" in a restyle task counted as a risk
+  keyword; a bare "token" no longer does, only phrases like access token or API key (the signals-only benchmark is
+  unchanged). Remaining: owner click-through, and tuning after the labels (M3-E1).
 - [ ] **M3-04** Workflow templates as versioned YAML in `catalog/workflows/`, one per tier as described in the PRD.
       Progress (step 2): S and M in `catalog/workflows/`, validated by zod and compiled with the roles into
       `tasks/library.json` (`library.test.ts` fails while it's stale). Step 3: L, with a `parallel` step of read-only
@@ -1228,6 +1246,40 @@ Decisions: [ADR-0009](adr/0009-release-signing-and-updates.md). Maintainer steps
 ### Exit criteria
 
 - [ ] **M7-E1** A change to a workflow template reports its success and cost delta on the benchmark before merge.
+
+---
+
+## M8 — Multi-folder workspaces & agent fleet (proposed)
+
+→ PRD [F9](PRD.md#f9--multi-folder-workspaces-p2). Owner requests, 2026-10-30. Several ideas come from
+[CLI Agent Orchestrator](https://github.com/awslabs/cli-agent-orchestrator) (CAO, AWS Labs, Apache-2.0). They're
+reference only: no code is copied, and each one gets a plan before it's built.
+
+- [ ] **M8-01** Multi-folder workspaces (F9): a workspace is a named set of folders, e.g. an app repo and its API
+      repo.
+  - Sessions run in the primary folder and add the others with the SDK's `additionalDirectories` (the CLI's
+    `--add-dir`; in the installed SDK's types).
+  - Readiness, the setup plan and git work per folder, and the guard allows all the workspace's folders.
+  - Tasks name the folder in their affected areas; XL sub-tasks can target different folders, each in its own
+    worktree.
+  - **(verify)** whether project settings, hooks and CLAUDE.md load from the added folders.
+  - Open: where the definition lives (the app's database, or a file like VS Code's `.code-workspace`).
+- [ ] **M8-02** A fleet view: every running session and task step across workspaces, with live status (working,
+      waiting for approval, idle, done), cost, and one click to open it. From CAO's dashboard and status badges; it
+      extends M4's agent tree.
+- [ ] **M8-03** Supervisor and worker sessions: a supervisor session hands work to worker sessions (assign, hand
+      off, send a message, an inbox) through an in-app MCP server, under the app's approvals and budgets. From CAO's
+      supervisor/worker model; it goes beyond XL's fixed split (M3-07).
+- [ ] **M8-04** An agent profiles manager: create from a template, edit, clone and delete, validated before saving,
+      with per-profile tool allowlists. From CAO's profile editor; builds on M3-05's roles and UX-10's Plugins page.
+- [ ] **M8-05** Scheduled flows: run a task template on a schedule (e.g. a nightly dependency bump), locally, with a
+      budget cap and an evidence report per run. From CAO's flows.
+- [ ] **M8-06** Lessons from outcomes: suggest CLAUDE.md additions from finished tasks' evidence, each one approved
+      by the user (opt-in). From CAO's memory and self-learning loop.
+- **Not adopted from CAO:**
+  - other providers' CLIs (PRD §7 non-goal);
+  - tmux terminal backends (the app has its own terminal and sessions);
+  - an HTTP server with a web UI, since the sidecar has no network port (THREAT_MODEL T-05).
 
 ---
 

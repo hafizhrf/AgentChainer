@@ -134,7 +134,7 @@ export function HomeView({
  * Workspace selection (M1-06): native folder picker, recent workspaces, or a typed path. There's no default folder:
  * owner testing showed a home-folder workspace lets the agent roam the whole home directory, so it gets a warning.
  */
-function WorkspaceCard({
+export function WorkspaceCard({
   cwd,
   onChange,
   recent,

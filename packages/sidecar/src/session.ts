@@ -85,13 +85,20 @@ export type PermissionAnswer = {
   scope?: AlwaysScope;
 };
 
-type Pending = { resolve: (result: PermissionResult) => void; toolName: string; always: PermissionUpdate[] };
+type Pending = {
+  resolve: (result: PermissionResult) => void;
+  toolName: string;
+  input: Record<string, unknown>;
+  always: PermissionUpdate[];
+};
 
 type SessionCallbacks = {
   emit: (event: AgentEvent) => void;
   askPermission: (request: Omit<PermissionRequest, "sessionId">) => void;
   /** The query ended: closed, or the CLI process exited. */
   onEnd: () => void;
+  /** The user answered a permission request: a task's run records it for its evidence (M3-09). */
+  answered?: (request: { toolName: string; input: Record<string, unknown> }, answer: PermissionAnswer) => void;
 };
 
 /**
@@ -151,7 +158,7 @@ export class Session {
         canUseTool: (toolName, input, ctx) =>
           new Promise<PermissionResult>((resolve) => {
             const always = ctx.suppressAlwaysAllowRule ? [] : alwaysUpdates(ctx.suggestions);
-            this.pendingPermissions.set(ctx.requestId, { resolve, toolName, always });
+            this.pendingPermissions.set(ctx.requestId, { resolve, toolName, input, always });
             ctx.signal.addEventListener("abort", () => {
               this.pendingPermissions.delete(ctx.requestId);
               resolve({ behavior: "deny", message: "Request was cancelled." });
@@ -240,6 +247,7 @@ export class Session {
     if (!pending) return false;
     this.pendingPermissions.delete(requestId);
     pending.resolve(permissionResult(pending, answer));
+    this.callbacks.answered?.({ toolName: pending.toolName, input: pending.input }, answer);
     return true;
   }
 
@@ -277,7 +285,10 @@ export class Session {
 }
 
 /** Turns the user's answer into the SDK's permission result. */
-export function permissionResult(pending: Omit<Pending, "resolve">, answer: PermissionAnswer): PermissionResult {
+export function permissionResult(
+  pending: Pick<Pending, "toolName" | "always">,
+  answer: PermissionAnswer,
+): PermissionResult {
   if (!answer.allow) {
     return { behavior: "deny", message: answer.message?.trim() || "The user denied this action." };
   }

@@ -117,7 +117,9 @@ Planned surface (v0.1):
 | request | `task.draft` | A read-only session (Read, Grep, Glob; the generators' hook and the workspace guard) drafts the contract as structured output, then triage runs on it: deterministic signals plus a haiku classification |
 | request | `task.retriage` / `task.approve` / `task.revise` | Save an edited draft and triage it again; approve the contract and tier together (refused if the contract changed since triage; another tier needs a reason); reopen for editing |
 | request | `task.cancel` | Stops a draft, a triage or a run in progress; a stopped draft or triage fails with `cancelled` (-32007) |
-| request | `task.start` / `task.resume` | Runs an approved S or M task (M3-06) in the background, or continues an interrupted run: a session per step, the gates run by the sidecar, fix rounds ([planner.md](design/planner.md) §6–§7) |
+| request | `task.start` / `task.resume` | Runs an approved S, M or L task (M3-06) in the background, or continues an interrupted run: the gates once before the task (baseline), a session per step (L's planners in parallel, read-only), the gates run by the sidecar, fix rounds for new failures only ([planner.md](design/planner.md) §6–§7) |
+| request | `task.acceptRisk` | Ends a failed or not verified run as Accepted with risk, with the user's reason (M3-10); the evidence report keeps it |
+| request | `task.evidence` | The evidence report (M3-09) as markdown and its path in the task folder; built from the run's records when a run ends, and again when it's older than the task ([planner.md](design/planner.md) §9) |
 | notification | `task.updated` | A run changed: a step started or ended, gates ran, or it ended |
 | notification | `task` tag on `agent.event` / `permission.request` | Marks a task step's session, which has no tab: the task page shows its transcript, and its approvals show over any page |
 | request | `workspace.scan` | Detect stack, commands, and audit the setup → `WorkspaceProfile` + findings (read-only) |

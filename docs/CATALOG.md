@@ -186,6 +186,7 @@ Profiles live in `catalog/profiles/<id>.yaml` with `suggest: {always | stacks | 
 | ID | Kind | Tier | License | Install method | Status |
 |---|---|---|---|---|---|
 | `ac-write-claude-md`, `ac-setup-hooks`, `ac-scaffold-tests`, `ac-generate-ci`, `ac-smoke-test` | skill | first-party | Apache-2.0 | Copied from `skills/` | To build (M2-19) |
+| `ac-implementer`, `ac-architect`, `ac-independent-reviewer`, `ac-test-planner`, `ac-security-reviewer`, `ac-docs-writer` | agent | first-party | Apache-2.0 | Not a catalog item: the setup plan's optional fix `fix:install-agents` writes `agents/ac-*.md` into `.claude/agents/` (files preview, rollback), from the library compiled into the app (M3-05) | Built |
 | `code-review` (1.0.1) | plugin | official | Apache-2.0 | `claude plugin install code-review@claude-plugins-official --scope project` | Reviewed ([2026-10-30 review](catalog-reviews/2026-10-30.md)) |
 | `security-guidance` (2.0.17) | plugin | official | Apache-2.0 | same pattern | **Not approved**: its hooks pip-install an unpinned SDK at runtime |
 | `commit-commands` (1.0.1) | plugin | official | Apache-2.0 | same pattern | Reviewed |

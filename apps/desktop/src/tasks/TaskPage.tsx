@@ -17,6 +17,8 @@ import {
   CircleHelp,
   CircleX,
   ClipboardList,
+  ExternalLink,
+  FileText,
   Loader2,
   MinusCircle,
   Play,
@@ -25,21 +27,26 @@ import {
   X,
 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { Confirm } from "../Dialog.tsx";
+import { type Confirm, Modal } from "../Dialog.tsx";
+import { Markdown } from "../Markdown.tsx";
 import { MODE_NAMES, MODELS, modeOptions } from "../options.ts";
 import { isRpcError } from "../rpc-client.ts";
 import { request, subscribe } from "../sidecar.ts";
 import { TranscriptView } from "../TranscriptView.tsx";
 import { folderName } from "../tabs.ts";
 import { ActionMenu } from "../ui/ActionMenu.tsx";
+import { CopyButton } from "../ui/CopyButton.tsx";
 import { EditableList, StringList } from "../ui/EditableList.tsx";
 import { Field } from "../ui/Field.tsx";
 import { IconButton } from "../ui/IconButton.tsx";
 import { EmptyState } from "../ui/Section.tsx";
 import { Select } from "../ui/Select.tsx";
 import {
+  canAcceptRisk,
   duration,
+  failedBefore,
   fromHistory,
+  gateKey,
   gateRounds,
   newer,
   passedGate,
@@ -61,7 +68,7 @@ import {
   tidyContract,
 } from "./taskForm.ts";
 
-type Busy = "draft" | "retriage" | "approve" | "revise" | "run" | "resume" | null;
+type Busy = "draft" | "retriage" | "approve" | "revise" | "run" | "resume" | "accept" | null;
 
 /** Profiles a run's write steps can ask in; plan mode doesn't fit a step that must implement. */
 const RUN_MODES: Exclude<PermissionMode, "plan">[] = ["default", "acceptEdits", "auto"];
@@ -72,7 +79,8 @@ const usd = (n: number) => `≈$${n.toFixed(n < 0.1 ? 4 : 2)}`;
 /**
  * A task (M3, preview): the request, a contract Claude drafts from the repository (read-only), and a tier from triage,
  * approved together; then the run (M3-06): each step a Claude session shown in a timeline, the gates the app runs
- * itself, and fix rounds. Opens over Home or a session, like Workspace settings.
+ * itself, and fix rounds; then the evidence report (M3-09), and Done or Accepted with risk (M3-10). Opens over Home or
+ * a session, like Workspace settings.
  */
 export function TaskPage({
   cwd,
@@ -81,6 +89,7 @@ export function TaskPage({
   backLabel,
   confirm,
   onBack,
+  onOpenFile,
 }: {
   cwd: string;
   model: string;
@@ -89,6 +98,8 @@ export function TaskPage({
   backLabel: string;
   confirm: Confirm;
   onBack: () => void;
+  /** Opens a file (an absolute path) in the editor from settings. */
+  onOpenFile: (file: string) => Promise<unknown>;
 }) {
   const [tasks, setTasks] = useState<TaskSummary[]>([]);
   const [task, setTask] = useState<Task | null>(null);
@@ -102,6 +113,8 @@ export function TaskPage({
   const [budget, setBudget] = useState("");
   const [runMode, setRunMode] = useState<Exclude<PermissionMode, "plan">>(mode === "plan" ? "default" : mode);
   const [stepItems, setStepItems] = useState<StepItems>({});
+  const [accepting, setAccepting] = useState(false);
+  const [acceptReason, setAcceptReason] = useState("");
   const taskId = useRef<string | null>(null);
   taskId.current = task?.id ?? null;
 
@@ -211,6 +224,11 @@ export function TaskPage({
     if (ok) await request("task.cancel", { cwd, id: t.id }).catch((err: unknown) => setError(message(err)));
   }
 
+  async function acceptRisk(id: string) {
+    setAccepting(false);
+    await step("accept", id, () => request("task.acceptRisk", { cwd, id, reason: acceptReason.trim() }));
+  }
+
   async function open(id: string) {
     try {
       show(await request("task.get", { cwd, id }));
@@ -277,7 +295,7 @@ export function TaskPage({
             {folderName(cwd)}
           </span>
         </div>
-        <span className="chip" title="A preview: S and M tasks run; reports and L and XL tasks arrive later.">
+        <span className="chip" title="A preview: S, M and L tasks run; XL tasks arrive later.">
           Preview
         </span>
         <span className="grow" />
@@ -392,6 +410,16 @@ export function TaskPage({
           />
         )}
 
+        {task?.run && task.state !== "draft" && task.state !== "ready" && task.state !== "running" && (
+          <EvidenceCard
+            task={task}
+            cwd={cwd}
+            onOpenFile={(file) =>
+              onOpenFile(file).catch((err: unknown) => setError(`Couldn't open the report: ${message(err)}`))
+            }
+          />
+        )}
+
         {task && task.state !== "draft" && task.contract && task.triage && (
           <ReadyView task={task} contract={task.contract} triage={task.triage} />
         )}
@@ -445,6 +473,20 @@ export function TaskPage({
             </>
           ) : (
             <>
+              {canAcceptRisk(task) && (
+                <button
+                  type="button"
+                  className="secondary"
+                  disabled={busy !== null}
+                  onClick={() => {
+                    setAcceptReason("");
+                    setAccepting(true);
+                  }}
+                >
+                  {busy === "accept" && <Loader2 size={14} className="spin" />}
+                  Accept risk…
+                </button>
+              )}
               <button
                 type="button"
                 className="secondary"
@@ -486,6 +528,46 @@ export function TaskPage({
             </>
           )}
         </footer>
+      )}
+      {task && (
+        <Modal
+          open={accepting}
+          onOpenChange={setAccepting}
+          title="Accept the risk?"
+          description={
+            task.state === "unverified"
+              ? "No gate ran, so nothing proved the task."
+              : "The latest gate runs didn't all pass, so the task isn't proved."
+          }
+          actions={
+            <>
+              <button type="button" className="secondary" onClick={() => setAccepting(false)}>
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={!acceptReason.trim() || busy !== null}
+                onClick={() => void acceptRisk(task.id)}
+              >
+                Accept with risk
+              </button>
+            </>
+          }
+        >
+          <p>
+            The task ends as <strong>Accepted with risk</strong>, not Done. Your reason goes into the evidence report.
+            Nothing in the working tree changes.
+          </p>
+          <Field label="Why is it acceptable?">
+            <textarea
+              rows={3}
+              value={acceptReason}
+              onChange={(e) => setAcceptReason(e.target.value)}
+              placeholder="e.g. The failing test is a known bug, tracked separately."
+              maxLength={2000}
+            />
+          </Field>
+        </Modal>
       )}
     </div>
   );
@@ -795,7 +877,7 @@ function ReadyView({ task, contract, triage }: { task: Task; contract: TaskContr
           <p className="callout">
             {RUNNABLE_TIERS.has(triage.chosen)
               ? "Run it from the footer: each step is a Claude session you can watch here, and the app runs the gates itself."
-              : `${triage.chosen} tasks run in a later update; S and M tasks run now.`}{" "}
+              : `${triage.chosen} tasks run in a later update; S, M and L tasks run now.`}{" "}
             The task is saved in <code>.agentchainer/tasks/{task.id}/</code>.
           </p>
         )}
@@ -884,6 +966,7 @@ function RunView({
   const { label, tone } = stateLabel(task.state);
   const running = run.steps.find((s) => s.status === "running");
   const shown = open ?? running?.id ?? null;
+  const before = failedBefore(task);
 
   async function toggle(entry: StepRun) {
     const next = shown === entry.id ? "" : entry.id;
@@ -911,6 +994,11 @@ function RunView({
           </span>
         </div>
         {run.outcome && <p className={`callout tone-${tone}`}>{run.outcome}</p>}
+        {run.acceptance && (
+          <p className="callout">
+            <strong>Risk accepted</strong> {new Date(run.acceptance.at).toLocaleString()}: {run.acceptance.reason}
+          </p>
+        )}
         <ol className="task-steps">
           {run.steps.map((entry) => {
             const expanded = shown === entry.id;
@@ -928,13 +1016,20 @@ function RunView({
                   <StepIcon status={entry.status} />
                   <span className="task-step-label">{entry.label}</span>
                   {entry.role && <span className="muted">{entry.role}</span>}
+                  {entry.group && (
+                    <span className="badge" title={`Runs at the same time as the other ${entry.group} steps`}>
+                      parallel
+                    </span>
+                  )}
                   <span className="grow muted task-step-note">{entry.note}</span>
                   <span className="muted">{duration(entry.startedAt, entry.endedAt)}</span>
-                  {entry.kind !== "gates" && <span className="muted">{usd(entry.costUsd)}</span>}
+                  {entry.kind !== "gates" && entry.kind !== "baseline" && (
+                    <span className="muted">{usd(entry.costUsd)}</span>
+                  )}
                 </button>
                 {expanded &&
-                  (entry.kind === "gates" ? (
-                    <GateList runs={gates} />
+                  (entry.kind === "gates" || entry.kind === "baseline" ? (
+                    <GateList runs={gates} before={entry.kind === "gates" ? before : undefined} />
                   ) : sessionItems?.length ? (
                     <div className="task-step-transcript transcript">
                       <TranscriptView cwd={cwd} items={sessionItems} />
@@ -954,15 +1049,23 @@ function RunView({
           <h2>Gates</h2>
           <span className="muted">Run by AgentChainer, with the real exit codes.</span>
         </div>
-        {run.gates.length === 0 ? (
+        {run.gates.length === 0 && run.baseline.length === 0 ? (
           <EmptyState>No gate has run yet.</EmptyState>
         ) : (
-          gateRounds(run.gates).map((round) => (
-            <div key={round[0]?.round} className="task-gate-round">
-              <span className="field-label">Round {(round[0]?.round ?? 0) + 1}</span>
-              <GateList runs={round} />
-            </div>
-          ))
+          <>
+            {run.baseline.length > 0 && (
+              <div className="task-gate-round">
+                <span className="field-label">Before the task</span>
+                <GateList runs={run.baseline} />
+              </div>
+            )}
+            {gateRounds(run.gates).map((round) => (
+              <div key={round[0]?.round} className="task-gate-round">
+                <span className="field-label">Round {(round[0]?.round ?? 0) + 1}</span>
+                <GateList runs={round} before={before} />
+              </div>
+            ))}
+          </>
         )}
         {run.notRun.length > 0 && (
           <p className="muted">Not run, no command detected: {run.notRun.join(", ")}. They don't count as passed.</p>
@@ -972,7 +1075,8 @@ function RunView({
   );
 }
 
-function GateList({ runs }: { runs: GateRun[] }) {
+/** `before`: the gates that failed before the task, marked in later rounds. */
+function GateList({ runs, before }: { runs: GateRun[]; before?: ReadonlySet<string> }) {
   if (!runs.length) return <p className="muted task-step-empty">No gates to run.</p>;
   return (
     <ul className="task-gates">
@@ -988,6 +1092,11 @@ function GateList({ runs }: { runs: GateRun[] }) {
               <span className="task-gate-kind">{g.kind}</span>
               <code>{g.command}</code>
               {g.package !== "." && <span className="muted">{g.package}</span>}
+              {before?.has(gateKey(g)) && (
+                <span className="badge">
+                  {passedGate(g) ? "fixed: failed before the task" : "failed before the task"}
+                </span>
+              )}
               <span className="grow" />
               <span className="muted">
                 {g.timedOut ? "timed out" : `exit ${g.exitCode}`} · {(g.durationMs / 1000).toFixed(1)} s
@@ -1003,5 +1112,82 @@ function GateList({ runs }: { runs: GateRun[] }) {
         </li>
       ))}
     </ul>
+  );
+}
+
+/**
+ * The evidence report (M3-09), built by the sidecar from what the run recorded: changed files, real gate runs,
+ * criteria, review, approvals and guard blocks, risks and cost. Copy gives the markdown; the file is in the task folder.
+ */
+function EvidenceCard({
+  task,
+  cwd,
+  onOpenFile,
+}: {
+  task: Task;
+  cwd: string;
+  onOpenFile: (file: string) => Promise<unknown>;
+}) {
+  const [report, setReport] = useState<{ markdown: string; path: string } | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [open, setOpen] = useState(false);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: fetched again whenever the task changes (an acceptance, a new run).
+  useEffect(() => {
+    let live = true;
+    setError(null);
+    request("task.evidence", { cwd, id: task.id }).then(
+      (r) => live && setReport(r),
+      (err: unknown) => live && setError(message(err)),
+    );
+    return () => {
+      live = false;
+    };
+  }, [cwd, task.id, task.updatedAt]);
+  return (
+    <section className="card task-evidence">
+      <div className="card-title">
+        <FileText size={16} aria-hidden />
+        <h2>Evidence</h2>
+        <span className="muted">From the run's records; Claude's own statements are labeled as such.</span>
+        <span className="grow" />
+        {report && <CopyButton text={report.markdown} label="Copy the report as markdown" />}
+        {report && (
+          <button type="button" className="ghost small" onClick={() => void onOpenFile(report.path)}>
+            <ExternalLink size={13} />
+            Open in editor
+          </button>
+        )}
+      </div>
+      {error ? (
+        <p className="muted">The report couldn't be built: {error}</p>
+      ) : !report ? (
+        <p className="muted">
+          <Loader2 size={14} className="spin" aria-hidden /> Building the report…
+        </p>
+      ) : (
+        <>
+          {open && (
+            <div className="task-evidence-body">
+              <Markdown text={report.markdown} />
+            </div>
+          )}
+          <div className="card-footer">
+            <button
+              type="button"
+              className="ghost small task-evidence-toggle"
+              aria-expanded={open}
+              onClick={() => setOpen(!open)}
+            >
+              <ChevronRight size={14} aria-hidden />
+              {open ? "Hide the report" : "Show the report"}
+            </button>
+            <span className="grow" />
+            <span className="muted" title={report.path}>
+              .agentchainer/tasks/{task.id}/evidence.md
+            </span>
+          </div>
+        </>
+      )}
+    </section>
   );
 }

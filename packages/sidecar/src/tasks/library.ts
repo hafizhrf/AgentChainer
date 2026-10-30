@@ -62,8 +62,20 @@ export const GatesStepSchema = z
   .strict();
 export type GatesStep = z.infer<typeof GatesStepSchema>;
 
-export type WorkflowStep = AgentStep | GatesStep;
+/** Read-only steps that run at the same time (L's planners); their answers merge into `plan.md`, one section each. */
+export const ParallelStepSchema = z
+  .object({
+    id: StepId,
+    label: z.string().min(1),
+    parallel: z.array(AgentStepSchema).min(2).max(5),
+    output: z.literal("plan"),
+  })
+  .strict();
+export type ParallelStep = z.infer<typeof ParallelStepSchema>;
+
+export type WorkflowStep = AgentStep | GatesStep | ParallelStep;
 export const isGates = (s: WorkflowStep): s is GatesStep => "gates" in s;
+export const isParallel = (s: WorkflowStep): s is ParallelStep => "parallel" in s;
 
 export const WorkflowSchema = z
   .object({
@@ -71,26 +83,36 @@ export const WorkflowSchema = z
     tier: z.enum(TIERS),
     version: z.number().int().positive(),
     description: z.string().min(1),
-    steps: z.array(z.union([AgentStepSchema, GatesStepSchema])).min(1),
+    steps: z.array(z.union([AgentStepSchema, GatesStepSchema, ParallelStepSchema])).min(1),
   })
   .strict()
   .superRefine((w, ctx) => {
-    const ids = w.steps.map((s) => s.id);
-    if (new Set(ids).size !== ids.length) ctx.addIssue({ code: "custom", message: `${w.id}: step ids must be unique` });
+    const issue = (message: string) => ctx.addIssue({ code: "custom", message: `${w.id}/${message}` });
+    const ids = w.steps.flatMap((s) => (isParallel(s) ? [s.id, ...s.parallel.map((m) => m.id)] : [s.id]));
+    if (new Set(ids).size !== ids.length) issue("step ids must be unique");
     for (const [i, s] of w.steps.entries()) {
+      if (isParallel(s)) {
+        // Only read steps may run at the same time: two writers would edit the same tree.
+        for (const m of s.parallel) {
+          if (m.access !== "read" || m.output || m.fix)
+            issue(`${m.id}: a parallel step must be read-only, without output or fix`);
+        }
+        continue;
+      }
+      if (!isGates(s) && s.output === "review" && s.access !== "read")
+        issue(`${s.id}: a review step must be read-only`);
       if (!s.fix) continue;
       const target = w.steps.find((t) => t.id === s.fix?.step);
-      if (!target || isGates(target) || target.access !== "write" || w.steps.indexOf(target) > i) {
-        ctx.addIssue({ code: "custom", message: `${w.id}/${s.id}: fix.step must name an earlier write step` });
+      if (
+        !target ||
+        isGates(target) ||
+        isParallel(target) ||
+        target.access !== "write" ||
+        w.steps.indexOf(target) > i
+      ) {
+        issue(`${s.id}: fix.step must name an earlier write step`);
       }
-      if (!isGates(s) && s.output !== "review") {
-        ctx.addIssue({ code: "custom", message: `${w.id}/${s.id}: only a review step takes fix` });
-      }
-    }
-    for (const s of w.steps) {
-      if (!isGates(s) && s.output === "review" && s.access !== "read") {
-        ctx.addIssue({ code: "custom", message: `${w.id}/${s.id}: a review step must be read-only` });
-      }
+      if (!isGates(s) && s.output !== "review") issue(`${s.id}: only a review step takes fix`);
     }
   });
 export type Workflow = z.infer<typeof WorkflowSchema>;
@@ -139,8 +161,7 @@ export function buildLibrary(workflows: Record<string, string>, roles: Record<st
   }
   for (const role of ROLES) if (!out.roles[role]) throw new Error(`agents/ac-${role}.md is missing`);
   for (const w of Object.values(out.workflows)) {
-    for (const s of w.steps) {
-      if (isGates(s)) continue;
+    for (const s of w.steps.flatMap((x) => (isParallel(x) ? x.parallel : isGates(x) ? [] : [x]))) {
       const role = out.roles[s.role];
       if (s.access === "read" && role?.tools !== "Read, Grep, Glob") {
         throw new Error(`${w.id}/${s.id}: a read step's role must list tools: Read, Grep, Glob`);
@@ -151,3 +172,18 @@ export function buildLibrary(workflows: Record<string, string>, roles: Record<st
 }
 
 export const libraryJsonText = (library: Library) => `${JSON.stringify(library, null, 2)}\n`;
+
+/** A role back as its file, as `.claude/agents/` reads it: what "Install roles" writes (M3-05). */
+export function renderRoleFile(role: RoleDefinition): string {
+  return [
+    "---",
+    `name: ${role.name}`,
+    `description: ${role.description}`,
+    ...(role.tools ? [`tools: ${role.tools}`] : []),
+    `model: ${role.model}`,
+    "---",
+    "",
+    role.prompt,
+    "",
+  ].join("\n");
+}

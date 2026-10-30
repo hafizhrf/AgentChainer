@@ -1,7 +1,17 @@
-import type { GateKind, GateRun, StepRun, Task, TaskContract, TaskRun, TaskTag } from "@agentchainer/protocol";
+import type {
+  ApprovalRecord,
+  GateKind,
+  GateRun,
+  GuardBlock,
+  StepRun,
+  Task,
+  TaskContract,
+  TaskRun,
+  TaskTag,
+} from "@agentchainer/protocol";
 import { z } from "zod";
-import type { AgentStep, GatesStep, Workflow } from "./library.ts";
-import { isGates } from "./library.ts";
+import type { AgentStep, GatesStep, ParallelStep, Role, Workflow } from "./library.ts";
+import { isGates, isParallel } from "./library.ts";
 
 /**
  * The orchestrator (M3-06, planner.md §6): runs a task's workflow template step by step and records everything it
@@ -36,12 +46,24 @@ export type Runner = {
   close(): void;
 };
 
-/** Hand-off files in the task folder (`plan.md`, `review.json`). */
+/** Hand-off files in the task folder (`plan.md`, `review.json`, `summary.md`). */
 export type HandOff = { read(name: string): string | null; write(name: string, text: string): void };
 
 /** Below this, a step isn't worth starting: the task's budget is used up. */
 const MIN_STEP_BUDGET_USD = 0.05;
 const MAX_DIFF_CHARS = 80_000;
+/** Read steps of a parallel group running at once (planner.md §6). */
+const MAX_PARALLEL = 3;
+
+/** What each role's step is asked first; the inputs follow. */
+const INTRO: Record<Role, string> = {
+  implementer: "Implement this approved task.",
+  architect: "Plan the implementation of this approved task.",
+  "independent-reviewer": "Review this change against its contract.",
+  "test-planner": "Plan the tests that prove this approved task's acceptance criteria.",
+  "security-reviewer": "Review this approved task for security risks before it is implemented.",
+  "docs-writer": "Update the documentation for this change.",
+};
 
 const ReviewSchema = z.object({
   verdict: z.enum(["approve", "changes-requested"]),
@@ -128,17 +150,37 @@ export function contractText(c: TaskContract): string {
   ].join("\n");
 }
 
-function gatesText(runs: GateRun[], notRun: GateKind[]): string {
+/** `before`: whether a failure was already there before the task, so the reviewer doesn't hold the change to it. */
+function gatesText(runs: GateRun[], notRun: GateKind[], before: (run: GateRun) => boolean): string {
   if (!runs.length) return "No gates ran: the workspace has no commands for them.";
   return [
     ...runs.map(
-      (r) => `- ${r.kind} \`${r.command}\` (${r.package}): ${r.timedOut ? "timed out" : `exit ${r.exitCode}`}`,
+      (r) =>
+        `- ${r.kind} \`${r.command}\` (${r.package}): ${r.timedOut ? "timed out" : `exit ${r.exitCode}`}${
+          (r.exitCode !== 0 || r.timedOut) && before(r)
+            ? " (already failing before the task: not this change's to fix unless the contract says so)"
+            : ""
+        }`,
     ),
     ...(notRun.length ? [`- not run, no command detected: ${notRun.join(", ")}`] : []),
   ].join("\n");
 }
 
+/** A planner's answer under its role's `##` section: its own headings go one level down; code blocks stay as they are. */
+export function demote(markdown: string): string {
+  let fence: string | null = null;
+  return markdown
+    .split("\n")
+    .map((line) => {
+      const marker = /^\s*(`{3,}|~{3,})/.exec(line)?.[1];
+      if (marker && (!fence || marker.startsWith(fence))) fence = fence ? null : marker;
+      return !fence && !marker && /^#{1,5} /.test(line) ? `#${line}` : line;
+    })
+    .join("\n");
+}
+
 const failing = (runs: GateRun[]) => runs.filter((r) => r.exitCode !== 0 || r.timedOut);
+const kinds = (runs: GateRun[]) => [...new Set(runs.map((r) => r.kind))].join(", ");
 
 /** Why a session's turn ended, for the timeline. */
 function stopped(subtype: string): string {
@@ -194,6 +236,16 @@ export class Orchestrator {
     this.save(this.task);
   }
 
+  /** An approval a step asked for, and the answer: for the evidence's security notes (M3-09). */
+  recordApproval(record: ApprovalRecord): void {
+    this.commit((r) => ({ approvals: [...r.approvals, record] }));
+  }
+
+  /** A tool call the guard denied. */
+  recordGuardBlock(block: GuardBlock): void {
+    this.commit((r) => ({ guardBlocks: [...r.guardBlocks, block] }));
+  }
+
   /** Stops the run: the running turn or gate is interrupted, and the run ends `cancelled`. */
   cancel(): void {
     this.cancelled = true;
@@ -210,17 +262,33 @@ export class Orchestrator {
           ),
         }));
       }
+      await this.baseline();
+      if (this.cancelled) return this.end("cancelled", "Stopped by the user. The working tree is left as it is.");
       for (let i = this.rec.position; i < this.workflow.steps.length; i++) {
         this.commit(() => ({ position: i }));
         const step = this.workflow.steps[i];
         if (!step) break;
-        const ok = isGates(step) ? await this.gatesLoop(step) : await this.agentStep(step);
+        const ok = isGates(step)
+          ? await this.gatesLoop(step)
+          : isParallel(step)
+            ? await this.parallelStep(step)
+            : await this.agentStep(step);
         if (this.cancelled) return this.end("cancelled", "Stopped by the user. The working tree is left as it is.");
         if (!ok) return this.end("failed");
         this.resuming = false;
       }
       if (!this.rec.gates.length) {
         return this.end("unverified", "No gate ran: the workspace has no commands for them, so nothing proved it.");
+      }
+      // Done needs every gate's latest run to pass. New failures already ended the run in the gates loop, so what can
+      // be left here failed before the task too.
+      const old = failing(this.latestGates());
+      if (old.length) {
+        const were =
+          new Set(old.map((g) => g.kind)).size === 1
+            ? "was already failing before the task and still fails"
+            : "were already failing before the task and still fail";
+        return this.end("failed", `${kinds(old)} ${were}. Accept the risk if that's expected.`);
       }
       return this.end("done", "Every gate passed after the last change.");
     } catch (err) {
@@ -288,13 +356,7 @@ export class Orchestrator {
   private prompt(step: AgentStep): string {
     const contract = this.task.contract;
     if (!contract) throw new Error("The task has no contract.");
-    const intro =
-      step.output === "plan"
-        ? "Plan the implementation of this approved task."
-        : step.output === "review"
-          ? "Review this change against its contract."
-          : "Implement this approved task.";
-    const parts = [intro];
+    const parts = [INTRO[step.role]];
     for (const input of step.inputs) {
       if (input === "contract") parts.push(contractText(contract));
       if (input === "plan") parts.push(`## Plan (from the plan step)\n\n${this.files.read("plan.md") ?? "(no plan)"}`);
@@ -304,7 +366,9 @@ export class Orchestrator {
         parts.push(`## Diff since the task started\n\n\`\`\`diff\n${capped || "(no changes)"}\n\`\`\``);
       }
       if (input === "gates")
-        parts.push(`## Gate results (run by AgentChainer)\n\n${gatesText(this.latestGates(), this.rec.notRun)}`);
+        parts.push(
+          `## Gate results (run by AgentChainer)\n\n${gatesText(this.latestGates(), this.rec.notRun, (r) => this.preexisting(r))}`,
+        );
     }
     return parts.filter(Boolean).join("\n\n");
   }
@@ -315,16 +379,23 @@ export class Orchestrator {
     return this.rec.gates.filter((g) => g.round === last);
   }
 
-  private async agentStep(step: AgentStep): Promise<boolean> {
+  /** Runs one agent step's turn in its own timeline entry: its answer, or null when it stopped or couldn't start. */
+  private async turnOf(step: AgentStep, group?: string): Promise<{ id: string; out: AgentOutcome } | null> {
     // A write step's session also takes its fix rounds, and the SDK caps a session as a whole: it gets what's left of
     // the task's budget. Read steps are fresh sessions with caps of their own.
     const budget = this.budget(step.access === "write" ? Number.POSITIVE_INFINITY : step.limits.maxBudgetUsd);
     if (!budget) {
       this.commit(() => ({ outcome: `The task's budget ran out before ${step.label.toLowerCase()}.` }));
-      return false;
+      return null;
     }
     const previous = this.resuming && step.access === "write" ? this.sessionOf(step.id) : undefined;
-    const id = this.begin({ step: step.id, label: step.label, kind: "agent", role: step.role });
+    const id = this.begin({
+      step: step.id,
+      label: step.label,
+      kind: "agent",
+      role: step.role,
+      ...(group ? { group } : {}),
+    });
     const tag = this.tag(id, step.label, step.role);
     const out = previous
       ? await this.runner.followUp(
@@ -337,7 +408,7 @@ export class Orchestrator {
       : await this.runner.start(step, this.prompt(step), budget, tag);
     if (this.cancelled) {
       this.finish(id, { status: "cancelled", sessionId: out.sessionId }, out.costUsd);
-      return false;
+      return null;
     }
     if (!out.ok) {
       this.finish(
@@ -346,29 +417,37 @@ export class Orchestrator {
         out.costUsd,
       );
       this.commit(() => ({ outcome: `${step.label} stopped: ${stopped(out.subtype)}.` }));
-      return false;
+      return null;
     }
+    this.finish(id, { status: "done", sessionId: out.sessionId }, out.costUsd);
+    // The implementer's latest summary: what each file's change is for, in the evidence.
+    if (step.access === "write") this.files.write("summary.md", out.text);
+    return { id, out };
+  }
+
+  private async agentStep(step: AgentStep): Promise<boolean> {
+    const turn = await this.turnOf(step);
+    if (!turn) return false;
+    const { out } = turn;
     if (step.output === "plan") this.files.write("plan.md", out.text);
-    if (step.output !== "review") {
-      this.finish(id, { status: "done", sessionId: out.sessionId }, out.costUsd);
-      return true;
-    }
+    if (step.output !== "review") return true;
     const review = parseReview(out.structured, out.text);
     this.files.write("review.json", `${JSON.stringify(review ?? { unreadable: out.text }, null, 2)}\n`);
     const mustFix = review?.findings.filter((f) => f.severity === "must-fix") ?? [];
-    this.finish(
-      id,
-      {
-        status: "done",
-        sessionId: out.sessionId,
-        note: !review
-          ? "The review couldn't be read; it's kept as text."
-          : mustFix.length
-            ? `${mustFix.length} must-fix finding${mustFix.length === 1 ? "" : "s"}.`
-            : `No must-fix findings (${review.verdict}).`,
-      },
-      out.costUsd,
-    );
+    this.commit((r) => ({
+      steps: r.steps.map((s) =>
+        s.id === turn.id
+          ? {
+              ...s,
+              note: !review
+                ? "The review couldn't be read; it's kept as text."
+                : mustFix.length
+                  ? `${mustFix.length} must-fix finding${mustFix.length === 1 ? "" : "s"}.`
+                  : `No must-fix findings (${review.verdict}).`,
+            }
+          : s,
+      ),
+    }));
     if (!mustFix.length || !step.fix || step.fix.maxRounds < 1) return true;
     const findings = mustFix.map((f) => `- ${f.file ? `${f.file}: ` : ""}${f.text}`).join("\n");
     const fixed = await this.fix(
@@ -382,10 +461,49 @@ export class Orchestrator {
     return gates ? this.gatesLoop(gates) : true;
   }
 
+  /** Read-only steps at the same time, a few at once; their answers become `plan.md`, one section each. */
+  private async parallelStep(step: ParallelStep): Promise<boolean> {
+    const members = step.parallel;
+    const answers: (AgentOutcome | null)[] = members.map(() => null);
+    let next = 0;
+    const worker = async () => {
+      while (next < members.length && !this.cancelled) {
+        const i = next++;
+        const member = members[i];
+        if (member) answers[i] = (await this.turnOf(member, step.label))?.out ?? null;
+      }
+    };
+    await Promise.all(Array.from({ length: Math.min(MAX_PARALLEL, members.length) }, worker));
+    if (this.cancelled || answers.some((a) => !a)) return false;
+    this.files.write(
+      "plan.md",
+      members.map((m, i) => `## ${m.label} (${m.role})\n\n${demote(answers[i]?.text ?? "")}`).join("\n\n"),
+    );
+    return true;
+  }
+
+  /** The gates once before the first step: what already fails isn't the task's doing, and isn't its to fix. */
+  private async baseline(): Promise<void> {
+    const gates = this.workflow.steps.find(isGates);
+    if (!gates || this.rec.steps.some((s) => s.kind === "baseline" && s.status !== "running")) return;
+    const id = this.begin({ step: "baseline", label: "Gates before the task", kind: "baseline" });
+    const { runs, notRun } = await this.runner.gates(gates.gates, 0);
+    this.commit(() => ({ baseline: runs, notRun }));
+    if (this.cancelled) {
+      this.finish(id, { status: "cancelled" });
+      return;
+    }
+    const failed = failing(runs);
+    this.finish(id, {
+      status: failed.length ? "failed" : "done",
+      note: !runs.length ? "No gates to run." : failed.length ? `Already failing: ${kinds(failed)}.` : "All passed.",
+    });
+  }
+
   private async fix(spec: { step: string; maxBudgetUsd: number }, prompt: string, what: string): Promise<boolean> {
     const target = this.workflow.steps.find((s) => s.id === spec.step);
     const sessionId = this.sessionOf(spec.step);
-    if (!target || isGates(target) || !sessionId) {
+    if (!target || isGates(target) || isParallel(target) || !sessionId) {
       this.commit(() => ({ outcome: `No session to send the ${what} to.` }));
       return false;
     }
@@ -413,7 +531,15 @@ export class Orchestrator {
       return false;
     }
     this.finish(id, { status: "done", sessionId: out.sessionId }, out.costUsd);
+    this.files.write("summary.md", out.text);
     return true;
+  }
+
+  /** Whether the same gate (kind and package) already failed before the task. */
+  private preexisting(run: GateRun): boolean {
+    return this.rec.baseline.some(
+      (b) => b.kind === run.kind && b.package === run.package && (b.exitCode !== 0 || b.timedOut),
+    );
   }
 
   private async gatesLoop(step: GatesStep): Promise<boolean> {
@@ -431,21 +557,32 @@ export class Orchestrator {
         return false;
       }
       const failed = failing(runs);
+      // Failures the task didn't cause go back to no one: they don't use fix rounds.
+      const fresh = failed.filter((f) => !this.preexisting(f));
+      const old = failed.filter((f) => this.preexisting(f));
       this.commit((r) => ({ gates: [...r.gates, ...runs], notRun }));
-      const names = [...new Set(failed.map((f) => f.kind))].join(", ");
       this.finish(id, {
         status: failed.length ? "failed" : "done",
-        note: !runs.length ? "No gates to run." : failed.length ? `Failed: ${names}.` : "All passed.",
+        note: !runs.length
+          ? "No gates to run."
+          : failed.length
+            ? `Failed: ${kinds(failed)}${old.length ? ` (${kinds(old)} already before the task)` : ""}.`
+            : "All passed.",
       });
-      if (!failed.length) return true;
+      // Only failures from before the task: no fix round, and the run goes on, since a review still adds evidence. It
+      // can't end Done (see run()).
+      if (!fresh.length) return true;
       if (this.rec.fixRounds >= step.fix.maxRounds) {
-        this.commit(() => ({
-          outcome: `${names} still failing after ${step.fix.maxRounds} fix round${step.fix.maxRounds === 1 ? "" : "s"}.`,
-        }));
+        const rounds = `${step.fix.maxRounds} fix round${step.fix.maxRounds === 1 ? "" : "s"}`;
+        const before = old.length ? ` ${kinds(old)} already failed before the task.` : "";
+        this.commit(() => ({ outcome: `${kinds(fresh)} still failing after ${rounds}.${before}` }));
         return false;
       }
       this.commit((r) => ({ fixRounds: r.fixRounds + 1 }));
-      const detail = failed
+      const alreadyFailing = old.length
+        ? `\n\nAlready failing before the task, so not part of this fix unless the contract asks for it: ${kinds(old)}.`
+        : "";
+      const detail = fresh
         .map(
           (f) =>
             `### ${f.kind}: \`${f.command}\` in ${f.package} ${f.timedOut ? "timed out" : `exited ${f.exitCode}`}\n\n\`\`\`\n${f.tail}\n\`\`\``,
@@ -453,8 +590,8 @@ export class Orchestrator {
         .join("\n\n");
       const fixed = await this.fix(
         step.fix,
-        `AgentChainer ran the project's gates after your change, and these failed. Fix the cause in the code, not the checks, then summarize again.\n\n${detail}`,
-        `failing ${names}`,
+        `AgentChainer ran the project's gates after your change, and these failed. Fix the cause in the code, not the checks, then summarize again.\n\n${detail}${alreadyFailing}`,
+        `failing ${kinds(fresh)}`,
       );
       if (!fixed) return false;
     }
@@ -479,6 +616,9 @@ export function newRun(
     steps: [],
     gates: [],
     notRun: [],
+    baseline: [],
+    approvals: [],
+    guardBlocks: [],
     costUsd: 0,
   };
 }

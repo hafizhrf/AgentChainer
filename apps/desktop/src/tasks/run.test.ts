@@ -1,7 +1,18 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import type { GateRun, Task } from "@agentchainer/protocol";
-import { duration, fromHistory, gateRounds, newer, runBlocker, runsOfEntry, stateLabel, withStepEvent } from "./run.ts";
+import {
+  canAcceptRisk,
+  duration,
+  failedBefore,
+  fromHistory,
+  gateRounds,
+  newer,
+  runBlocker,
+  runsOfEntry,
+  stateLabel,
+  withStepEvent,
+} from "./run.ts";
 
 const gate = (round: number, exitCode = 0): GateRun => ({
   kind: "test",
@@ -53,17 +64,20 @@ describe("task runs on the page", () => {
   it("says when a task can't run", () => {
     assert.equal(runBlocker(task()), null);
     assert.equal(runBlocker(task({ state: "failed" })), null, "a finished run can run again");
+    assert.equal(runBlocker(task({ state: "accepted" })), null);
     assert.match(runBlocker(task({ state: "running" })) ?? "", /running/);
     assert.match(runBlocker(task({ state: "interrupted" })) ?? "", /Resume/);
     assert.match(runBlocker(task({ state: "draft" })) ?? "", /Approve/);
     const base = task().triage;
     assert.ok(base);
-    assert.match(runBlocker(task({ triage: { ...base, chosen: "L" } })) ?? "", /L tasks run in a later update/);
+    assert.equal(runBlocker(task({ triage: { ...base, chosen: "L" } })), null);
+    assert.match(runBlocker(task({ triage: { ...base, chosen: "XL" } })) ?? "", /XL tasks run in a later update/);
   });
 
   it("labels states", () => {
     assert.deepEqual(stateLabel("unverified"), { label: "Not verified", tone: "warn" });
     assert.equal(stateLabel("cancelled").label, "Stopped");
+    assert.deepEqual(stateLabel("accepted"), { label: "Accepted with risk", tone: "warn" });
   });
 
   it("builds a step's transcript from live events and from history", () => {
@@ -80,7 +94,7 @@ describe("task runs on the page", () => {
     );
   });
 
-  it("groups gate runs by round and finds an entry's round", () => {
+  it("groups gate runs by round and finds an entry's round, the baseline's apart", () => {
     const runs = [gate(0, 1), gate(1, 0)];
     assert.equal(gateRounds(runs).length, 2);
     const t = task({
@@ -93,6 +107,15 @@ describe("task runs on the page", () => {
         position: 1,
         fixRounds: 1,
         steps: [
+          {
+            id: "baseline",
+            step: "baseline",
+            label: "Gates before the task",
+            kind: "baseline",
+            status: "failed",
+            startedAt: "",
+            costUsd: 0,
+          },
           { id: "gates", step: "gates", label: "Gates", kind: "gates", status: "failed", startedAt: "", costUsd: 0 },
           {
             id: "gates-2",
@@ -104,17 +127,53 @@ describe("task runs on the page", () => {
             costUsd: 0,
           },
         ],
+        baseline: [gate(0, 7)],
         gates: runs,
         notRun: [],
+        approvals: [],
+        guardBlocks: [],
         costUsd: 0,
       },
     });
-    const second = t.run?.steps[1];
-    assert.ok(second);
+    const [before, first, second] = t.run?.steps ?? [];
+    assert.ok(before && first && second);
+    assert.deepEqual(
+      runsOfEntry(t, before).map((g) => g.exitCode),
+      [7],
+    );
+    assert.deepEqual(
+      runsOfEntry(t, first).map((g) => g.exitCode),
+      [1],
+    );
     assert.deepEqual(
       runsOfEntry(t, second).map((g) => g.exitCode),
       [0],
     );
+    assert.deepEqual([...failedBefore(t)], ["test:."]);
+  });
+
+  it("offers accepting the risk only after a failed or unverified run", () => {
+    const run: NonNullable<Task["run"]> = {
+      workflow: { id: "tier-s", version: 1 },
+      permissionMode: "default",
+      base: null,
+      untrackedAtStart: [],
+      startedAt: "2026-10-30T00:00:00.000Z",
+      position: 1,
+      fixRounds: 0,
+      steps: [],
+      baseline: [],
+      gates: [],
+      notRun: [],
+      approvals: [],
+      guardBlocks: [],
+      costUsd: 0,
+    };
+    assert.equal(canAcceptRisk(task({ state: "failed", run })), true);
+    assert.equal(canAcceptRisk(task({ state: "unverified", run })), true);
+    assert.equal(canAcceptRisk(task({ state: "done", run })), false);
+    assert.equal(canAcceptRisk(task({ state: "accepted", run })), false, "already accepted");
+    assert.equal(canAcceptRisk(task({ state: "failed" })), false, "no run, nothing to accept");
   });
 
   it("keeps the newest version: a run's notifications can overtake the reply that started it", () => {

@@ -116,6 +116,22 @@ describe("apply and roll back fixes", () => {
     assert.equal(read(dir, ".gitignore"), original);
   });
 
+  it("installs the task roles into .claude/agents/, and rolls them back", async () => {
+    const dir = copyFixture("sample-app");
+    const { runId, results } = await applyActions(dir, ["fix:install-agents"], ctx(dir));
+    assert.equal(results[0]?.status, "applied");
+    const implementer = read(dir, ".claude/agents/ac-implementer.md");
+    assert.match(implementer, /^---\nname: ac-implementer\n/);
+    assert.equal(read(dir, ".claude/agents/ac-independent-reviewer.md").includes("model: opus"), true);
+    const lock = JSON.parse(read(dir, ".agentchainer/lock.json"));
+    assert.ok(lock.fixes.some((f: { id: string }) => f.id === "install-agents"));
+    // Installed and unchanged: the plan doesn't offer it again.
+    const again = await applyActions(dir, ["fix:install-agents"], ctx(dir));
+    assert.equal(again.results[0]?.status, "skipped");
+    rollback(dir, runId, ctx(dir));
+    assert.equal(existsSync(join(dir, ".claude", "agents")), false);
+  });
+
   it("initializes git in an empty folder, and removes it again while it has no commits", async () => {
     const dir = copyFixture("empty");
     const { runId, results } = await applyActions(dir, ["fix:git-init"], ctx(dir));

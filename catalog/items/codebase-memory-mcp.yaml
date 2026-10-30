@@ -32,9 +32,10 @@ source:
 platforms: [darwin, linux, win32]
 risk: medium
 permissions:
-  - "Indexes the workspace into a local graph database in its own cache folder"
-  - "Starts a background daemon that watches indexed git projects for changes"
-  - "Runs locally; the project states it makes no network requests and collects no telemetry"
+  - "Indexes code into a local database in ~/.cache/codebase-memory-mcp, shared by every project and agent on this account"
+  - "Starts a per-account background process that watches the git projects of open sessions and re-indexes them"
+  - "Claude can ask it to index any folder on this machine, delete an index, or save design notes in the index"
+  - "Runs git; makes no network requests and collects no telemetry (checked in the 0.11.0 source and binary)"
 install:
   # The binary's path is specific to this machine, so the server is registered privately.
   scope: local
@@ -47,4 +48,7 @@ uninstall:
 reviews: []
 notes: >-
   AgentChainer never runs the project's install script: it edits the global config of every coding agent it finds
-  and adds hooks, agents and skills. Only the binary is used, registered for this workspace.
+  and adds hooks, agents and skills. Only the binary is used, registered for this workspace. Not approved at 0.11.0
+  (docs/catalog-reviews/2026-10-30.md): 0.12.0 fixed a heap overflow reachable through query_graph and two symlink
+  escapes. Re-pin to 0.12.1 and review again; as a community item it needs two reviews. Every cbm process on the
+  machine must run the same version, so another installed version conflicts.

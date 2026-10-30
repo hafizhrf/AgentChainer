@@ -7,8 +7,9 @@ license: "MIT"
 homepage: https://github.com/cloudflare/security-audit-skill
 summary: "Six-phase security audit that produces machine-readable findings."
 why: >-
-  Finds real vulnerabilities, each with steps to validate it, instead of generic advice. It's thorough and slow, so
-  run it on demand (before a release), not on every change.
+  Claude reviews your code like a security auditor and reports only problems it can back with evidence, each with
+  steps to check it, instead of generic advice. A full audit is thorough, slow and uses many model calls, so run it
+  on demand (for example before a release), not on every change.
 source:
   type: git
   repo: https://github.com/cloudflare/security-audit-skill
@@ -21,8 +22,9 @@ requires:
     hint: "Install Node.js 18 or later"
 risk: medium
 permissions:
-  - "Spawns several subagents during an audit"
-  - "Runs the project's build and test commands while validating findings"
+  - "In a full audit, spawns many subagents (4 to map the code, then hunters, reviewers and verifiers), which uses a lot of model usage"
+  - "Writes its reports outside the project, by default in ~/security-audit-skill/<repo>/run-<N>"
+  - "Runs the project's build and tests only inside an OS sandbox without network; without one it only reads code"
   - "Runs node to check its own report files (the validators use only the file system)"
 install:
   scope: project
@@ -33,6 +35,7 @@ uninstall:
     - remove: ".claude/skills/security-audit"
 reviews: []
 notes: >-
-  Pre-review scan at c1c8a8c (20 files): the two validator scripts require only fs, path and util; their tests spawn
-  node locally; eval/exec appear only as text in ATTACK-CLASSES.md. No network calls found. A maintainer still has
-  to read every file (docs/CATALOG.md §4).
+  Not approved yet (docs/catalog-reviews/2026-10-30.md). All 20 files at c1c8a8c were read (tree hash matches): no
+  network calls or install steps, validators use only the file system. Blocking: its MIT notice lives at the repo
+  root and isn't copied with the skill, which needs an app change. On Windows the validators reject all input, so a
+  full audit can't finish there; guidance mode works.

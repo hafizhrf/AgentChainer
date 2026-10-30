@@ -497,7 +497,7 @@ All of these run on macOS, Windows and Ubuntu against a sample repo in `fixtures
         rules, and full commit SHAs only.
       - `build-catalog.ts` compiles the snapshot.
       - `plan.test.ts` fails in CI when `catalog/` is invalid or the compiled files are stale.
-- [ ] **M2-02** Seed the items from [CATALOG §6](CATALOG.md#6-seed-items) with pinned refs, CI-computed hashes and licenses.
+- [x] **M2-02** Seed the items from [CATALOG §6](CATALOG.md#6-seed-items) with pinned refs, CI-computed hashes and licenses.
       Review each one with the [§4 checklist](CATALOG.md#4-review-checklist-adding-or-updating-an-item).
       Progress:
       - 10 marketplace plugins are in `catalog/items/`, their names, versions and configs read from the official
@@ -517,7 +517,16 @@ All of these run on macOS, Windows and Ubuntu against a sample repo in `fixtures
         - playwright-mcp 0.0.83, pinned, which replaces the unpinned plugin in `web-testing`.
         - The `catalog-sources` workflow re-downloads every asset, checks its sha256 against the catalog and GitHub's
           digest, and checks npm integrity. Run locally: all 16 pins match.
-      - Remaining: maintainer reviews (each item is offered once its `reviews` count is met).
+      — evidence: [the first maintainer reviews](catalog-reviews/2026-10-30.md) (PR #34). Merging that PR is the
+      owner's sign-off.
+      - 11 items are approved, several with corrected permissions: code-review, commit-commands, the four LSPs,
+        context7, github, playwright-mcp (now `--isolated`), actionlint, gitleaks.
+      - 4 are not approved:
+        - security-guidance: an unpinned pip install at runtime, and spend outside the session's cost. It's out of
+          `baseline`.
+        - the playwright plugin: `@latest`.
+        - cloudflare-security-audit: its MIT notice isn't copied (M2-29).
+        - codebase-memory-mcp 0.11.0: security fixes are in 0.12.x.
 - [x] **M2-03** Show trust tiers in the UI. Community items are never pre-selected or auto-applied.
       — evidence:
       - The plan review shows each item's tier (community in red).
@@ -798,6 +807,17 @@ All of these run on macOS, Windows and Ubuntu against a sample repo in `fixtures
       - `apply.test.ts` runs installers and rollback on temp copies of the fixtures, with a fake CLI and fake fetch,
         so there's no network in CI.
 
+### Follow-ups from the first catalog review ([2026-10-30](catalog-reviews/2026-10-30.md))
+
+- [ ] **M2-29** Carry license notices for git-source items: a `licensePath` pinned with its own hash and copied with
+      the files. This unblocks cloudflare-security-audit.
+- [ ] **M2-30** The gitleaks hook wrapper prefers a gitleaks on PATH and doesn't hash-check the tools-folder copy:
+      prefer the pinned copy and check it against its marker.
+- [ ] **M2-31** `merge-json` replaces arrays. Merge permission lists (allow/deny) by union, so an item can add a deny
+      rule to `.claude/settings.json`.
+- [ ] **M2-32** Re-pin codebase-memory-mcp to 0.12.1 (the weekly bot proposes it) and review it again; it needs two
+      reviews as a community item.
+
 ### Exit criteria
 
 - [x] **M2-E1** Bootstrap succeeds on every fixture on macOS, Windows and Ubuntu.
@@ -953,6 +973,12 @@ for the desktop shell, start screen and session view to be cleaned up (UX-02, UX
         - **Help:** docs, install guide, shortcuts, privacy, release notes, updates, About.
 - [ ] **UX-08** App icon and visual identity, after naming and branding are settled (M0-01).
 - [ ] **UX-09** Usability test with 3–5 target users on macOS, Windows and Ubuntu; fix the top issues.
+- [ ] **UX-10** A Plugins page like Android Studio's, after M3 step 1. Owner request, 2026-10-30.
+  - Marketplace and Installed tabs, search, a detail page (vendor, version, license, permissions, risk, review
+    status, source link), Install/Uninstall per workspace, and update notices.
+  - It lists the reviewed catalog **and the whole official marketplace**; unreviewed plugins are clearly marked.
+    That changes ADR-0005's trust model, so a new ADR comes first.
+  - Plugins keep installing through the Claude CLI, from their original marketplace.
 
 ### Exit criteria
 

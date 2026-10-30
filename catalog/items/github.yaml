@@ -3,7 +3,7 @@ id: github
 name: "GitHub (official MCP)"
 kind: plugin
 tier: verified-vendor
-license: "MIT (verify)"
+license: "Apache-2.0 (plugin files); GitHub's hosted server (source MIT)"
 homepage: https://github.com/github/github-mcp-server
 summary: "GitHub's own MCP server: issues, pull requests, code search and the rest of the GitHub API."
 why: >-
@@ -18,8 +18,8 @@ source:
 platforms: [darwin, linux, win32]
 risk: high
 permissions:
-  - "Acts on GitHub with your personal access token: read and, depending on the token, write repositories, issues and pull requests"
-  - "Talks to api.githubcopilot.com"
+  - "Acts on GitHub as you with your personal access token: reads and, if the token allows, creates or changes files, branches, repositories, issues and pull requests (including merging)"
+  - "Sends your token and every request to GitHub's hosted MCP server (api.githubcopilot.com)"
 secrets:
   - "GITHUB_PERSONAL_ACCESS_TOKEN"
 install:
@@ -29,7 +29,15 @@ install:
 uninstall:
   steps:
     - run: [claude, plugin, uninstall, "github@claude-plugins-official", --scope, project, --json]
-reviews: []
+reviews:
+  - by: hafizhrf
+    date: "2026-10-30"
+    ref: "f8c5e7a1dcb71b10cb74586224b5401f3de5db28"
+    notes: >-
+      Read both plugin files at f8c5e7a: a remote MCP server at api.githubcopilot.com with
+      Authorization: Bearer ${GITHUB_PERSONAL_ACCESS_TOKEN}; nothing runs locally; the server's default tool sets
+      include write and merge tools. docs/catalog-reviews/2026-10-30.md
 notes: >-
   The token is read from the environment by the CLI; AgentChainer never stores it (ADR-0002). Use a fine-grained
-  token limited to the repositories you need.
+  token limited to the repositories you need. The plugin uses GitHub's full default tool set (read and write). If
+  the variable isn't set, the server fails to connect.

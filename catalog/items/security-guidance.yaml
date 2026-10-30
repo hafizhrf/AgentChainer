@@ -3,7 +3,7 @@ id: security-guidance
 name: "Security Guidance"
 kind: plugin
 tier: official
-license: "Apache-2.0 (marketplace repo)"
+license: "Apache-2.0"
 summary: "Flags insecure patterns in Claude's edits and reviews the diff for vulnerabilities."
 why: >-
   Catches injection, XSS, SSRF, hardcoded secrets and similar mistakes while Claude writes the code, not after
@@ -16,11 +16,18 @@ source:
   reviewedVersion: "2.0.17"
   reviewedRef: "f8c5e7a1dcb71b10cb74586224b5401f3de5db28"
 platforms: [darwin, linux, win32]
-risk: medium
+requires:
+  - tool: python3
+    hint: "Python 3.10 or newer (macOS's built-in 3.9 runs only the pattern warnings)"
+risk: high
 permissions:
-  - "Adds hooks that check every edit Claude makes for risky patterns"
-  - "Runs an extra model review of the diff when Claude stops (uses your Claude plan)"
-  - "Adds a commit reviewer agent"
+  - "Checks every file Claude edits for risky code patterns and warns Claude (local, no network)"
+  - "After each turn, sends the changed code to Claude Opus for a security review that isn't shown in your session's cost (uses your Claude plan or API key)"
+  - "After git commit or push, a background reviewer reads related project files and sends them to the model"
+  - "Can wake Claude after it finishes so it fixes the findings"
+  - "On first use, installs the latest claude-agent-sdk from PyPI (a few hundred MB, not pinned) into ~/.claude/security"
+  - "Keeps a log and state in ~/.claude/security, which uninstall doesn't remove"
+  - "Reports usage counts to Anthropic through Claude Code's hook metrics"
 install:
   scope: project
   steps:
@@ -29,3 +36,8 @@ uninstall:
   steps:
     - run: [claude, plugin, uninstall, "security-guidance@claude-plugins-official", --scope, project, --json]
 reviews: []
+notes: >-
+  Not approved at f8c5e7a (docs/catalog-reviews/2026-10-30.md): its hooks pip-install an unpinned claude-agent-sdk at
+  runtime, which ADR-0005 rules out, and its model reviews spend outside the session's visible cost. It's no longer
+  in the baseline profile. If you use it anyway: ENABLE_CODE_SECURITY_REVIEW=0 turns off the model reviews and the
+  SDK install; SECURITY_GUIDANCE_DISABLE=1 turns the plugin off.

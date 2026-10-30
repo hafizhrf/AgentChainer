@@ -3,7 +3,7 @@ id: pyright-lsp
 name: "Python language server (Pyright)"
 kind: plugin
 tier: official
-license: "Apache-2.0 (marketplace repo)"
+license: "Apache-2.0"
 summary: "Gives Claude Python type checking and code intelligence through Pyright."
 why: >-
   Claude sees type errors and definitions in Python code like an editor does.
@@ -17,7 +17,7 @@ source:
 platforms: [darwin, linux, win32]
 requires:
   - tool: pyright-langserver
-    hint: "npm install -g pyright (or pip install pyright)"
+    hint: "npm install -g pyright (or pipx install pyright)"
 risk: low
 permissions:
   - "Starts pyright-langserver in the project"
@@ -28,4 +28,11 @@ install:
 uninstall:
   steps:
     - run: [claude, plugin, uninstall, "pyright-lsp@claude-plugins-official", --scope, project, --json]
-reviews: []
+reviews:
+  - by: hafizhrf
+    date: "2026-10-30"
+    ref: "f8c5e7a1dcb71b10cb74586224b5401f3de5db28"
+    notes: >-
+      Read the marketplace entry, README and LICENSE at f8c5e7a (1.0.0, the whole folder): Apache-2.0; a config-only
+      LSP plugin that starts pyright-langserver --stdio from PATH; no hooks, MCP servers, scripts or telemetry.
+      docs/catalog-reviews/2026-10-30.md

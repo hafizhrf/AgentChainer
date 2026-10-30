@@ -168,7 +168,7 @@ Profiles group items. The detector picks profiles; the user can add or remove it
 
 | Profile | When suggested | Items |
 |---|---|---|
-| `baseline` | Every workspace | AgentChainer first-party skills (`ac-*`), `code-review`, `security-guidance`, `commit-commands` (official plugins), `gitleaks` pre-commit hook |
+| `baseline` | Every workspace | AgentChainer first-party skills (`ac-*`), `code-review`, `commit-commands` (official plugins), `gitleaks` pre-commit hook. `security-guidance` left it after the [2026-10-30 review](catalog-reviews/2026-10-30.md) |
 | `ts-node` | Node stack | `typescript-lsp` (needs `typescript-language-server`) |
 | `python` | Python stack | `pyright-lsp` (needs `pyright-langserver`) |
 | `go` | Go stack | `gopls-lsp` (needs `gopls`) |
@@ -186,20 +186,20 @@ Profiles live in `catalog/profiles/<id>.yaml` with `suggest: {always | stacks | 
 | ID | Kind | Tier | License | Install method | Status |
 |---|---|---|---|---|---|
 | `ac-write-claude-md`, `ac-setup-hooks`, `ac-scaffold-tests`, `ac-generate-ci`, `ac-smoke-test` | skill | first-party | Apache-2.0 | Copied from `skills/` | To build (M2-19) |
-| `code-review` (1.0.1) | plugin | official | Apache-2.0 (marketplace repo) | `claude plugin install code-review@claude-plugins-official --scope project` | In `catalog/`, awaiting review |
-| `security-guidance` (2.0.17) | plugin | official | Apache-2.0 (marketplace repo) | same pattern | In `catalog/`, awaiting review |
-| `commit-commands` (1.0.1) | plugin | official | Apache-2.0 (marketplace repo) | same pattern | In `catalog/`, awaiting review |
-| `typescript-lsp`, `pyright-lsp`, `gopls-lsp`, `rust-analyzer-lsp` (1.0.0) | plugin | official | Apache-2.0 (marketplace repo) | same pattern; each needs its language server on PATH | In `catalog/`, awaiting review |
-| `context7` | plugin | verified-vendor | **(verify)** | Partner plugin: the hosted MCP at `mcp.context7.com`, may ask you to sign in | In `catalog/`, awaiting review |
-| `playwright` | plugin | verified-vendor | Apache-2.0 **(verify)** | Partner plugin. **It runs `npx @playwright/mcp@latest`, which is unpinned**, so the profile uses `playwright-mcp` | In `catalog/`, in no profile |
-| `playwright-mcp` (0.0.83) | mcp | verified-vendor | Apache-2.0 | `npx -y @playwright/mcp@0.0.83` merged into the project's `.mcp.json` | In `catalog/`, awaiting review |
-| `github` | plugin | verified-vendor | MIT **(verify)** | Partner plugin: the remote MCP `api.githubcopilot.com` with `GITHUB_PERSONAL_ACCESS_TOKEN` from your environment | In `catalog/`, awaiting review |
+| `code-review` (1.0.1) | plugin | official | Apache-2.0 | `claude plugin install code-review@claude-plugins-official --scope project` | Reviewed ([2026-10-30 review](catalog-reviews/2026-10-30.md)) |
+| `security-guidance` (2.0.17) | plugin | official | Apache-2.0 | same pattern | **Not approved**: its hooks pip-install an unpinned SDK at runtime |
+| `commit-commands` (1.0.1) | plugin | official | Apache-2.0 | same pattern | Reviewed |
+| `typescript-lsp`, `pyright-lsp`, `gopls-lsp`, `rust-analyzer-lsp` (1.0.0) | plugin | official | Apache-2.0 | same pattern; each needs its language server on PATH | Reviewed |
+| `context7` | plugin | verified-vendor | Apache-2.0 (plugin files); hosted service under Context7's terms | Partner plugin: the hosted MCP at `mcp.context7.com`, may ask you to sign in | Reviewed |
+| `playwright` | plugin | verified-vendor | Apache-2.0 | Partner plugin. **It runs `npx @playwright/mcp@latest`, which is unpinned**, so the profile uses `playwright-mcp` | **Not approved**; in no profile |
+| `playwright-mcp` (0.0.83) | mcp | verified-vendor | Apache-2.0 | `npx -y @playwright/mcp@0.0.83 --isolated` merged into the project's `.mcp.json` | Reviewed |
+| `github` | plugin | verified-vendor | Apache-2.0 (plugin files); GitHub's hosted server (source MIT) | Partner plugin: the remote MCP `api.githubcopilot.com` with `GITHUB_PERSONAL_ACCESS_TOKEN` from your environment | Reviewed |
 | `firebase` | plugin | verified-vendor | per plugin | Partner plugin | Seed **(verify)** |
-| `cloudflare-security-audit` | skill | verified-vendor | MIT | Copy `skills/security-audit/` at a pinned SHA | Seed |
-| `codebase-memory-mcp` (0.11.0) | mcp | community | MIT | Pinned release binary + `claude mcp add --scope local` | In `catalog/`, awaiting 2 reviews |
+| `cloudflare-security-audit` | skill | verified-vendor | MIT | Copy `skills/security-audit/` at a pinned SHA | **Not approved yet**: the MIT notice isn't copied (M2-29) |
+| `codebase-memory-mcp` (0.11.0) | mcp | community | MIT | Pinned release binary + `claude mcp add --scope local` | **Not approved at 0.11.0**: re-pin to 0.12.1 (M2-32), then 2 reviews |
 | `anthropic-example-skills` | plugin | official | Apache-2.0 (subset) | `example-skills@anthropic-agent-skills` | Optional; exclude source-available document skills |
-| `gitleaks` (8.30.1) | hook | verified-vendor | MIT | Pinned release binary; pre-commit hook via the repo's hook manager, or a local hook | In `catalog/`, awaiting review |
-| `actionlint` (1.7.12) | tool | verified-vendor | MIT | Pinned release binary. The verifier downloads it on demand to check generated workflows (AgentChainer's own tool, like the Agent SDK); not offered as an install | In `catalog/` |
+| `gitleaks` (8.30.1) | hook | verified-vendor | MIT | Pinned release binary; pre-commit hook via the repo's hook manager, or a local hook | Reviewed |
+| `actionlint` (1.7.12) | tool | verified-vendor | MIT | Pinned release binary. The verifier downloads it on demand to check generated workflows (AgentChainer's own tool, like the Agent SDK); not offered as an install | Reviewed |
 | `semgrep` | tool | verified-vendor | LGPL-2.1 (CLI) **(verify)** | Pinned CLI; CI gate / on-demand scan | Optional **(verify no-login usage)** |
 | `trivy` | tool | verified-vendor | Apache-2.0 | Pinned CLI; CI gate for deps/containers | Optional |
 

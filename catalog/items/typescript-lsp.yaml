@@ -3,7 +3,7 @@ id: typescript-lsp
 name: "TypeScript language server"
 kind: plugin
 tier: official
-license: "Apache-2.0 (marketplace repo)"
+license: "Apache-2.0"
 summary: "Gives Claude TypeScript/JavaScript code intelligence through typescript-language-server."
 why: >-
   Claude can jump to definitions and see type errors like an editor does, instead of guessing from text search.
@@ -28,4 +28,11 @@ install:
 uninstall:
   steps:
     - run: [claude, plugin, uninstall, "typescript-lsp@claude-plugins-official", --scope, project, --json]
-reviews: []
+reviews:
+  - by: hafizhrf
+    date: "2026-10-30"
+    ref: "f8c5e7a1dcb71b10cb74586224b5401f3de5db28"
+    notes: >-
+      Read the marketplace entry, README and LICENSE at f8c5e7a (1.0.0, the whole folder): Apache-2.0; a config-only
+      LSP plugin that starts typescript-language-server --stdio from PATH; no hooks, MCP servers, scripts or
+      telemetry. docs/catalog-reviews/2026-10-30.md

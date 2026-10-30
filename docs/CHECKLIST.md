@@ -1168,6 +1168,12 @@ Decisions: [ADR-0009](adr/0009-release-signing-and-updates.md). Maintainer steps
         - the task branch's log has one commit and one merge per sub-task; the report's gate runs match the recorded
           ones and a re-run by hand;
         - Clean up removed the worktrees and the user's branch was untouched.
+      - **Windows 11** (2026-10-30, CLI 2.1.314): the first XL run stopped after merging sub-task 1 with `EPERM`
+        removing its worktree. The step's `claude` (and the MCP servers it started there) was still exiting, and
+        Windows won't remove a folder a process runs in. `Session.close()` now resolves when the CLI has exited, the
+        orchestrator waits for it, and a merged sub-task's worktree that still can't go is left for Clean up instead
+        of stopping the run. After that: 5 XL runs ended Done (two with 2 sub-tasks), Clean up removed the worktrees;
+        S, M and L also ended Done with the evidence matching the recorded gate runs.
       - **Workflow tool** ([spike S7](spikes/S7-workflow-tool.md)): available on the owner's account; not the
         executor, since gates and evidence must stay the app's; usable inside a step.
       - Remaining: owner click-through.

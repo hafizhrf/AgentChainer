@@ -42,8 +42,8 @@ export type Runner = {
   diff(): string;
   /** Stops what's running now: a session's turn or a gate. */
   stop(): void;
-  /** The run ended: close what's still open. */
-  close(): void;
+  /** The run ended: close what's still open. Resolves once the sessions' processes have exited. */
+  close(): Promise<void>;
 };
 
 /** Hand-off files in the task folder (`plan.md`, `review.json`, `summary.md`). */
@@ -295,7 +295,8 @@ export class Orchestrator {
       if (this.cancelled) return this.end("cancelled", "Stopped by the user. The working tree is left as it is.");
       return this.end("failed", `Stopped on an error: ${err instanceof Error ? err.message : String(err)}`);
     } finally {
-      this.runner.close();
+      // Before the run counts as ended: XL removes a sub-task's worktree next, which needs its sessions gone.
+      await this.runner.close();
     }
   }
 

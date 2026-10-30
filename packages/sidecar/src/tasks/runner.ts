@@ -255,7 +255,7 @@ export function sessionRunner(
       tags.set(session.id, { ...tag, cwd: root });
       if (step.access === "write") live.set(step.id, session);
       const out = await turn(session, prompt);
-      if (step.access === "read") session.close();
+      if (step.access === "read") void session.close();
       return out;
     },
     async followUp(step, sessionId, prompt, budgetUsd, tag) {
@@ -281,10 +281,10 @@ export function sessionRunner(
     diff: () => taskDiff(root, run.base, run.untrackedAtStart),
     stop() {
       gatesAbort?.abort();
-      for (const s of open) s.close();
+      for (const s of open) void s.close();
     },
-    close() {
-      for (const s of open) s.close();
+    async close() {
+      await Promise.all([...open].map((s) => s.close()));
     },
   };
 }

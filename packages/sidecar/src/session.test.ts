@@ -99,3 +99,32 @@ describe("Session.turn", () => {
     s.close();
   });
 });
+
+describe("Session.close", () => {
+  it("resolves only once the CLI process has exited, and again after that", async () => {
+    const spawned: { child?: { exitCode: number | null } } = {};
+    // Spawns a stand-in CLI through the session's own spawner; it exits a moment after its stdin closes, like the CLI.
+    const sdk = {
+      query: ({ options }: { options: Record<string, unknown> }) => {
+        const spawnCli = options.spawnClaudeCodeProcess as (o: Record<string, unknown>) => { exitCode: number | null };
+        spawned.child = spawnCli({
+          command: process.execPath,
+          args: ["-e", "process.stdin.resume(); process.stdin.on('end', () => setTimeout(() => process.exit(0), 300))"],
+          env: process.env,
+        });
+        const proc = spawned.child as unknown as { stdin: { end(): void } };
+        const messages = (async function* () {})();
+        return Object.assign(messages, { close: () => proc.stdin.end(), interrupt: async () => undefined });
+      },
+    } as unknown as AgentSdkModule;
+    const s = new Session(sdk, { cwd: process.cwd(), claudePath: "claude" }, callbacks());
+    await s.close();
+    assert.notEqual(spawned.child?.exitCode, null, "the process exited before close() resolved");
+    await s.close();
+  });
+
+  it("resolves at once when no process was started", async () => {
+    const { sdk } = fakeSdk([]);
+    await new Session(sdk, { cwd: "/w", claudePath: "claude" }, callbacks()).close();
+  });
+});

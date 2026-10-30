@@ -1,5 +1,7 @@
+import { type ChildProcess, spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { appendFileSync } from "node:fs";
+import { createInterface } from "node:readline";
 import type {
   AgentEvent,
   AlwaysScope,
@@ -20,6 +22,7 @@ import type {
 import { checkToolCall, READ_TOOLS, readOnlyHook } from "./guard.ts";
 import { normalize } from "./normalize.ts";
 import { alwaysUpdates, describeUpdates, retarget } from "./permissions.ts";
+import { log } from "./rpc.ts";
 import type { AgentSdkModule } from "./sdk-loader.ts";
 
 /**
@@ -118,6 +121,9 @@ export class Session {
   private readonly waiters: { resolve: (r: TurnResult) => void; reject: (e: Error) => void }[] = [];
   /** The session's running cost, to give each turn its own. */
   private totalCostUsd = 0;
+  /** The CLI process, so that closing can wait for it to exit (and let go of the session's folder). */
+  private proc: ChildProcess | null = null;
+  private closing: Promise<void> | null = null;
 
   constructor(sdk: AgentSdkModule, options: SessionOptions, callbacks: SessionCallbacks) {
     this.callbacks = callbacks;
@@ -151,6 +157,19 @@ export class Session {
         enableFileCheckpointing: true,
         ...(options.model ? { model: options.model } : {}),
         pathToClaudeCodeExecutable: options.claudePath,
+        // Spawned here, as the SDK would, only to keep the process: see close().
+        spawnClaudeCodeProcess: ({ command, args, cwd, env, signal }) => {
+          const child = spawn(command, args, {
+            ...(cwd ? { cwd } : {}),
+            env,
+            signal,
+            stdio: ["pipe", "pipe", "pipe"],
+            windowsHide: true,
+          });
+          createInterface({ input: child.stderr }).on("line", (line) => log(`claude: ${line}`));
+          this.proc = child;
+          return child;
+        },
         includePartialMessages: true,
         forwardSubagentText: true,
         permissionMode: options.permissionMode ?? "default",
@@ -251,9 +270,22 @@ export class Session {
     return true;
   }
 
-  close(): void {
+  /**
+   * Ends the session. Resolves once its CLI has exited, after the SDK's grace period at most: until then it (and the
+   * MCP servers it started) still runs in the session's folder, which Windows won't let anyone remove, e.g. an XL
+   * sub-task's worktree.
+   */
+  close(): Promise<void> {
+    if (this.closing) return this.closing;
+    const proc = this.proc;
+    const exited =
+      proc && proc.exitCode === null && proc.signalCode === null
+        ? new Promise<void>((resolve) => proc.once("exit", () => resolve()))
+        : Promise.resolve();
     this.input.close();
     this.q.close();
+    this.closing = exited;
+    return exited;
   }
 
   private async pump(): Promise<void> {

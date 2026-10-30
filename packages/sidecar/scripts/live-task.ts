@@ -14,6 +14,7 @@
 import { execSync, spawn } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { createInterface } from "node:readline";
+import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
 import type { MethodName, Methods, Task } from "@agentchainer/protocol";
 import { copyFixture, removeFixtureCopies } from "../src/detect/fixture-copy.ts";
@@ -33,7 +34,7 @@ const { values } = parseArgs({
 
 const cwd = copyFixture(values.fixture);
 console.log(`workspace: ${cwd}`);
-const child = spawn(process.execPath, [new URL("../src/main.ts", import.meta.url).pathname], {
+const child = spawn(process.execPath, [fileURLToPath(new URL("../src/main.ts", import.meta.url))], {
   stdio: ["pipe", "pipe", "inherit"],
 });
 const pending = new Map<number, (m: { result?: unknown; error?: { message: string } }) => void>();
@@ -169,6 +170,12 @@ try {
   }
   console.log(`\ngit status:\n${execSync("git status --short", { cwd, encoding: "utf8" })}`);
 } finally {
-  child.kill();
+  // Close stdin and let the sidecar end its sessions and exit: on Windows a folder that a live process still runs in
+  // can't be removed (EPERM). Killed only if it hangs.
+  const exited = new Promise((resolve) => child.once("exit", resolve));
+  child.stdin.end();
+  const timer = setTimeout(() => child.kill(), 10_000);
+  await exited;
+  clearTimeout(timer);
   if (!values.keep) removeFixtureCopies();
 }

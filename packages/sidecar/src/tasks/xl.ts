@@ -345,11 +345,22 @@ export class XlOrchestrator {
       this.finish(id, { status: "failed", note: message });
       return `${this.name(child)} couldn't be merged: ${message}`;
     }
-    this.finish(id, { status: "done", note: accepted ? "Merged; it was accepted with risk." : "Merged." });
+    let kept = false;
     if (!wt.removed && world.exists(wt.path)) {
-      world.removeWorktree(wt.path);
-      world.save({ ...world.load(child.id), worktree: { ...wt, removed: true } });
+      // Its work is merged, so a folder that can't go yet (on Windows, while a process it started still runs there) is
+      // left for Clean up instead of stopping the run.
+      try {
+        world.removeWorktree(wt.path);
+        world.save({ ...world.load(child.id), worktree: { ...wt, removed: true } });
+      } catch {
+        kept = true;
+      }
     }
+    const note = [
+      accepted ? "Merged; it was accepted with risk." : "Merged.",
+      kept ? "Its worktree is left for Clean up." : "",
+    ];
+    this.finish(id, { status: "done", note: note.filter(Boolean).join(" ") });
     merged.add(child.id);
     return null;
   }

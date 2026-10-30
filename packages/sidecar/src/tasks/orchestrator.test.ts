@@ -104,7 +104,7 @@ function fakeRunner(opts: {
     stop: () => {
       stopped = true;
     },
-    close: () => undefined,
+    close: async () => undefined,
   };
   return { runner, calls, wasStopped: () => stopped };
 }

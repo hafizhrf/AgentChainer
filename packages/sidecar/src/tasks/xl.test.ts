@@ -68,6 +68,8 @@ function fakeWorld(
     integration?: GateRun[];
     setupFails?: boolean;
     slow?: Record<string, number>;
+    /** Worktrees that can't be removed yet, as on Windows while a process still runs in them. */
+    busy?: string[];
   } = {},
 ) {
   const store = new Map(children.map((c) => [c.id, c]));
@@ -88,6 +90,7 @@ function fakeWorld(
     codeOf: (p) => p,
     exists: (p) => trees.has(p),
     removeWorktree: (p) => {
+      if (opts.busy?.includes(p.slice(4))) throw new Error(`EPERM, Permission denied: ${p}`);
       trees.delete(p);
       log.push(`remove ${name(p.slice(4))}`);
     },
@@ -203,6 +206,20 @@ describe("XL runs", () => {
     assert.equal(done.worktree?.branch, `agentchainer/${PARENT}`);
     assert.equal(f.store.get(A)?.worktree?.removed, true);
     assert.match(done.run?.outcome ?? "", /^Every sub-task was merged into agentchainer\//);
+  });
+
+  it("goes on when a merged sub-task's worktree can't be removed yet, and leaves it for Clean up", async () => {
+    const f = fakeWorld([task(A), task(B), task(C, { dependsOn: [A] })], { busy: [A] });
+    const { o } = orchestrate(parent(), f.world);
+    const done = await o.run();
+    assert.equal(done.state, "done", done.run?.outcome);
+    assert.equal(timeline(done)?.at(-1), "integration:done");
+    assert.match(
+      done.run?.steps.find((s) => s.id === "merge-1")?.note ?? "",
+      /^Merged\. Its worktree is left for Clean up\.$/,
+    );
+    assert.equal(f.store.get(A)?.worktree?.removed, undefined, "still there for Clean up");
+    assert.equal(f.store.get(C)?.worktree?.removed, true);
   });
 
   it("starts nothing new after a sub-task fails, lets the running one finish, and names it", async () => {

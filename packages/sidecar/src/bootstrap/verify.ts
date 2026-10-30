@@ -1,4 +1,4 @@
-import { spawn } from "node:child_process";
+import { type ChildProcess, spawn } from "node:child_process";
 import { existsSync } from "node:fs";
 import path from "node:path";
 import { detectWorkspace } from "../detect/detect.ts";
@@ -16,6 +16,23 @@ const TAIL_LINES = 40;
 export type CommandRun = { command: string; exitCode: number | null; timedOut: boolean; tail: string; ms: number };
 
 /**
+ * Stops a command and everything it started. Killing only the shell isn't enough: Linux's `sh` (dash) and Windows'
+ * `cmd` run the command as a child, which would keep running and hold the output open.
+ */
+function killTree(child: ChildProcess): void {
+  if (child.pid === undefined) return;
+  if (process.platform === "win32") {
+    spawn("taskkill", ["/pid", String(child.pid), "/T", "/F"], { stdio: "ignore" });
+    return;
+  }
+  try {
+    process.kill(-child.pid, "SIGKILL");
+  } catch {
+    child.kill("SIGKILL");
+  }
+}
+
+/**
  * Runs a project command through the shell (commands come from the project's own manifests) without blocking.
  * `signal` stops it early, like the timeout does.
  */
@@ -31,6 +48,8 @@ export function runCommand(
     const child = spawn(command, {
       cwd,
       shell: true,
+      // Its own process group on POSIX, so stopping it can take its children too (see killTree).
+      detached: process.platform !== "win32",
       stdio: ["ignore", "pipe", "pipe"],
       env: { ...process.env, CI: "1", ...env },
     });
@@ -43,9 +62,9 @@ export function runCommand(
     let timedOut = false;
     const timer = setTimeout(() => {
       timedOut = true;
-      child.kill("SIGKILL");
+      killTree(child);
     }, timeoutMs);
-    const stop = () => child.kill("SIGKILL");
+    const stop = () => killTree(child);
     signal?.addEventListener("abort", stop);
     const done = (exitCode: number | null) => {
       clearTimeout(timer);

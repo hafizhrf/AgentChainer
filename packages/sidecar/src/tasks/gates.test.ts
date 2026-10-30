@@ -35,6 +35,8 @@ describe("gates", () => {
     writeFileSync(join(root, "a.txt"), "messy  \n");
     writeFileSync(join(root, "keep.txt"), "keep\n");
     g("init", "-q", "-b", "main");
+    // Exact bytes when the guard restores a file, on Windows too.
+    g("config", "core.autocrlf", "false");
     g("add", "-A");
     g("commit", "-q", "-m", "init");
   });
@@ -63,17 +65,26 @@ describe("gates", () => {
   });
 
   it("records real exit codes, runs every gate after a failure, keeps format's changes and reverts a check's", async () => {
+    // node -e: the same in sh and cmd.
+    const node = (js: string) => `node -e "${js}"`;
     const gates = [
       // A formatter: rewrites a.txt.
-      { kind: "format" as const, command: "printf 'clean\\n' > a.txt", package: ".", cwd: root },
-      // A check that fails and dirties keep.txt on the way: the change must be reverted.
       {
-        kind: "lint" as const,
-        command: "echo dirty >> keep.txt; echo 'lint: 2 problems'; exit 1",
+        kind: "format" as const,
+        command: node("require('fs').writeFileSync('a.txt','clean\\n')"),
         package: ".",
         cwd: root,
       },
-      { kind: "test" as const, command: "echo tests ok", package: ".", cwd: root },
+      // A check that fails and dirties keep.txt on the way: the change must be reverted.
+      {
+        kind: "lint" as const,
+        command: node(
+          "require('fs').appendFileSync('keep.txt','dirty\\n');console.log('lint: 2 problems');process.exit(1)",
+        ),
+        package: ".",
+        cwd: root,
+      },
+      { kind: "test" as const, command: node("console.log('tests ok')"), package: ".", cwd: root },
     ];
     const runs = await runGates(root, gates, 0);
     assert.deepEqual(
@@ -96,7 +107,9 @@ describe("gates", () => {
   it("stops when aborted", async () => {
     const abort = new AbortController();
     const started = Date.now();
-    const pending = runGates(root, [{ kind: "test", command: "sleep 30", package: ".", cwd: root }], 0, abort.signal);
+    // `&&` makes every shell run node as a child rather than replacing itself with it: stopping must reach the child.
+    const command = `node -e "setTimeout(() => {}, 30000)" && node -e "0"`;
+    const pending = runGates(root, [{ kind: "test", command, package: ".", cwd: root }], 0, abort.signal);
     setTimeout(() => abort.abort(), 200);
     const runs = await pending;
     assert.ok(Date.now() - started < 10_000);

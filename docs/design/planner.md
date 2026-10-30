@@ -1,6 +1,7 @@
 # Design: adaptive planner, task contracts and evidence (M3)
 
-- **Status:** Draft, for owner review. M3-01 says no M3 code is written before this is approved.
+- **Status:** Draft, for owner review. M3-01 says no M3 code is written before this is approved. The owner's
+  decisions of 2026-10-30 are in §15.
 - **Date:** 2026-10-30
 - **Covers:** M3-02…M3-10 and the exit criteria M3-E1/E2. Scope source: PRD [F3](../PRD.md#f3--adaptive-planner-task-contracts-and-evidence-p1).
 - **Builds on:**
@@ -65,6 +66,7 @@ stateDiagram-v2
    - A read-only session drafts a `TaskContract` as structured output. It's grounded in the repo: it reads files
      (Read, Grep, Glob) but can't write.
    - The user edits it in a form and approves it. Nothing can change files before approval.
+   - S tasks show it too, with a single **Approve and run**.
 3. **Triage.**
    - A card shows the proposed tier, the signals behind it, and the cheap model's rationale.
    - The user can pick another tier. The override and its reason are recorded.
@@ -97,7 +99,7 @@ Stored as `contract.json` (schema in `packages/protocol`, zod):
 **Drafting:**
 - The draft comes from a read-only session using `outputFormat: { type: "json_schema" }`, the same mechanism the M2
   generators use for structured output.
-- The model is the user's default model, so a small task stays cheap.
+- The model is the user's default model (§15).
 - If the request is too vague for criteria, the draft says so in `risks`, and the form asks the user to clarify.
 
 **Editing:** the form lets the user add, remove and reword every field. A criterion with no `check` is `manual` by
@@ -300,7 +302,8 @@ with the report.
   - defaults are S $1, M $3, L $8, and XL $5 per sub-task, to be tuned with the benchmark;
   - running totals are visible;
   - a cap ends the step, as the SDK's `maxBudgetUsd` does today.
-- **Task files** live in `.agentchainer/tasks/<id>/`. Whether they're committed is open question 1.
+- **Task files** live in `.agentchainer/tasks/<id>/`, kept out of git by `.agentchainer/.gitignore` (§15). The
+  evidence is exported as markdown, and in M5 it goes into the PR description.
 
 ## 12. Testing
 
@@ -339,16 +342,21 @@ Grouped into fewer, larger PRs:
 | Model-only triage | Not explainable, and drifts; the deterministic floor keeps risky tasks from being under-tiered |
 | Installing the agent library into every project first | A file write before the first task; programmatic agents work everywhere, and install stays optional |
 
-## 15. Open questions for the owner
+## 15. Decisions (owner, 2026-10-30) and what's still open
 
-1. **Task files in git:** keep `.agentchainer/tasks/` out of git (proposed), or commit contracts and evidence for
-   team visibility? M5's PR description can carry the evidence either way.
-2. **Contract approval for S tasks:** always show the contract (proposed: yes, one click), or let S skip straight to
-   running?
+**Decided:**
+1. **Task files stay out of git.** `.agentchainer/tasks/` is ignored. Evidence is exported on demand, and in M5 it
+   goes into the PR description.
+2. **S tasks show their contract.** Approval is a single **Approve and run**.
 3. **Models per role:**
-   - proposed: Haiku for triage;
-   - the user's default model for the contract, the implementer and the planners;
-   - the user's default or stronger for the independent reviewer.
-4. **Default budgets** per tier (§11), and the fix-round cap (2).
-5. **Benchmark labels:** the owner labels the 20+ fixture tasks' tiers before tuning (M3-E1 needs a human reviewer).
-6. **Name in the UI:** "Task" (proposed) vs "Job"/"Run".
+   - Haiku for triage;
+   - the user's default model for the contract, the planners and the implementer;
+   - **Opus for the independent reviewer**, so the check is stronger than the work it checks. The reviewer's step
+     budget accounts for the higher price.
+4. **Budgets:** S $1, M $3, L $8, XL $5 per sub-task. Fix rounds are capped at 2. These are tuned after the
+   benchmark, and the user can change them on the triage card.
+
+**Still open:**
+5. **Benchmark labels:** the owner labels the fixture tasks' tiers before tuning. M3-E1 needs a human reviewer; this
+   is needed with delivery step 1.
+6. **Name in the UI:** "Task" is used unless the owner prefers another name.

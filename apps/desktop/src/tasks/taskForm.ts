@@ -42,6 +42,21 @@ export function checkOptions(gates: GateKind[]): CheckOption[] {
   ];
 }
 
+const SIGNAL_LABELS: Record<string, string> = {
+  "risk-keywords": "Risk keywords",
+  breadth: "Breadth",
+  scope: "Scope",
+  "new-areas": "New areas",
+  "repo-size": "Repository size",
+  tests: "Tests",
+};
+
+/** A triage signal's name in sentence case; an unknown one from a newer sidecar reads as its words. */
+export function signalLabel(signal: string): string {
+  const words = signal.replace(/-/g, " ");
+  return SIGNAL_LABELS[signal] ?? `${words.charAt(0).toUpperCase()}${words.slice(1)}`;
+}
+
 export function checkLabel(check: CriterionCheck): string {
   return checkOptions([...GATE_KINDS]).find((o) => o.value === check)?.label ?? check;
 }

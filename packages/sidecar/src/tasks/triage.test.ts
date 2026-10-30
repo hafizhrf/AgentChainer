@@ -52,6 +52,9 @@ describe("triage signals", () => {
   it("sets an L floor for risk keywords, as whole words with common endings", () => {
     assert.equal(run("Store login tokens", {}).floor, "L");
     assert.equal(run("Add a deploy job", {}).floor, "L");
+    assert.equal(run("Restyle the app", { objective: "Theme tokens follow Material 3" }).floor, "S", "design tokens");
+    assert.equal(run("Rotate access tokens daily", {}).floor, "L");
+    assert.equal(run("Read the API key from the environment", {}).floor, "L");
     assert.equal(run("Show the author's name", {}).floor, "S", "author isn't auth");
     assert.equal(run("Fix the typo", { affectedAreas: ["src/auth/session.ts"] }).floor, "L", "paths count");
     assert.equal(run("Fix the typo", { risks: ["Could corrupt the database"] }).floor, "L");

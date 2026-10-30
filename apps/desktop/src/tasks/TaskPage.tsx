@@ -63,6 +63,7 @@ import {
   checkOptions,
   contractChanged,
   DEFAULT_BUDGET_USD,
+  signalLabel,
   TIER_HELP,
   TIERS,
   tidyContract,
@@ -421,7 +422,7 @@ export function TaskPage({
         )}
 
         {task && task.state !== "draft" && task.contract && task.triage && (
-          <ReadyView task={task} contract={task.contract} triage={task.triage} />
+          <ContractView key={task.id} task={task} contract={task.contract} triage={task.triage} />
         )}
       </div>
 
@@ -668,7 +669,12 @@ function ContractForm({
             <CircleHelp size={14} aria-hidden /> Open questions
           </strong>
           <p className="muted">Settle them by editing the contract, then remove them.</p>
-          <StringList label="Open question" items={contract.openQuestions} onChange={(v) => set("openQuestions", v)} />
+          <StringList
+            label="Open question"
+            items={contract.openQuestions}
+            onChange={(v) => set("openQuestions", v)}
+            multiline
+          />
         </div>
       )}
       <Field label="Objective" help="The outcome in a sentence or two, not the steps.">
@@ -686,6 +692,7 @@ function ContractForm({
           onChange={(v) => set("acceptanceCriteria", v)}
           addLabel="Add criterion"
           empty="No criteria yet: a task needs at least one."
+          multiline
           text={(c) => c.text}
           withText={(c, text) => ({ ...c, text })}
           blank={() => ({ id: "", text: "", check: "manual" })}
@@ -700,33 +707,31 @@ function ContractForm({
           )}
         />
       </div>
-      <div className="task-columns">
-        <ListField
-          label="Affected areas"
-          help="Paths or globs Claude expects to change."
-          mono
-          items={contract.affectedAreas}
-          onChange={(v) => set("affectedAreas", v)}
-        />
-        <ListField
-          label="Constraints"
-          help="Limits the work must respect."
-          items={contract.constraints}
-          onChange={(v) => set("constraints", v)}
-        />
-        <ListField
-          label="Out of scope"
-          help="Related work this task won't do."
-          items={contract.outOfScope}
-          onChange={(v) => set("outOfScope", v)}
-        />
-        <ListField
-          label="Risks"
-          help="What could go wrong. Feeds triage and the report."
-          items={contract.risks}
-          onChange={(v) => set("risks", v)}
-        />
-      </div>
+      <ListField
+        label="Affected areas"
+        help="Paths or globs Claude expects to change."
+        mono
+        items={contract.affectedAreas}
+        onChange={(v) => set("affectedAreas", v)}
+      />
+      <ListField
+        label="Constraints"
+        help="Limits the work must respect."
+        items={contract.constraints}
+        onChange={(v) => set("constraints", v)}
+      />
+      <ListField
+        label="Out of scope"
+        help="Related work this task won't do."
+        items={contract.outOfScope}
+        onChange={(v) => set("outOfScope", v)}
+      />
+      <ListField
+        label="Risks"
+        help="What could go wrong. Feeds triage and the report."
+        items={contract.risks}
+        onChange={(v) => set("risks", v)}
+      />
     </section>
   );
 }
@@ -745,10 +750,17 @@ function ListField({
   mono?: boolean;
 }) {
   return (
-    <div className="task-field">
+    <div className={`task-field${mono ? " task-paths" : ""}`}>
       <span className="field-label">{label}</span>
       <span className="field-help">{help}</span>
-      <StringList label={label} items={items} onChange={onChange} empty="None." {...(mono ? { mono } : {})} />
+      {/* Paths are short and stay on one line; sentences wrap. */}
+      <StringList
+        label={label}
+        items={items}
+        onChange={onChange}
+        empty="None."
+        {...(mono ? { mono } : { multiline: true })}
+      />
     </div>
   );
 }
@@ -790,25 +802,29 @@ function TriageCard({
         <ul className="task-signals">
           {triage.signals.map((s) => (
             <li key={s.signal}>
-              <span className="task-signal-name">{s.signal.replace("-", " ")}</span>
-              <span className="grow">{s.detail}</span>
-              {s.floor && (
-                <span className="badge" title={`At least ${s.floor}`}>
-                  ≥ {s.floor}
-                </span>
-              )}
+              <div className="task-signal-head">
+                <span className="task-signal-name">{signalLabel(s.signal)}</span>
+                {s.floor && (
+                  <span className="badge" title={`At least ${s.floor}`}>
+                    ≥ {s.floor}
+                  </span>
+                )}
+              </div>
+              <span>{s.detail}</span>
             </li>
           ))}
           <li>
-            <span className="task-signal-name">Claude (haiku)</span>
+            <div className="task-signal-head">
+              <span className="task-signal-name">Claude (Haiku)</span>
+              {triage.model && <span className="badge">{triage.model.tier}</span>}
+            </div>
             {triage.model ? (
-              <span className="grow">
+              <span>
                 {triage.model.rationale} <span className="muted">({triage.model.confidence} confidence)</span>
               </span>
             ) : (
-              <span className="grow muted">Unavailable: {triage.modelError}. The proposal is the floor.</span>
+              <span className="muted">Unavailable: {triage.modelError}. The proposal is the floor.</span>
             )}
-            {triage.model && <span className="badge">{triage.model.tier}</span>}
           </li>
         </ul>
         {triage.model && triage.floor !== "S" && triage.proposed !== triage.model.tier && (
@@ -857,77 +873,112 @@ function TriageCard({
   );
 }
 
-function ReadyView({ task, contract, triage }: { task: Task; contract: TaskContract; triage: Triage }) {
+/**
+ * The approved contract, read-only: the request, the facts on one label column, the criteria with how each is checked,
+ * and the lists as bullets. Once the task has run, it folds to its objective so the run comes first.
+ */
+function ContractView({ task, contract, triage }: { task: Task; contract: TaskContract; triage: Triage }) {
+  const [open, setOpen] = useState(!task.run);
   const lists: [string, string[]][] = [
-    ["Affected areas", contract.affectedAreas],
     ["Constraints", contract.constraints],
     ["Out of scope", contract.outOfScope],
     ["Risks", contract.risks],
   ];
   return (
-    <>
-      <section className="card">
-        <div className="card-title">
-          <ClipboardList size={16} aria-hidden />
-          <h2>Approved</h2>
-          <span className="grow" />
-          <span className={`tier-badge tier-${triage.chosen}`}>{triage.chosen}</span>
-        </div>
-        {task.state === "ready" && (
-          <p className="callout">
-            {RUNNABLE_TIERS.has(triage.chosen)
-              ? "Run it from the footer: each step is a Claude session you can watch here, and the app runs the gates itself."
-              : `${triage.chosen} tasks run in a later update; S, M and L tasks run now.`}{" "}
-            The task is saved in <code>.agentchainer/tasks/{task.id}/</code>.
-          </p>
+    <section className="card task-contract-view">
+      <div className="card-title">
+        <ClipboardList size={16} aria-hidden />
+        <h2>Contract</h2>
+        {contract.approvedAt && (
+          <span className="muted">Approved {new Date(contract.approvedAt).toLocaleString()}</span>
         )}
-        <Quote text={task.request} />
-        <dl className="action-facts">
-          <dt>Objective</dt>
-          <dd>{contract.objective}</dd>
-          <dt>Tier</dt>
-          <dd>
-            {triage.chosen} · {TIER_HELP[triage.chosen]}
-            {triage.override && (
-              <span className="muted">
-                {" "}
-                Proposed {triage.proposed}; changed because: {triage.override.reason}
-              </span>
-            )}
-          </dd>
-          <dt>Budget</dt>
-          <dd>
-            ${triage.budgetUsd}
-            {triage.chosen === "XL" ? " per sub-task" : ""}
-          </dd>
-          <dt>Approved</dt>
-          <dd>{contract.approvedAt ? new Date(contract.approvedAt).toLocaleString() : "—"}</dd>
-        </dl>
-      </section>
-      <section className="card">
-        <div className="card-title">
-          <h2>Acceptance criteria</h2>
-        </div>
-        <ul className="task-criteria">
-          {contract.acceptanceCriteria.map((c) => (
-            <li key={c.id}>
-              <span className="grow">{c.text}</span>
-              <span className="badge">{checkLabel(c.check)}</span>
-            </li>
-          ))}
-        </ul>
-        <dl className="action-facts">
-          {lists
-            .filter(([, items]) => items.length)
-            .map(([label, items]) => (
-              <div key={label} className="task-fact">
-                <dt>{label}</dt>
-                <dd>{items.join(" · ")}</dd>
+        <span className="grow" />
+        <span className={`tier-badge tier-${triage.chosen}`} title={TIER_HELP[triage.chosen]}>
+          {triage.chosen}
+        </span>
+        {task.run && (
+          <button type="button" className="ghost small task-fold" aria-expanded={open} onClick={() => setOpen(!open)}>
+            <ChevronRight size={14} aria-hidden />
+            {open ? "Hide" : "Show"}
+          </button>
+        )}
+      </div>
+      {task.state === "ready" && (
+        <p className="callout">
+          {RUNNABLE_TIERS.has(triage.chosen)
+            ? "Run it from the footer: each step is a Claude session you can watch here, and the app runs the gates itself."
+            : `${triage.chosen} tasks run in a later update; S, M and L tasks run now.`}{" "}
+          The task is saved in <code>.agentchainer/tasks/{task.id}/</code>.
+        </p>
+      )}
+      {!open ? (
+        <p className="task-contract-summary">{contract.objective}</p>
+      ) : (
+        <>
+          <Quote text={task.request} />
+          <dl className="task-facts">
+            <dt>Objective</dt>
+            <dd>{contract.objective}</dd>
+            <dt>Tier</dt>
+            <dd>
+              {triage.chosen}: {TIER_HELP[triage.chosen]}
+              {triage.override && (
+                <span className="muted">
+                  {" "}
+                  Proposed {triage.proposed}; changed because: {triage.override.reason}
+                </span>
+              )}
+            </dd>
+            <dt>Budget</dt>
+            <dd>
+              ${triage.budgetUsd}
+              {triage.chosen === "XL" ? " per sub-task" : ""}
+            </dd>
+          </dl>
+          <div className="task-field">
+            <span className="field-label">Acceptance criteria</span>
+            <ul className="task-criteria">
+              {contract.acceptanceCriteria.map((c) => (
+                <li key={c.id}>
+                  <span>{c.text}</span>
+                  <span className="badge">{checkLabel(c.check)}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+          <dl className="task-facts">
+            {contract.affectedAreas.length > 0 && (
+              <div className="task-fact">
+                <dt>Affected areas</dt>
+                <dd>
+                  <ul className="task-paths-list">
+                    {contract.affectedAreas.map((a) => (
+                      <li key={a}>
+                        <code>{a}</code>
+                      </li>
+                    ))}
+                  </ul>
+                </dd>
               </div>
-            ))}
-        </dl>
-      </section>
-    </>
+            )}
+            {lists
+              .filter(([, items]) => items.length)
+              .map(([label, items]) => (
+                <div key={label} className="task-fact">
+                  <dt>{label}</dt>
+                  <dd>
+                    <ul>
+                      {items.map((item) => (
+                        <li key={item}>{item}</li>
+                      ))}
+                    </ul>
+                  </dd>
+                </div>
+              ))}
+          </dl>
+        </>
+      )}
+    </section>
   );
 }
 

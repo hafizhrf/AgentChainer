@@ -10,7 +10,16 @@
   align-items: start;
 }
 
-.task-scroll > .task-review {
+/* One centered frame for every stage: a reading column, and the wider draft grid (contract, then triage). */
+.setup-scroll.task-scroll {
+  align-items: center;
+}
+
+.setup-scroll.task-scroll > * {
+  max-width: 960px;
+}
+
+.setup-scroll.task-scroll > .task-review {
   max-width: 1180px;
 }
 
@@ -27,6 +36,11 @@
   .task-triage {
     position: static;
   }
+}
+
+.task-step-intro {
+  margin: 0;
+  font-size: var(--text-sm);
 }
 
 .task-request {
@@ -73,12 +87,6 @@ fieldset.task-field legend {
   padding: 0;
 }
 
-.task-columns {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-  gap: var(--space-4);
-}
-
 .task-questions {
   display: flex;
   flex-direction: column;
@@ -121,6 +129,28 @@ fieldset.task-field legend {
   font-family: var(--font-mono);
 }
 
+/* Rows that wrap: the field grows with its text (ui/autosize.ts); the row's controls stay on its first line. */
+.editable-list.multiline .editable-row {
+  align-items: flex-start;
+}
+
+.editable-row textarea {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  padding-top: 5px;
+  padding-bottom: 5px;
+  overflow: hidden;
+  font-size: var(--text-sm);
+  line-height: 1.45;
+  resize: none;
+}
+
+/* A criterion's check sits in a fixed column, so the rows' right edges line up. */
+.editable-row .select-trigger.compact {
+  flex: 0 0 168px;
+}
+
 .editable-add {
   align-self: flex-start;
 }
@@ -128,6 +158,18 @@ fieldset.task-field legend {
 .editable-empty {
   margin: 0;
   font-size: var(--text-sm);
+}
+
+/* Paths are short: two per line. */
+.task-paths .editable-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  column-gap: var(--space-3);
+}
+
+.task-paths .editable-empty,
+.task-paths .editable-add {
+  grid-column: 1 / -1;
 }
 
 /* Triage */
@@ -149,23 +191,36 @@ fieldset.task-field legend {
 }
 
 .task-signals {
-  gap: var(--space-2);
+  gap: var(--space-3);
   font-size: var(--text-sm);
 }
 
-.task-signals li,
-.task-criteria li {
+/* A signal: its name and the floor it sets, then why. */
+.task-signals li {
   display: flex;
-  align-items: baseline;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.task-signal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   gap: var(--space-2);
 }
 
 .task-signal-name {
-  flex-shrink: 0;
-  width: 88px;
   color: var(--muted);
   font-size: var(--text-xs);
-  text-transform: capitalize;
+  font-weight: 500;
+}
+
+/* A criterion, then how it's checked, in a column of its own. */
+.task-criteria li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: var(--space-3);
 }
 
 .task-tiers {
@@ -216,6 +271,57 @@ fieldset.task-field legend {
 
 .task-fact {
   display: contents;
+}
+
+/* The contract's facts and lists share one label column. */
+.task-facts {
+  display: grid;
+  grid-template-columns: 128px minmax(0, 1fr);
+  gap: var(--space-2) var(--space-4);
+  margin: 0;
+  font-size: var(--text-sm);
+}
+
+.task-facts dt {
+  color: var(--muted);
+}
+
+.task-facts dd {
+  margin: 0;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.task-facts ul {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  padding-left: var(--space-4);
+}
+
+.task-facts .task-paths-list {
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  padding: 0;
+  list-style: none;
+}
+
+.task-contract-summary {
+  display: -webkit-box;
+  margin: 0;
+  overflow: hidden;
+  color: var(--muted);
+  font-size: var(--text-sm);
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+@media (max-width: 640px) {
+  .task-facts {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 
 /* The list of tasks */
@@ -393,11 +499,14 @@ fieldset.task-field legend {
   background: var(--bg);
 }
 
-.task-evidence-toggle svg {
+/* Fold toggles: the evidence report, and the contract once a task has run. */
+.task-evidence-toggle svg,
+.task-fold svg {
   transition: transform var(--duration);
 }
 
-.task-evidence-toggle[aria-expanded="true"] svg {
+.task-evidence-toggle[aria-expanded="true"] svg,
+.task-fold[aria-expanded="true"] svg {
   transform: rotate(90deg);
 }
 

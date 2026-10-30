@@ -74,6 +74,7 @@ and Claude Code Desktop, so AgentChainer complements those tools rather than loc
 | F6 | Deployment adapters | P2 | v0.4 |
 | F7 | Editable workflow canvas | P2 | v0.4 |
 | F8 | Evals and analytics | P2 | v0.5 |
+| F9 | Multi-folder workspaces | P2 | later (M8) |
 
 ### F1 — Agent session core (P0)
 
@@ -141,7 +142,7 @@ and Claude Code Desktop, so AgentChainer complements those tools rather than loc
 - **Gates:** independent AI review plus deterministic scanners as merge gates.
 - **Human-only operations:** merge, force push and release tags always need a person.
 
-### F6–F8 (P2)
+### F6–F9 (P2)
 
 - **F6 Deploy adapters:**
   - Vercel, Cloudflare, Fly.io, Docker registry, Firebase;
@@ -151,6 +152,18 @@ and Claude Code Desktop, so AgentChainer complements those tools rather than loc
 - **F8 Evals and analytics:**
   - local metrics: gate pass rate, cost per successful task, duration, retries, human-fix rate;
   - a benchmark harness to A/B test templates, models and skills.
+
+### F9 — Multi-folder workspaces (P2)
+
+Owner request, 2026-10-30. A workspace can be a named set of folders, e.g. an app repo and its API repo, so a
+session or task works across them:
+- sessions run in the primary folder, with the others added through the SDK's `additionalDirectories` (the CLI's
+  `--add-dir`);
+- readiness, the setup plan and git are per folder, and the guard allows all the workspace's folders;
+- tasks name the folder in their affected areas; XL sub-tasks can target different folders, each in its own worktree.
+
+Open: whether project settings and CLAUDE.md load from the added folders **(verify)**, and where the definition lives
+(the app's database, or a file like VS Code's `.code-workspace`). Work items: [CHECKLIST](CHECKLIST.md) M8.
 
 ## 6. User stories and acceptance criteria (P0)
 

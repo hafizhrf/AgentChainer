@@ -2,12 +2,14 @@ import { existsSync, readFileSync, realpathSync, statSync } from "node:fs";
 import path from "node:path";
 import { Document, isMap, isSeq, parseDocument } from "yaml";
 import { git, repoOf } from "../workspace.ts";
+import { MARKER } from "./tools.ts";
 
 /**
  * Pre-commit hooks for catalog items such as gitleaks (M2-22). A repo with a hook manager (lefthook, pre-commit,
  * husky) gets the hook in that manager's committed config, so the whole team runs it; the command is a small committed
- * wrapper that finds the tool on PATH or in AgentChainer's tools folder, and steps aside when neither has it. A repo
- * without one gets a local `.git/hooks/pre-commit` for this machine only, and an existing hook is never overwritten.
+ * wrapper that prefers the pinned copy in AgentChainer's tools folder, checked against its marker, then the tool on
+ * PATH, and steps aside when neither is there. A repo without one gets a local `.git/hooks/pre-commit` for this machine
+ * only, which checks the pinned copy the same way; an existing hook is never overwritten.
  */
 
 /** The app identifier from tauri.conf.json: the tools folder is `<OS app data>/<APP_ID>/tools`. */
@@ -81,11 +83,12 @@ export function hookChanges(
 ): HookFile[] {
   if (manager === "local") {
     const before = read(root, LOCAL_HOOK);
-    const argv = hook.run.map((a) => (a === "{binary}" ? tool.binary.replaceAll("\\", "/") : a));
     const after = [
       "#!/bin/sh",
       `${MARK}: ${tool.name} ${tool.version} checks staged changes before each commit (this machine only).`,
-      `exec ${argv.map(shQuote).join(" ")}`,
+      `bin=${shQuote(tool.binary.replaceAll("\\", "/"))}`,
+      ...verifyPinned(tool),
+      `exec "$bin" ${toolArgs(hook)}`,
       "",
     ].join("\n");
     return [{ path: LOCAL_HOOK, before, after, executable: true }];
@@ -143,34 +146,59 @@ export function hookChanges(
   return files;
 }
 
-/**
- * The committed hook script: the tool from PATH, else AgentChainer's copy (macOS, Linux and Windows app data
- * folders), else a hint and success, so a teammate without the tool can still commit.
- */
-function wrapperScript(hook: HookSpec, tool: { id: string; name: string; version: string }): string {
-  const exe = `tools/${tool.id}/*/${tool.name}`;
-  const args = hook.run
+/** The hook's arguments after `{binary}`, quoted for sh. */
+const toolArgs = (hook: HookSpec) =>
+  hook.run
     .slice(hook.run[0] === "{binary}" ? 1 : 0)
     .map(shQuote)
     .join(" ");
+
+/**
+ * sh lines that stop the commit unless `$bin` matches the sha256 its install recorded in the marker next to it, so a
+ * changed or damaged copy never runs (M2-30). `sha256sum` (Linux, Git Bash) or `shasum` (macOS) reads it from stdin.
+ */
+function verifyPinned(tool: { name: string; version: string }): string[] {
+  const reinstall = `Reinstall it from AgentChainer's workspace settings, or remove this hook.`;
+  return [
+    `want=$(sed -n 's/.*"binarySha256": *"\\([0-9a-f]*\\)".*/\\1/p' "$(dirname "$bin")/${MARKER}" 2>/dev/null)`,
+    `if command -v sha256sum >/dev/null 2>&1; then got=$(sha256sum < "$bin" 2>/dev/null); else got=$(shasum -a 256 < "$bin" 2>/dev/null); fi`,
+    `if [ -z "$want" ] || [ "\${got%% *}" != "$want" ]; then`,
+    `  echo "AgentChainer's ${tool.name} ${tool.version} ($bin) failed its hash check, so this commit was stopped. ${reinstall}" >&2`,
+    "  exit 1",
+    "fi",
+  ];
+}
+
+/**
+ * The committed hook script: AgentChainer's pinned copy (macOS, Linux and Windows app data folders), checked against
+ * its marker; else the tool from PATH; else a hint and success, so a teammate without the tool can still commit.
+ */
+function wrapperScript(hook: HookSpec, tool: { id: string; name: string; version: string }): string {
+  const exe = `tools/${tool.id}/${tool.version}/${tool.name}`;
   return `#!/bin/sh
 ${MARK}: runs ${tool.name} before each commit (pinned ${tool.version} in AgentChainer's tools folder).
-# Uses ${tool.name} from PATH, or AgentChainer's copy. Without either, it only prints a hint, so it never blocks a commit.
-bin=$(command -v ${tool.name} 2>/dev/null)
-if [ -z "$bin" ]; then
-  appdata=\${APPDATA:-}
-  if [ -n "$appdata" ] && command -v cygpath >/dev/null 2>&1; then appdata=$(cygpath -u "$appdata"); fi
-  for dir in "$HOME/Library/Application Support" "\${XDG_DATA_HOME:-$HOME/.local/share}" "$appdata"; do
-    for f in "$dir"/${APP_ID}/${exe} "$dir"/${APP_ID}/${exe}.exe; do
-      if [ -x "$f" ]; then bin=$f; fi
-    done
+# Uses AgentChainer's pinned copy, checked against its recorded sha256 (a copy that fails the check stops the commit),
+# else ${tool.name} from PATH. Without either, it only prints a hint, so it never blocks a commit.
+bin=
+appdata=\${APPDATA:-}
+if [ -n "$appdata" ] && command -v cygpath >/dev/null 2>&1; then appdata=$(cygpath -u "$appdata"); fi
+for dir in "$HOME/Library/Application Support" "\${XDG_DATA_HOME:-$HOME/.local/share}" "$appdata"; do
+  for f in "$dir"/${APP_ID}/${exe} "$dir"/${APP_ID}/${exe}.exe; do
+    if [ -f "$f" ]; then bin=$f; fi
   done
+done
+if [ -n "$bin" ]; then
+${verifyPinned(tool)
+  .map((l) => `  ${l}`)
+  .join("\n")}
+else
+  bin=$(command -v ${tool.name} 2>/dev/null)
 fi
 if [ -z "$bin" ]; then
   echo "${tool.name} isn't installed, so this commit wasn't checked. Install it from AgentChainer or your package manager." >&2
   exit 0
 fi
-exec "$bin" ${args}
+exec "$bin" ${toolArgs(hook)}
 `;
 }
 

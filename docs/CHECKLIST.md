@@ -833,8 +833,14 @@ All of these run on macOS, Windows and Ubuntu against a sample repo in `fixtures
 
 - [ ] **M2-29** Carry license notices for git-source items: a `licensePath` pinned with its own hash and copied with
       the files. This unblocks cloudflare-security-audit.
-- [ ] **M2-30** The gitleaks hook wrapper prefers a gitleaks on PATH and doesn't hash-check the tools-folder copy:
+- [x] **M2-30** The gitleaks hook wrapper prefers a gitleaks on PATH and doesn't hash-check the tools-folder copy:
       prefer the pinned copy and check it against its marker.
+      — evidence: the committed wrapper (`git-hooks.ts`) looks for the item's exact pinned version in the app's tools
+      folder first and checks its sha256 against `binarySha256` in `.agentchainer-tool.json`; a copy that fails the
+      check stops the commit, and gitleaks on PATH is used only when no pinned copy is installed. The local
+      `.git/hooks/pre-commit` checks the same way. Tests: `git-hooks.test.ts` commits through both hooks (pinned
+      preferred over PATH, a changed copy stops the commit, PATH only, neither); on Windows the same commits were run
+      by hand through Git Bash with the same results (2026-10-30).
 - [x] **M2-31** `merge-json` replaces arrays. Merge permission lists (allow/deny) by union, so an item can add a deny
       rule to `.claude/settings.json`.
       — evidence: `mergeJson` (`bootstrap/steps.ts`) keeps the rules in `permissions.allow`, `ask` and `deny` and adds

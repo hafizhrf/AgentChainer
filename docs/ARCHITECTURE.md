@@ -116,7 +116,10 @@ Planned surface (v0.1):
 | request | `task.create` / `task.list` / `task.get` / `task.delete` | Tasks (M3, preview): files in `.agentchainer/tasks/<id>/`, git-ignored ([planner.md](design/planner.md)) |
 | request | `task.draft` | A read-only session (Read, Grep, Glob; the generators' hook and the workspace guard) drafts the contract as structured output, then triage runs on it: deterministic signals plus a haiku classification |
 | request | `task.retriage` / `task.approve` / `task.revise` | Save an edited draft and triage it again; approve the contract and tier together (refused if the contract changed since triage; another tier needs a reason); reopen for editing |
-| request | `task.cancel` | Stops a draft or triage in progress; the stopped request fails with `cancelled` (-32007) |
+| request | `task.cancel` | Stops a draft, a triage or a run in progress; a stopped draft or triage fails with `cancelled` (-32007) |
+| request | `task.start` / `task.resume` | Runs an approved S or M task (M3-06) in the background, or continues an interrupted run: a session per step, the gates run by the sidecar, fix rounds ([planner.md](design/planner.md) §6–§7) |
+| notification | `task.updated` | A run changed: a step started or ended, gates ran, or it ended |
+| notification | `task` tag on `agent.event` / `permission.request` | Marks a task step's session, which has no tab: the task page shows its transcript, and its approvals show over any page |
 | request | `workspace.scan` | Detect stack, commands, and audit the setup → `WorkspaceProfile` + findings (read-only) |
 | request | `workspace.saveProfile` | Write the profile to `.agentchainer/profile.json` |
 | request | `bootstrap.plan` | Fixes + catalog items + generators for the workspace, each with a preview (read-only; M2-11) |

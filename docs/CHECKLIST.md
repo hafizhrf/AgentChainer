@@ -1097,16 +1097,36 @@ Decisions: [ADR-0009](adr/0009-release-signing-and-updates.md). Maintainer steps
   signals and the rationale; another tier needs a reason, recorded in `triage.json`. An edited contract must be
   triaged again before approval. Remaining: owner click-through, and tuning after the labels (M3-E1).
 - [ ] **M3-04** Workflow templates as versioned YAML in `catalog/workflows/`, one per tier as described in the PRD.
+      Progress (step 2): S and M in `catalog/workflows/`, validated by zod and compiled with the roles into
+      `tasks/library.json` (`library.test.ts` fails while it's stale). Remaining: L and XL with their steps.
 - [ ] **M3-05** Agent library, installable into `.claude/agents/`: architect, test-planner, security-reviewer, docs-writer,
       and independent-reviewer (fresh context: it gets the diff and contract, not the implementer's transcript).
+      Progress (step 2): all six roles in `agents/ac-*.md` (`.claude/agents/` format), used as step prompts; the
+      reviewer runs fresh on Opus with only the contract, the diff and the gate results. Remaining: Install into
+      project.
 - [ ] **M3-06** Orchestrator that executes a template:
   - sequential and parallel steps;
   - hand-offs as files (`plan.md`, `contract.json`);
   - budget and turn caps per step.
+
+  Progress (step 2): `tasks/orchestrator.ts` runs S and M as sessions per step (read steps isolated and read-only,
+  write steps with approvals in the profile picked at Run), with hand-off files, a base snapshot, persistence, Stop
+  and Resume; tested with a fake runner (9 cases). Live (2026-10-30, `scripts/live-task.ts` on `sample-app`): an S task
+  done in 8 s for ≈$0.01; an M task through plan, implement, gates and an Opus review in 38 s for ≈$0.13, the review
+  arriving as structured output; and an M task that failed honestly after 2 fix rounds; Stop (`--stop-after`) ends a
+  run `cancelled` and leaves no process behind. Clicked through on macOS (2026-10-30, debug build): Approve and run,
+  the step's Edit and Bash approvals over the task page, the timeline with the step's transcript, the gates panel, Run
+  again. Two fixes from it: the reply to `task.start` could overwrite newer step updates (the timeline stayed empty
+  while a step ran), and a step's approval covered the page's Stop, so it now offers Stop task itself. Remaining:
+  parallel steps (L).
 - [ ] **M3-07** XL path: split into sub-tasks, each with its own contract and worktree. Evaluate the SDK `Workflow` tool
       where the user's plan supports it.
 - [ ] **M3-08** Verification gates from WorkspaceProfile commands (format, lint, typecheck, test, smoke), with a bounded fix loop
       (iteration and budget caps).
+      Progress (step 2): `tasks/gates.ts` resolves gates from the profile (root or per package) plus `scripts/smoke.*`,
+      runs format in write mode and checks under the workspace guard, all gates after a failure, with fix rounds
+      capped (2) across the run. In the live runs, every recorded exit code matched the command re-run by hand.
+      Remaining: owner click-through.
 - [ ] **M3-09** Evidence report per task, stored and exportable as markdown:
   - changed files and their purpose;
   - gates run, with real exit codes; gates not run, with reasons;

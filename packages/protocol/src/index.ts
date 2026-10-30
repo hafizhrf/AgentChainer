@@ -415,20 +415,98 @@ export type Triage = z.infer<typeof TriageSchema>;
 /** `<date>-<8 hex>`, e.g. 2026-10-30-1a2b3c4d. Checked before it becomes part of a path. */
 export const TaskIdSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}-[0-9a-f]{8}$/);
 
+/**
+ * `draft` until the user approves the contract and the tier, then `ready`. A run (M3-06) ends `done` (every gate's
+ * latest run passed after the last change), `failed`, `unverified` (no gates to run), or `cancelled`. `interrupted`
+ * is a run the app stopped in the middle of (computed when read back), which can be resumed.
+ */
+export const TASK_STATES = [
+  "draft",
+  "ready",
+  "running",
+  "done",
+  "failed",
+  "unverified",
+  "cancelled",
+  "interrupted",
+] as const;
+export type TaskState = (typeof TASK_STATES)[number];
+
+/** One entry in a run's timeline: an agent step's turn, a fix round, or a round of gates. */
+export const StepRunSchema = z.object({
+  /** Unique within the run, e.g. `implement`, `gates-2`, `fix-1`. */
+  id: z.string(),
+  /** The template step it belongs to. */
+  step: z.string(),
+  label: z.string(),
+  kind: z.enum(["agent", "fix", "gates"]),
+  role: z.string().optional(),
+  status: z.enum(["running", "done", "failed", "cancelled"]),
+  sessionId: z.string().optional(),
+  startedAt: z.string(),
+  endedAt: z.string().optional(),
+  costUsd: z.number(),
+  /** What happened, in a sentence: the failing gates, the must-fix findings, an error. */
+  note: z.string().optional(),
+});
+export type StepRun = z.infer<typeof StepRunSchema>;
+
+/** A gate the sidecar ran itself (M3-08): the real command, exit code and end of the log. */
+export const GateRunSchema = z.object({
+  kind: z.enum(GATE_KINDS),
+  command: z.string(),
+  /** The package it ran in; "." is the workspace root. */
+  package: z.string(),
+  exitCode: z.number().int().nullable(),
+  timedOut: z.boolean(),
+  durationMs: z.number(),
+  tail: z.string(),
+  /** 0 for the first run, then one more per fix round. */
+  round: z.number().int(),
+  at: z.string(),
+  /** Format: the files it rewrote. A check: files it changed, which were reverted. */
+  changed: z.array(z.string()).optional(),
+});
+export type GateRun = z.infer<typeof GateRunSchema>;
+
+export const TaskRunSchema = z.object({
+  workflow: z.object({ id: z.string(), version: z.number().int() }),
+  permissionMode: PermissionModeSchema,
+  model: z.string().optional(),
+  /** What the task's changes are measured from: a snapshot of the tree at the start, or null outside git. */
+  base: z.string().nullable(),
+  /** Files already untracked at the start: not the task's changes. */
+  untrackedAtStart: z.array(z.string()),
+  startedAt: z.string(),
+  endedAt: z.string().optional(),
+  /** The template step running now, or to resume from. */
+  position: z.number().int(),
+  fixRounds: z.number().int(),
+  steps: z.array(StepRunSchema),
+  gates: z.array(GateRunSchema),
+  /** Gates the workflow asks for that the workspace has no command for: reported as not run, never as passed. */
+  notRun: z.array(z.enum(GATE_KINDS)),
+  costUsd: z.number(),
+  /** Why the run ended, in a sentence. */
+  outcome: z.string().optional(),
+});
+export type TaskRun = z.infer<typeof TaskRunSchema>;
+
 export const TaskSchema = z.object({
   id: TaskIdSchema,
   /** What the user asked for, verbatim. */
   request: z.string(),
-  /** `draft` until the user approves the contract and the tier, then `ready`. Running arrives with M3-06. */
-  state: z.enum(["draft", "ready"]),
+  state: z.enum(TASK_STATES),
   createdAt: z.string(),
   updatedAt: z.string(),
   contract: TaskContractSchema.nullable(),
   triage: TriageSchema.nullable(),
   /** Gates the profile has commands for. A criterion checked by another gate can't be proved. */
   availableGates: z.array(z.enum(GATE_KINDS)),
-  /** Model spend so far on drafting and triage, an estimate. */
+  /** Model spend so far on drafting, triage and the run, an estimate. */
   costUsd: z.number(),
+  /** The latest run; tasks from before runs existed have none. */
+  run: TaskRunSchema.nullable().default(null),
 });
 export type Task = z.infer<typeof TaskSchema>;
 
@@ -836,7 +914,17 @@ export const methodSchemas = {
   },
   /** Reopens an approved contract for editing. Edits then need a new triage before approval. */
   "task.revise": { params: TaskRef, result: TaskSchema },
-  /** Stops a draft or triage in progress. */
+  /**
+   * Runs an approved S or M task (M3-06): returns at once, and the run continues, reporting through `task.updated`.
+   * Write steps ask for approvals in `permissionMode`.
+   */
+  "task.start": {
+    params: TaskRef.extend({ permissionMode: PermissionModeSchema.exclude(["plan"]), model: z.string().optional() }),
+    result: TaskSchema,
+  },
+  /** Continues an interrupted run from the step it stopped in. */
+  "task.resume": { params: TaskRef, result: TaskSchema },
+  /** Stops a draft, a triage or a run in progress. A stopped run leaves the working tree as it is. */
   "task.cancel": { params: TaskRef, result: z.object({ cancelled: z.boolean() }) },
   "task.list": { params: WorkspaceRef, result: z.object({ tasks: z.array(TaskSummarySchema) }) },
   "task.get": { params: TaskRef, result: TaskSchema },
@@ -853,8 +941,20 @@ export type Methods = {
 
 /* ---------- Notifications: sidecar → UI ---------- */
 
+/** Marks a session as a task's step, so the UI shows it on the task page and routes its approvals. */
+export const TaskTagSchema = z.object({
+  id: TaskIdSchema,
+  cwd: z.string(),
+  stepId: z.string(),
+  label: z.string(),
+  role: z.string().optional(),
+});
+export type TaskTag = z.infer<typeof TaskTagSchema>;
+
 export const PermissionRequestSchema = z.object({
   sessionId: z.string(),
+  /** Set for a task step's session (M3-06), which has no tab of its own. */
+  task: TaskTagSchema.optional(),
   requestId: z.string(),
   toolName: z.string(),
   toolUseId: z.string(),
@@ -875,11 +975,17 @@ export const PermissionRequestSchema = z.object({
 });
 export type PermissionRequest = z.infer<typeof PermissionRequestSchema>;
 
-export const AgentEventNotificationSchema = z.object({ sessionId: z.string(), event: AgentEventSchema });
+export const AgentEventNotificationSchema = z.object({
+  sessionId: z.string(),
+  event: AgentEventSchema,
+  task: TaskTagSchema.optional(),
+});
 
 export const notificationSchemas = {
   "agent.event": AgentEventNotificationSchema,
   "permission.request": PermissionRequestSchema,
+  /** A task's run changed: a step started or ended, gates ran, or the run ended (M3-06). */
+  "task.updated": z.object({ cwd: z.string(), task: TaskSchema }),
 } as const;
 
 export type NotificationName = keyof typeof notificationSchemas;

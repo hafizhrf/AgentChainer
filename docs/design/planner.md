@@ -148,111 +148,126 @@ it.
 
 ## 5. Workflow templates (M3-04) and the agent library (M3-05)
 
-**Templates** live in `catalog/workflows/<tier>.yaml`. They're versioned, validated by zod like catalog items, and
-first-party only. A template is a list of steps:
+**Templates** live in `catalog/workflows/<tier>.yaml`. They're versioned, validated by zod (`tasks/library.ts`), and
+first-party only. `scripts/build-catalog.ts` compiles them with the roles into `packages/sidecar/src/tasks/library.json`,
+so nothing is parsed or fetched at runtime (ADR-0007), and a test fails while that file is stale. The M template as
+built:
 
 ```yaml
 id: tier-m
+tier: M
 version: 1
 steps:
   - id: plan
-    role: architect            # an agent from the library
+    role: architect            # a role from the library
     access: read               # read | write
-    inputs: [contract.json]
-    outputs: [plan.md]
+    inputs: [contract]         # contract | plan | diff | gates: what the step's prompt includes
+    output: plan               # kept as plan.md
     limits: { maxTurns: 30, maxBudgetUsd: 0.75 }
   - id: implement
     role: implementer
     access: write
-    inputs: [contract.json, plan.md]
-    limits: { maxTurns: 80, maxBudgetUsd: 3 }
+    inputs: [contract, plan]
+    limits: { maxTurns: 80, maxBudgetUsd: 2 }
   - id: gates
-    gates: [format, lint, typecheck, test, smoke]   # those the profile has; see §7
+    gates: [format, lint, typecheck, test, build, smoke]   # those the workspace has; see §7
     fix: { step: implement, maxRounds: 2, maxBudgetUsd: 1 }
   - id: review
     role: independent-reviewer
     access: read
     fresh: true                # no transcript: only the contract, the diff and gate results
-    inputs: [contract.json, diff.patch, gates.json]
-    outputs: [review.json]
+    inputs: [contract, diff, gates]
+    output: review             # structured output, kept as review.json
+    fix: { step: implement, maxRounds: 1, maxBudgetUsd: 1 }   # must-fix findings, then the gates again
 ```
 
 **The tiers, as in the PRD:**
 
 | Tier | Steps | Notes |
 |---|---|---|
-| S | implement → gates | No plan step; the contract is the plan |
-| M | plan → implement → gates → review | |
-| L | in parallel: architect, security-reviewer, test-planner (all read-only) → implement → gates → independent review | The parallel group only reads; their outputs merge into `plan.md` |
+| S | implement → gates | No plan step; the contract is the plan. Built (step 2) |
+| M | plan → implement → gates → review | Built (step 2) |
+| L | in parallel: architect, security-reviewer, test-planner (all read-only) → implement → gates → independent review | The parallel group only reads; their outputs merge into `plan.md`. Step 3 |
 | XL | split into sub-tasks (each with its own contract, tier and worktree) → per sub-task flow → integration gates | §8 |
 
-**Agent library:**
-- Roles: architect, test-planner, security-reviewer, docs-writer, independent-reviewer, implementer.
-- Each is a markdown file with a system prompt and frontmatter (tools, model).
-- The orchestrator passes them to the SDK as programmatic `agents` / per-step system prompts, so nothing has to be
+**Agent library** (`agents/ac-<role>.md` at the repo root, like `skills/`):
+- Roles: implementer, architect, independent-reviewer, test-planner, security-reviewer, docs-writer.
+- Each is a markdown file in the `.claude/agents/` format: frontmatter (`name`, `description`, `tools`, `model`) and
+  the role's instructions. Read roles list `tools: Read, Grep, Glob`; the reviewer's model is `opus` (§15); the others
+  inherit the task's model.
+- The orchestrator appends a step's role to the default system prompt of that step's session, so nothing has to be
   installed for tasks to work.
-- **Install into project** writes them into `.claude/agents/` through the normal plan and rollback flow, so the same
-  roles work from the CLI and other Claude surfaces. Plain files stay the export format (PRD §3).
+- **Install into project** (writing them into `.claude/agents/` through the plan and rollback flow) comes with step 3.
 
 ## 6. The orchestrator (M3-06)
 
-A sidecar module (`packages/sidecar/src/tasks/`) runs a template as a state machine and persists it.
+A sidecar module (`packages/sidecar/src/tasks/orchestrator.ts`) runs a template as a state machine and persists every
+change. The world comes through a `Runner` (`tasks/runner.ts`), so the machine is tested without models.
 
-- **One SDK session per step.** Each step is a `query()` with:
-  - its role prompt;
-  - tools by access: read steps get Read, Grep and Glob plus the profile's check commands; write steps get the normal
-    tool set;
-  - `maxTurns`/`maxBudgetUsd` from the template, capped by the task budget;
-  - the guard hook, and approvals in the user's profile.
+- **One session per step**, a `Session` like a chat tab's, driven by the orchestrator (`Session.turn()` awaits a
+  turn's result):
+  - **read steps** get Read, Grep and Glob only, a read-only hook (the guard, then reads inside the workspace), and
+    no user or project settings, like the generators. Read tools need no approval;
+  - **write steps** get the normal tools and the user's settings, with approvals in the permission profile picked at
+    Run (Safe, Standard or Autonomous), and the guard hook;
+  - the role's prompt and the step's `maxTurns`; the role's model, or the task's.
 
-  Separate sessions keep budgets, transcripts and costs per step, and give the reviewer a really fresh context.
-  Claude may still spawn its own subagents inside a step.
-- **Hand-offs are files** in the task folder: `contract.json`, `plan.md`, `review.json`. A step's prompt names its
-  inputs, and its outputs are checked to exist (and, for JSON, to validate) before the next step starts.
-- **Parallel steps** run concurrently up to a limit (default 3). Only read steps may run in parallel; at most one
-  write step runs per working tree at a time.
-- **Persistence and resume.**
-  - `task.json` holds the state, the current step and the session ids.
-  - After an app restart, a task in progress shows as **Interrupted**, with Resume. Resume continues the step's
-    session (SDK resume) or re-runs a read step.
-- **Budgets.** The task has a total cap (defaults by tier; the user sets it on the triage card). A step that hits its
-  cap ends that step; the task then goes to Failed, unless a later step can still run usefully.
-- **Cancel** interrupts the running steps and leaves the working tree as it is: rewind and git still work as in
-  sessions.
+  Separate sessions keep transcripts and costs per step, and give the reviewer a really fresh context. They're stored
+  like any session (`session.history` replays them on the task page). Claude may still spawn its own subagents.
+- **Hand-offs are files** in the task folder, written by the orchestrator, since read steps can't write: `plan.md` is
+  the plan step's final answer, `review.json` the reviewer's structured output. The next step's prompt includes them.
+- **Base.** At the start, `git stash create` records the tree as it was (or HEAD when it's clean), and the files
+  already untracked. The reviewer's diff, and later the report, cover only the task's own changes.
+- **Persistence and resume.** `task.json` holds the run: the template, the base, the permission profile, a timeline
+  of steps (turns, fix rounds, gate rounds, with session ids and costs), every gate run, the position and the fix
+  rounds used. A run the app stopped in the middle of reads back as **Interrupted**; Resume continues a write step's
+  session (SDK resume) or re-runs a read step or the gates.
+- **Budgets.** The task's total cap (from the triage card) holds. Read steps are fresh sessions with their own caps; a
+  write step's session also takes its fix rounds, and the SDK caps a session as a whole, so it gets what's left of the
+  task's budget. A step that can't start for lack of budget ends the task as Failed.
+- **Parallel steps** (L) and the end-state rules for Done vs accepted risk (M3-10) come with step 3.
+- **Stop** closes the running session or kills the running gate and ends the run `cancelled`; the working tree is
+  left as it is (rewind and git still work).
 
 **Protocol:**
-- **Requests in step 1:** `task.create`, `task.draft` (contract, then triage), `task.retriage`, `task.approve`,
-  `task.revise`, `task.cancel`, `task.list`, `task.get`, `task.delete`.
-- **Later steps add** `task.start`, `task.acceptRisk` and `task.exportEvidence`.
+- **Requests:** `task.create`, `task.draft`, `task.retriage`, `task.approve`, `task.revise`, `task.cancel` (also
+  stops a run), `task.list`, `task.get`, `task.delete`, `task.start`, `task.resume`. Later: `task.acceptRisk` and
+  `task.exportEvidence`.
 - **Events:**
-  - `task.updated` carries the state and step changes;
-  - step sessions emit the normal agent events, tagged with `taskId` and `stepId`, so the transcript UI and the later
-    M4 graph reuse them.
+  - `task.updated {cwd, task}` on every change of a run;
+  - step sessions emit the normal `agent.event`s, and their `permission.request`s, with a `task` tag (task id, step,
+    label, role, cwd), so the task page shows them and the app shows their approvals although they have no tab. The
+    later M4 graph reuses them.
 
 ## 7. Gates and the fix loop (M3-08)
 
 **What gates are:**
-- Gates come from the workspace profile's detected commands: `format`, `lint`, `typecheck`, `test`, `build`. `smoke`
-  joins them when the M2 smoke generator's script exists; this needs a `smoke` command kind, which M3-08 adds.
-- Only kinds the profile has become gates. A missing kind is listed in the evidence as **not run: no command
-  detected**, never as passed.
+- Gates come from the workspace profile's detected commands: `format`, `lint`, `typecheck`, `test`, `build`. A command
+  of the root package runs once at the root; otherwise each package's own runs in its folder. `smoke` is the
+  `scripts/smoke.*` script the readiness audit finds (M2-09), run with an interpreter by its extension.
+- Only kinds the workspace has become gates. A missing kind is listed as **not run: no command detected**, never as
+  passed. A run with no gates at all ends **unverified**, not Done.
 
-**How they run:**
+**How they run (`tasks/gates.ts`):**
 - **The sidecar runs them, never the model.** It uses `runCommand` from the M2 verifier: timeout, exit code, the
-  tail of the log, duration.
-- **Format** runs in write mode, and the files it changes become part of the task's diff, recorded as "formatted N
-  files". The other gates are checks.
-- Gates run in order, and every required gate runs after the last change. A fix round re-runs all of them, because a
-  fix can break another gate.
+  end of the log, duration.
+- **Format** runs in write mode; the files it changed are recorded with the run. The other gates are checks and run
+  under the workspace guard: whatever a check changes (snapshots, lockfiles) is reverted and recorded.
+- Gates run in order, and all of them run even after one fails, so a fix round sees every failure at once. A fix
+  round re-runs all of them, because a fix can break another gate.
 
 **Fix loop:**
-- On a failure, the orchestrator resumes the implementer's session with the failing gate, its command, its exit code
-  and the end of its log, and asks for a fix.
-- Rounds are capped (default 2) and have their own budget.
+- On a failure, the orchestrator sends the implementer's session the failing gates: command, package, exit code and
+  the end of the log, and asks for a fix in the code, not the checks.
+- Rounds are capped (default 2) and counted across the run.
 - When the cap is reached, the task is **Failed** with the last results.
 
-**The independent reviewer's must-fix findings** get one fix round of their own, under the same caps. Other findings
-go into the report.
+**The independent reviewer's must-fix findings** get one fix round of their own, then the gates run again under the
+same cap. Other findings stay in `review.json` for the report.
+
+**Seen in live runs (2026-10-30):** a gate that already failed before the task (the sample app's seeded bug) can't be
+fixed inside a contract that puts it out of scope, so the task ends Failed although it did its own part. Step 3
+should run the gates once at the start, so the report can tell "already failing before the task" apart.
 
 ## 8. XL tasks, worktrees and the Workflow tool (M3-07)
 

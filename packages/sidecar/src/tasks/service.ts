@@ -1,11 +1,23 @@
-import { RpcErrorCode, type Task, type TaskContract, type Tier, type Triage } from "@agentchainer/protocol";
+import {
+  type PermissionMode,
+  RpcErrorCode,
+  type Task,
+  type TaskContract,
+  type TaskSummary,
+  type Tier,
+  type Triage,
+} from "@agentchainer/protocol";
 import { AC_DIR } from "../ac-dir.ts";
 import { detectWorkspace } from "../detect/detect.ts";
 import { RpcFailure } from "../rpc.ts";
 import type { AgentSdkModule } from "../sdk-loader.ts";
 import { listFiles } from "../workspace.ts";
 import { availableGates, draftContract, normalizeContract } from "./contract.ts";
-import { createTask, loadTask, saveTask } from "./store.ts";
+import shipped from "./library.json" with { type: "json" };
+import { LibrarySchema } from "./library.ts";
+import { newRun, Orchestrator } from "./orchestrator.ts";
+import { type SessionHost, sessionRunner, startBase } from "./runner.ts";
+import { createTask, deleteTask, listTasks, loadTask, readTaskFile, saveTask, writeTaskFile } from "./store.ts";
 import { classify, classifyPrompt, signals, triageRecord } from "./triage.ts";
 
 /**
@@ -34,10 +46,11 @@ async function cancellable<T>(id: string, fn: (controller: AbortController) => P
   }
 }
 
+/** Stops a draft, a triage or a run in progress. */
 export function cancelTask(id: string): boolean {
   const controller = running.get(id);
   controller?.abort();
-  return controller !== undefined;
+  return controller !== undefined || stopRun(id);
 }
 
 function requireDraft(task: Task): void {
@@ -47,7 +60,7 @@ function requireDraft(task: Task): void {
 export function newTask(root: string, request: string): Task {
   const text = request.trim();
   if (!text) throw invalid("Describe the task first.");
-  return createTask(root, text, availableGates(detectWorkspace(root)));
+  return createTask(root, text, availableGates(detectWorkspace(root), root));
 }
 
 async function triage(
@@ -88,7 +101,7 @@ export async function draftTask(root: string, id: string, claude: Claude, model?
     });
     const drafted: Task = {
       ...task,
-      availableGates: availableGates(profile),
+      availableGates: availableGates(profile, root),
       costUsd: task.costUsd + draft.costUsd,
       updatedAt: new Date().toISOString(),
     };
@@ -177,9 +190,113 @@ export function approveTask(
 /** Reopens an approved contract for editing. Unchanged, it can be approved again without a new triage. */
 export function reviseTask(root: string, id: string, now = new Date()): Task {
   const task = loadTask(root, id);
+  if (runs.has(id)) throw invalid("The task is running. Stop it first.");
   if (task.state === "draft" || !task.contract) return task;
   const { approvedAt: _approved, ...contract } = task.contract;
-  const next: Task = { ...task, state: "draft", contract, updatedAt: now.toISOString() };
+  // A new contract makes the last run's results meaningless.
+  const next: Task = { ...task, state: "draft", contract, run: null, updatedAt: now.toISOString() };
   saveTask(root, next);
   return next;
+}
+
+/* ---------- Runs (M3-06) ---------- */
+
+const library = LibrarySchema.parse(shipped);
+
+/** Runs in progress in this sidecar, by task id. */
+const runs = new Map<string, Orchestrator>();
+/** Set while the sidecar shuts down: a run cut off then is left `running`, so it reads back as interrupted. */
+let shuttingDown = false;
+
+/** A run that says it's running but has no orchestrator here was cut off (the app quit): it's `interrupted`. */
+export function present(task: Task): Task {
+  return task.state === "running" && !runs.has(task.id) ? { ...task, state: "interrupted" } : task;
+}
+
+export function listTasksLive(root: string): TaskSummary[] {
+  return listTasks(root).map((t) => (t.state === "running" && !runs.has(t.id) ? { ...t, state: "interrupted" } : t));
+}
+
+export function deleteTaskSafe(root: string, id: string): void {
+  if (runs.has(id)) throw invalid("The task is running. Stop it first.");
+  deleteTask(root, id);
+}
+
+/** Tasks a new run can start from. */
+const STARTABLE = new Set<Task["state"]>(["ready", "done", "failed", "unverified", "cancelled"]);
+
+function launch(root: string, task: Task, host: SessionHost, notify: (task: Task) => void, resume: boolean): void {
+  const workflow = Object.values(library.workflows).find((w) => w.id === task.run?.workflow.id);
+  if (!workflow) throw invalid(`The workflow ${task.run?.workflow.id} isn't in this version of the app.`);
+  const orchestrator = new Orchestrator(task, {
+    workflow,
+    runner: sessionRunner(root, task, library, host),
+    files: {
+      read: (name) => readTaskFile(root, task.id, name),
+      write: (name, text) => writeTaskFile(root, task.id, name, text),
+    },
+    save: (t) => {
+      if (shuttingDown) return;
+      saveTask(root, t);
+      notify(present(t));
+    },
+    resume,
+  });
+  runs.set(task.id, orchestrator);
+  void orchestrator.run().finally(() => {
+    runs.delete(task.id);
+    if (!shuttingDown) notify(present(orchestrator.current));
+  });
+}
+
+/** Starts a run of an approved task (S or M for now). It continues in the background and reports through `notify`. */
+export function startTask(
+  root: string,
+  id: string,
+  host: SessionHost,
+  opts: { permissionMode: PermissionMode; model?: string },
+  notify: (task: Task) => void,
+  now = new Date(),
+): Task {
+  const task = present(loadTask(root, id));
+  if (runs.has(id)) throw invalid("The task is already running.");
+  if (!STARTABLE.has(task.state) || !task.contract?.approvedAt || !task.triage) {
+    throw invalid("Approve the contract and the tier first.");
+  }
+  const workflow = library.workflows[task.triage.chosen];
+  if (!workflow) {
+    throw invalid(`${task.triage.chosen} tasks can run in a later update; S and M tasks can run now.`);
+  }
+  const started: Task = {
+    ...task,
+    state: "running",
+    run: newRun(workflow, { ...opts, ...startBase(root) }, now),
+    updatedAt: now.toISOString(),
+  };
+  saveTask(root, started);
+  notify(started);
+  launch(root, started, host, notify, false);
+  return started;
+}
+
+/** Continues an interrupted run from the step it stopped in. */
+export function resumeTask(root: string, id: string, host: SessionHost, notify: (task: Task) => void): Task {
+  const task = present(loadTask(root, id));
+  if (task.state !== "interrupted" || !task.run) throw invalid("Only an interrupted run can be resumed.");
+  const running: Task = { ...task, state: "running" };
+  launch(root, running, host, notify, true);
+  notify(running);
+  return running;
+}
+
+/** Stops a running task. */
+export function stopRun(id: string): boolean {
+  const orchestrator = runs.get(id);
+  orchestrator?.cancel();
+  return orchestrator !== undefined;
+}
+
+/** The sidecar is shutting down: runs still going stay `running` on disk and read back as interrupted. */
+export function shutdownRuns(): void {
+  shuttingDown = true;
 }

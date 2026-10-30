@@ -96,6 +96,10 @@ export function App() {
     back: string | null;
     view?: SetupView;
   } | null>(null);
+  /** Approvals from task steps' sessions, which have no tab (M3-06), oldest first. */
+  const [taskApprovals, setTaskApprovals] = useState<PermissionRequest[]>([]);
+  /** Task step sessions' running cost totals, for each turn's spend in cost history. */
+  const stepTotals = useRef(new Map<string, number>());
   /** The task page (M3 preview), open over the session it came from (or Home when `back` is null). */
   const [taskView, setTaskView] = useState<{ cwd: string; model: string; back: string | null } | null>(null);
   /** Self-test screenshots only: the right panel's tab. */
@@ -195,11 +199,26 @@ export function App() {
     });
     const offEvents = subscribe((n) => {
       if (n.method === "permission.request") {
+        // A task step's session has no tab: its approvals queue up and show over whatever page is open.
+        const { task } = n.params;
+        if (task && !tabsRef.current.some((t) => t.sessionId === n.params.sessionId)) {
+          setTaskApprovals((q) => [...q, n.params]);
+          return;
+        }
         patchTab(n.params.sessionId, (t) => ({ ...t, permissions: [...t.permissions, n.params] }));
         return;
       }
-      const { sessionId, event } = n.params;
-      if (event.type === "turn.completed") recordCost(sessionId, event);
+      if (n.method === "task.updated") {
+        // A run that ended cancels its steps' pending approvals.
+        const { task } = n.params;
+        if (task.state !== "running") setTaskApprovals((q) => q.filter((p) => p.task?.id !== task.id));
+        return;
+      }
+      const { sessionId, event, task } = n.params;
+      if (event.type === "turn.completed") {
+        if (task && !tabsRef.current.some((t) => t.sessionId === sessionId)) recordStepCost(sessionId, event, task.cwd);
+        else recordCost(sessionId, event);
+      }
       if (event.type === "turn.completed") {
         turnWaiters.current.get(sessionId)?.(event);
         turnWaiters.current.delete(sessionId);
@@ -263,6 +282,25 @@ export function App() {
   }
 
   /** Local cost history (M1-33); the turn's own cost is known unless the session was resumed in this tab. */
+  /** A task step's turn, for cost history: its session's running total gives the turn's spend. */
+  function recordStepCost(sessionId: string, e: TurnCompleted, stepCwd: string) {
+    const previous = stepTotals.current.get(sessionId);
+    stepTotals.current.set(sessionId, e.totalCostUsd);
+    const turn = {
+      sessionId,
+      cwd: stepCwd,
+      at: Date.now(),
+      totalCostUsd: e.totalCostUsd,
+      deltaUsd: previous === undefined ? e.totalCostUsd : Math.max(0, e.totalCostUsd - previous),
+      durationMs: Math.round(e.durationMs),
+      inputTokens: null,
+      outputTokens: null,
+      model: null,
+      subtype: e.subtype,
+    };
+    void invoke("cost_record", { turn }).catch((err: unknown) => console.warn(`cost history: ${err}`));
+  }
+
   function recordCost(sessionId: string, e: TurnCompleted) {
     const tab = tabsRef.current.find((t) => t.sessionId === sessionId);
     if (!tab) return;
@@ -478,6 +516,27 @@ export function App() {
     }
   }
 
+  async function answerTaskStep(req: PermissionRequest, reply: PermissionAnswer) {
+    setTaskApprovals((q) => q.filter((p) => p.requestId !== req.requestId));
+    try {
+      await request("permission.respond", { sessionId: req.sessionId, requestId: req.requestId, ...reply });
+    } catch (err) {
+      setRuntimeNotice(`Couldn't answer the task step: ${err}`);
+    }
+  }
+
+  /** Stops the run a step's approval belongs to; its other pending approvals go with it. */
+  async function stopTaskStep(req: PermissionRequest) {
+    const task = req.task;
+    if (!task) return;
+    setTaskApprovals((q) => q.filter((p) => p.task?.id !== task.id));
+    try {
+      await request("task.cancel", { cwd: task.cwd, id: task.id });
+    } catch (err) {
+      setRuntimeNotice(`Couldn't stop the task: ${err}`);
+    }
+  }
+
   /** "Rewind files to here" (M1-23): preview, confirm with the documented limits, then restore. */
   async function rewind(sessionId: string, messageId: string) {
     try {
@@ -629,6 +688,8 @@ export function App() {
 
   const activeTab = tabs.find((t) => t.sessionId === active);
   const permission = activeTab?.permissions[0];
+  // A task step's approval shows when the active session has none waiting.
+  const stepApproval = permission ? undefined : taskApprovals[0];
   const workspace = cwd.trim();
 
   /** Everything the command palette offers (UX-07), built from the same actions as the menu and the views. */
@@ -840,6 +901,7 @@ export function App() {
                       key={taskView.cwd}
                       cwd={taskView.cwd}
                       model={taskView.model}
+                      mode={mode}
                       backLabel={taskView.back ? "Back to session" : "Back to Home"}
                       confirm={confirm}
                       onBack={() => setTaskView(null)}
@@ -858,6 +920,16 @@ export function App() {
             cwd={activeTab.cwd}
             canAutonomous={activeTab.budgetUsd !== null}
             onAnswer={(reply) => void answer(permission, reply)}
+          />
+        )}
+        {stepApproval?.task && (
+          <PermissionDialog
+            key={stepApproval.requestId}
+            request={stepApproval}
+            cwd={stepApproval.task.cwd}
+            canAutonomous={false}
+            onAnswer={(reply) => void answerTaskStep(stepApproval, reply)}
+            onStopTask={() => void stopTaskStep(stepApproval)}
           />
         )}
         {settingsOpen && settings && (

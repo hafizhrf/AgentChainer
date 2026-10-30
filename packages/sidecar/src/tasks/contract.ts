@@ -9,6 +9,7 @@ import {
 import { generatorHook } from "../bootstrap/generate.ts";
 import { guarded } from "../bootstrap/workspace-guard.ts";
 import type { AgentSdkModule } from "../sdk-loader.ts";
+import { smokeCommand } from "./gates.ts";
 
 /**
  * Drafting the task contract (M3-02, planner.md §3): a read-only session reads the repository and answers with
@@ -16,9 +17,13 @@ import type { AgentSdkModule } from "../sdk-loader.ts";
  * workspace guard reverts anything that changed anyway. The user edits the draft and approves it.
  */
 
-/** Gates the profile has a command for. `smoke` joins when the smoke generator's command kind exists (M3-08). */
-export function availableGates(profile: WorkspaceProfile): GateKind[] {
-  return GATE_KINDS.filter((kind) => kind !== "smoke" && profile.packages.some((p) => p.commands[kind]));
+/** Gates the workspace has a command for: the profile's, plus `smoke` when `scripts/smoke.*` exists (M3-08). */
+export function availableGates(profile: WorkspaceProfile, root?: string): GateKind[] {
+  return GATE_KINDS.filter((kind) =>
+    kind === "smoke"
+      ? root !== undefined && smokeCommand(root) !== null
+      : profile.packages.some((p) => p.commands[kind]),
+  );
 }
 
 const CHECKS = ["review", "manual", ...GATE_KINDS.map((k) => `gate:${k}`)];
@@ -155,7 +160,7 @@ export async function draftContract(
   profile: WorkspaceProfile,
   opts: DraftOptions = {},
 ): Promise<{ contract: TaskContract | null; error?: string; costUsd: number }> {
-  const gates = availableGates(profile);
+  const gates = availableGates(profile, root);
   let costUsd = 0;
   const { result } = await guarded(root, async () => {
     const q = sdk.query({

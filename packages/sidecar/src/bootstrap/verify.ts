@@ -1,4 +1,4 @@
-import { spawn } from "node:child_process";
+import { type ChildProcess, spawn } from "node:child_process";
 import { existsSync } from "node:fs";
 import path from "node:path";
 import { detectWorkspace } from "../detect/detect.ts";
@@ -15,18 +15,41 @@ const TAIL_LINES = 40;
 
 export type CommandRun = { command: string; exitCode: number | null; timedOut: boolean; tail: string; ms: number };
 
-/** Runs a project command through the shell (commands come from the project's own manifests) without blocking. */
+/**
+ * Stops a command and everything it started. Killing only the shell isn't enough: Linux's `sh` (dash) and Windows'
+ * `cmd` run the command as a child, which would keep running and hold the output open.
+ */
+function killTree(child: ChildProcess): void {
+  if (child.pid === undefined) return;
+  if (process.platform === "win32") {
+    spawn("taskkill", ["/pid", String(child.pid), "/T", "/F"], { stdio: "ignore" });
+    return;
+  }
+  try {
+    process.kill(-child.pid, "SIGKILL");
+  } catch {
+    child.kill("SIGKILL");
+  }
+}
+
+/**
+ * Runs a project command through the shell (commands come from the project's own manifests) without blocking.
+ * `signal` stops it early, like the timeout does.
+ */
 export function runCommand(
   command: string,
   cwd: string,
   timeoutMs: number,
   env: Record<string, string> = {},
+  signal?: AbortSignal,
 ): Promise<CommandRun> {
   const started = Date.now();
   return new Promise((resolve) => {
     const child = spawn(command, {
       cwd,
       shell: true,
+      // Its own process group on POSIX, so stopping it can take its children too (see killTree).
+      detached: process.platform !== "win32",
       stdio: ["ignore", "pipe", "pipe"],
       env: { ...process.env, CI: "1", ...env },
     });
@@ -39,10 +62,13 @@ export function runCommand(
     let timedOut = false;
     const timer = setTimeout(() => {
       timedOut = true;
-      child.kill("SIGKILL");
+      killTree(child);
     }, timeoutMs);
+    const stop = () => killTree(child);
+    signal?.addEventListener("abort", stop);
     const done = (exitCode: number | null) => {
       clearTimeout(timer);
+      signal?.removeEventListener("abort", stop);
       resolve({
         command,
         exitCode,
@@ -57,17 +83,27 @@ export function runCommand(
 }
 
 /** Runs a verification command; whatever it changes in the workspace (lockfiles, snapshots) is reverted. */
-async function runGuarded(
+export async function runGuarded(
   root: string,
   command: string,
   cwd: string,
   timeoutMs: number,
   env: Record<string, string> = {},
-): Promise<CommandRun> {
-  const { result, reverted } = await guarded(root, () => runCommand(command, cwd, timeoutMs, env));
+  signal?: AbortSignal,
+): Promise<CommandRun & { reverted: string[] }> {
+  const { result, reverted } = await guarded(root, () => runCommand(command, cwd, timeoutMs, env, signal));
   return reverted.length
-    ? { ...result, tail: `${result.tail}\n(reverted changes the command made to ${reverted.join(", ")})` }
-    : result;
+    ? { ...result, tail: `${result.tail}\n(reverted changes the command made to ${reverted.join(", ")})`, reverted }
+    : { ...result, reverted };
+}
+
+/** How a project script runs, by its extension: `scripts/smoke.mjs` → `node scripts/smoke.mjs`. */
+export function scriptCommand(script: string): string {
+  const ext = path.extname(script);
+  if (ext === ".mjs" || ext === ".js" || ext === ".ts") return `node ${script}`;
+  if (ext === ".py") return `python3 ${script}`;
+  if (ext === ".ps1") return `powershell -NoProfile -File ${script}`;
+  return `sh ${script}`;
 }
 
 const asCheck = (name: string, r: CommandRun): Check => ({
@@ -102,16 +138,7 @@ export async function verifyApplied(root: string, action: string, files: string[
     if (!script || !existsSync(path.join(root, ...script.split("/")))) {
       return [{ name: "smoke script", status: "fail", detail: "no scripts/smoke.* was written" }];
     }
-    const ext = path.extname(script);
-    const command =
-      ext === ".mjs" || ext === ".js"
-        ? `node ${script}`
-        : ext === ".py"
-          ? `python3 ${script}`
-          : ext === ".ps1"
-            ? `powershell -NoProfile -File ${script}`
-            : `sh ${script}`;
-    return [asCheck("smoke test runs", await runGuarded(root, command, root, 120_000))];
+    return [asCheck("smoke test runs", await runGuarded(root, scriptCommand(script), root, 120_000))];
   }
   if (action === "stop-tests") {
     // Run the hook as Claude Code would (no hook input on stdin): exit 0 when tests pass, 2 when they fail.

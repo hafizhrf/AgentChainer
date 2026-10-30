@@ -25,6 +25,7 @@ export function PermissionDialog({
   cwd,
   canAutonomous,
   onAnswer,
+  onStopTask,
 }: {
   request: PermissionRequest;
   /** The session's workspace: paths inside it read as relative and count as safer. */
@@ -32,11 +33,13 @@ export function PermissionDialog({
   /** The Autonomous profile needs a budget cap on the session. */
   canAutonomous: boolean;
   onAnswer: (answer: PermissionAnswer) => void;
+  /** A task step's approval: the dialog covers the page's Stop, so it offers its own. */
+  onStopTask?: () => void;
 }) {
   return request.toolName === "ExitPlanMode" ? (
     <PlanReview request={request} canAutonomous={canAutonomous} onAnswer={onAnswer} />
   ) : (
-    <Approval request={request} cwd={cwd} onAnswer={onAnswer} />
+    <Approval request={request} cwd={cwd} onAnswer={onAnswer} {...(onStopTask ? { onStopTask } : {})} />
   );
 }
 
@@ -61,10 +64,12 @@ function Approval({
   request,
   cwd,
   onAnswer,
+  onStopTask,
 }: {
   request: PermissionRequest;
   cwd: string;
   onAnswer: (a: PermissionAnswer) => void;
+  onStopTask?: () => void;
 }) {
   const original = JSON.stringify(request.input, null, 2);
   const [input, setInput] = useState(original);
@@ -106,12 +111,21 @@ function Approval({
       title={request.title ?? `Allow ${request.toolName}?`}
       description={
         <>
-          {request.agentId ? `Requested by subagent ${request.agentId}` : "Requested by the main agent"} ·{" "}
-          {request.toolName}
+          {request.task
+            ? `Requested by the task step ${request.task.label}${request.task.role ? ` (${request.task.role})` : ""}`
+            : request.agentId
+              ? `Requested by subagent ${request.agentId}`
+              : "Requested by the main agent"}{" "}
+          · {request.toolName}
         </>
       }
       actions={
         <>
+          {onStopTask && (
+            <button type="button" className="secondary approval-stop" onClick={onStopTask}>
+              Stop task
+            </button>
+          )}
           <button
             type="button"
             className="secondary"

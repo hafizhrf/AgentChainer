@@ -1,6 +1,6 @@
 import { existsSync } from "node:fs";
 import { homedir } from "node:os";
-import { PROTOCOL_VERSION, RpcErrorCode } from "@agentchainer/protocol";
+import { PROTOCOL_VERSION, RpcErrorCode, type Task } from "@agentchainer/protocol";
 import pkg from "../package.json" with { type: "json" };
 import { applyActions, type Cli, listRuns, rollback } from "./bootstrap/apply.ts";
 import { autoApplicable } from "./bootstrap/auto-apply.ts";
@@ -40,8 +40,23 @@ import { log, notify, RpcFailure, serve } from "./rpc.ts";
 import { loadSdk } from "./sdk-loader.ts";
 import { Session } from "./session.ts";
 import { historyEvents, retention, toSessionInfo } from "./stored-sessions.ts";
-import { approveTask, type Claude, cancelTask, draftTask, newTask, retriageTask, reviseTask } from "./tasks/service.ts";
-import { deleteTask, listTasks, loadTask } from "./tasks/store.ts";
+import type { SessionHost } from "./tasks/runner.ts";
+import {
+  approveTask,
+  type Claude,
+  cancelTask,
+  deleteTaskSafe,
+  draftTask,
+  listTasksLive,
+  newTask,
+  present,
+  resumeTask,
+  retriageTask,
+  reviseTask,
+  shutdownRuns,
+  startTask,
+} from "./tasks/service.ts";
+import { loadTask } from "./tasks/store.ts";
 import { fileDiff, gitInit, listFiles, revert } from "./workspace.ts";
 
 /** Live sessions by SDK session id, one per workspace tab (M1-08). */
@@ -83,6 +98,23 @@ async function claude(): Promise<Claude> {
   const { sdk } = await prepareSdk();
   return { sdk, claudePath };
 }
+
+/**
+ * How a task's step sessions plug into the sidecar: registered with the live sessions (so approvals and interrupts
+ * reach them), and their events and approvals tagged with the task, since they have no tab of their own.
+ */
+function sessionHost({ sdk, claudePath }: Claude): SessionHost {
+  return {
+    sdk,
+    claudePath,
+    register: (session) => sessions.set(session.id, session),
+    unregister: (id) => sessions.delete(id),
+    event: (sessionId, event, task) => notify("agent.event", { sessionId, event, task }),
+    permission: (sessionId, request, task) => notify("permission.request", { sessionId, ...request, task }),
+  };
+}
+
+const taskUpdated = (cwd: string) => (task: Task) => notify("task.updated", { cwd, task });
 
 function rejectIfOpen(sessionId: string, action: string): void {
   if (sessions.has(sessionId)) {
@@ -450,23 +482,36 @@ serve(
 
     "task.cancel": ({ id }) => ({ cancelled: cancelTask(id) }),
 
+    "task.start": async ({ cwd, id, permissionMode, model }) => {
+      requireFolder(cwd);
+      const host = sessionHost(await claude());
+      return startTask(cwd, id, host, { permissionMode, ...(model ? { model } : {}) }, taskUpdated(cwd));
+    },
+
+    "task.resume": async ({ cwd, id }) => {
+      requireFolder(cwd);
+      return resumeTask(cwd, id, sessionHost(await claude()), taskUpdated(cwd));
+    },
+
     "task.list": ({ cwd }) => {
       requireFolder(cwd);
-      return { tasks: listTasks(cwd) };
+      return { tasks: listTasksLive(cwd) };
     },
 
     "task.get": ({ cwd, id }) => {
       requireFolder(cwd);
-      return loadTask(cwd, id);
+      return present(loadTask(cwd, id));
     },
 
     "task.delete": ({ cwd, id }) => {
       requireFolder(cwd);
-      deleteTask(cwd, id);
+      deleteTaskSafe(cwd, id);
       return { ok: true };
     },
   },
   () => {
+    // Runs still going stay `running` on disk, so they read back as interrupted and can be resumed.
+    shutdownRuns();
     for (const session of sessions.values()) session.close();
   },
 );

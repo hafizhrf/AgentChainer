@@ -17,7 +17,7 @@ import type {
   Query,
   SDKUserMessage,
 } from "@anthropic-ai/claude-agent-sdk";
-import { checkToolCall } from "./guard.ts";
+import { checkToolCall, READ_TOOLS, readOnlyHook } from "./guard.ts";
 import { normalize } from "./normalize.ts";
 import { alwaysUpdates, describeUpdates, retarget } from "./permissions.ts";
 import type { AgentSdkModule } from "./sdk-loader.ts";
@@ -38,6 +38,27 @@ export type SessionOptions = {
   claudePath: string;
   /** Session id from `listSessions` to continue. */
   resume?: string;
+  /**
+   * A task's read step (M3-06): Read, Grep and Glob inside the workspace, isolated from the user's and the project's
+   * settings (no hooks, plugins or MCP servers), like the generators.
+   */
+  readOnly?: boolean;
+  /** Added to the default system prompt: a task step's role (agents/ac-*.md). */
+  appendSystemPrompt?: string;
+  maxTurns?: number;
+  /** Structured output for the session's answers, e.g. the reviewer's findings. */
+  outputFormat?: { type: "json_schema"; schema: Record<string, unknown> };
+};
+
+/** How a turn ended, for code that drives a session itself (a task's steps). */
+export type TurnResult = {
+  subtype: string;
+  isError: boolean;
+  /** The final answer's text; empty when the turn stopped on an error. */
+  text: string;
+  structured?: unknown;
+  /** What this turn cost, an estimate. */
+  costUsd: number;
 };
 
 /** Runs the hard denylist on every tool call, including ones `canUseTool` never sees (ARCHITECTURE §6). */
@@ -86,6 +107,10 @@ export class Session {
   private readonly q: Query;
   /** User messages sent but not yet answered by a `result`. */
   private openTurns = 0;
+  /** `turn()` callers, in order, waiting for their turn's `result`. */
+  private readonly waiters: { resolve: (r: TurnResult) => void; reject: (e: Error) => void }[] = [];
+  /** The session's running cost, to give each turn its own. */
+  private totalCostUsd = 0;
 
   constructor(sdk: AgentSdkModule, options: SessionOptions, callbacks: SessionCallbacks) {
     this.callbacks = callbacks;
@@ -96,7 +121,20 @@ export class Session {
         cwd: options.cwd,
         ...(options.resume ? { resume: options.resume } : { sessionId: this.id }),
         // Like the CLI: the user's and the project's settings, CLAUDE.md, skills and hooks (ARCHITECTURE §5.1).
-        settingSources: ["user", "project", "local"],
+        // A read-only task step is isolated instead, like the generators.
+        settingSources: options.readOnly ? [] : ["user", "project", "local"],
+        ...(options.readOnly ? { tools: READ_TOOLS } : {}),
+        ...(options.appendSystemPrompt
+          ? {
+              systemPrompt: {
+                type: "preset" as const,
+                preset: "claude_code" as const,
+                append: options.appendSystemPrompt,
+              },
+            }
+          : {}),
+        ...(options.maxTurns ? { maxTurns: options.maxTurns } : {}),
+        ...(options.outputFormat ? { outputFormat: options.outputFormat } : {}),
         ...(options.effort ? { effort: options.effort } : {}),
         ...(options.maxBudgetUsd ? { maxBudgetUsd: options.maxBudgetUsd } : {}),
         // Without a display mode the CLI streams thinking with empty text; `showThinkingSummaries` alone didn't change
@@ -109,7 +147,7 @@ export class Session {
         includePartialMessages: true,
         forwardSubagentText: true,
         permissionMode: options.permissionMode ?? "default",
-        hooks: { PreToolUse: [{ hooks: [guardHook] }] },
+        hooks: { PreToolUse: [{ hooks: [options.readOnly ? readOnlyHook(options.cwd, "This step") : guardHook] }] },
         canUseTool: (toolName, input, ctx) =>
           new Promise<PermissionResult>((resolve) => {
             const always = ctx.suppressAlwaysAllowRule ? [] : alwaysUpdates(ctx.suggestions);
@@ -152,6 +190,13 @@ export class Session {
       : text;
     this.input.push({ type: "user", message: { role: "user", content }, parent_tool_use_id: null, uuid });
     return uuid;
+  }
+
+  /** Sends a message and resolves with how its turn ended: what a task's orchestrator drives steps with. */
+  turn(text: string): Promise<TurnResult> {
+    const result = new Promise<TurnResult>((resolve, reject) => this.waiters.push({ resolve, reject }));
+    this.send(text);
+    return result;
   }
 
   /** Restores checkpointed files to their state before the user message `messageId`. */
@@ -207,12 +252,25 @@ export class Session {
     try {
       for await (const message of this.q) {
         if (RECORD_PATH) appendFileSync(RECORD_PATH, `${JSON.stringify(message)}\n`);
-        if (message.type === "result") this.openTurns = Math.max(0, this.openTurns - 1);
+        if (message.type === "result") {
+          this.openTurns = Math.max(0, this.openTurns - 1);
+          const costUsd = Math.max(0, message.total_cost_usd - this.totalCostUsd);
+          this.totalCostUsd = message.total_cost_usd;
+          const ok = message.subtype === "success";
+          this.waiters.shift()?.resolve({
+            subtype: message.subtype,
+            isError: message.is_error,
+            text: ok ? message.result : "",
+            ...(ok && message.structured_output !== undefined ? { structured: message.structured_output } : {}),
+            costUsd,
+          });
+        }
         for (const event of normalize(message)) this.callbacks.emit(event);
       }
     } catch (err) {
       this.callbacks.emit({ type: "error", message: err instanceof Error ? err.message : String(err) });
     } finally {
+      for (const w of this.waiters.splice(0)) w.reject(new Error("The session ended before its turn finished."));
       this.callbacks.onEnd();
     }
   }

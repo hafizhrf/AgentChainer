@@ -1,5 +1,6 @@
 import { homedir } from "node:os";
 import { isAbsolute, relative, resolve } from "node:path";
+import type { HookCallback } from "@anthropic-ai/claude-agent-sdk";
 
 /**
  * Hard denylist applied to every tool call through a PreToolUse hook, in every permission mode
@@ -104,4 +105,34 @@ function secretPathMentioned(command: string, home: string): boolean {
   // biome-ignore lint/suspicious/noTemplateCurlyInString: matches the literal shell text `${HOME}/` in a command.
   const prefixes = ["~/", "$HOME/", "${HOME}/", `${home}/`];
   return SECRET_DIRS.some((dir) => prefixes.some((p) => command.includes(`${p}${dir}`)));
+}
+
+/** The tools a read-only session gets: it can look, not change. */
+export const READ_TOOLS = ["Read", "Grep", "Glob"];
+
+/**
+ * The PreToolUse hook of a read-only session (a task's plan or review step): the denylist, then Read, Grep and Glob
+ * inside `root`, and nothing else. Structured output arrives through a tool of its own, which is allowed.
+ */
+export function readOnlyHook(root: string, who: string): HookCallback {
+  return async (input) => {
+    if (input.hook_event_name !== "PreToolUse") return {};
+    const deny = (reason: string) => ({
+      hookSpecificOutput: {
+        hookEventName: "PreToolUse" as const,
+        permissionDecision: "deny" as const,
+        permissionDecisionReason: reason,
+      },
+    });
+    if (input.tool_name === "StructuredOutput") return {};
+    const guard = checkToolCall(input.tool_name, input.tool_input, input.cwd);
+    if (guard) return deny(`Blocked by AgentChainer guard: ${guard}`);
+    if (!READ_TOOLS.includes(input.tool_name)) return deny(`${who} can only read files, not use ${input.tool_name}.`);
+    const args = (input.tool_input ?? {}) as Record<string, unknown>;
+    const target = args.file_path ?? args.path;
+    if (typeof target === "string" && target && relative(root, resolve(root, target)).startsWith("..")) {
+      return deny(`${who} can only read inside the workspace.`);
+    }
+    return {};
+  };
 }

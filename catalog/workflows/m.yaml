@@ -1,0 +1,34 @@
+# Tier M (docs/design/planner.md §5): a feature within one module. A read-only plan, the implementation, the gates
+# with fix rounds, then an independent review in a fresh session; its must-fix findings get one fix round of their own,
+# and the gates run again after it.
+id: tier-m
+tier: M
+version: 1
+description: Plan, implement, run the gates (with fix rounds), then an independent review in a fresh context.
+steps:
+  - id: plan
+    label: Plan
+    role: architect
+    access: read
+    inputs: [contract]
+    output: plan
+    limits: { maxTurns: 30, maxBudgetUsd: 0.75 }
+  - id: implement
+    label: Implement
+    role: implementer
+    access: write
+    inputs: [contract, plan]
+    limits: { maxTurns: 80, maxBudgetUsd: 2 }
+  - id: gates
+    label: Gates
+    gates: [format, lint, typecheck, test, build, smoke]
+    fix: { step: implement, maxRounds: 2, maxBudgetUsd: 1 }
+  - id: review
+    label: Independent review
+    role: independent-reviewer
+    access: read
+    fresh: true
+    inputs: [contract, diff, gates]
+    output: review
+    fix: { step: implement, maxRounds: 1, maxBudgetUsd: 1 }
+    limits: { maxTurns: 30, maxBudgetUsd: 1 }

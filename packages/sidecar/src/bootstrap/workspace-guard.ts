@@ -73,3 +73,19 @@ function restore(top: string, before: Map<string, Entry>): string[] {
   }
   return reverted.sort();
 }
+
+/**
+ * Each git-visible changed file with a hash of its content (null when deleted). Comparing two fingerprints tells what
+ * a command changed, e.g. the files a formatter rewrote. Empty outside git.
+ */
+export function fingerprint(root: string): Map<string, string | null> {
+  const repo = repoOf(root);
+  if (!repo) return new Map();
+  return new Map([...snapshot(repo.top)].map(([file, e]) => [file, e.hash]));
+}
+
+/** The files whose content differs between two fingerprints. */
+export function changedBetween(before: Map<string, string | null>, after: Map<string, string | null>): string[] {
+  const files = new Set([...before.keys(), ...after.keys()]);
+  return [...files].filter((f) => (before.get(f) ?? "clean") !== (after.get(f) ?? "clean")).sort();
+}

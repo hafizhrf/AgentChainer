@@ -76,6 +76,7 @@ export function createTask(root: string, request: string, availableGates: GateKi
     triage: null,
     availableGates,
     costUsd: 0,
+    run: null,
   };
   mkdirSync(taskDir(root, task.id), { recursive: true });
   saveTask(root, task);
@@ -134,6 +135,22 @@ export function listTasks(root: string): TaskSummary[] {
     }
   }
   return tasks.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+}
+
+/** Files steps hand to each other (planner.md §6), kept in the task's folder. */
+const HAND_OFF_FILES = new Set(["plan.md", "review.json"]);
+
+export function readTaskFile(root: string, id: string, name: string): string | null {
+  if (!HAND_OFF_FILES.has(name)) throw new Error(`Not a task file: ${name}`);
+  const file = path.join(taskDir(root, id), name);
+  return existsSync(file) ? readFileSync(file, "utf8") : null;
+}
+
+export function writeTaskFile(root: string, id: string, name: string, text: string): void {
+  if (!HAND_OFF_FILES.has(name)) throw new Error(`Not a task file: ${name}`);
+  const dir = taskDir(root, id);
+  requireRealDir(root, dir);
+  writeFileSync(path.join(dir, name), text);
 }
 
 export function deleteTask(root: string, id: string): void {

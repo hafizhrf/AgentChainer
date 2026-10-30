@@ -1,0 +1,17 @@
+# Tier S (docs/design/planner.md §5): a typo, a small bug or a config tweak. The contract is the plan: one agent
+# implements it, then the gates run, and failures go back to it for at most two rounds.
+id: tier-s
+tier: S
+version: 1
+description: One agent implements the contract, then the project's gates run, with up to two fix rounds.
+steps:
+  - id: implement
+    label: Implement
+    role: implementer
+    access: write
+    inputs: [contract]
+    limits: { maxTurns: 60, maxBudgetUsd: 1 }
+  - id: gates
+    label: Gates
+    gates: [format, lint, typecheck, test, build, smoke]
+    fix: { step: implement, maxRounds: 2, maxBudgetUsd: 0.5 }

@@ -3,6 +3,9 @@ import { describe, it } from "node:test";
 import type { GateRun, Task } from "@agentchainer/protocol";
 import {
   canAcceptRisk,
+  canContinue,
+  childRunBlocker,
+  dependsLabel,
   duration,
   failedBefore,
   fromHistory,
@@ -71,7 +74,45 @@ describe("task runs on the page", () => {
     const base = task().triage;
     assert.ok(base);
     assert.equal(runBlocker(task({ triage: { ...base, chosen: "L" } })), null);
-    assert.match(runBlocker(task({ triage: { ...base, chosen: "XL" } })) ?? "", /XL tasks run in a later update/);
+  });
+
+  it("runs an XL task once it's split and every sub-task is approved, then goes on with Continue", () => {
+    const base = task().triage;
+    assert.ok(base);
+    const xl = (over: Partial<Task> = {}) => task({ triage: { ...base, chosen: "XL" }, ...over });
+    assert.match(runBlocker(xl()) ?? "", /Split the task/);
+    const children = [task({ id: "2026-10-30-0000000a" }), task({ id: "2026-10-30-0000000b", state: "draft" })];
+    const split = xl({ subtasks: children.map((c) => c.id) });
+    assert.match(runBlocker(split, children) ?? "", /Approve every sub-task/);
+    assert.equal(
+      runBlocker(
+        split,
+        children.map((c) => ({ ...c, state: "ready" as const })),
+      ),
+      null,
+    );
+    assert.match(runBlocker({ ...split, state: "failed" }, children) ?? "", /Continue/);
+    const run = task({ state: "failed" });
+    assert.equal(canContinue({ ...xl(), state: "failed", run: run.run ?? emptyRun() }), true);
+    assert.equal(canContinue({ ...xl(), state: "done", run: emptyRun() }), false);
+    assert.equal(canContinue({ ...task(), state: "failed", run: emptyRun() }), false, "only XL");
+  });
+
+  it("lets a sub-task run on its own only in its worktree, while its XL task doesn't run", () => {
+    const child = task({ parent: { id: "2026-10-30-00000000", index: 1 }, state: "failed" });
+    assert.match(childRunBlocker(child, null) ?? "", /run from their XL task/);
+    const wt = { path: "/wt/x", branch: "agentchainer/x", base: "h", untracked: [] };
+    assert.equal(childRunBlocker({ ...child, worktree: wt }, task({ state: "failed" })), null);
+    assert.match(childRunBlocker({ ...child, worktree: wt }, task({ state: "running" })) ?? "", /XL task is running/);
+    assert.match(childRunBlocker({ ...child, worktree: { ...wt, removed: true } }, null) ?? "", /from their XL/);
+    assert.equal(
+      dependsLabel({ ...child, dependsOn: ["2026-10-30-0000000a", "2026-10-30-0000000c"] }, [
+        "2026-10-30-0000000a",
+        "2026-10-30-0000000b",
+        "2026-10-30-0000000c",
+      ]),
+      "after 1, 3",
+    );
   });
 
   it("labels states", () => {
@@ -197,3 +238,22 @@ describe("task runs on the page", () => {
     assert.equal(duration("2026-10-30T00:00:00Z", "2026-10-30T00:03:04Z"), "3 min 4 s");
   });
 });
+
+function emptyRun(): NonNullable<Task["run"]> {
+  return {
+    workflow: { id: "tier-xl", version: 1 },
+    permissionMode: "default",
+    base: null,
+    untrackedAtStart: [],
+    startedAt: "2026-10-30T00:00:00.000Z",
+    position: 0,
+    fixRounds: 0,
+    steps: [],
+    baseline: [],
+    gates: [],
+    notRun: [],
+    approvals: [],
+    guardBlocks: [],
+    costUsd: 0,
+  };
+}

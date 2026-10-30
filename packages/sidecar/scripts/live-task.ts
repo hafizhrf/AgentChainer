@@ -7,6 +7,8 @@
 //   [--stop-after <seconds>]: stops the run that long after it starts, to check it ends `cancelled`
 //   [--accept "<reason>"]: accepts the risk when the run ends failed or not verified (M3-10)
 //   [--print-evidence]: prints the evidence report (M3-09)
+//   --tier XL: splits the task, approves every sub-task as drafted, runs it, prints the task branch's log, then cleans
+//   the worktrees up (M3-07)
 //   cost: a few cents with haiku for an S task; an M or L task's review runs on Opus (≈$0.2–3).
 
 import { execSync, spawn } from "node:child_process";
@@ -37,7 +39,9 @@ const child = spawn(process.execPath, [new URL("../src/main.ts", import.meta.url
 const pending = new Map<number, (m: { result?: unknown; error?: { message: string } }) => void>();
 let finished: (task: Task) => void = () => undefined;
 const done = new Promise<Task>((resolve) => (finished = resolve));
-let lastStep = "";
+const lastStep = new Map<string, string>();
+/** The task this run is about; an XL task's sub-tasks report too, prefixed with their number. */
+let topId = "";
 
 createInterface({ input: child.stdout }).on("line", (line) => {
   const m = JSON.parse(line);
@@ -54,10 +58,11 @@ createInterface({ input: child.stdout }).on("line", (line) => {
   if (m.method === "task.updated") {
     const t: Task = m.params.task;
     const step = t.run?.steps.at(-1);
+    const prefix = t.parent ? `    [${t.parent.index + 1}] ` : "  · ";
     const line = step ? `${step.label}: ${step.status}${step.note ? ` (${step.note})` : ""}` : t.state;
-    if (line !== lastStep) console.log(`  · ${line}`);
-    lastStep = line;
-    if (!["running", "ready"].includes(t.state)) finished(t);
+    if (line !== lastStep.get(t.id)) console.log(`${prefix}${line}`);
+    lastStep.set(t.id, line);
+    if (t.id === topId && !["running", "ready"].includes(t.state)) finished(t);
   }
 });
 
@@ -74,9 +79,10 @@ async function request<M extends MethodName>(method: M, params: Methods[M]["para
 try {
   await request("system.hello", { protocolVersion: 2 });
   const created = await request("task.create", { cwd, request: values.request });
+  topId = created.id;
   const drafted = await request("task.draft", { cwd, id: created.id, model: values.model });
   if (!drafted.contract || !drafted.triage) throw new Error("no contract");
-  const tier = (values.tier ?? drafted.triage.proposed) as "S" | "M" | "L";
+  const tier = (values.tier ?? drafted.triage.proposed) as "S" | "M" | "L" | "XL";
   console.log(`drafted ($${drafted.costUsd.toFixed(3)}); proposed ${drafted.triage.proposed}, running as ${tier}`);
   await request("task.approve", {
     cwd,
@@ -86,6 +92,18 @@ try {
     ...(tier !== drafted.triage.proposed ? { reason: "live test" } : {}),
     budgetUsd: drafted.triage.budgetUsd,
   });
+  if (tier === "XL") {
+    const split = await request("task.split", { cwd, id: created.id, model: values.model });
+    console.log(`split ($${split.costUsd.toFixed(3)} so far):`);
+    for (const [i, id] of (split.subtasks ?? []).entries()) {
+      const sub = await request("task.get", { cwd, id });
+      const after = (sub.dependsOn ?? []).map((d) => (split.subtasks ?? []).indexOf(d) + 1);
+      console.log(
+        `  ${i + 1}. [${sub.triage?.chosen}] ${sub.title}${after.length ? ` (after ${after.join(", ")})` : ""}`,
+      );
+    }
+    await request("task.approveSubtasks", { cwd, id: created.id });
+  }
   const t0 = Date.now();
   await request("task.start", { cwd, id: created.id, permissionMode: "acceptEdits", model: values.model });
   if (values["stop-after"]) {
@@ -112,7 +130,7 @@ try {
     let code = 0;
     try {
       execSync(g.command, {
-        cwd: `${cwd}/${g.package === "." ? "" : g.package}`,
+        cwd: `${end.worktree?.path ?? cwd}/${g.package === "." ? "" : g.package}`,
         stdio: "ignore",
         env: { ...process.env, CI: "1" },
       });
@@ -136,6 +154,19 @@ try {
   console.log(`  gate runs in the report ${same ? "✓ match the recorded runs" : "✗ differ from the recorded runs"}`);
   console.log(`  sections: ${[...evidence.markdown.matchAll(/^## (.+)$/gm)].map((m) => m[1]).join(" · ")}`);
   if (values["print-evidence"]) console.log(`\n${evidence.markdown}`);
+  if (end.worktree) {
+    console.log(
+      `\n${end.worktree.branch}:\n${execSync(`git log --oneline --graph -12 ${end.worktree.branch}`, { cwd, encoding: "utf8" })}`,
+    );
+    for (const id of end.subtasks ?? []) {
+      const sub = await request("task.get", { cwd, id });
+      console.log(
+        `  [${(sub.parent?.index ?? 0) + 1}] ${sub.state}: ${sub.run?.outcome ?? ""} (≈$${(sub.run?.costUsd ?? 0).toFixed(3)})`,
+      );
+    }
+    await request("task.cleanup", { cwd, id: created.id, deleteBranches: false });
+    console.log(`after Clean up:\n${execSync("git worktree list", { cwd, encoding: "utf8" })}`);
+  }
   console.log(`\ngit status:\n${execSync("git status --short", { cwd, encoding: "utf8" })}`);
 } finally {
   child.kill();

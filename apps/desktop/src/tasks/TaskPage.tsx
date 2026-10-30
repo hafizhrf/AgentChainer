@@ -19,6 +19,8 @@ import {
   ClipboardList,
   ExternalLink,
   FileText,
+  GitMerge,
+  ListTree,
   Loader2,
   MinusCircle,
   Play,
@@ -43,11 +45,15 @@ import { EmptyState } from "../ui/Section.tsx";
 import { Select } from "../ui/Select.tsx";
 import {
   canAcceptRisk,
+  canContinue,
+  childRunBlocker,
+  dependsLabel,
   duration,
   failedBefore,
   fromHistory,
   gateKey,
   gateRounds,
+  isXl,
   newer,
   passedGate,
   RUNNABLE_TIERS,
@@ -69,7 +75,18 @@ import {
   tidyContract,
 } from "./taskForm.ts";
 
-type Busy = "draft" | "retriage" | "approve" | "revise" | "run" | "resume" | "accept" | null;
+type Busy =
+  | "draft"
+  | "retriage"
+  | "approve"
+  | "revise"
+  | "run"
+  | "resume"
+  | "accept"
+  | "split"
+  | "approveAll"
+  | "continue"
+  | null;
 
 /** Profiles a run's write steps can ask in; plan mode doesn't fit a step that must implement. */
 const RUN_MODES: Exclude<PermissionMode, "plan">[] = ["default", "acceptEdits", "auto"];
@@ -116,6 +133,9 @@ export function TaskPage({
   const [stepItems, setStepItems] = useState<StepItems>({});
   const [accepting, setAccepting] = useState(false);
   const [acceptReason, setAcceptReason] = useState("");
+  /** An XL task's sub-tasks, and a sub-task's XL task, as they are now. */
+  const [children, setChildren] = useState<Record<string, Task>>({});
+  const [parentTask, setParentTask] = useState<Task | null>(null);
   const taskId = useRef<string | null>(null);
   taskId.current = task?.id ?? null;
 
@@ -139,6 +159,11 @@ export function TaskPage({
         if (n.method === "task.updated" && n.params.cwd === cwd) {
           const updated = n.params.task;
           setTask((current) => (current?.id === updated.id ? newer(current, updated, "notification") : current));
+          setChildren((all) => {
+            const known = all[updated.id];
+            return known ? { ...all, [updated.id]: newer(known, updated, "notification") } : all;
+          });
+          setParentTask((p) => (p?.id === updated.id ? newer(p, updated, "notification") : p));
           if (!taskId.current) void loadList();
         } else if (n.method === "agent.event" && n.params.task && n.params.task.id === taskId.current) {
           const { sessionId, event } = n.params;
@@ -147,6 +172,36 @@ export function TaskPage({
       }),
     [cwd],
   );
+
+  const subtaskIds = task?.subtasks?.join(",") ?? "";
+  const loadChildren = useCallback(
+    async (ids: string) => {
+      if (!ids) return setChildren({});
+      try {
+        const list = await Promise.all(ids.split(",").map((id) => request("task.get", { cwd, id })));
+        setChildren(Object.fromEntries(list.map((t) => [t.id, t])));
+      } catch (err) {
+        setError(message(err));
+      }
+    },
+    [cwd],
+  );
+  useEffect(() => {
+    void loadChildren(subtaskIds);
+  }, [loadChildren, subtaskIds]);
+
+  const parentId = task?.parent?.id ?? null;
+  useEffect(() => {
+    if (!parentId) return setParentTask(null);
+    let live = true;
+    request("task.get", { cwd, id: parentId }).then(
+      (t) => live && setParentTask(t),
+      () => undefined,
+    );
+    return () => {
+      live = false;
+    };
+  }, [cwd, parentId]);
 
   function show(t: Task) {
     setTask((current) => newer(current, t, "reply"));
@@ -230,6 +285,19 @@ export function TaskPage({
     await step("accept", id, () => request("task.acceptRisk", { cwd, id, reason: acceptReason.trim() }));
   }
 
+  const split = (id: string) =>
+    step("split", id, () => request("task.split", { cwd, id, ...(modelAlias ? { model: modelAlias } : {}) }));
+
+  async function approveAll(id: string) {
+    await step("approveAll", id, () => request("task.approveSubtasks", { cwd, id }));
+    await loadChildren(subtaskIds);
+  }
+
+  async function continueRun(id: string) {
+    setStepItems({});
+    await step("continue", id, () => request("task.continue", { cwd, id }));
+  }
+
   async function open(id: string) {
     try {
       show(await request("task.get", { cwd, id }));
@@ -261,7 +329,8 @@ export function TaskPage({
   }
 
   function back() {
-    if (task) {
+    if (task?.parent) void open(task.parent.id);
+    else if (task) {
       setTask(null);
       setEdited(null);
       setError(null);
@@ -288,15 +357,15 @@ export function TaskPage({
       <header className="setup-header">
         <button type="button" className="ghost small" onClick={back} disabled={busy !== null}>
           <ArrowLeft size={14} />
-          {task ? "All tasks" : backLabel}
+          {task?.parent ? "XL task" : task ? "All tasks" : backLabel}
         </button>
         <div className="setup-title">
-          <h1>{task ? "Task" : "New task"}</h1>
+          <h1>{task?.parent ? `Sub-task ${task.parent.index + 1}` : task ? "Task" : "New task"}</h1>
           <span className="muted" title={cwd}>
             {folderName(cwd)}
           </span>
         </div>
-        <span className="chip" title="A preview: S, M and L tasks run; XL tasks arrive later.">
+        <span className="chip" title="A preview: tasks of every tier run; XL sub-tasks run in git worktrees.">
           Preview
         </span>
         <span className="grow" />
@@ -398,8 +467,28 @@ export function TaskPage({
               onReason={setReason}
               budget={budget}
               onBudget={setBudget}
+              {...(task.parent ? { tiers: TIERS.filter((t) => t !== "XL") } : {})}
             />
           </div>
+        )}
+
+        {task && busy === "split" && (
+          <section className="card task-drafting" aria-live="polite">
+            <Loader2 size={18} className="spin" aria-hidden />
+            <div className="grow">
+              <strong>Claude is reading the project to split the task into sub-tasks.</strong>
+              <p className="muted">
+                Read-only: it can't change files. Each sub-task gets its own contract and tier. <Elapsed />
+              </p>
+            </div>
+            <button
+              type="button"
+              className="secondary"
+              onClick={() => void request("task.cancel", { cwd, id: task.id })}
+            >
+              Cancel
+            </button>
+          </section>
         )}
 
         {task?.run && task.state !== "draft" && task.state !== "ready" && (
@@ -408,8 +497,25 @@ export function TaskPage({
             cwd={cwd}
             items={stepItems}
             onLoaded={(sessionId, items) => setStepItems((all) => ({ ...all, [sessionId]: items }))}
+            onOpenTask={(id) => void open(id)}
           />
         )}
+
+        {task && isXl(task) && task.worktree && task.state !== "running" && (
+          <ResultCard task={task} cwd={cwd} confirm={confirm} onChanged={(t) => show(t)} onError={setError} />
+        )}
+
+        {task?.subtasks?.length ? (
+          <SubtasksCard
+            task={task}
+            cwd={cwd}
+            subtasks={task.subtasks.flatMap((id) => (children[id] ? [children[id]] : []))}
+            busy={busy}
+            onOpen={(id) => void open(id)}
+            onApproveAll={() => void approveAll(task.id)}
+            onSplitAgain={() => void split(task.id)}
+          />
+        ) : null}
 
         {task?.run && task.state !== "draft" && task.state !== "ready" && task.state !== "running" && (
           <EvidenceCard
@@ -455,17 +561,19 @@ export function TaskPage({
                 <button
                   type="button"
                   disabled={busy !== null || blocker !== null}
-                  onClick={() => void approve(form, tier === "S", task.id)}
+                  onClick={() => void approve(form, tier === "S" && !task.parent, task.id)}
                 >
                   {busy === "approve" || busy === "run" ? <Loader2 size={14} className="spin" /> : null}
-                  {tier === "S" ? "Approve and run" : "Approve contract and tier"}
+                  {/* A sub-task runs from its XL task, never on approval. */}
+                  {tier === "S" && !task.parent ? "Approve and run" : "Approve contract and tier"}
                 </button>
               )}
             </>
           ) : task.state === "running" ? (
             <>
               <span className="muted">
-                Run {usd(task.run?.costUsd ?? 0)} of ${task.triage?.budgetUsd}
+                Run {usd(task.run?.costUsd ?? 0)}
+                {isXl(task) ? ` · $${task.triage?.budgetUsd} per sub-task` : ` of $${task.triage?.budgetUsd}`}
               </span>
               <button type="button" className="danger" onClick={() => void stop(task)}>
                 <Square size={14} />
@@ -488,14 +596,17 @@ export function TaskPage({
                   Accept risk…
                 </button>
               )}
-              <button
-                type="button"
-                className="secondary"
-                disabled={busy !== null}
-                onClick={() => void step("revise", task.id, () => request("task.revise", { cwd, id: task.id }))}
-              >
-                Revise
-              </button>
+              {/* Once split, an XL task's contract is what its sub-tasks were made from: it stays. */}
+              {!(isXl(task) && task.subtasks?.length) && (
+                <button
+                  type="button"
+                  className="secondary"
+                  disabled={busy !== null}
+                  onClick={() => void step("revise", task.id, () => request("task.revise", { cwd, id: task.id }))}
+                >
+                  Revise
+                </button>
+              )}
               {task.state === "interrupted" ? (
                 <button
                   type="button"
@@ -505,26 +616,37 @@ export function TaskPage({
                   <Play size={14} />
                   Resume
                 </button>
-              ) : (
+              ) : canContinue(task) ? (
+                <button type="button" disabled={busy !== null} onClick={() => void continueRun(task.id)}>
+                  {busy === "continue" ? <Loader2 size={14} className="spin" /> : <Play size={14} />}
+                  Continue
+                </button>
+              ) : isXl(task) && task.state === "ready" && !task.subtasks?.length ? (
                 <>
                   <div className="task-model">
-                    <Select
-                      value={runMode}
-                      onChange={(v) => setRunMode(v as Exclude<PermissionMode, "plan">)}
-                      options={modeOptions(RUN_MODES, true)}
-                      label="Permission profile for the run's write steps"
-                    />
+                    <Select value={modelAlias} onChange={setModelAlias} options={MODELS} label="Model for the split" />
                   </div>
-                  <button
-                    type="button"
-                    disabled={busy !== null || runBlocker(task) !== null}
-                    title={runBlocker(task) ?? undefined}
-                    onClick={() => void runTask(task.id)}
-                  >
-                    {busy === "run" ? <Loader2 size={14} className="spin" /> : <Play size={14} />}
-                    {task.run ? "Run again" : "Run"}
+                  <button type="button" disabled={busy !== null} onClick={() => void split(task.id)}>
+                    {busy === "split" && <Loader2 size={14} className="spin" />}
+                    Split into sub-tasks
                   </button>
                 </>
+              ) : isXl(task) && task.state !== "ready" ? null : (
+                <RunButton
+                  label={task.run ? "Run again" : "Run"}
+                  blocker={
+                    task.parent
+                      ? childRunBlocker(task, parentTask)
+                      : runBlocker(
+                          task,
+                          (task.subtasks ?? []).flatMap((id) => (children[id] ? [children[id]] : [])),
+                        )
+                  }
+                  busy={busy}
+                  runMode={runMode}
+                  onRunMode={setRunMode}
+                  onRun={() => void runTask(task.id)}
+                />
               )}
             </>
           )}
@@ -774,6 +896,7 @@ function TriageCard({
   onReason,
   budget,
   onBudget,
+  tiers = TIERS,
 }: {
   triage: Triage;
   stale: boolean;
@@ -783,6 +906,8 @@ function TriageCard({
   onReason: (r: string) => void;
   budget: string;
   onBudget: (b: string) => void;
+  /** The tiers on offer: a sub-task runs as S, M or L. */
+  tiers?: readonly Tier[];
 }) {
   return (
     <aside className="card task-triage" aria-label="Triage">
@@ -836,7 +961,7 @@ function TriageCard({
       <fieldset className="task-field">
         <legend className="field-label">Tier</legend>
         <div className="task-tiers">
-          {TIERS.map((t) => (
+          {tiers.map((t) => (
             <button
               key={t}
               type="button"
@@ -903,11 +1028,16 @@ function ContractView({ task, contract, triage }: { task: Task; contract: TaskCo
           </button>
         )}
       </div>
-      {task.state === "ready" && (
+      {task.state === "ready" && task.parent && (
+        <p className="callout">It runs from its XL task: approve the sub-tasks there, then run that task.</p>
+      )}
+      {task.state === "ready" && !task.parent && (
         <p className="callout">
-          {RUNNABLE_TIERS.has(triage.chosen)
-            ? "Run it from the footer: each step is a Claude session you can watch here, and the app runs the gates itself."
-            : `${triage.chosen} tasks run in a later update; S, M and L tasks run now.`}{" "}
+          {triage.chosen === "XL"
+            ? "Split it into sub-tasks from the footer: each gets its own contract, tier and git worktree, and you approve them before anything runs."
+            : RUNNABLE_TIERS.has(triage.chosen)
+              ? "Run it from the footer: each step is a Claude session you can watch here, and the app runs the gates itself."
+              : `${triage.chosen} tasks run in a later update.`}{" "}
           The task is saved in <code>.agentchainer/tasks/{task.id}/</code>.
         </p>
       )}
@@ -998,11 +1128,14 @@ function RunView({
   cwd,
   items,
   onLoaded,
+  onOpenTask,
 }: {
   task: Task;
   cwd: string;
   items: StepItems;
   onLoaded: (sessionId: string, items: StepItems[string]) => void;
+  /** Opens a sub-task's page, from an XL run's timeline. */
+  onOpenTask: (id: string) => void;
 }) {
   const run = task.run;
   const [open, setOpen] = useState<string | null>(null);
@@ -1041,7 +1174,8 @@ function RunView({
           <span className={`badge tone-${tone}`}>{label}</span>
           <span className="grow" />
           <span className="muted">
-            {MODE_NAMES[run.permissionMode]} · {usd(run.costUsd)} of ${task.triage?.budgetUsd}
+            {MODE_NAMES[run.permissionMode]} · {usd(run.costUsd)}
+            {isXl(task) ? " across its sub-tasks" : ` of $${task.triage?.budgetUsd}`}
           </span>
         </div>
         {run.outcome && <p className={`callout tone-${tone}`}>{run.outcome}</p>}
@@ -1074,13 +1208,24 @@ function RunView({
                   )}
                   <span className="grow muted task-step-note">{entry.note}</span>
                   <span className="muted">{duration(entry.startedAt, entry.endedAt)}</span>
-                  {entry.kind !== "gates" && entry.kind !== "baseline" && (
+                  {(entry.kind === "agent" || entry.kind === "fix" || entry.kind === "subtask") && (
                     <span className="muted">{usd(entry.costUsd)}</span>
                   )}
                 </button>
                 {expanded &&
                   (entry.kind === "gates" || entry.kind === "baseline" ? (
                     <GateList runs={gates} before={entry.kind === "gates" ? before : undefined} />
+                  ) : entry.kind === "subtask" && entry.taskId ? (
+                    <div className="task-step-empty task-step-actions">
+                      <span className="muted grow">
+                        {entry.note ?? "Runs its own tier's workflow in its worktree."}
+                      </span>
+                      <button type="button" className="secondary small" onClick={() => onOpenTask(entry.taskId ?? "")}>
+                        Open sub-task
+                      </button>
+                    </div>
+                  ) : entry.kind === "setup" || entry.kind === "merge" ? (
+                    <p className="muted task-step-empty">{entry.note ?? "Working…"}</p>
                   ) : sessionItems?.length ? (
                     <div className="task-step-transcript transcript">
                       <TranscriptView cwd={cwd} items={sessionItems} />
@@ -1239,6 +1384,276 @@ function EvidenceCard({
           </div>
         </>
       )}
+    </section>
+  );
+}
+
+/** The run's permission profile and the Run button, with why it can't run when it can't. */
+function RunButton({
+  label,
+  blocker,
+  busy,
+  runMode,
+  onRunMode,
+  onRun,
+}: {
+  label: string;
+  blocker: string | null;
+  busy: Busy;
+  runMode: Exclude<PermissionMode, "plan">;
+  onRunMode: (mode: Exclude<PermissionMode, "plan">) => void;
+  onRun: () => void;
+}) {
+  return (
+    <>
+      {blocker && <span className="muted">{blocker}</span>}
+      <div className="task-model">
+        <Select
+          value={runMode}
+          onChange={(v) => onRunMode(v as Exclude<PermissionMode, "plan">)}
+          options={modeOptions(RUN_MODES, true)}
+          label="Permission profile for the run's write steps"
+        />
+      </div>
+      <button type="button" disabled={busy !== null || blocker !== null} onClick={onRun}>
+        {busy === "run" ? <Loader2 size={14} className="spin" /> : <Play size={14} />}
+        {label}
+      </button>
+    </>
+  );
+}
+
+/**
+ * An XL task's sub-tasks (M3-07): each opens its own page, where its contract and tier are edited and approved like any
+ * task's. Before the run, the card says where the task branch starts and what each worktree runs first.
+ */
+function SubtasksCard({
+  task,
+  cwd,
+  subtasks,
+  busy,
+  onOpen,
+  onApproveAll,
+  onSplitAgain,
+}: {
+  task: Task;
+  cwd: string;
+  subtasks: Task[];
+  busy: Busy;
+  onOpen: (id: string) => void;
+  onApproveAll: () => void;
+  onSplitAgain: () => void;
+}) {
+  const order = task.subtasks ?? [];
+  const drafts = subtasks.filter((c) => c.state === "draft").length;
+  const ran = subtasks.some((c) => c.run || (c.state !== "draft" && c.state !== "ready"));
+  const [setup, setSetup] = useState<string | null>(null);
+  const [dirty, setDirty] = useState(false);
+  useEffect(() => {
+    if (task.state !== "ready") return;
+    let live = true;
+    request("workspace.scan", { cwd }).then(
+      ({ profile }) =>
+        live && setSetup(profile.packages.find((p) => p.commands.install)?.commands.install?.run ?? null),
+      () => undefined,
+    );
+    request("workspace.files", { cwd }).then(
+      (f) => live && setDirty(f.files.some((x) => x.status !== undefined && x.status !== "untracked")),
+      () => undefined,
+    );
+    return () => {
+      live = false;
+    };
+  }, [cwd, task.state]);
+  return (
+    <section className="card">
+      <div className="card-title">
+        <ListTree size={16} aria-hidden />
+        <h2>Sub-tasks</h2>
+        <span className="muted">In dependency order, two at once, each in its own worktree.</span>
+        <span className="grow" />
+        {task.state === "ready" && !ran && (
+          <button type="button" className="ghost small" disabled={busy !== null} onClick={onSplitAgain}>
+            Split again
+          </button>
+        )}
+        {drafts > 0 && (
+          <button type="button" className="secondary small" disabled={busy !== null} onClick={onApproveAll}>
+            {busy === "approveAll" && <Loader2 size={14} className="spin" />}
+            Approve all
+          </button>
+        )}
+      </div>
+      {task.state === "ready" && (
+        <p className="callout">
+          {drafts
+            ? "Open a sub-task to edit its contract and tier, or approve them all as drafted. "
+            : "Every sub-task is approved: run the task from the footer. "}
+          The task branch starts from your last commit
+          {dirty ? "; your uncommitted changes aren't part of it" : ""}.
+          {setup && (
+            <>
+              {" "}
+              Each worktree runs <code>{setup}</code> first.
+            </>
+          )}
+        </p>
+      )}
+      <ol className="task-subtasks">
+        {order.map((id, i) => {
+          const c = subtasks.find((x) => x.id === id);
+          if (!c) {
+            return (
+              <li key={id} className="muted">
+                Loading…
+              </li>
+            );
+          }
+          const { label, tone } = stateLabel(c.state);
+          const deps = dependsLabel(c, order);
+          return (
+            <li key={id}>
+              <button type="button" className="task-subtask" onClick={() => onOpen(id)}>
+                <span className="task-subtask-n">{i + 1}</span>
+                <span className="task-subtask-title">{c.title ?? c.request}</span>
+                {deps && <span className="muted">{deps}</span>}
+                <span className="grow" />
+                {c.triage && <span className={`tier-badge tier-${c.triage.chosen}`}>{c.triage.chosen}</span>}
+                <span className={`badge tone-${tone}`}>{label}</span>
+                {c.run && <span className="muted">{usd(c.run.costUsd)}</span>}
+                <ChevronRight size={14} aria-hidden />
+              </button>
+            </li>
+          );
+        })}
+      </ol>
+    </section>
+  );
+}
+
+/**
+ * An XL run's result (M3-07): its branch, which changes the user's branch only when they merge it, and its worktrees,
+ * which Clean up removes (the branches stay).
+ */
+function ResultCard({
+  task,
+  cwd,
+  confirm,
+  onChanged,
+  onError,
+}: {
+  task: Task;
+  cwd: string;
+  confirm: Confirm;
+  onChanged: (task: Task) => void;
+  onError: (message: string) => void;
+}) {
+  const wt = task.worktree;
+  const [status, setStatus] = useState<{ branch: string | null; dirty: boolean } | null>(null);
+  const [busy, setBusy] = useState<"merge" | "cleanup" | null>(null);
+  const [conflicts, setConflicts] = useState<string[]>([]);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: read again whenever the task changes.
+  useEffect(() => {
+    let live = true;
+    request("workspace.files", { cwd }).then(
+      (f) =>
+        live &&
+        setStatus({ branch: f.branch, dirty: f.files.some((x) => x.status !== undefined && x.status !== "untracked") }),
+      () => undefined,
+    );
+    return () => {
+      live = false;
+    };
+  }, [cwd, task.updatedAt]);
+  if (!wt) return null;
+  const finished = task.state === "done" || task.state === "accepted";
+  const mergeBlock = !finished
+    ? "Merge once the run is Done, or accept its risk first."
+    : status?.dirty
+      ? "Commit or stash your changes first."
+      : null;
+
+  async function act(kind: "merge" | "cleanup", action: () => Promise<void>) {
+    setBusy(kind);
+    try {
+      await action();
+      onChanged(await request("task.get", { cwd, id: task.id }));
+    } catch (err) {
+      onError(message(err));
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function cleanUp() {
+    const ok = await confirm({
+      title: "Remove the task's worktrees?",
+      body: (
+        <p>
+          The worktrees in <code>.agentchainer/worktrees/</code> are removed, with whatever was installed in them. The
+          branches stay, so nothing committed is lost; delete them with git when you no longer need them.
+        </p>
+      ),
+      confirmLabel: "Remove worktrees",
+    });
+    if (ok)
+      await act("cleanup", () =>
+        request("task.cleanup", { cwd, id: task.id, deleteBranches: false }).then(() => undefined),
+      );
+  }
+
+  return (
+    <section className="card">
+      <div className="card-title">
+        <GitMerge size={16} aria-hidden />
+        <h2>Result</h2>
+        <span className="muted">On its own branch: yours changes only when you merge it.</span>
+      </div>
+      <dl className="task-facts">
+        <dt>Branch</dt>
+        <dd>
+          <code>{wt.branch}</code>
+        </dd>
+        <dt>Merged</dt>
+        <dd>
+          {task.mergedInto
+            ? `Into ${task.mergedInto.branch}, ${new Date(task.mergedInto.at).toLocaleString()}`
+            : "Not yet"}
+        </dd>
+        <dt>Worktrees</dt>
+        <dd>{wt.removed ? "Removed" : <code>.agentchainer/worktrees/</code>}</dd>
+      </dl>
+      {conflicts.length > 0 && (
+        <p className="callout">
+          The merge stopped on conflicts in {conflicts.join(", ")}. Resolve and commit them, or abort the merge, in the
+          Git panel.
+        </p>
+      )}
+      <div className="card-footer">
+        {mergeBlock && !task.mergedInto && <span className="muted">{mergeBlock}</span>}
+        <span className="grow" />
+        {!wt.removed && (
+          <button type="button" className="secondary" disabled={busy !== null} onClick={() => void cleanUp()}>
+            {busy === "cleanup" && <Loader2 size={14} className="spin" />}
+            Clean up
+          </button>
+        )}
+        {!task.mergedInto && (
+          <button
+            type="button"
+            disabled={busy !== null || mergeBlock !== null}
+            onClick={() =>
+              void act("merge", async () => {
+                const r = await request("task.mergeResult", { cwd, id: task.id });
+                setConflicts(r.conflicts);
+              })
+            }
+          >
+            {busy === "merge" ? <Loader2 size={14} className="spin" /> : <GitMerge size={14} />}
+            Merge into {status?.branch ?? "your branch"}
+          </button>
+        )}
+      </div>
     </section>
   );
 }

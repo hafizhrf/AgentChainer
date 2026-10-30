@@ -17,6 +17,18 @@ export type FileChange = {
 
 export type SecretsScan = { ran: false; why: string } | { ran: true; scanned: number; flagged: string[] };
 
+/** An XL task's sub-task, as its own report sums it up (M3-07). */
+export type SubtaskSummary = {
+  number: number;
+  title: string;
+  tier: string | null;
+  state: Task["state"];
+  costUsd: number;
+  outcome: string | null;
+  /** Its own report, relative to the workspace. */
+  report: string;
+};
+
 export type EvidenceInput = {
   task: Task;
   files: FileChange[];
@@ -24,6 +36,8 @@ export type EvidenceInput = {
   summary: string | null;
   review: Review | null;
   secrets: SecretsScan;
+  /** An XL task's sub-tasks; none for other tiers. */
+  subtasks?: SubtaskSummary[];
   now: Date;
 };
 
@@ -50,6 +64,9 @@ export type Evidence = {
   };
   outcome: { state: Task["state"]; text: string; acceptance?: { reason: string; at: string } };
   files: (FileChange & { purpose: string | null })[];
+  subtasks: SubtaskSummary[];
+  /** An XL run's merges of its sub-tasks into the task branch. */
+  merges: { label: string; status: string; note: string | null }[];
   gates: { baseline: GateRun[]; runs: GateRun[]; notRun: GateKind[]; preexisting: string[]; fixedByTask: string[] };
   criteria: CriterionResult[];
   review: Review | null;
@@ -98,6 +115,7 @@ function purposeOf(path: string, known: Map<string, string>): string | null {
 /** Why a run has no review: its tier has none, the run ended first, or the answer couldn't be read. */
 function reviewAbsence(task: Task): string {
   if (task.triage?.chosen === "S") return "Tier S has no independent review.";
+  if (task.triage?.chosen === "XL") return "XL tasks are reviewed per sub-task: see their reports.";
   if (!task.run?.steps.some((s) => s.role === "independent-reviewer" && s.kind === "agent"))
     return "The independent review didn't run: the run ended before it.";
   return "The review's answer couldn't be read.";
@@ -148,7 +166,7 @@ function criterion(
 
 const RISK_ORDER = { high: 0, medium: 1, low: 2 } as const;
 
-export function buildEvidence({ task, files, summary, review, secrets, now }: EvidenceInput): Evidence {
+export function buildEvidence({ task, files, summary, review, secrets, subtasks = [], now }: EvidenceInput): Evidence {
   const noReview = review ? null : reviewAbsence(task);
   const run = task.run;
   const contract = task.contract;
@@ -179,6 +197,10 @@ export function buildEvidence({ task, files, summary, review, secrets, now }: Ev
       ...(run?.acceptance ? { acceptance: run.acceptance } : {}),
     },
     files: files.map((f) => ({ ...f, purpose: purposeOf(f.path, known) })),
+    subtasks,
+    merges: (run?.steps ?? [])
+      .filter((s) => s.kind === "merge")
+      .map((s) => ({ label: s.label, status: s.status, note: s.note ?? null })),
     gates: {
       baseline: run?.baseline ?? [],
       runs: run?.gates ?? [],
@@ -252,6 +274,18 @@ export function renderEvidence(e: Evidence): string {
   add(`- **Outcome:** **${STATE_TEXT[e.outcome.state] ?? e.outcome.state}.** ${e.outcome.text}`);
   if (e.outcome.acceptance) {
     add(`- **Risk accepted** by the user at ${e.outcome.acceptance.at}: ${e.outcome.acceptance.reason}`);
+  }
+  if (e.subtasks.length) {
+    add("", "## Sub-tasks", "", "Each ran its own tier's workflow in its own worktree and has its own report.", "");
+    add("| # | Sub-task | Tier | Outcome | Cost | Report |", "|---|---|---|---|---|---|");
+    for (const t of e.subtasks) {
+      add(
+        `| ${t.number} | ${cell(t.title)} | ${t.tier ?? "–"} | ${STATE_TEXT[t.state] ?? t.state}${t.outcome ? `: ${cell(t.outcome)}` : ""} | ${usd(t.costUsd)} | \`${cell(t.report)}\` |`,
+      );
+    }
+    const failedMerges = e.merges.filter((m) => m.status !== "done");
+    if (failedMerges.length) add("");
+    for (const m of failedMerges) add(`- ${m.label}: ${m.note ?? m.status}`);
   }
   add("", "## Changed files", "");
   if (!e.files.length) add("No files changed since the task started.");

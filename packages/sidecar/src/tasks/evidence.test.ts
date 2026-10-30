@@ -196,6 +196,58 @@ describe("evidence", () => {
     assert.equal(build({ ...red, triage: { ...triage, chosen: "S" } }).noReview, "Tier S has no independent review.");
   });
 
+  it("sums up an XL task's sub-tasks, points at their reports, and names a merge that failed", () => {
+    const t = task();
+    const xl: Task = {
+      ...t,
+      triage: t.triage ? { ...t.triage, chosen: "XL" } : null,
+      run: t.run
+        ? {
+            ...t.run,
+            steps: [
+              ...t.run.steps,
+              {
+                id: "merge-2",
+                step: "merge-2",
+                label: "Merge sub-task 2",
+                kind: "merge",
+                status: "failed",
+                note: "Conflicts in src/cart.js.",
+                startedAt: "",
+                costUsd: 0,
+              },
+            ],
+          }
+        : null,
+    };
+    const e = buildEvidence({
+      task: xl,
+      files: [],
+      summary: null,
+      review: null,
+      secrets: { ran: false, why: "gitleaks isn't installed" },
+      subtasks: [
+        {
+          number: 1,
+          title: "Fix total()",
+          tier: "S",
+          state: "done",
+          costUsd: 0.02,
+          outcome: "Every gate passed after the last change.",
+          report: ".agentchainer/tasks/2026-10-30-0000000a/evidence.md",
+        },
+      ],
+      now: new Date("2026-10-30T02:00:00.000Z"),
+    });
+    assert.equal(e.noReview, "XL tasks are reviewed per sub-task: see their reports.");
+    const md = renderEvidence(e);
+    assert.match(
+      md,
+      /## Sub-tasks[\s\S]*\| 1 \| Fix total\(\) \| S \| Done: Every gate passed after the last change\. \| ≈\$0\.0200 \| `\.agentchainer\/tasks\/2026-10-30-0000000a\/evidence\.md` \|/,
+    );
+    assert.match(md, /- Merge sub-task 2: Conflicts in src\/cart\.js\./);
+  });
+
   it("fences a log that contains backticks so it can't break out", () => {
     const t = task({ baseline: [{ ...gate("test", 1, 0), tail: "expected ```x``` got y" }], gates: [] });
     assert.match(renderEvidence(evidence(t)), /\n````\nexpected ```x``` got y\n````/);

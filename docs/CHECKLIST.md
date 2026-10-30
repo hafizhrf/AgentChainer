@@ -1117,7 +1117,8 @@ Decisions: [ADR-0009](adr/0009-release-signing-and-updates.md). Maintainer steps
 - [ ] **M3-04** Workflow templates as versioned YAML in `catalog/workflows/`, one per tier as described in the PRD.
       Progress (step 2): S and M in `catalog/workflows/`, validated by zod and compiled with the roles into
       `tasks/library.json` (`library.test.ts` fails while it's stale). Step 3: L, with a `parallel` step of read-only
-      planners (the schema refuses write steps there). Remaining: XL (M3-07).
+      planners (the schema refuses write steps there). Step 4: XL (`xl.yaml`: the split step, `maxParallel`, the
+      integration gates), so every tier has its template. Remaining: owner click-through.
 - [ ] **M3-05** Agent library, installable into `.claude/agents/`: architect, test-planner, security-reviewer, docs-writer,
       and independent-reviewer (fresh context: it gets the diff and contract, not the implementer's transcript).
       Progress (step 2): all six roles in `agents/ac-*.md` (`.claude/agents/` format), used as step prompts; the
@@ -1144,6 +1145,25 @@ Decisions: [ADR-0009](adr/0009-release-signing-and-updates.md). Maintainer steps
   and the Opus review, and ended Done in 65 s for ≈$0.18. Remaining: owner click-through.
 - [ ] **M3-07** XL path: split into sub-tasks, each with its own contract and worktree. Evaluate the SDK `Workflow` tool
       where the user's plan supports it.
+      Progress (step 4, planner.md §8):
+      - **Split:** a read-only session; the sub-tasks are draft child tasks with their own contracts and triage,
+        approved one by one or all at once.
+      - **Run:** in worktrees on `agentchainer/*` branches, in dependency order, two at once. Each sub-task that ends
+        Done is committed and merged into the task branch, then the integration gates run there with the baseline
+        rule. Continue picks up after a failure or a stop. The user merges the result with a click and cleans the
+        worktrees up.
+      - **Tests:** `xl.test.ts`, `worktree.test.ts`, `split.test.ts`, the service tests.
+      - **Live** (2026-10-30, `live-task.ts --tier XL` on `sample-app`, haiku with the Opus review):
+        - the split gave 2 sub-tasks, S then M after it;
+        - the baseline found `test` already failing, and the S sub-task fixed it;
+        - both ended Done and were merged; the integration gates passed;
+        - 50 s, ≈$0.11;
+        - the task branch's log has one commit and one merge per sub-task; the report's gate runs match the recorded
+          ones and a re-run by hand;
+        - Clean up removed the worktrees and the user's branch was untouched.
+      - **Workflow tool** ([spike S7](spikes/S7-workflow-tool.md)): available on the owner's account; not the
+        executor, since gates and evidence must stay the app's; usable inside a step.
+      - Remaining: owner click-through.
 - [ ] **M3-08** Verification gates from WorkspaceProfile commands (format, lint, typecheck, test, smoke), with a bounded fix loop
       (iteration and budget caps).
       Progress (step 2): `tasks/gates.ts` resolves gates from the profile (root or per package) plus `scripts/smoke.*`,
@@ -1209,6 +1229,8 @@ Decisions: [ADR-0009](adr/0009-release-signing-and-updates.md). Maintainer steps
 
 - [ ] **M5-01** Each task runs in an isolated worktree and branch. Parallel tasks are supported, with a warning when two touch
       the same files. Worktrees are cleaned up afterward.
+      Note (2026-10-30): XL tasks already run in worktrees (`tasks/worktree.ts`, M3-07); M5-01 extends them to every
+      tier.
 - [ ] **M5-02** PR creation (gh CLI or GitHub API) with the contract and evidence report in the body.
 - [ ] **M5-03** CI status polling, plus a "Fix CI" loop that reads failing logs. The loop is gated by approval and budget.
 - [ ] **M5-04** Merge gates: independent AI review of the diff, plus deterministic scanners (gitleaks; semgrep and trivy if installed).

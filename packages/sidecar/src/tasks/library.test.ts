@@ -67,6 +67,20 @@ describe("task library", () => {
     assert.equal(WorkflowSchema.safeParse({ ...base, steps: [implement, writingReview] }).success, false);
   });
 
+  it("has the XL template: a read-only split, a parallel cap and the integration gates", () => {
+    const xl = LibrarySchema.parse(shipped).xl;
+    assert.ok(xl);
+    assert.equal(xl.split.role, "architect");
+    assert.equal(xl.split.access, "read");
+    assert.equal(xl.maxParallel, 2);
+    assert.deepEqual(xl.integration.gates, ["format", "lint", "typecheck", "test", "build", "smoke"]);
+    const writing = (sources.workflows["xl.yaml"] ?? "").replace("access: read", "access: write");
+    assert.throws(
+      () => buildLibrary({ ...sources.workflows, "xl.yaml": writing }, sources.roles),
+      /split step is read-only/,
+    );
+  });
+
   it("has L plan in parallel with three read-only planners", () => {
     const l = LibrarySchema.parse(shipped).workflows.L;
     const plan = l?.steps[0];

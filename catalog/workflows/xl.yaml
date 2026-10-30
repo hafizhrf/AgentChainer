@@ -1,0 +1,18 @@
+# Tier XL (docs/design/planner.md §8): an epic or a migration. A read-only architect splits the approved contract into
+# sub-tasks (S, M or L), each with its own contract, triage and worktree. They run in dependency order, a few at once,
+# each with its own tier's workflow; each one that ends Done is committed on its branch and merged into the task
+# branch, where the integration gates run last.
+id: tier-xl
+tier: XL
+version: 1
+description: Split into sub-tasks with their own contracts, run each in its own worktree with its tier's workflow, merge them into the task branch, then run the integration gates.
+split:
+  id: split
+  label: Split
+  role: architect
+  access: read
+  inputs: [contract]
+  limits: { maxTurns: 40, maxBudgetUsd: 1 }
+maxParallel: 2
+integration:
+  gates: [format, lint, typecheck, test, build, smoke]

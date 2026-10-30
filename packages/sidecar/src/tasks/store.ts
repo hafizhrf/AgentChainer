@@ -112,7 +112,7 @@ export function loadTask(root: string, id: string): Task {
   return { ...meta.data, contract: contract.data, triage: triage.data };
 }
 
-/** This workspace's tasks, newest first. Folders that aren't valid tasks are skipped. */
+/** This workspace's tasks, newest first, without XL sub-tasks. Folders that aren't valid tasks are skipped. */
 export function listTasks(root: string): TaskSummary[] {
   const dir = tasksRoot(root);
   if (!existsSync(dir)) return [];
@@ -121,6 +121,8 @@ export function listTasks(root: string): TaskSummary[] {
     if (!TaskIdSchema.safeParse(id).success) continue;
     try {
       const t = loadTask(root, id);
+      // An XL task's sub-tasks show on its page, not in the list.
+      if (t.parent) continue;
       tasks.push({
         id: t.id,
         request: t.request,

@@ -28,7 +28,7 @@ export function availableGates(profile: WorkspaceProfile, root?: string): GateKi
 
 const CHECKS = ["review", "manual", ...GATE_KINDS.map((k) => `gate:${k}`)];
 
-const DRAFT_JSON_SCHEMA = {
+export const DRAFT_JSON_SCHEMA = {
   type: "object",
   properties: {
     objective: { type: "string" },
@@ -72,18 +72,21 @@ the structured output:
   what the repository answers.
 Keep every item short. Don't plan the implementation.`;
 
-export function draftPrompt(request: string, profile: WorkspaceProfile, gates: GateKind[]): string {
+/** The detected packages and the gates that exist, for a drafting or split prompt. */
+export function workspaceLines(profile: WorkspaceProfile, gates: GateKind[]): string[] {
   const packages = profile.packages.map((p) => {
     const commands = Object.keys(p.commands).join(", ") || "none";
     return `- ${p.path} (${p.stack}${p.frameworks.length ? `, ${p.frameworks.join(", ")}` : ""}): commands ${commands}`;
   });
   return [
-    `Request: ${request}`,
-    "",
     "Workspace (detected by AgentChainer):",
     ...(packages.length ? packages : ["- no packages detected"]),
     `Available gates: ${gates.length ? gates.join(", ") : "none"}.`,
-  ].join("\n");
+  ];
+}
+
+export function draftPrompt(request: string, profile: WorkspaceProfile, gates: GateKind[]): string {
+  return [`Request: ${request}`, "", ...workspaceLines(profile, gates)].join("\n");
 }
 
 const MAX = { criteria: 30, list: 30, areas: 50, questions: 20, line: 2000, area: 500, objective: 4000 };

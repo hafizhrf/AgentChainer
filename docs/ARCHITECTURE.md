@@ -108,7 +108,10 @@ Planned surface (v0.1):
 | request | `workspace.diff` | HEAD vs working tree for one file, with its `-U0` hunks |
 | request | `workspace.revert` | Revert a file to HEAD (new files are deleted) or one hunk (`git apply -R`), worktree only |
 | request | `workspace.gitInit` | `git init`, offered when the workspace isn't a repository |
-| request | `git.branches` / `git.switch` / `git.stage` / `git.unstage` / `git.commit` / `git.push` | Git panel (M1-30). Push is never forced and runs with `GIT_TERMINAL_PROMPT=0` |
+| request | `git.branches` / `git.switch` / `git.stage` / `git.unstage` / `git.commit` / `git.push` | Git panel (M1-30). `git.branches` includes remote-only branches and a merge in progress; `git.switch` with `track` checks out a remote branch. Push is never forced and runs with `GIT_TERMINAL_PROMPT=0` |
+| request | `git.fetch` / `git.pull` | `fetch --all --prune`, and `pull --ff-only` (a diverged branch fails with a message, never an automatic merge). Both with `GIT_TERMINAL_PROMPT=0` |
+| request | `git.merge` / `git.abortMerge` | Merge a branch into the current one; conflicts come back as files and leave the merge in progress |
+| request | `git.renameBranch` / `git.deleteBranch` | `branch -m`; `branch -d`, or `-D` only with `force` after the user confirms losing unmerged commits |
 | request | `git.draftMessage` | Commit message from the staged diff: a one-shot haiku `query()` with `tools: []`, `settingSources: []`, `persistSession: false` |
 | request | `task.create` / `task.list` / `task.get` / `task.delete` | Tasks (M3, preview): files in `.agentchainer/tasks/<id>/`, git-ignored ([planner.md](design/planner.md)) |
 | request | `task.draft` | A read-only session (Read, Grep, Glob; the generators' hook and the workspace guard) drafts the contract as structured output, then triage runs on it: deterministic signals plus a haiku classification |

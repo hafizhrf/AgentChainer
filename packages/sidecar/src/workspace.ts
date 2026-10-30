@@ -20,6 +20,13 @@ const WALK_SKIP = new Set([".git", "node_modules", "target", "dist", "build", ".
 
 type GitResult = { status: number | null; stdout: string; stderr: string };
 
+/**
+ * For the listing and the diff: git's status may rewrite `.git/index` to refresh file stats, and the file watcher
+ * sees that as a change, so every refresh would trigger another (the diff view jumped back to the top). With this,
+ * read-only calls don't write (VS Code does the same); the diff uses plumbing, which never refreshes the index.
+ */
+const READ = ["--no-optional-locks"];
+
 export function git(
   args: string[],
   cwd: string,
@@ -103,7 +110,9 @@ export function repoOf(cwd: string): RepoInfo | null {
  * git can't pair a rename's two sides and reports it as an added file.
  */
 function statusUnder(cwd: string, repo: RepoInfo): Map<string, StatusEntry> {
-  const raw = parseStatus(gitOrThrow(["status", "--porcelain=v1", "-z", "--untracked-files=all", "--", "."], cwd));
+  const raw = parseStatus(
+    gitOrThrow([...READ, "status", "--porcelain=v1", "-z", "--untracked-files=all", "--", "."], cwd),
+  );
   const local = new Map<string, StatusEntry>();
   for (const [file, entry] of raw) {
     if (!file.startsWith(repo.prefix)) continue;
@@ -133,7 +142,7 @@ export function listFiles(cwd: string): WorkspaceFiles {
     const files = walk(cwd);
     return { isGitRepo: false, branch: null, files: files.slice(0, MAX_WALK), truncated: files.length > MAX_WALK };
   }
-  const listed = gitOrThrow(["ls-files", "-z", "--cached", "--others", "--exclude-standard"], cwd)
+  const listed = gitOrThrow([...READ, "ls-files", "-z", "--cached", "--others", "--exclude-standard"], cwd)
     .split("\0")
     .filter(Boolean);
   const status = statusUnder(cwd, repo);
@@ -181,7 +190,10 @@ export function fileDiff(cwd: string, rel: string): FileDiff {
   const text = !tooLarge && !binary;
   const hunks =
     text && original !== null && entry?.status !== "renamed"
-      ? parseHunks(gitOrThrow(["diff", "--no-color", "--no-ext-diff", "-U0", "HEAD", "--", rel], cwd))
+      ? // Plumbing: porcelain `git diff HEAD` rewrites the index even with --no-optional-locks. Same hunks as the revert's.
+        parseHunks(
+          gitOrThrow([...READ, "diff-index", "-p", "--no-color", "--no-ext-diff", "-U0", "HEAD", "--", rel], cwd),
+        )
       : [];
   return {
     path: rel,
@@ -196,7 +208,7 @@ export function fileDiff(cwd: string, rel: string): FileDiff {
 
 /** The file's content at HEAD, or null when it isn't in HEAD (new file, or a repo without commits). */
 function showHead(cwd: string, rel: string): Buffer | null {
-  const r = spawnSync("git", ["show", `HEAD:./${rel.split(path.sep).join("/")}`], {
+  const r = spawnSync("git", [...READ, "show", `HEAD:./${rel.split(path.sep).join("/")}`], {
     cwd,
     timeout: 30_000,
     maxBuffer: 64 * 1024 * 1024,

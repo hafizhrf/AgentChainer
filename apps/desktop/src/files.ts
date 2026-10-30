@@ -1,4 +1,4 @@
-import type { FileStatus, WorkspaceFile } from "@agentchainer/protocol";
+import type { FileStatus, WorkspaceFile, WorkspaceFiles } from "@agentchainer/protocol";
 import type { Item, ToolItem } from "./transcript.ts";
 
 /** File tree, agent edits and path helpers for the workspace panels (M1-25/M1-26). Pure, so it's unit-tested. */
@@ -134,4 +134,14 @@ export function agentEdits(items: Item[], cwd: string): TurnEdits[] {
   }
   if (current?.files.length) turns.push(current);
   return turns;
+}
+
+/**
+ * Whether two workspace listings are the same. A refresh that changed nothing keeps the previous object, so the panels
+ * don't re-render and an open diff isn't re-read (it jumped back to the top).
+ */
+export function sameListing(a: WorkspaceFiles | null, b: WorkspaceFiles | null): boolean {
+  if (a === b) return true;
+  if (!a || !b) return false;
+  return JSON.stringify(a) === JSON.stringify(b);
 }

@@ -330,8 +330,15 @@
   gap: var(--space-2);
 }
 
+.branch-bar {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
 .branch-button {
-  width: 100%;
+  flex: 1;
+  min-width: 0;
   justify-content: flex-start;
   gap: 6px;
   padding: 0 var(--space-2);
@@ -413,13 +420,26 @@
   box-shadow: none;
 }
 
-.branch-list {
+.branch-lists {
   flex: 1;
   min-height: 0;
-  margin: 0;
   padding: var(--space-1);
   overflow-y: auto;
+}
+
+.branch-list {
+  margin: 0;
+  padding: 0;
   list-style: none;
+}
+
+.branch-group {
+  padding: var(--space-2) var(--space-2) 2px;
+  color: var(--muted);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
 }
 
 .branch-item {
@@ -439,6 +459,50 @@
 .branch-item:focus-visible {
   background: var(--accent-soft);
   outline: none;
+}
+
+/* A branch with its ⋯ menu: the whole row highlights, not just the button. */
+.branch-row {
+  display: flex;
+  align-items: center;
+  border-radius: var(--radius-sm);
+}
+
+.branch-row:hover,
+.branch-row:focus-within {
+  background: var(--accent-soft);
+}
+
+.branch-row .branch-item {
+  flex: 1;
+  min-width: 0;
+}
+
+.branch-row .branch-item:hover,
+.branch-row .branch-item:focus-visible {
+  background: none;
+}
+
+.branch-row .branch-item span:last-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.branch-actions {
+  flex-shrink: 0;
+  opacity: 0;
+}
+
+.branch-actions button.icon {
+  width: 24px;
+  min-height: 24px;
+}
+
+.branch-row:hover .branch-actions,
+.branch-row:focus-within .branch-actions,
+.branch-actions:has([data-state="open"]) {
+  opacity: 1;
 }
 
 .branch-item svg {
@@ -470,6 +534,24 @@
   gap: var(--space-2);
   padding: var(--space-3);
   font-size: var(--text-sm);
+}
+
+.merge-banner {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2);
+  border-radius: var(--radius-sm);
+  background: var(--warn-bg);
+  font-size: var(--text-sm);
+}
+
+.merge-banner svg {
+  flex-shrink: 0;
+}
+
+.merge-banner span {
+  flex: 1;
 }
 
 .commit-box {

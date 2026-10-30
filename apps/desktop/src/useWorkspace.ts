@@ -2,6 +2,7 @@ import type { WorkspaceFiles } from "@agentchainer/protocol";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { useCallback, useEffect, useState } from "react";
+import { sameListing } from "./files.ts";
 import { request } from "./sidecar.ts";
 
 /**
@@ -14,7 +15,8 @@ export function useWorkspace(cwd: string, active: boolean) {
 
   const refresh = useCallback(async () => {
     try {
-      setFiles(await request("workspace.files", { cwd }));
+      const next = await request("workspace.files", { cwd });
+      setFiles((prev) => (sameListing(prev, next) ? prev : next));
       setError(null);
     } catch (err) {
       setError(String(err));

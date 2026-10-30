@@ -769,19 +769,46 @@ export const methodSchemas = {
     result: z.object({
       current: z.string().nullable(),
       branches: z.array(z.string()),
+      /** Remote branches with no local branch of the same name, e.g. "origin/feature-x". */
+      remote: z.array(z.string()),
       upstream: z.string().nullable(),
       ahead: z.number().int(),
       behind: z.number().int(),
+      /** A merge in progress: the branch being merged, when known, and the files with conflicts. */
+      merging: z.object({ branch: z.string().nullable(), conflicts: z.array(z.string()) }).nullable(),
     }),
   },
   "git.switch": {
-    params: WorkspaceRef.extend({ branch: z.string().min(1).max(250), create: z.boolean().optional() }),
+    params: WorkspaceRef.extend({
+      branch: z.string().min(1).max(250),
+      create: z.boolean().optional(),
+      /** `branch` is a remote branch: create the local branch that tracks it. */
+      track: z.boolean().optional(),
+    }),
     result: Ok,
   },
   "git.stage": { params: WorkspaceRef.extend({ paths: z.array(z.string().min(1)).min(1) }), result: Ok },
   "git.unstage": { params: WorkspaceRef.extend({ paths: z.array(z.string().min(1)).min(1) }), result: Ok },
   "git.commit": { params: WorkspaceRef.extend({ message: z.string().min(1) }), result: z.object({ sha: z.string() }) },
   "git.push": { params: WorkspaceRef, result: z.object({ output: z.string() }) },
+  "git.fetch": { params: WorkspaceRef, result: z.object({ output: z.string() }) },
+  /** Fast-forward only: a diverged branch fails with a message, and is never merged behind the user's back. */
+  "git.pull": { params: WorkspaceRef, result: z.object({ output: z.string() }) },
+  /** Without `force`, an unmerged branch isn't deleted and comes back as `unmerged`, so the UI can ask again. */
+  "git.deleteBranch": {
+    params: WorkspaceRef.extend({ branch: z.string().min(1).max(250), force: z.boolean().optional() }),
+    result: z.object({ deleted: z.boolean(), unmerged: z.boolean() }),
+  },
+  "git.renameBranch": {
+    params: WorkspaceRef.extend({ from: z.string().min(1).max(250), to: z.string().min(1).max(250) }),
+    result: Ok,
+  },
+  /** Merges a branch into the current one. Conflicts aren't an error: the merge stays in progress. */
+  "git.merge": {
+    params: WorkspaceRef.extend({ branch: z.string().min(1).max(250) }),
+    result: z.object({ merged: z.boolean(), conflicts: z.array(z.string()) }),
+  },
+  "git.abortMerge": { params: WorkspaceRef, result: Ok },
   /** A commit message drafted by Claude (haiku, no tools) from the staged diff, for the user to edit. */
   "git.draftMessage": { params: WorkspaceRef, result: z.object({ message: z.string() }) },
 

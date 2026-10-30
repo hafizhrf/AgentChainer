@@ -391,7 +391,11 @@
 - [ ] **M1-27** Monaco diff viewer; revert a file or a hunk (via git), with confirmation.
       Progress: Monaco bundled locally and lazy-loaded; `workspace.diff` / `workspace.revert` tested on a real repo
       (hunk revert leaves other hunks, new files deleted, staged renames undone, binary files flagged). Confirmation
-      dialogs before every revert. Remaining: click through in the app.
+      dialogs before every revert. The diff no longer jumps back to the top while scrolling: listing and diff calls
+      never write `.git/index` (`--no-optional-locks`, plumbing `diff-index`; regression test in
+      `workspace.test.ts`), so a refresh can't trigger another through the file watcher; an unchanged listing keeps
+      its object (`sameListing`), and the diff keeps its scroll position and folds when the text does change.
+      Remaining: click through in the app.
 - [ ] **M1-28** "Open in editor" at `file:line` (VS Code, Cursor, JetBrains, system default).
       Progress: `open_in_editor` for VS Code, Cursor, Zed, IntelliJ (`idea`) and the system default, from the diff
       pane and tool cards; editor chosen in Settings. Argument building is unit-tested. Remaining: try each editor.
@@ -409,6 +413,11 @@
       Progress:
       - The sidebar's Git tab has a branch switcher with ↑/↓ counts, create, stage/unstage per file or all, commit,
         and push / publish branch behind a confirmation.
+      - The branch picker also lists remote branches (checked out as tracking branches), and each branch has a ⋯ menu:
+        merge into the current branch, rename, delete (an unmerged branch only after a second confirm). Fetch
+        (`--all --prune`) and pull (fast-forward only) sit next to it. A merge with conflicts stays in progress with a
+        banner and Abort. Tested on real repos with a bare remote (`git.test.ts`, 7 cases), and end to end over
+        JSON-RPC on a scratch repo.
       - Tested on real repos with a bare remote (`git.test.ts`): staging before the first commit, commits, a new
         branch pushed with tracking, and a diverged push that fails instead of overwriting the remote. No code path
         passes `--force`.

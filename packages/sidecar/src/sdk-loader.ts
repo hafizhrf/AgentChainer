@@ -4,6 +4,7 @@ import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync 
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import type * as AgentSdk from "@anthropic-ai/claude-agent-sdk";
+import { systemTar } from "./bootstrap/tools.ts";
 import { log } from "./rpc.ts";
 import pin from "./sdk-pin.json" with { type: "json" };
 import type { SdkPin } from "./sdk-pin.ts";
@@ -83,7 +84,8 @@ export async function ensureSdk(
   mkdirSync(tmp, { recursive: true });
   const tgz = join(tmp, "sdk.tgz");
   writeFileSync(tgz, data);
-  const tar = spawnSync("tar", ["-xzf", tgz, "-C", tmp], { encoding: "utf8" });
+  // Windows' own tar: Git's GNU tar can come first on PATH and reads `C:\…` as a remote host.
+  const tar = spawnSync(systemTar(), ["-xzf", tgz, "-C", tmp], { encoding: "utf8" });
   if (tar.status !== 0) {
     rmSync(tmp, { recursive: true, force: true });
     throw new Error(

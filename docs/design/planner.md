@@ -188,7 +188,7 @@ steps:
 | S | implement → gates | No plan step; the contract is the plan. Built (step 2) |
 | M | plan → implement → gates → review | Built (step 2) |
 | L | in parallel: architect, security-reviewer, test-planner (all read-only) → implement → gates → independent review | The parallel group only reads; their outputs merge into `plan.md`, a section per role. Built (step 3) |
-| XL | split into sub-tasks (each with its own contract, tier and worktree) → per sub-task flow → integration gates | §8 |
+| XL | split into sub-tasks (each with its own contract, tier and worktree) → per sub-task flow → integration gates | `xl.yaml`: the split step, `maxParallel`, the integration gates. Built (step 4), §8 |
 
 **Agent library** (`agents/ac-<role>.md` at the repo root, like `skills/`):
 - Roles: implementer, architect, independent-reviewer, test-planner, security-reviewer, docs-writer.
@@ -239,8 +239,9 @@ change. The world comes through a `Runner` (`tasks/runner.ts`), so the machine i
 
 **Protocol:**
 - **Requests:** `task.create`, `task.draft`, `task.retriage`, `task.approve`, `task.revise`, `task.cancel` (also
-  stops a run), `task.list`, `task.get`, `task.delete`, `task.start`, `task.resume`, and since step 3
-  `task.acceptRisk` and `task.evidence` (§9).
+  stops a run), `task.list`, `task.get`, `task.delete`, `task.start`, `task.resume`; since step 3
+  `task.acceptRisk` and `task.evidence` (§9); since step 4 `task.split`, `task.approveSubtasks`, `task.continue`,
+  `task.mergeResult` and `task.cleanup` (§8).
 - **Events:**
   - `task.updated {cwd, task}` on every change of a run;
   - step sessions emit the normal `agent.event`s, and their `permission.request`s, with a `task` tag (task id, step,
@@ -289,23 +290,57 @@ Accepted with risk.
 
 ## 8. XL tasks, worktrees and the Workflow tool (M3-07)
 
-**Splitting:**
-- An architect step splits the contract into sub-tasks. Each sub-task has its own contract, which the user approves
-  as a list, and its own tier.
-- Sub-tasks with no dependency on each other run in parallel, each in its own worktree:
-  `git worktree add .agentchainer/worktrees/<task>-<n> -b agentchainer/<task>-<n>`.
-- Each sub-task runs its tier's flow in its worktree.
+Built in step 4: `catalog/workflows/xl.yaml`, `tasks/split.ts`, `tasks/xl.ts`, `tasks/worktree.ts`.
 
-**Integration:**
-- The sub-task branches merge back in order into a task branch, and the gates run there (integration gates).
-- A merge conflict stops the task, shows the conflicting files, and leaves the resolution to the user. In M5 a
-  resolve step may be offered.
+**Splitting (`task.split`):**
+- After the XL contract and tier are approved, a read-only session (Read, Grep, Glob; the drafting hook; isolated from
+  settings) proposes 2–8 sub-tasks as structured output. Each has a title, a request, a contract, a tier and the
+  earlier sub-tasks it depends on.
+- Each becomes a **child task in Draft**:
+  - its contract is normalized like a drafted one;
+  - its triage is the deterministic signals plus the split's tier as the model's opinion, so there's no model call
+    per sub-task. The tier is capped at L;
+  - its budget is its tier's default, capped by XL's per-sub-task budget.
+- The user opens each one with the usual contract form and triage card, or uses **Approve all**. **Split again**
+  replaces the drafts while none has run. Sub-tasks don't appear in the task list, only on their XL task's page.
+- A dependency can only name an earlier sub-task, so the order has no cycles.
 
-**The SDK's Workflow tool:**
-- It can run multi-agent workflows inside one session. Its availability depends on the user's plan and settings
-  (`enableWorkflows`/`disableWorkflows` in the SDK's settings) **(verify per account type)**.
-- M3-07 evaluates it as an alternative executor for XL. It's not the base mechanism, because our gates, evidence and
-  approvals have to stay deterministic and inspectable.
+**The run (`XlOrchestrator`):**
+1. **Task branch:** `agentchainer/<id>` from HEAD, in `.agentchainer/worktrees/<id>` (git-ignored). Uncommitted changes
+   in the workspace aren't part of it, and the page says so.
+2. **Setup:** each new worktree runs the profile's install command under the workspace guard, so a rewritten lockfile
+   is put back. The files it leaves untracked aren't the task's changes.
+3. **Baseline** gates in the task's worktree.
+4. **Sub-tasks:** in dependency order, up to `maxParallel` (2) at once. Each gets its own worktree on
+   `agentchainer/<child>`, from the task branch's tip when it starts, and runs its own tier's workflow (the
+   orchestrator of §6) there. Its task files stay in the workspace's task folder.
+   - A sub-task that ends **Done** is committed on its branch, with the user's identity and commit hooks, merged
+     (`--no-ff`) into the task branch, and its worktree is removed.
+   - One that doesn't end Done stops new starts. The running ones finish, and finished ones are still merged.
+   - A merge conflict stops the run, and the merge stays in progress in the task's worktree for the user.
+5. **Integration gates** on the task branch, with the baseline rule: new failures fail it; failures that were already
+   there need an accepted risk. There's no fix loop at this level.
+
+**After a stop:**
+- **Continue** (`task.continue`) picks up a failed, stopped or interrupted run. Merged sub-tasks are skipped. One that
+  is Done or accepted (run again on its own, or accepted after a failure) is merged as it is. The others run again in
+  their worktrees, and their changes count from where the worktree branched.
+- A sub-task can also be run again on its own page, in its worktree, while its XL task isn't running.
+
+**The result** is the branch `agentchainer/<id>`:
+- **Merge into `<branch>`** (`task.mergeResult`) needs a clean tree and is the only way the user's branch changes;
+- **Clean up** (`task.cleanup`) removes the worktrees and keeps the branches.
+
+Deleting an XL task deletes its sub-tasks and worktrees, but not its branches.
+
+**Evidence:** each sub-task's report is built in its own worktree when it ends. The XL task's report adds a sub-tasks
+table (state, tier, outcome, cost, a link to each report) and any failed merge.
+
+**The SDK's Workflow tool** ([spike S7](../spikes/S7-workflow-tool.md)):
+- It's available on the owner's account with default settings (CLI 2.1.293), and depends on plan and settings.
+- It's **not the XL executor**: gates, approvals, per-sub-task contracts, budgets and evidence must stay the app's own
+  and deterministic.
+- Write steps keep the user's settings, so Claude can still use it inside a step like any tool.
 
 ## 9. Evidence report (M3-09) and "Done" (M3-10)
 
@@ -386,8 +421,8 @@ Grouped into fewer, larger PRs:
    - the benchmark harness, with the owner labeling the fixture tasks.
 2. **Orchestrator, templates, agents and gates** (M3-04, M3-05, M3-06, M3-08): the S and M tiers end to end, done
    (#38).
-3. **Evidence and Done** (M3-09, M3-10), plus the L tier, baseline gates and Install roles: step 3.
-4. **XL** (M3-07): sub-tasks, worktrees, integration gates, and the Workflow tool evaluation.
+3. **Evidence and Done** (M3-09, M3-10), plus the L tier, baseline gates and Install roles, done (#39).
+4. **XL** (M3-07): sub-tasks, worktrees, integration gates, and the Workflow tool evaluation: step 4.
 5. **Exit runs** (M3-E1, M3-E2).
 
 ## 14. Alternatives considered

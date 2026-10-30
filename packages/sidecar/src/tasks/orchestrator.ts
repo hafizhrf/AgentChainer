@@ -179,8 +179,8 @@ export function demote(markdown: string): string {
     .join("\n");
 }
 
-const failing = (runs: GateRun[]) => runs.filter((r) => r.exitCode !== 0 || r.timedOut);
-const kinds = (runs: GateRun[]) => [...new Set(runs.map((r) => r.kind))].join(", ");
+export const failing = (runs: GateRun[]) => runs.filter((r) => r.exitCode !== 0 || r.timedOut);
+export const kinds = (runs: GateRun[]) => [...new Set(runs.map((r) => r.kind))].join(", ");
 
 /** Why a session's turn ended, for the timeline. */
 function stopped(subtype: string): string {
@@ -600,7 +600,7 @@ export class Orchestrator {
 
 /** A fresh run record for `task`, measured from `base`. */
 export function newRun(
-  workflow: Workflow,
+  workflow: Pick<Workflow, "id" | "version">,
   opts: { permissionMode: TaskRun["permissionMode"]; model?: string; base: string | null; untrackedAtStart: string[] },
   now: Date,
 ): TaskRun {

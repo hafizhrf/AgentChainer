@@ -441,7 +441,10 @@ export const StepRunSchema = z.object({
   /** The template step it belongs to. */
   step: z.string(),
   label: z.string(),
-  kind: z.enum(["agent", "fix", "gates", "baseline"]),
+  /** XL adds `setup` (the task branch's worktree), `subtask` (a sub-task's run, see `taskId`) and `merge`. */
+  kind: z.enum(["agent", "fix", "gates", "baseline", "setup", "subtask", "merge"]),
+  /** The sub-task a `subtask` or `merge` entry is about. */
+  taskId: z.string().optional(),
   role: z.string().optional(),
   /** Steps that run at the same time (L's planners) share their parallel step's label. */
   group: z.string().optional(),
@@ -543,6 +546,30 @@ export const TaskSchema = z.object({
   costUsd: z.number(),
   /** The latest run; tasks from before runs existed have none. */
   run: TaskRunSchema.nullable().default(null),
+  /** A sub-task of an XL task (M3-07): its parent, and its place in the split. */
+  parent: z.object({ id: TaskIdSchema, index: z.number().int().min(0) }).optional(),
+  /** A sub-task's short title, from the split. */
+  title: z.string().optional(),
+  /** The sub-tasks this one runs after. */
+  dependsOn: z.array(TaskIdSchema).optional(),
+  /**
+   * The git worktree an XL task or sub-task works in, on its own branch: `base` is the commit it started from, and
+   * `untracked` the files already untracked after its setup (installed dependencies), which aren't its changes.
+   * `removed` once the worktree is gone (merged, or cleaned up); the branch can outlive it.
+   */
+  worktree: z
+    .object({
+      path: z.string(),
+      branch: z.string(),
+      base: z.string(),
+      untracked: z.array(z.string()),
+      removed: z.boolean().optional(),
+    })
+    .optional(),
+  /** An XL task's sub-tasks, in the split's order. */
+  subtasks: z.array(TaskIdSchema).optional(),
+  /** Where the user merged an XL task's branch. */
+  mergedInto: z.object({ branch: z.string(), at: z.string() }).optional(),
 });
 export type Task = z.infer<typeof TaskSchema>;
 
@@ -967,6 +994,22 @@ export const methodSchemas = {
    * (`.agentchainer/tasks/<id>/evidence.md`).
    */
   "task.evidence": { params: TaskRef, result: z.object({ markdown: z.string(), path: z.string() }) },
+  /**
+   * XL (M3-07): a read-only session splits the approved contract into sub-tasks, created as draft tasks with their own
+   * contracts and triage. Again replaces sub-tasks that haven't run.
+   */
+  "task.split": { params: TaskRef.extend({ model: z.string().optional() }), result: TaskSchema },
+  /** Approves every draft sub-task as drafted (contract and tier). */
+  "task.approveSubtasks": { params: TaskRef, result: TaskSchema },
+  /** Picks a stopped, failed or interrupted XL run up again: merged sub-tasks are skipped, the others run. */
+  "task.continue": { params: TaskRef, result: TaskSchema },
+  /** Merges an XL task's branch into the workspace's current branch; conflicts leave the merge in progress. */
+  "task.mergeResult": {
+    params: TaskRef,
+    result: z.object({ merged: z.boolean(), conflicts: z.array(z.string()), into: z.string() }),
+  },
+  /** Removes an XL task's worktrees, and its branches when asked. */
+  "task.cleanup": { params: TaskRef.extend({ deleteBranches: z.boolean() }), result: Ok },
   /** Stops a draft, a triage or a run in progress. A stopped run leaves the working tree as it is. */
   "task.cancel": { params: TaskRef, result: z.object({ cancelled: z.boolean() }) },
   "task.list": { params: WorkspaceRef, result: z.object({ tasks: z.array(TaskSummarySchema) }) },

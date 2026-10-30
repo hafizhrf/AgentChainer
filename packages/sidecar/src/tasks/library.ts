@@ -117,6 +117,26 @@ export const WorkflowSchema = z
   });
 export type Workflow = z.infer<typeof WorkflowSchema>;
 
+/**
+ * XL (M3-07): not a list of steps. A read-only architect splits the contract into sub-tasks, which run with their own
+ * tiers' workflows in worktrees, `maxParallel` at once; the integration gates run on the merged task branch.
+ */
+export const XlWorkflowSchema = z
+  .object({
+    id: z.literal("tier-xl"),
+    tier: z.literal("XL"),
+    version: z.number().int().positive(),
+    description: z.string().min(1),
+    split: AgentStepSchema,
+    maxParallel: z.number().int().min(1).max(4),
+    integration: z.object({ gates: z.array(z.enum(GATE_KINDS)).min(1) }).strict(),
+  })
+  .strict()
+  .refine((w) => w.split.access === "read" && !w.split.output && !w.split.fix, {
+    message: "tier-xl/split: the split step is read-only, without output or fix",
+  });
+export type XlWorkflow = z.infer<typeof XlWorkflowSchema>;
+
 /** A role file's frontmatter, as `.claude/agents/` expects it, plus the prompt (its body). */
 export const RoleSchema = z
   .object({
@@ -133,6 +153,7 @@ export type RoleDefinition = z.infer<typeof RoleSchema>;
 
 export const LibrarySchema = z.object({
   workflows: z.record(z.string(), WorkflowSchema),
+  xl: XlWorkflowSchema.optional(),
   roles: z.record(z.string(), RoleSchema),
 });
 export type Library = z.infer<typeof LibrarySchema>;
@@ -146,8 +167,15 @@ export function parseRoleFile(text: string): unknown {
 
 /** Builds the library from the sources: `workflows` YAML texts by file name, role markdown texts by file name. */
 export function buildLibrary(workflows: Record<string, string>, roles: Record<string, string>): Library {
-  const out: Library = { workflows: {}, roles: {} };
+  // Keys in the schema's order, so the compiled JSON reads back identical (xl stays out of it when there's none).
+  const out: Library = { workflows: {}, xl: undefined, roles: {} };
   for (const [file, text] of Object.entries(workflows)) {
+    if (file === "xl.yaml") {
+      const xl = XlWorkflowSchema.safeParse(parse(text));
+      if (!xl.success) throw new Error(`catalog/workflows/${file} is invalid:\n${z.prettifyError(xl.error)}`);
+      out.xl = xl.data;
+      continue;
+    }
     const w = WorkflowSchema.safeParse(parse(text));
     if (!w.success) throw new Error(`catalog/workflows/${file} is invalid:\n${z.prettifyError(w.error)}`);
     if (`${w.data.tier.toLowerCase()}.yaml` !== file) throw new Error(`catalog/workflows/${file}: name it <tier>.yaml`);
@@ -160,12 +188,15 @@ export function buildLibrary(workflows: Record<string, string>, roles: Record<st
     out.roles[r.data.name.slice(3)] = r.data;
   }
   for (const role of ROLES) if (!out.roles[role]) throw new Error(`agents/ac-${role}.md is missing`);
-  for (const w of Object.values(out.workflows)) {
-    for (const s of w.steps.flatMap((x) => (isParallel(x) ? x.parallel : isGates(x) ? [] : [x]))) {
-      const role = out.roles[s.role];
-      if (s.access === "read" && role?.tools !== "Read, Grep, Glob") {
-        throw new Error(`${w.id}/${s.id}: a read step's role must list tools: Read, Grep, Glob`);
-      }
+  const readSteps = [
+    ...Object.values(out.workflows).flatMap((w) =>
+      w.steps.flatMap((x) => (isParallel(x) ? x.parallel : isGates(x) ? [] : [x])).map((s) => ({ w: w.id, s })),
+    ),
+    ...(out.xl ? [{ w: out.xl.id, s: out.xl.split }] : []),
+  ];
+  for (const { w, s } of readSteps) {
+    if (s.access === "read" && out.roles[s.role]?.tools !== "Read, Grep, Glob") {
+      throw new Error(`${w}/${s.id}: a read step's role must list tools: Read, Grep, Glob`);
     }
   }
   return out;

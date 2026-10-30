@@ -43,18 +43,23 @@ import { historyEvents, retention, toSessionInfo } from "./stored-sessions.ts";
 import type { SessionHost } from "./tasks/runner.ts";
 import {
   acceptRisk,
+  approveSubtasks,
   approveTask,
   type Claude,
   cancelTask,
+  cleanupTask,
+  continueTask,
   deleteTaskSafe,
   draftTask,
   listTasksLive,
+  mergeResult,
   newTask,
   present,
   resumeTask,
   retriageTask,
   reviseTask,
   shutdownRuns,
+  splitTask,
   startTask,
   taskEvidence,
 } from "./tasks/service.ts";
@@ -503,6 +508,32 @@ serve(
     "task.evidence": ({ cwd, id }) => {
       requireFolder(cwd);
       return taskEvidence(cwd, id);
+    },
+
+    "task.split": async ({ cwd, id, model }) => {
+      requireFolder(cwd);
+      return splitTask(cwd, id, await claude(), model);
+    },
+
+    "task.approveSubtasks": ({ cwd, id }) => {
+      requireFolder(cwd);
+      return approveSubtasks(cwd, id);
+    },
+
+    "task.continue": async ({ cwd, id }) => {
+      requireFolder(cwd);
+      return continueTask(cwd, id, sessionHost(await claude()), taskUpdated(cwd));
+    },
+
+    "task.mergeResult": ({ cwd, id }) => {
+      requireFolder(cwd);
+      return mergeResult(cwd, id);
+    },
+
+    "task.cleanup": ({ cwd, id, deleteBranches }) => {
+      requireFolder(cwd);
+      cleanupTask(cwd, id, deleteBranches);
+      return { ok: true };
     },
 
     "task.list": ({ cwd }) => {

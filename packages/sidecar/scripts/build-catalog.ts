@@ -26,5 +26,5 @@ const sources = readLibrarySources(fileURLToPath(new URL("../../../", import.met
 const library = buildLibrary(sources.workflows, sources.roles);
 writeFileSync(new URL("../src/tasks/library.json", import.meta.url), libraryJsonText(library));
 console.log(
-  `catalog ${catalog.version}: ${catalog.items.length} items, ${catalog.profiles.length} profiles; skills: ${Object.keys(skills).join(", ")}; workflows: ${Object.keys(library.workflows).join(", ")}; roles: ${Object.keys(library.roles).length}`,
+  `catalog ${catalog.version}: ${catalog.items.length} items, ${catalog.profiles.length} profiles; skills: ${Object.keys(skills).join(", ")}; workflows: ${[...Object.keys(library.workflows), ...(library.xl ? ["XL"] : [])].join(", ")}; roles: ${Object.keys(library.roles).length}`,
 );

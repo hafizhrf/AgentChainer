@@ -45,7 +45,8 @@ export function startBase(root: string): { base: string | null; untrackedAtStart
   return { base: stash || head || null, untrackedAtStart: untracked(root) };
 }
 
-function untracked(root: string): string[] {
+/** Files git doesn't track and doesn't ignore, relative to `root`. */
+export function untracked(root: string): string[] {
   return git(["--no-optional-locks", "ls-files", "-z", "--others", "--exclude-standard"], root)
     .stdout.split("\0")
     .filter(Boolean);

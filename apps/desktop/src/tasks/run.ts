@@ -3,8 +3,8 @@ import { applyEvent, closeAssistant, type Item } from "../transcript.ts";
 
 /** A task's run on the task page (M3-06): what may run, how states read, step transcripts and gate rounds. */
 
-/** Tiers that run in this version; XL arrives with its workflow. */
-export const RUNNABLE_TIERS: ReadonlySet<string> = new Set(["S", "M", "L"]);
+/** Tiers that run in this version. */
+export const RUNNABLE_TIERS: ReadonlySet<string> = new Set(["S", "M", "L", "XL"]);
 const STARTABLE: ReadonlySet<Task["state"]> = new Set([
   "ready",
   "done",
@@ -17,15 +17,44 @@ const STARTABLE: ReadonlySet<Task["state"]> = new Set([
 /** Failed and not verified runs can end as accepted with risk, with a reason (M3-10). */
 export const canAcceptRisk = (task: Task) => (task.state === "failed" || task.state === "unverified") && !!task.run;
 
-/** Why the task can't run now, or null when it can. */
-export function runBlocker(task: Task): string | null {
+/**
+ * Why the task can't run now, or null when it can. An XL task runs once its sub-tasks are approved (`children`, in
+ * the split's order); after that it goes on with Continue.
+ */
+export function runBlocker(task: Task, children: Task[] = []): string | null {
   const tier = task.triage?.chosen;
   if (task.state === "running") return "The task is running.";
   if (task.state === "interrupted") return "Resume the interrupted run, or revise the task.";
   if (!tier || !task.contract?.approvedAt || !STARTABLE.has(task.state))
     return "Approve the contract and the tier first.";
-  if (!RUNNABLE_TIERS.has(tier)) return `${tier} tasks run in a later update; S, M and L tasks run now.`;
+  if (!RUNNABLE_TIERS.has(tier)) return `${tier} tasks run in a later update.`;
+  if (tier === "XL") {
+    if (task.state !== "ready") return "An XL run that stopped goes on with Continue.";
+    if (!task.subtasks?.length) return "Split the task into sub-tasks first.";
+    if (children.length < task.subtasks.length || children.some((c) => c.state !== "ready"))
+      return "Approve every sub-task first.";
+  }
   return null;
+}
+
+export const isXl = (task: Task) => task.triage?.chosen === "XL";
+
+/** An XL run that stopped, failed or was cut off picks up where it was. */
+export const canContinue = (task: Task) =>
+  isXl(task) && !!task.run && ["failed", "unverified", "cancelled"].includes(task.state);
+
+/** Why a sub-task can't run on its own now, or null: only in its worktree, and not while its XL task runs. */
+export function childRunBlocker(child: Task, parent: Task | null): string | null {
+  if (parent?.state === "running") return "Its XL task is running: sub-tasks run from there.";
+  if (!child.worktree || child.worktree.removed) return "Sub-tasks run from their XL task.";
+  if (child.state === "done") return "Done, and merged with the XL task's next Continue.";
+  return runBlocker(child);
+}
+
+/** "after 1, 3": the sub-tasks one waits for, by their numbers in the split. */
+export function dependsLabel(child: Task, order: string[]): string | null {
+  const numbers = (child.dependsOn ?? []).map((id) => order.indexOf(id) + 1).filter((n) => n > 0);
+  return numbers.length ? `after ${numbers.join(", ")}` : null;
 }
 
 export type Tone = "ok" | "warn" | "err" | "busy" | "muted";
@@ -72,7 +101,10 @@ export function gateRounds(runs: GateRun[]): GateRun[][] {
   return [...rounds.entries()].sort(([a], [b]) => a - b).map(([, rs]) => rs);
 }
 
-/** The gate runs a timeline entry stands for: the baseline entry its own, gates entries rounds 0, 1, 2, … in order. */
+/**
+ * The gate runs a timeline entry stands for: the baseline entry its own, gates entries rounds 0, 1, 2, … in order (an
+ * XL run's integration gates included).
+ */
 export function runsOfEntry(task: Task, entry: StepRun): GateRun[] {
   const run = task.run;
   if (run && entry.kind === "baseline") return run.baseline;

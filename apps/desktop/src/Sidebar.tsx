@@ -1,8 +1,9 @@
 import { CircleAlert, CircleCheck, Folder, Loader2, Plus, Settings } from "lucide-react";
-import { shortcut } from "./options.ts";
+
 import { folderName, type Tab } from "./tabs.ts";
 import { ActionMenu } from "./ui/ActionMenu.tsx";
 import { IconButton } from "./ui/IconButton.tsx";
+import { menuShortcut } from "./useMenuCommands.ts";
 
 /**
  * The left column (UX-03): new session, open sessions with their status, recent workspaces, and at the bottom the
@@ -38,7 +39,7 @@ export function Sidebar({
         <button type="button" className={`new-session${active === null ? " current" : ""}`} onClick={onNew}>
           <Plus size={16} />
           New session
-          <kbd>{shortcut("N")}</kbd>
+          <kbd>{menuShortcut("new-session")}</kbd>
         </button>
       </div>
 
@@ -64,7 +65,13 @@ export function Sidebar({
                   <SessionStatus tab={t} />
                   <ActionMenu
                     label={`Actions for ${t.title}`}
-                    items={[{ label: "Close session", shortcut: shortcut("W"), onSelect: () => onClose(t.sessionId) }]}
+                    items={[
+                      {
+                        label: "Close session",
+                        shortcut: menuShortcut("close-session"),
+                        onSelect: () => onClose(t.sessionId),
+                      },
+                    ]}
                   />
                 </li>
               ))}
@@ -100,7 +107,7 @@ export function Sidebar({
           {ready === null ? "Checking…" : ready ? "Ready" : "Needs setup"}
         </button>
         <span className="grow" />
-        <IconButton label="Settings" shortcut={shortcut(",")} onClick={onSettings}>
+        <IconButton label="Settings" shortcut={menuShortcut("settings")} onClick={onSettings}>
           <Settings size={16} />
         </IconButton>
       </div>

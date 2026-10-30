@@ -22,6 +22,7 @@ pub const UI_COMMANDS: &[&str] = &[
     "toggle-terminal",
     "export-diagnostics",
     "check-updates",
+    "command-palette",
 ];
 
 /// Help items that open a page instead of reaching the UI.
@@ -75,6 +76,13 @@ pub fn build<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
         .build()?;
 
     let view = SubmenuBuilder::new(app, "View")
+        .item(&item(
+            app,
+            "command-palette",
+            "Command Palette…",
+            Some("CmdOrCtrl+Shift+P"),
+        )?)
+        .separator()
         .item(&item(
             app,
             "toggle-sidebar",

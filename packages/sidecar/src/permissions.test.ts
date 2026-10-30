@@ -4,7 +4,14 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, it } from "node:test";
 import type { PermissionUpdate } from "@anthropic-ai/claude-agent-sdk";
-import { alwaysUpdates, describeUpdates, listRules, localSettingsPath, removeRule } from "./permissions.ts";
+import {
+  alwaysUpdates,
+  describeUpdates,
+  listRules,
+  localSettingsPath,
+  removeRule,
+  teamSettingsPath,
+} from "./permissions.ts";
 import { permissionResult } from "./session.ts";
 
 const suggestions: PermissionUpdate[] = [
@@ -55,6 +62,16 @@ describe("permissionResult", () => {
     assert.equal(permissionResult(pending, { allow: false }).behavior, "deny");
   });
 
+  it("saves always-allow rules where the user chose: the session, just me, or the team", () => {
+    const destinations = (scope?: "session" | "workspace" | "team") => {
+      const r = permissionResult(pending, { allow: true, always: true, ...(scope ? { scope } : {}) });
+      return r.behavior === "allow" ? r.updatedPermissions?.map((u) => u.destination) : [];
+    };
+    assert.deepEqual(destinations(), ["localSettings", "localSettings"], "the workspace, just me, by default");
+    assert.deepEqual(destinations("session"), ["session", "session"]);
+    assert.deepEqual(destinations("team"), ["projectSettings", "projectSettings"]);
+  });
+
   it("switches mode only when approving a plan", () => {
     const plan = permissionResult({ toolName: "ExitPlanMode", always: [] }, { allow: true, mode: "acceptEdits" });
     assert.deepEqual(plan, {
@@ -85,6 +102,29 @@ describe("rules in .claude/settings.local.json", () => {
         permissions: { allow: ["Bash(npm test:*)"], deny: ["WebFetch"], defaultMode: "default" },
       });
       assert.throws(() => removeRule(cwd, "deny", "Read"), /No deny rule/);
+    } finally {
+      rmSync(cwd, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("rules shared with the team (.claude/settings.json)", () => {
+  it("lists and removes team rules separately, and keeps every other setting", () => {
+    const cwd = mkdtempSync(join(tmpdir(), "ac-perms-team-"));
+    try {
+      mkdirSync(join(cwd, ".claude"));
+      writeFileSync(localSettingsPath(cwd), JSON.stringify({ permissions: { allow: ["Read"] } }));
+      const team = { hooks: { Stop: [] }, permissions: { allow: ["Bash(pnpm test)"], deny: ["Bash(rm -rf *)"] } };
+      writeFileSync(teamSettingsPath(cwd), JSON.stringify(team));
+      assert.deepEqual(listRules(cwd, "team"), { allow: ["Bash(pnpm test)"], ask: [], deny: ["Bash(rm -rf *)"] });
+      assert.deepEqual(listRules(cwd, "workspace").allow, ["Read"]);
+
+      removeRule(cwd, "allow", "Bash(pnpm test)", "team");
+      const after = JSON.parse(readFileSync(teamSettingsPath(cwd), "utf8"));
+      assert.deepEqual(after.hooks, { Stop: [] }, "other team settings stay");
+      assert.deepEqual(after.permissions, { allow: [], deny: ["Bash(rm -rf *)"] });
+      assert.deepEqual(listRules(cwd, "workspace").allow, ["Read"], "the local file is untouched");
+      assert.throws(() => removeRule(cwd, "allow", "Read", "team"), /No allow rule Read/);
     } finally {
       rmSync(cwd, { recursive: true, force: true });
     }

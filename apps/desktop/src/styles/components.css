@@ -314,7 +314,185 @@
   accent-color: var(--accent);
 }
 
+/* Command palette (UX-07): top-anchored, like an editor's */
+
+.palette-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  background: rgb(10 14 12 / 25%);
+}
+
+.palette {
+  position: fixed;
+  top: 12vh;
+  left: 50%;
+  z-index: 41;
+  transform: translateX(-50%);
+  width: min(620px, calc(100vw - 32px));
+  max-height: 60vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  box-shadow: var(--shadow-lg);
+  animation: fade-in var(--duration) ease-out;
+}
+
+.palette:focus {
+  outline: none;
+}
+
+.palette-input {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border-bottom: 1px solid var(--border);
+  color: var(--muted);
+}
+
+.palette-input input {
+  flex: 1;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  font-size: var(--text-md);
+}
+
+.palette-input input:focus {
+  outline: none;
+}
+
+.palette-list {
+  margin: 0;
+  padding: var(--space-1);
+  overflow-y: auto;
+  list-style: none;
+}
+
+.palette-group {
+  padding: var(--space-2) var(--space-2) var(--space-1);
+  color: var(--muted);
+  font-size: var(--text-xs);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.palette-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: 6px var(--space-2);
+  border-radius: var(--radius-sm);
+  cursor: default;
+}
+
+.palette-item.active {
+  background: var(--accent-soft);
+}
+
+.palette-title {
+  flex-shrink: 0;
+}
+
+.palette-hint {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--muted);
+  font-size: var(--text-sm);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.palette-hint + .palette-hint {
+  flex: 0 0 auto;
+}
+
+.palette-item kbd {
+  margin-left: auto;
+}
+
+.palette-empty {
+  padding: var(--space-3);
+}
+
+/* What each permission profile means (UX-05), from the Composer */
+
+.mode-help {
+  z-index: 60;
+  width: min(420px, calc(100vw - 32px));
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: var(--shadow-lg);
+  font-size: var(--text-sm);
+}
+
+.mode-help h3 {
+  margin-bottom: var(--space-2);
+  font-size: var(--text-md);
+}
+
+.mode-help dl {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: 0 0 var(--space-2);
+}
+
+.mode-help dt {
+  font-weight: 600;
+}
+
+.mode-help dd {
+  margin: 0;
+  color: var(--muted);
+}
+
+.mode-help .current dd {
+  color: var(--fg);
+}
+
 /* Approvals and the plan review */
+
+/* The risk line (UX-05): a badge and the rules' reasons, tinted by level. */
+.approval-risk {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface-2);
+  font-size: var(--text-sm);
+}
+
+.approval-risk.risk-high {
+  border-color: var(--err);
+}
+
+.approval-command {
+  max-height: 12rem;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.approval-details > summary {
+  color: var(--muted);
+  font-size: var(--text-sm);
+  cursor: default;
+}
+
+.approval-details[open] > summary {
+  margin-bottom: var(--space-2);
+}
 
 .tool-input {
   font-size: var(--text-sm);

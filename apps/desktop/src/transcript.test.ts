@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import type { AgentEvent } from "@agentchainer/protocol";
-import { type AgentItem, applyEvent, type Item } from "./transcript.ts";
+import { type AgentItem, applyEvent, groupItems, type Item, type ToolItem } from "./transcript.ts";
 
 const run = (events: AgentEvent[]) => events.reduce<Item[]>(applyEvent, []);
 
@@ -101,5 +101,49 @@ describe("transcript: thinking and tool timing", () => {
     assert.equal(live[0]?.kind === "tool" && live[0].durationMs, 2500);
     const replayed = applyEvent(applyEvent([], started), done);
     assert.equal(replayed[0]?.kind === "tool" && replayed[0].durationMs, undefined);
+  });
+});
+
+describe("transcript: timestamps and tool groups (UX-04)", () => {
+  it("stamps live messages with their arrival time, and replayed ones not at all", () => {
+    const live = applyEvent([], { type: "text.delta", text: "Hi" }, 1_000);
+    assert.equal(live[0]?.kind === "assistant" && live[0].at, 1_000);
+    const replayed = applyEvent([], { type: "user.message", text: "Hello", messageId: "m1" });
+    assert.equal(replayed[0]?.kind === "user" && replayed[0].at, undefined);
+  });
+
+  const tool = (id: string, status: ToolItem["status"] = "done"): ToolItem => ({
+    kind: "tool",
+    id,
+    name: "Read",
+    input: {},
+    status,
+  });
+  const text = (id: number): Item => ({ kind: "assistant", id, text: "…", open: false });
+  const thought = (id: number, open = false): Item => ({ kind: "thinking", id, text: "…", open });
+
+  it("groups two or more tool calls in a row, with the thinking between them", () => {
+    const rows = groupItems([text(1), tool("a"), thought(2), tool("b"), tool("c"), text(3)]);
+    assert.deepEqual(
+      rows.map((r) => r.kind),
+      ["assistant", "tools", "assistant"],
+    );
+    const group = rows[1];
+    assert.deepEqual(group?.kind === "tools" && group.members.map((m) => m.id), ["a", 2, "b", "c"]);
+  });
+
+  it("leaves a single call alone, and keeps trailing or streaming thinking outside the group", () => {
+    assert.deepEqual(
+      groupItems([text(1), tool("a"), text(2)]).map((r) => r.kind),
+      ["assistant", "tool", "assistant"],
+    );
+    assert.deepEqual(
+      groupItems([tool("a"), tool("b"), thought(3), text(4)]).map((r) => r.kind),
+      ["tools", "thinking", "assistant"],
+    );
+    assert.deepEqual(
+      groupItems([tool("a"), thought(5, true)]).map((r) => r.kind),
+      ["tool", "thinking"],
+    );
   });
 });

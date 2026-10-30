@@ -1,9 +1,10 @@
 import { Folder, GitBranch, PanelRight, SquareTerminal } from "lucide-react";
 import { useState } from "react";
-import { shortcut } from "./options.ts";
+
 import { folderName, type Tab } from "./tabs.ts";
 import { ActionMenu } from "./ui/ActionMenu.tsx";
 import { IconButton } from "./ui/IconButton.tsx";
+import { menuShortcut } from "./useMenuCommands.ts";
 
 /** The top of a session: title (rename in place), workspace and branch, panel toggles and session actions. */
 export function SessionHeader({
@@ -74,10 +75,20 @@ export function SessionHeader({
         </span>
       </div>
       <div className="session-tools">
-        <IconButton label="Terminal" shortcut={shortcut("J")} pressed={terminalOpen} onClick={onToggleTerminal}>
+        <IconButton
+          label="Terminal"
+          shortcut={menuShortcut("toggle-terminal")}
+          pressed={terminalOpen}
+          onClick={onToggleTerminal}
+        >
           <SquareTerminal size={16} />
         </IconButton>
-        <IconButton label="Workspace panel" shortcut={shortcut("B")} pressed={rightOpen} onClick={onToggleRight}>
+        <IconButton
+          label="Workspace panel"
+          shortcut={menuShortcut("toggle-right-panel")}
+          pressed={rightOpen}
+          onClick={onToggleRight}
+        >
           <PanelRight size={16} />
         </IconButton>
         <ActionMenu
@@ -86,7 +97,7 @@ export function SessionHeader({
             { label: "Rename", onSelect: () => setEditing(tab.title) },
             { label: "Fork into a new session", onSelect: onFork },
             { label: "Workspace settings…", onSelect: onOpenSetup },
-            { label: "Close session", shortcut: shortcut("W"), onSelect: onClose },
+            { label: "Close session", shortcut: menuShortcut("close-session"), onSelect: onClose },
           ]}
         />
       </div>

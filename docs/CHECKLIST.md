@@ -333,7 +333,8 @@
       Progress: the dialog shows title, reason, path, the asking agent and the input (editable as JSON); "Always
       allow" lists the rule it saves. Verified live (`spike-host --scenario approvals`, 5/5): always-allow saves a
       rule and the next call doesn't ask, edited input is what runs, deny blocks and the agent sees the message.
-      Remaining: click through in the app.
+      Since UX-05 the dialog also shows a plain-language view and a risk level. "Always allow" saves for the session,
+      for this user, or for the team (`.claude/settings.json`). Remaining: click through in the app.
 - [ ] **M1-18** Permission profiles Safe / Standard / Autonomous ([ARCHITECTURE §6](ARCHITECTURE.md#6-permissions)).
       Check auto-mode availability per account type. `auto` works on the owner's account (spike S3).
       Explain each mode in the UI, because owner testing showed "auto-accept edits" being read as "auto mode" (Bash
@@ -878,11 +879,28 @@ for the desktop shell, start screen and session view to be cleaned up (UX-02, UX
     - Open:
       - owner click-through;
       - overall polish "to the level of the big IDEs". The owner wants it later, once the features exist.
-- [ ] **UX-04** Transcript polish: markdown and code highlighting, grouped and collapsible tool runs, a streaming cursor,
+- [x] **UX-04** Transcript polish: markdown and code highlighting, grouped and collapsible tool runs, a streaming cursor,
       copy buttons, timestamps, long-session performance.
-- [ ] **UX-05** Approval and mode UX:
+      — evidence: PR #32, checked in a debug build with real Haiku turns, in light and dark.
+      - **Code blocks:** fenced code is highlighted by Monaco's colorizer (lazy, no new dependency), with a language bar
+        and Copy.
+      - **Tool runs:** two or more calls in a row fold into one row ("Ran 4 tools · Read ×2 · Glob · Bash"). The row
+        stays open while running or when a call failed or was blocked.
+      - **Messages:** a blinking caret while a reply streams; the time and Copy on hover.
+      - **Performance:** rows are memoized with stable callbacks.
+      - **Scrolling:** output is followed only while you're at the bottom; otherwise "Jump to latest" appears.
+- [x] **UX-05** Approval and mode UX:
   - richer approval dialog: diff preview for edits, plain-language command explanation, risk level, "always allow" with scope;
   - explain each permission mode in the UI, and show why the guard blocked a call.
+
+      — evidence: PR #32, checked in the debug build:
+      - `rm -rf build && git push` showed "High risk" with both reasons, Claude's explanation, and Deny focused.
+      - An Edit showed "Low risk" and its diff.
+      - The rules are deterministic (`approval.ts`, tested). "Always allow" saves for this session, this user
+        (`.claude/settings.local.json`) or the team (`.claude/settings.json`).
+      - Workspace settings → Permissions lists both files.
+      - A "?" next to the Composer's profile explains each profile.
+      - The guard's reason is on the blocked call's badge and in its card.
 - [ ] **UX-06** Onboarding and empty states: native folder picker instead of a typed path, first-run checklist,
       helpful errors.
   - Progress (2026-10-29):
@@ -906,6 +924,15 @@ for the desktop shell, start screen and session view to be cleaned up (UX-02, UX
         screen; after the first message the composer moves to the bottom.
     - Open: owner click-through, and the in-app guide.
 - [ ] **UX-07** Keyboard shortcuts and a command palette.
+  - Progress (2026-10-30), the command palette (⇧⌘P / Ctrl+Shift+P, View → Command Palette…):
+    - It's Radix Dialog + `fuzzy.ts`, with no new dependency (ADR-0008 note).
+    - It finds every action:
+      - session: new, open folder, stop, resume, fork, close, permission profile, model;
+      - open sessions and recent workspaces;
+      - Workspace settings sections;
+      - panels and panel tabs, and the theme;
+      - Settings, updates, diagnostics, help.
+    - Displayed shortcuts come from one map (`MENU_SHORTCUTS`), which a test checks against `menu.rs`.
   - Progress (2026-10-29):
     - Native menu (`src-tauri/src/menu.rs`): App, File, Edit, View, Window and Help.
     - Shortcuts:
@@ -938,15 +965,19 @@ for the desktop shell, start screen and session view to be cleaned up (UX-02, UX
 
 Decisions: [ADR-0009](adr/0009-release-signing-and-updates.md). Maintainer steps: [RELEASING.md](RELEASING.md).
 
-- [ ] **R1-01** Bundles: macOS dmg, Windows msi/nsis, Linux AppImage + deb + rpm.
-      - `.github/workflows/release.yml` builds them on macOS arm64, macOS x64 (`macos-15-intel`), Windows x64 and
-        Ubuntu 22.04. It installs the `.dmg`, `.msi` and `.deb` on their runners and launches them.
-      - `scripts/release-assets.mjs` gives the assets names that don't collide, and writes `SHA256SUMS`.
-      - Remaining: a green dry run on a PR as evidence.
-- [ ] **R1-02** Ship the sidecar per target triple via `bundle.externalBin`. No Claude binary is bundled. M0-03 is resolved.
-      - Each release runner builds its own sidecar (`build:sea` in `beforeBuildCommand`). The install smoke runs the
-        installed sidecar's first-run SDK download.
-      - Remaining: the same dry run as evidence.
+- [x] **R1-01** Bundles: macOS dmg, Windows msi/nsis, Linux AppImage + deb + rpm.
+      — evidence: the release dry run of #31 ([run 40998609031](https://github.com/hafizhrf/AgentChainer/actions/runs/40998609031)).
+      - All four runners and the finalize job passed: macOS arm64, macOS x64 (`macos-15-intel`), Windows x64 and
+        Ubuntu 22.04.
+      - Each runner installed its `.dmg`, `.msi` or `.deb` and launched the installed app.
+      - `scripts/release-assets.mjs` gives the assets names that don't collide, and writes `SHA256SUMS` and
+        `latest.json`.
+      - Earlier dry runs found two problems, both fixed: pnpm's self-update on Intel macOS (#29), and Git's tar
+        breaking the SDK extraction on Windows (#31).
+- [x] **R1-02** Ship the sidecar per target triple via `bundle.externalBin`. No Claude binary is bundled. M0-03 is resolved.
+      — evidence: the same run.
+      - Each runner builds its own sidecar (`build:sea` in `beforeBuildCommand`).
+      - On every OS, the installed sidecar downloaded and verified the Agent SDK, then started from the cache.
 - [ ] **R1-03** Signing:
   - macOS: Developer ID + notarization, with every embedded binary signed.
   - Windows: Azure Artifact Signing, or unsigned with SmartScreen guidance.

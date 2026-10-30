@@ -114,6 +114,17 @@
   align-self: center;
 }
 
+/* Shown when the reader scrolled up: back to the newest output, which is then followed again. */
+.jump-latest {
+  position: sticky;
+  bottom: var(--space-3);
+  display: flex;
+  width: fit-content;
+  margin: 0 auto;
+  border-radius: var(--radius-full);
+  box-shadow: var(--shadow-lg);
+}
+
 .msg {
   line-height: 1.6;
   white-space: pre-wrap;
@@ -150,6 +161,86 @@
   padding: 0 var(--space-1);
 }
 
+/* A message's time and actions (UX-04): quiet until the message is hovered or focused. */
+.msg-meta {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 22px;
+  opacity: 0;
+  transition: opacity 120ms;
+}
+
+.msg-user:hover .msg-meta,
+.msg.assistant:hover .msg-meta,
+.msg-meta:focus-within {
+  opacity: 1;
+}
+
+.msg-time {
+  color: var(--muted);
+  font-size: var(--text-xs);
+}
+
+/* The reply that's still streaming in ends with a blinking caret. */
+.msg.assistant.streaming .markdown > :last-child::after {
+  content: "";
+  display: inline-block;
+  width: 0.5em;
+  height: 1.1em;
+  margin-left: 2px;
+  vertical-align: text-bottom;
+  background: var(--accent);
+  animation: caret-blink 1s steps(1) infinite;
+}
+
+@keyframes caret-blink {
+  50% {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .msg.assistant.streaming .markdown > :last-child::after {
+    animation: none;
+  }
+}
+
+/* Fenced code (UX-04): a bar with the language and Copy, then the code, highlighted by Monaco. */
+.code-block {
+  margin: 0.5rem 0;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+}
+
+.code-block-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 2px var(--space-1) 2px var(--space-3);
+  border-bottom: 1px solid var(--border);
+  color: var(--muted);
+  font-size: var(--text-xs);
+}
+
+.markdown .code-block pre.code {
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+  white-space: pre;
+  line-height: 1.5;
+}
+
+/* A run of tool calls: its members sit inside, a little indented. */
+.tool-group > .tool-group-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: var(--space-2) var(--space-3);
+}
+
 .working {
   display: flex;
   align-items: center;
@@ -179,7 +270,8 @@
 
 /* Tool calls and subagents: one compact row each, details on demand. */
 .tool,
-.agent {
+.agent,
+.tool-group {
   border: 1px solid var(--border);
   border-radius: var(--radius);
   background: var(--surface);
@@ -191,7 +283,8 @@
 }
 
 .tool > summary,
-.agent > summary {
+.agent > summary,
+.tool-group > summary {
   display: flex;
   align-items: center;
   gap: var(--space-2);
@@ -203,12 +296,14 @@
 
 .tool > summary::-webkit-details-marker,
 .agent > summary::-webkit-details-marker,
+.tool-group > summary::-webkit-details-marker,
 .thinking-block > summary::-webkit-details-marker {
   display: none;
 }
 
 .tool[open] > summary,
-.agent[open] > summary {
+.agent[open] > summary,
+.tool-group[open] > summary {
   border-bottom: 1px solid var(--border);
 }
 
@@ -243,12 +338,14 @@
 }
 
 .tool.done > summary .tool-status,
-.agent.done > summary .tool-status {
+.agent.done > summary .tool-status,
+.tool-group.done > summary .tool-status {
   color: var(--ok);
 }
 
 .tool.error > summary .tool-status,
-.agent.error > summary .tool-status {
+.agent.error > summary .tool-status,
+.tool-group.error > summary .tool-status {
   color: var(--err);
 }
 

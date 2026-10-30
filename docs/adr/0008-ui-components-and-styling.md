@@ -66,6 +66,8 @@ two weeks old.
   - Our wrappers in `src/ui/` must stay thin, so the Radix API stays visible.
 - **Revisit when:** the component set grows beyond what thin wrappers cover (a command palette, data tables, a
   date picker), or Radix stops being maintained.
+- **Revisited 2026-10-30 (UX-07):** the command palette fit within this approach. It's Radix Dialog with an input and
+  a listbox (`aria-activedescendant`), filtered by our `fuzzy.ts`, so no new dependency such as `cmdk` was needed.
 
 ## References
 

@@ -1,17 +1,28 @@
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import path from "node:path";
+import type { AlwaysScope, RuleScope } from "@agentchainer/protocol";
 import type { PermissionRuleValue, PermissionUpdate } from "@anthropic-ai/claude-agent-sdk";
 
 /**
- * "Always allow" rules (M1-17/M1-20). They live in the workspace's `.claude/settings.local.json`, which Claude Code
- * keeps out of git. Only the `permissions` lists are read or written here; any other settings in the file (it can hold
- * `env` values) are preserved and never leave the sidecar.
+ * "Always allow" rules (M1-17/M1-20, UX-05). They live in the workspace's `.claude/settings.local.json`, which Claude
+ * Code keeps out of git (just this user), or in its `.claude/settings.json`, which is committed (the whole team). Only
+ * the `permissions` lists are read or written here; any other settings in the files (they can hold `env` values) are
+ * preserved and never leave the sidecar.
  */
 
 export type Behavior = "allow" | "ask" | "deny";
 type Rules = Record<Behavior, string[]>;
 
 export const localSettingsPath = (cwd: string) => path.join(cwd, ".claude", "settings.local.json");
+export const teamSettingsPath = (cwd: string) => path.join(cwd, ".claude", "settings.json");
+const settingsPath = (cwd: string, scope: RuleScope) =>
+  scope === "team" ? teamSettingsPath(cwd) : localSettingsPath(cwd);
+
+const DESTINATION = { session: "session", workspace: "localSettings", team: "projectSettings" } as const;
+
+/** Saves the "Always allow" updates where the user chose (UX-05): the session, or one of the workspace's rule files. */
+export const retarget = (updates: PermissionUpdate[], scope: AlwaysScope): PermissionUpdate[] =>
+  updates.map((u) => ({ ...u, destination: DESTINATION[scope] }));
 
 /** Claude Code's rule syntax: `Tool` or `Tool(content)`, e.g. `Bash(npm test:*)`. */
 export const ruleText = (r: PermissionRuleValue) => (r.ruleContent ? `${r.toolName}(${r.ruleContent})` : r.toolName);
@@ -38,8 +49,8 @@ export function describeUpdates(updates: PermissionUpdate[]): string[] {
   });
 }
 
-function readSettings(cwd: string): Record<string, unknown> {
-  const file = localSettingsPath(cwd);
+function readSettings(cwd: string, scope: RuleScope): Record<string, unknown> {
+  const file = settingsPath(cwd, scope);
   if (!existsSync(file)) return {};
   const parsed: unknown = JSON.parse(readFileSync(file, "utf8"));
   if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) throw new Error(`${file} is not a JSON object.`);
@@ -48,20 +59,20 @@ function readSettings(cwd: string): Record<string, unknown> {
 
 const strings = (v: unknown) => (Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : []);
 
-export function listRules(cwd: string): Rules {
-  const perms = readSettings(cwd).permissions;
+export function listRules(cwd: string, scope: RuleScope = "workspace"): Rules {
+  const perms = readSettings(cwd, scope).permissions;
   const p = (perms && typeof perms === "object" ? perms : {}) as Record<string, unknown>;
   return { allow: strings(p.allow), ask: strings(p.ask), deny: strings(p.deny) };
 }
 
 /** Removes one rule and rewrites the file atomically; everything else in it stays as it was. */
-export function removeRule(cwd: string, behavior: Behavior, rule: string): void {
-  const settings = readSettings(cwd);
+export function removeRule(cwd: string, behavior: Behavior, rule: string, scope: RuleScope = "workspace"): void {
+  const settings = readSettings(cwd, scope);
   const perms = settings.permissions as Record<string, unknown> | undefined;
   const list = strings(perms?.[behavior]);
-  if (!perms || !list.includes(rule)) throw new Error(`No ${behavior} rule ${rule} in ${localSettingsPath(cwd)}.`);
+  const file = settingsPath(cwd, scope);
+  if (!perms || !list.includes(rule)) throw new Error(`No ${behavior} rule ${rule} in ${file}.`);
   perms[behavior] = list.filter((r) => r !== rule);
-  const file = localSettingsPath(cwd);
   mkdirSync(path.dirname(file), { recursive: true });
   const tmp = `${file}.${process.pid}.tmp`;
   writeFileSync(tmp, `${JSON.stringify(settings, null, 2)}\n`);

@@ -5,6 +5,7 @@ import {
   FilePen,
   FileText,
   Globe,
+  Layers,
   ListTodo,
   Loader2,
   type LucideIcon,
@@ -14,18 +15,20 @@ import {
   Wrench,
   X,
 } from "lucide-react";
-import { createContext, useContext, useState } from "react";
+import { createContext, memo, useCallback, useContext, useMemo, useRef, useState } from "react";
+import { diffStat, editDiffs, InlineDiff } from "./InlineDiff.tsx";
 import { Markdown } from "./Markdown.tsx";
-import { editPairs, lineDiff } from "./textdiff.ts";
-import type { AgentItem, Item, ToolItem } from "./transcript.ts";
+import { type AgentItem, groupItems, type Item, type ToolGroup, type ToolItem } from "./transcript.ts";
+import { CopyButton } from "./ui/CopyButton.tsx";
 
-/**
- * Renders a session transcript. `onRewind` is offered on user messages that have a message id, while no turn is
- * running (M1-23).
- */
 /** The session's workspace, so tool rows can show paths inside it as relative ones. */
 const Workspace = createContext("");
 
+/**
+ * Renders a session transcript (M1-10, UX-04). `onRewind` is offered on user messages that have a message id, while no
+ * turn is running (M1-23). Rows are memoized and get stable callbacks, so a streaming reply re-renders only itself;
+ * runs of tool calls collapse into one row.
+ */
 export function TranscriptView({
   cwd,
   items,
@@ -40,6 +43,15 @@ export function TranscriptView({
   // Long sessions render their latest items only; earlier ones load on demand (M1-10).
   const [shown, setShown] = useState(WINDOW);
   const hidden = Math.max(0, items.length - shown);
+  const rewindRef = useRef(onRewind);
+  rewindRef.current = onRewind;
+  const openRef = useRef(onOpenFile);
+  openRef.current = onOpenFile;
+  const rewind = useCallback((messageId: string) => rewindRef.current?.(messageId), []);
+  const open = useCallback((file: string) => openRef.current?.(file), []);
+  const canRewind = onRewind !== undefined;
+  const openFile = onOpenFile !== undefined ? open : undefined;
+  const rows = useMemo(() => groupItems(items.slice(hidden)), [items, hidden]);
   return (
     <Workspace.Provider value={cwd}>
       {hidden > 0 && (
@@ -47,9 +59,18 @@ export function TranscriptView({
           Show {Math.min(hidden, WINDOW)} earlier of {hidden} hidden
         </button>
       )}
-      {items.slice(hidden).map((it) => (
-        <ItemView key={`${it.kind}-${it.id}`} item={it} onRewind={onRewind} onOpenFile={onOpenFile} />
-      ))}
+      {rows.map((row) =>
+        row.kind === "tools" ? (
+          <ToolGroupView key={row.id} group={row} onOpenFile={openFile} />
+        ) : (
+          <ItemView
+            key={`${row.kind}-${row.id}`}
+            item={row}
+            onRewind={canRewind ? rewind : undefined}
+            onOpenFile={openFile}
+          />
+        ),
+      )}
     </Workspace.Provider>
   );
 }
@@ -58,7 +79,17 @@ const WINDOW = 200;
 
 type OpenFile = ((file: string) => void) | undefined;
 
-function ItemView({
+/** When a live message arrived: the time, with the full date on hover. */
+function MsgTime({ at }: { at: number }) {
+  const d = new Date(at);
+  return (
+    <time className="msg-time" dateTime={d.toISOString()} title={d.toLocaleString()}>
+      {d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+    </time>
+  );
+}
+
+const ItemView = memo(function ItemView({
   item,
   onRewind,
   onOpenFile,
@@ -88,24 +119,33 @@ function ItemView({
             ) : null}
             {item.text}
           </div>
-          {onRewind && messageId && (
-            <button
-              type="button"
-              className="ghost small rewind"
-              title="Restore files the agent edited since this message"
-              onClick={() => onRewind(messageId)}
-            >
-              <RotateCcw size={12} />
-              Rewind files to here
-            </button>
-          )}
+          <div className="msg-meta">
+            {item.at !== undefined && <MsgTime at={item.at} />}
+            {onRewind && messageId && (
+              <button
+                type="button"
+                className="ghost small rewind"
+                title="Restore files the agent edited since this message"
+                onClick={() => onRewind(messageId)}
+              >
+                <RotateCcw size={12} />
+                Rewind files to here
+              </button>
+            )}
+          </div>
         </div>
       );
     }
     case "assistant":
       return (
-        <div className="msg assistant">
+        <div className={`msg assistant${item.open ? " streaming" : ""}`}>
           <Markdown text={item.text} />
+          {!item.open && (
+            <div className="msg-meta">
+              {item.at !== undefined && <MsgTime at={item.at} />}
+              <CopyButton text={item.text} label="Copy message" />
+            </div>
+          )}
         </div>
       );
     case "thinking":
@@ -125,20 +165,58 @@ function ItemView({
     case "agent":
       return <AgentView agent={item} onOpenFile={onOpenFile} />;
   }
+});
+
+/** "Read ×3 · Bash · Edit": the tools of a group, in first-use order. */
+function toolCounts(tools: ToolItem[]): string {
+  const counts = new Map<string, number>();
+  for (const t of tools) counts.set(t.name, (counts.get(t.name) ?? 0) + 1);
+  return [...counts].map(([name, n]) => (n > 1 ? `${name} ×${n}` : name)).join(" · ");
 }
+
+/**
+ * A run of tool calls as one row (UX-04). Open while it runs, and whenever a call failed or the guard blocked one, so
+ * nothing that needs attention is folded away; a finished, clean run folds itself.
+ */
+const ToolGroupView = memo(
+  function ToolGroupView({ group, onOpenFile }: { group: ToolGroup; onOpenFile: OpenFile }) {
+    const tools = group.members.filter((m): m is ToolItem => m.kind === "tool");
+    const running = tools.some((t) => t.status === "running");
+    const failed = tools.filter((t) => t.status === "error").length;
+    const status = running ? "running" : failed ? "error" : "done";
+    return (
+      <details className={`tool-group ${status}`} open={running || failed > 0}>
+        <summary>
+          <Layers size={14} className="tool-icon" aria-hidden />
+          <span className="tool-name">{running ? "Running tools" : `Ran ${tools.length} tools`}</span>
+          <span className="tool-arg">{toolCounts(tools)}</span>
+          {failed > 0 && <span className="badge danger">{failed} failed</span>}
+          <StatusIcon status={status} />
+        </summary>
+        <div className="tool-group-body">
+          {group.members.map((m) => (
+            <ItemView key={`${m.kind}-${m.id}`} item={m} onOpenFile={onOpenFile} />
+          ))}
+        </div>
+      </details>
+    );
+  },
+  (a, b) =>
+    a.onOpenFile === b.onOpenFile &&
+    a.group.members.length === b.group.members.length &&
+    a.group.members.every((m, i) => m === b.group.members[i]),
+);
 
 const GUARD = "Blocked by AgentChainer guard: ";
 
-function ToolView({ tool, onOpenFile }: { tool: ToolItem; onOpenFile: OpenFile }) {
+const ToolView = memo(function ToolView({ tool, onOpenFile }: { tool: ToolItem; onOpenFile: OpenFile }) {
   const cwd = useContext(Workspace);
   const guardAt = tool.output?.indexOf(GUARD) ?? -1;
   const blocked = guardAt >= 0;
   const reason = blocked ? tool.output?.slice(guardAt + GUARD.length).split("\n")[0] : undefined;
   const file = (tool.input as { file_path?: unknown } | null)?.file_path;
-  const pairs = editPairs(tool.name, tool.input);
-  const diffs = pairs?.map((p) => lineDiff(p.before, p.after));
-  const added = diffs?.flat().filter((l) => l.op === "+").length ?? 0;
-  const removed = diffs?.flat().filter((l) => l.op === "-").length ?? 0;
+  const diffs = editDiffs(tool.name, tool.input);
+  const { added, removed } = diffs ? diffStat(diffs) : { added: 0, removed: 0 };
   return (
     <details className={`tool ${tool.status}`} open={blocked}>
       <summary>
@@ -150,7 +228,11 @@ function ToolView({ tool, onOpenFile }: { tool: ToolItem; onOpenFile: OpenFile }
             <span className="add">+{added}</span> <span className="del">−{removed}</span>
           </span>
         )}
-        {blocked && <span className="badge danger">blocked by guard</span>}
+        {blocked && (
+          <span className="badge danger" title={reason}>
+            blocked by guard
+          </span>
+        )}
         {tool.durationMs !== undefined && <span className="tool-time">{(tool.durationMs / 1000).toFixed(1)} s</span>}
         <StatusIcon status={tool.status} />
       </summary>
@@ -160,29 +242,13 @@ function ToolView({ tool, onOpenFile }: { tool: ToolItem; onOpenFile: OpenFile }
           Open in editor
         </button>
       )}
-      {diffs ? (
-        diffs.map((lines, i) => (
-          // Edits of one call have no ids; their order is fixed.
-          // biome-ignore lint/suspicious/noArrayIndexKey: see above.
-          <pre key={i} className="inline-diff">
-            {lines.map((l, j) => (
-              // biome-ignore lint/suspicious/noArrayIndexKey: lines of a fixed diff.
-              <span key={j} className={l.op === "+" ? "add" : l.op === "-" ? "del" : ""}>
-                {l.op} {l.text}
-                {"\n"}
-              </span>
-            ))}
-          </pre>
-        ))
-      ) : (
-        <pre>{JSON.stringify(tool.input, null, 2)}</pre>
-      )}
+      {diffs ? <InlineDiff diffs={diffs} /> : <pre>{JSON.stringify(tool.input, null, 2)}</pre>}
       {tool.output !== undefined && <pre className="tool-output">{tool.output}</pre>}
     </details>
   );
-}
+});
 
-function AgentView({ agent, onOpenFile }: { agent: AgentItem; onOpenFile: OpenFile }) {
+const AgentView = memo(function AgentView({ agent, onOpenFile }: { agent: AgentItem; onOpenFile: OpenFile }) {
   const meta = [
     agent.agentType,
     agent.durationMs !== undefined ? `${(agent.durationMs / 1000).toFixed(1)} s` : null,
@@ -211,7 +277,7 @@ function AgentView({ agent, onOpenFile }: { agent: AgentItem; onOpenFile: OpenFi
       </div>
     </details>
   );
-}
+});
 
 function StatusIcon({ status }: { status: "running" | "done" | "error" }) {
   if (status === "running") return <Loader2 size={14} className="tool-status spin" aria-label="Running" />;

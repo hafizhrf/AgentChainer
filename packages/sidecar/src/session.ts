@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { appendFileSync } from "node:fs";
 import type {
   AgentEvent,
+  AlwaysScope,
   Effort,
   Image,
   PermissionMode,
@@ -18,7 +19,7 @@ import type {
 } from "@anthropic-ai/claude-agent-sdk";
 import { checkToolCall } from "./guard.ts";
 import { normalize } from "./normalize.ts";
-import { alwaysUpdates, describeUpdates } from "./permissions.ts";
+import { alwaysUpdates, describeUpdates, retarget } from "./permissions.ts";
 import type { AgentSdkModule } from "./sdk-loader.ts";
 
 /**
@@ -60,6 +61,7 @@ export type PermissionAnswer = {
   updatedInput?: Record<string, unknown>;
   message?: string;
   mode?: PermissionMode;
+  scope?: AlwaysScope;
 };
 
 type Pending = { resolve: (result: PermissionResult) => void; toolName: string; always: PermissionUpdate[] };
@@ -222,7 +224,7 @@ export function permissionResult(pending: Omit<Pending, "resolve">, answer: Perm
     return { behavior: "deny", message: answer.message?.trim() || "The user denied this action." };
   }
   const updatedPermissions: PermissionUpdate[] = [
-    ...(answer.always ? pending.always : []),
+    ...(answer.always ? retarget(pending.always, answer.scope ?? "workspace") : []),
     // Approving a plan (M1-16) leaves plan mode for the mode the user picked to execute it in.
     ...(pending.toolName === "ExitPlanMode" && answer.mode
       ? [{ type: "setMode" as const, mode: answer.mode, destination: "session" as const }]

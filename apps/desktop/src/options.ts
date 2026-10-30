@@ -69,5 +69,6 @@ export const EFFORT_OPTIONS = [
 
 const isMac = typeof navigator !== "undefined" && /Mac/.test(navigator.userAgent);
 
-/** A keyboard shortcut as the platform writes it: "⌘J" on macOS, "Ctrl+J" elsewhere. */
-export const shortcut = (key: string) => (isMac ? `⌘${key}` : `Ctrl+${key}`);
+/** A keyboard shortcut as the platform writes it: "⌘J" or "⇧⌘P" on macOS, "Ctrl+J" or "Ctrl+Shift+P" elsewhere. */
+export const shortcut = (key: string, { shift = false }: { shift?: boolean } = {}) =>
+  isMac ? `${shift ? "⇧" : ""}⌘${key}` : `Ctrl+${shift ? "Shift+" : ""}${key}`;

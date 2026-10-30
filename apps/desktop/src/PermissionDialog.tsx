@@ -106,8 +106,12 @@ function Approval({
       title={request.title ?? `Allow ${request.toolName}?`}
       description={
         <>
-          {request.agentId ? `Requested by subagent ${request.agentId}` : "Requested by the main agent"} ·{" "}
-          {request.toolName}
+          {request.task
+            ? `Requested by the task step ${request.task.label}${request.task.role ? ` (${request.task.role})` : ""}`
+            : request.agentId
+              ? `Requested by subagent ${request.agentId}`
+              : "Requested by the main agent"}{" "}
+          · {request.toolName}
         </>
       }
       actions={

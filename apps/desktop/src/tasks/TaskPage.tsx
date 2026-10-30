@@ -1,18 +1,35 @@
 import {
   type AcceptanceCriterion,
+  type GateRun,
+  type PermissionMode,
   RpcErrorCode,
+  type StepRun,
   type Task,
   type TaskContract,
   type TaskSummary,
   type Tier,
   type Triage,
 } from "@agentchainer/protocol";
-import { ArrowLeft, CircleHelp, ClipboardList, Loader2, Scale, X } from "lucide-react";
+import {
+  ArrowLeft,
+  ChevronRight,
+  CircleCheck,
+  CircleHelp,
+  CircleX,
+  ClipboardList,
+  Loader2,
+  MinusCircle,
+  Play,
+  Scale,
+  Square,
+  X,
+} from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Confirm } from "../Dialog.tsx";
-import { MODELS } from "../options.ts";
+import { MODE_NAMES, MODELS, modeOptions } from "../options.ts";
 import { isRpcError } from "../rpc-client.ts";
-import { request } from "../sidecar.ts";
+import { request, subscribe } from "../sidecar.ts";
+import { TranscriptView } from "../TranscriptView.tsx";
 import { folderName } from "../tabs.ts";
 import { ActionMenu } from "../ui/ActionMenu.tsx";
 import { EditableList, StringList } from "../ui/EditableList.tsx";
@@ -20,6 +37,18 @@ import { Field } from "../ui/Field.tsx";
 import { IconButton } from "../ui/IconButton.tsx";
 import { EmptyState } from "../ui/Section.tsx";
 import { Select } from "../ui/Select.tsx";
+import {
+  duration,
+  fromHistory,
+  gateRounds,
+  passedGate,
+  RUNNABLE_TIERS,
+  runBlocker,
+  runsOfEntry,
+  type StepItems,
+  stateLabel,
+  withStepEvent,
+} from "./run.ts";
 import {
   approveBlocker,
   checkLabel,
@@ -31,25 +60,31 @@ import {
   tidyContract,
 } from "./taskForm.ts";
 
-type Busy = "draft" | "retriage" | "approve" | "revise" | null;
+type Busy = "draft" | "retriage" | "approve" | "revise" | "run" | "resume" | null;
+
+/** Profiles a run's write steps can ask in; plan mode doesn't fit a step that must implement. */
+const RUN_MODES: Exclude<PermissionMode, "plan">[] = ["default", "acceptEdits", "auto"];
 
 const message = (err: unknown) => (err instanceof Error ? err.message : String(err));
 const usd = (n: number) => `≈$${n.toFixed(n < 0.1 ? 4 : 2)}`;
 
 /**
  * A task (M3, preview): the request, a contract Claude drafts from the repository (read-only), and a tier from triage,
- * approved together. Running a task arrives with the orchestrator (M3-06); until then the page ends at "Ready".
- * Opens over Home or a session, like Workspace settings.
+ * approved together; then the run (M3-06): each step a Claude session shown in a timeline, the gates the app runs
+ * itself, and fix rounds. Opens over Home or a session, like Workspace settings.
  */
 export function TaskPage({
   cwd,
   model,
+  mode,
   backLabel,
   confirm,
   onBack,
 }: {
   cwd: string;
   model: string;
+  /** The default permission profile, for a run's write steps. */
+  mode: PermissionMode;
   backLabel: string;
   confirm: Confirm;
   onBack: () => void;
@@ -64,6 +99,10 @@ export function TaskPage({
   const [tier, setTier] = useState<Tier>("S");
   const [reason, setReason] = useState("");
   const [budget, setBudget] = useState("");
+  const [runMode, setRunMode] = useState<Exclude<PermissionMode, "plan">>(mode === "plan" ? "default" : mode);
+  const [stepItems, setStepItems] = useState<StepItems>({});
+  const taskId = useRef<string | null>(null);
+  taskId.current = task?.id ?? null;
 
   const loadList = useCallback(async () => {
     try {
@@ -76,6 +115,23 @@ export function TaskPage({
   useEffect(() => {
     void loadList();
   }, [loadList]);
+
+  // A run reports through notifications: the task as it changes, and its steps' session events.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: subscribes once per workspace; handlers only set state.
+  useEffect(
+    () =>
+      subscribe((n) => {
+        if (n.method === "task.updated" && n.params.cwd === cwd) {
+          const updated = n.params.task;
+          setTask((current) => (current?.id === updated.id ? updated : current));
+          if (!taskId.current) void loadList();
+        } else if (n.method === "agent.event" && n.params.task && n.params.task.id === taskId.current) {
+          const { sessionId, event } = n.params;
+          setStepItems((items) => withStepEvent(items, sessionId, event, Date.now()));
+        }
+      }),
+    [cwd],
+  );
 
   function show(t: Task) {
     setTask(t);
@@ -114,9 +170,50 @@ export function TaskPage({
     }
   }
 
+  /** Approves the contract and the tier, and starts the run right away for an S task (planner.md §15). */
+  async function approve(contract: TaskContract, andRun: boolean, id: string) {
+    setBusy("approve");
+    setError(null);
+    try {
+      show(
+        await request("task.approve", {
+          cwd,
+          id,
+          contract: tidyContract(contract),
+          tier,
+          ...(reason.trim() ? { reason: reason.trim() } : {}),
+          budgetUsd: Number(budget),
+        }),
+      );
+      if (andRun) await runTask(id);
+    } catch (err) {
+      setError(message(err));
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function runTask(id: string) {
+    setStepItems({});
+    await step("run", id, () =>
+      request("task.start", { cwd, id, permissionMode: runMode, ...(modelAlias ? { model: modelAlias } : {}) }),
+    );
+  }
+
+  async function stop(t: Task) {
+    const ok = await confirm({
+      title: "Stop the run?",
+      body: <p>The running step stops now. Files it already changed stay as they are; git and rewind still work.</p>,
+      confirmLabel: "Stop",
+      danger: true,
+    });
+    if (ok) await request("task.cancel", { cwd, id: t.id }).catch((err: unknown) => setError(message(err)));
+  }
+
   async function open(id: string) {
     try {
       show(await request("task.get", { cwd, id }));
+      setStepItems({});
       setError(null);
     } catch (err) {
       setError(message(err));
@@ -179,7 +276,7 @@ export function TaskPage({
             {folderName(cwd)}
           </span>
         </div>
-        <span className="chip" title="Tasks can't run yet: that arrives with the next update (M3 step 2).">
+        <span className="chip" title="A preview: S and M tasks run; reports and L and XL tasks arrive later.">
           Preview
         </span>
         <span className="grow" />
@@ -285,7 +382,16 @@ export function TaskPage({
           </div>
         )}
 
-        {task && task.state === "ready" && task.contract && task.triage && (
+        {task?.run && task.state !== "draft" && task.state !== "ready" && (
+          <RunView
+            task={task}
+            cwd={cwd}
+            items={stepItems}
+            onLoaded={(sessionId, items) => setStepItems((all) => ({ ...all, [sessionId]: items }))}
+          />
+        )}
+
+        {task && task.state !== "draft" && task.contract && task.triage && (
           <ReadyView task={task} contract={task.contract} triage={task.triage} />
         )}
       </div>
@@ -319,32 +425,64 @@ export function TaskPage({
                 <button
                   type="button"
                   disabled={busy !== null || blocker !== null}
-                  onClick={() =>
-                    void step("approve", task.id, () =>
-                      request("task.approve", {
-                        cwd,
-                        id: task.id,
-                        contract: tidyContract(form),
-                        tier,
-                        ...(reason.trim() ? { reason: reason.trim() } : {}),
-                        budgetUsd: Number(budget),
-                      }),
-                    )
-                  }
+                  onClick={() => void approve(form, tier === "S", task.id)}
                 >
-                  Approve contract and tier
+                  {busy === "approve" || busy === "run" ? <Loader2 size={14} className="spin" /> : null}
+                  {tier === "S" ? "Approve and run" : "Approve contract and tier"}
                 </button>
               )}
             </>
+          ) : task.state === "running" ? (
+            <>
+              <span className="muted">
+                Run {usd(task.run?.costUsd ?? 0)} of ${task.triage?.budgetUsd}
+              </span>
+              <button type="button" className="danger" onClick={() => void stop(task)}>
+                <Square size={14} />
+                Stop
+              </button>
+            </>
           ) : (
-            <button
-              type="button"
-              className="secondary"
-              disabled={busy !== null}
-              onClick={() => void step("revise", task.id, () => request("task.revise", { cwd, id: task.id }))}
-            >
-              Revise
-            </button>
+            <>
+              <button
+                type="button"
+                className="secondary"
+                disabled={busy !== null}
+                onClick={() => void step("revise", task.id, () => request("task.revise", { cwd, id: task.id }))}
+              >
+                Revise
+              </button>
+              {task.state === "interrupted" ? (
+                <button
+                  type="button"
+                  disabled={busy !== null}
+                  onClick={() => void step("resume", task.id, () => request("task.resume", { cwd, id: task.id }))}
+                >
+                  <Play size={14} />
+                  Resume
+                </button>
+              ) : (
+                <>
+                  <div className="task-model">
+                    <Select
+                      value={runMode}
+                      onChange={(v) => setRunMode(v as Exclude<PermissionMode, "plan">)}
+                      options={modeOptions(RUN_MODES, true)}
+                      label="Permission profile for the run's write steps"
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    disabled={busy !== null || runBlocker(task) !== null}
+                    title={runBlocker(task) ?? undefined}
+                    onClick={() => void runTask(task.id)}
+                  >
+                    {busy === "run" ? <Loader2 size={14} className="spin" /> : <Play size={14} />}
+                    {task.run ? "Run again" : "Run"}
+                  </button>
+                </>
+              )}
+            </>
           )}
         </footer>
       )}
@@ -353,8 +491,13 @@ export function TaskPage({
 }
 
 function StateBadge({ task }: { task: Task }) {
-  if (task.state === "ready") return <span className="badge risk-low">Ready · {task.triage?.chosen}</span>;
-  return <span className="badge">{task.contract ? "Draft" : "New"}</span>;
+  if (task.state === "draft") return <span className="badge">{task.contract ? "Draft" : "New"}</span>;
+  const { label, tone } = stateLabel(task.state);
+  return (
+    <span className={`badge tone-${tone}`}>
+      {label} · {task.triage?.chosen}
+    </span>
+  );
 }
 
 function Elapsed() {
@@ -402,9 +545,7 @@ function TaskList({
                 </span>
               </button>
               {t.tier && <span className={`tier-badge tier-${t.tier}`}>{t.tier}</span>}
-              <span className={`badge${t.state === "ready" ? " risk-low" : ""}`}>
-                {t.state === "ready" ? "Ready" : "Draft"}
-              </span>
+              <span className={`badge tone-${stateLabel(t.state).tone}`}>{stateLabel(t.state).label}</span>
               <ActionMenu
                 label={`Actions for ${t.request}`}
                 items={[{ label: "Discard", danger: true, onSelect: () => onDiscard(t) }]}
@@ -649,10 +790,14 @@ function ReadyView({ task, contract, triage }: { task: Task; contract: TaskContr
           <span className="grow" />
           <span className={`tier-badge tier-${triage.chosen}`}>{triage.chosen}</span>
         </div>
-        <p className="callout">
-          Running tasks arrives with the next update. The contract and tier are saved in{" "}
-          <code>.agentchainer/tasks/{task.id}/</code>.
-        </p>
+        {task.state === "ready" && (
+          <p className="callout">
+            {RUNNABLE_TIERS.has(triage.chosen)
+              ? "Run it from the footer: each step is a Claude session you can watch here, and the app runs the gates itself."
+              : `${triage.chosen} tasks run in a later update; S and M tasks run now.`}{" "}
+            The task is saved in <code>.agentchainer/tasks/{task.id}/</code>.
+          </p>
+        )}
         <Quote text={task.request} />
         <dl className="action-facts">
           <dt>Objective</dt>
@@ -700,5 +845,162 @@ function ReadyView({ task, contract, triage }: { task: Task; contract: TaskContr
         </dl>
       </section>
     </>
+  );
+}
+
+function StepIcon({ status }: { status: StepRun["status"] }) {
+  if (status === "running") return <Loader2 size={15} className="spin" aria-label="Running" />;
+  if (status === "done") return <CircleCheck size={15} className="ok" aria-label="Done" />;
+  if (status === "failed") return <CircleX size={15} className="err" aria-label="Failed" />;
+  return <MinusCircle size={15} className="muted" aria-label="Stopped" />;
+}
+
+/**
+ * The run (M3-06): the outcome, a timeline of steps (each opens its session's transcript, or its gate runs), and every
+ * gate run with its real exit code.
+ */
+function RunView({
+  task,
+  cwd,
+  items,
+  onLoaded,
+}: {
+  task: Task;
+  cwd: string;
+  items: StepItems;
+  onLoaded: (sessionId: string, items: StepItems[string]) => void;
+}) {
+  const run = task.run;
+  const [open, setOpen] = useState<string | null>(null);
+  const [, tick] = useState(0);
+  // Running steps' durations count up.
+  useEffect(() => {
+    if (task.state !== "running") return;
+    const t = setInterval(() => tick((n) => n + 1), 1000);
+    return () => clearInterval(t);
+  }, [task.state]);
+  if (!run) return null;
+  const { label, tone } = stateLabel(task.state);
+  const running = run.steps.find((s) => s.status === "running");
+  const shown = open ?? running?.id ?? null;
+
+  async function toggle(entry: StepRun) {
+    const next = shown === entry.id ? "" : entry.id;
+    setOpen(next);
+    const sessionId = entry.sessionId;
+    if (next && sessionId && !items[sessionId] && entry.status !== "running") {
+      try {
+        onLoaded(sessionId, fromHistory((await request("session.history", { cwd, sessionId })).events));
+      } catch {
+        onLoaded(sessionId, []);
+      }
+    }
+  }
+
+  return (
+    <>
+      <section className="card task-run">
+        <div className="card-title">
+          <Play size={16} aria-hidden />
+          <h2>Run</h2>
+          <span className={`badge tone-${tone}`}>{label}</span>
+          <span className="grow" />
+          <span className="muted">
+            {MODE_NAMES[run.permissionMode]} · {usd(run.costUsd)} of ${task.triage?.budgetUsd}
+          </span>
+        </div>
+        {run.outcome && <p className={`callout tone-${tone}`}>{run.outcome}</p>}
+        <ol className="task-steps">
+          {run.steps.map((entry) => {
+            const expanded = shown === entry.id;
+            const gates = runsOfEntry(task, entry);
+            const sessionItems = entry.sessionId ? items[entry.sessionId] : undefined;
+            return (
+              <li key={entry.id} className={`task-step ${entry.status}`}>
+                <button
+                  type="button"
+                  className="task-step-head"
+                  aria-expanded={expanded}
+                  onClick={() => void toggle(entry)}
+                >
+                  <ChevronRight size={14} className="task-step-chevron" aria-hidden />
+                  <StepIcon status={entry.status} />
+                  <span className="task-step-label">{entry.label}</span>
+                  {entry.role && <span className="muted">{entry.role}</span>}
+                  <span className="grow muted task-step-note">{entry.note}</span>
+                  <span className="muted">{duration(entry.startedAt, entry.endedAt)}</span>
+                  {entry.kind !== "gates" && <span className="muted">{usd(entry.costUsd)}</span>}
+                </button>
+                {expanded &&
+                  (entry.kind === "gates" ? (
+                    <GateList runs={gates} />
+                  ) : sessionItems?.length ? (
+                    <div className="task-step-transcript transcript">
+                      <TranscriptView cwd={cwd} items={sessionItems} />
+                    </div>
+                  ) : (
+                    <p className="muted task-step-empty">
+                      {entry.status === "running" ? "Waiting for the session's first words…" : "No transcript."}
+                    </p>
+                  ))}
+              </li>
+            );
+          })}
+        </ol>
+      </section>
+      <section className="card">
+        <div className="card-title">
+          <h2>Gates</h2>
+          <span className="muted">Run by AgentChainer, with the real exit codes.</span>
+        </div>
+        {run.gates.length === 0 ? (
+          <EmptyState>No gate has run yet.</EmptyState>
+        ) : (
+          gateRounds(run.gates).map((round) => (
+            <div key={round[0]?.round} className="task-gate-round">
+              <span className="field-label">Round {(round[0]?.round ?? 0) + 1}</span>
+              <GateList runs={round} />
+            </div>
+          ))
+        )}
+        {run.notRun.length > 0 && (
+          <p className="muted">Not run, no command detected: {run.notRun.join(", ")}. They don't count as passed.</p>
+        )}
+      </section>
+    </>
+  );
+}
+
+function GateList({ runs }: { runs: GateRun[] }) {
+  if (!runs.length) return <p className="muted task-step-empty">No gates to run.</p>;
+  return (
+    <ul className="task-gates">
+      {runs.map((g) => (
+        <li key={`${g.kind}-${g.package}-${g.round}`}>
+          <details>
+            <summary>
+              {passedGate(g) ? (
+                <CircleCheck size={14} className="ok" aria-label="Passed" />
+              ) : (
+                <CircleX size={14} className="err" aria-label="Failed" />
+              )}
+              <span className="task-gate-kind">{g.kind}</span>
+              <code>{g.command}</code>
+              {g.package !== "." && <span className="muted">{g.package}</span>}
+              <span className="grow" />
+              <span className="muted">
+                {g.timedOut ? "timed out" : `exit ${g.exitCode}`} · {(g.durationMs / 1000).toFixed(1)} s
+              </span>
+            </summary>
+            {g.changed?.length ? (
+              <p className="muted">
+                {g.kind === "format" ? "Formatted" : "Reverted changes to"}: {g.changed.join(", ")}
+              </p>
+            ) : null}
+            <pre className="task-gate-log">{g.tail || "(no output)"}</pre>
+          </details>
+        </li>
+      ))}
+    </ul>
   );
 }

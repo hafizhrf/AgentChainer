@@ -346,7 +346,10 @@ export function TaskPage({
   const stage = !task ? "request" : busy === "draft" ? "drafting" : !task.contract ? "empty" : task.state;
   const scroller = useRef<HTMLDivElement>(null);
   // biome-ignore lint/correctness/useExhaustiveDependencies: scrolls when the stage changes, not on every render.
-  useEffect(() => scroller.current?.scrollTo({ top: 0 }), [stage]);
+  useEffect(() => {
+    // A block body: Chromium's scrollTo returns a promise, which React would take for the clean-up (a blank page).
+    scroller.current?.scrollTo({ top: 0 });
+  }, [stage]);
   const blocker =
     edited && triage
       ? approveBlocker({ edited, stale, tier, proposed: triage.proposed, reason, budget })

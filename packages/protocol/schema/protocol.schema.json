@@ -2902,6 +2902,12 @@
               "type": "string"
             }
           },
+          "remote": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
           "upstream": {
             "type": [
               "string",
@@ -2917,14 +2923,45 @@
             "type": "integer",
             "minimum": -9007199254740991,
             "maximum": 9007199254740991
+          },
+          "merging": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "branch": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "conflicts": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "required": [
+                  "branch",
+                  "conflicts"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "required": [
           "current",
           "branches",
+          "remote",
           "upstream",
           "ahead",
-          "behind"
+          "behind",
+          "merging"
         ],
         "additionalProperties": false
       }
@@ -2944,6 +2981,9 @@
             "maxLength": 250
           },
           "create": {
+            "type": "boolean"
+          },
+          "track": {
             "type": "boolean"
           }
         },
@@ -3105,6 +3145,220 @@
         },
         "required": [
           "output"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "git.fetch": {
+      "params": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "cwd": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "cwd"
+        ],
+        "additionalProperties": false
+      },
+      "result": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "output": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "output"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "git.pull": {
+      "params": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "cwd": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "cwd"
+        ],
+        "additionalProperties": false
+      },
+      "result": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "output": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "output"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "git.deleteBranch": {
+      "params": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "cwd": {
+            "type": "string",
+            "minLength": 1
+          },
+          "branch": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 250
+          },
+          "force": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "cwd",
+          "branch"
+        ],
+        "additionalProperties": false
+      },
+      "result": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "deleted": {
+            "type": "boolean"
+          },
+          "unmerged": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "deleted",
+          "unmerged"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "git.renameBranch": {
+      "params": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "cwd": {
+            "type": "string",
+            "minLength": 1
+          },
+          "from": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 250
+          },
+          "to": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 250
+          }
+        },
+        "required": [
+          "cwd",
+          "from",
+          "to"
+        ],
+        "additionalProperties": false
+      },
+      "result": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "const": true
+          }
+        },
+        "required": [
+          "ok"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "git.merge": {
+      "params": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "cwd": {
+            "type": "string",
+            "minLength": 1
+          },
+          "branch": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 250
+          }
+        },
+        "required": [
+          "cwd",
+          "branch"
+        ],
+        "additionalProperties": false
+      },
+      "result": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "merged": {
+            "type": "boolean"
+          },
+          "conflicts": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "merged",
+          "conflicts"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "git.abortMerge": {
+      "params": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "cwd": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "cwd"
+        ],
+        "additionalProperties": false
+      },
+      "result": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "const": true
+          }
+        },
+        "required": [
+          "ok"
         ],
         "additionalProperties": false
       }

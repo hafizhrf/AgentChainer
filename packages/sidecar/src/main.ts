@@ -12,7 +12,21 @@ import { catalog } from "./catalog/index.ts";
 import { checkEnvironment, claudeVersion, findClaude } from "./claude.ts";
 import { auditWorkspace, saveProfile } from "./detect/audit.ts";
 import { detectWorkspace } from "./detect/detect.ts";
-import { branches, commit, draftMessage, push, stage, switchBranch, unstage } from "./git.ts";
+import {
+  abortMerge,
+  branches,
+  commit,
+  deleteBranch,
+  draftMessage,
+  fetchAll,
+  merge,
+  pull,
+  push,
+  renameBranch,
+  stage,
+  switchBranch,
+  unstage,
+} from "./git.ts";
 import {
   addMcpServer,
   installPlugin,
@@ -355,8 +369,8 @@ serve(
 
     "git.branches": ({ cwd }) => branches(cwd),
 
-    "git.switch": ({ cwd, branch, create }) => {
-      switchBranch(cwd, branch, create ?? false);
+    "git.switch": ({ cwd, branch, create, track }) => {
+      switchBranch(cwd, branch, create ?? false, track ?? false);
       return { ok: true };
     },
 
@@ -373,6 +387,24 @@ serve(
     "git.commit": ({ cwd, message }) => ({ sha: commit(cwd, message) }),
 
     "git.push": ({ cwd }) => ({ output: push(cwd) }),
+
+    "git.fetch": ({ cwd }) => ({ output: fetchAll(cwd) }),
+
+    "git.pull": ({ cwd }) => ({ output: pull(cwd) }),
+
+    "git.deleteBranch": ({ cwd, branch, force }) => deleteBranch(cwd, branch, force ?? false),
+
+    "git.renameBranch": ({ cwd, from, to }) => {
+      renameBranch(cwd, from, to);
+      return { ok: true };
+    },
+
+    "git.merge": ({ cwd, branch }) => merge(cwd, branch),
+
+    "git.abortMerge": ({ cwd }) => {
+      abortMerge(cwd);
+      return { ok: true };
+    },
 
     "git.draftMessage": async ({ cwd }) => {
       const claudePath = findClaude();

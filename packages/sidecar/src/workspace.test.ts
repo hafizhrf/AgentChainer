@@ -1,6 +1,15 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import {
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  realpathSync,
+  rmSync,
+  statSync,
+  utimesSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { after, before, describe, it } from "node:test";
@@ -58,6 +67,27 @@ describe("insideWorkspace", () => {
       assert.throws(() => insideWorkspace("/repo", bad), /inside the workspace/, bad);
     }
     assert.equal(insideWorkspace("/repo", "src/a.ts"), join("/repo", "src", "a.ts"));
+  });
+});
+
+describe("refreshing never writes the index", () => {
+  it("lists and diffs without touching .git/index, which plain git status would rewrite", () => {
+    const dir = makeRepo();
+    try {
+      // Same content, newer timestamp: git's stat info for a.txt is stale, so a plain status refreshes the index.
+      const later = new Date(Date.now() + 60_000);
+      utimesSync(join(dir, "a.txt"), later, later);
+      const index = join(dir, ".git", "index");
+      const before = { bytes: readFileSync(index), mtime: statSync(index).mtimeMs };
+      listFiles(dir);
+      fileDiff(dir, "a.txt");
+      assert.deepEqual(readFileSync(index), before.bytes, "index unchanged");
+      assert.equal(statSync(index).mtimeMs, before.mtime, "index not rewritten (no watcher event)");
+      git(dir, "status", "--porcelain");
+      assert.notEqual(statSync(index).mtimeMs, before.mtime, "plain git status does rewrite it: the loop we avoid");
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });
 

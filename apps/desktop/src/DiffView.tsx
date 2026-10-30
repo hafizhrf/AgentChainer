@@ -28,6 +28,7 @@ export default function DiffView({
   const [error, setError] = useState<string | null>(null);
   const host = useRef<HTMLDivElement>(null);
   const editor = useRef<monaco.editor.IStandaloneDiffEditor | null>(null);
+  const shownPath = useRef<string | null>(null);
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: `version` is the refresh trigger.
   useEffect(() => {
@@ -69,12 +70,20 @@ export default function DiffView({
   useEffect(() => {
     const ed = editor.current;
     if (!ed || !diff) return;
-    const language = languageFor(path);
     const previous = ed.getModel();
+    const original = diff.original ?? "";
+    const modified = diff.modified ?? "";
+    // A refresh with the same text keeps the models; one with new text keeps where the reader was.
+    if (previous?.original.getValue() === original && previous.modified.getValue() === modified) return;
+    // Only the same file keeps its scroll position; another file starts at the top.
+    const view = previous && shownPath.current === path ? ed.saveViewState() : null;
+    shownPath.current = path;
+    const language = languageFor(path);
     ed.setModel({
-      original: monaco.editor.createModel(diff.original ?? "", language),
-      modified: monaco.editor.createModel(diff.modified ?? "", language),
+      original: monaco.editor.createModel(original, language),
+      modified: monaco.editor.createModel(modified, language),
     });
+    if (view) ed.restoreViewState(view);
     previous?.original.dispose();
     previous?.modified.dispose();
   }, [diff, path]);

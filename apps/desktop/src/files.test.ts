@@ -7,6 +7,7 @@ import {
   folderPaths,
   joinPath,
   relativeTo,
+  sameListing,
   splitPath,
   visibleRows,
 } from "./files.ts";
@@ -116,5 +117,20 @@ describe("agentEdits", () => {
       { prompt: "first", files: ["a.ts"] },
       { prompt: "third", files: ["c.ts", "/tmp/outside.ts"] },
     ]);
+  });
+});
+
+describe("sameListing", () => {
+  const listing = (status?: "modified") => ({
+    isGitRepo: true,
+    branch: "main",
+    files: [{ path: "a.ts", ...(status ? { status } : {}) }],
+    truncated: false,
+  });
+  it("is true for an unchanged refresh and false when a file's status changed", () => {
+    assert.equal(sameListing(listing(), listing()), true);
+    assert.equal(sameListing(listing(), listing("modified")), false);
+    assert.equal(sameListing(null, listing()), false);
+    assert.equal(sameListing(null, null), true);
   });
 });

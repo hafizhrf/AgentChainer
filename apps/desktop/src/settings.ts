@@ -17,6 +17,8 @@ export type Settings = {
   theme: string | null;
   /** Apply safe setup before each new session (M2-18); null means off. */
   autoApply: boolean | null;
+  /** Show "New task" (M3 contract and triage) before tasks can run; null means off. */
+  tasksPreview: boolean | null;
   recentWorkspaces: string[];
 };
 

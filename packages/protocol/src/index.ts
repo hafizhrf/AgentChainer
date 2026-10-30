@@ -33,6 +33,8 @@ export const RpcErrorCode = {
   protocolMismatch: -32005,
   /** The session is already open in another tab, or is open and can't be deleted. */
   sessionOpen: -32006,
+  /** The user stopped the operation (`task.cancel`). */
+  cancelled: -32007,
 } as const;
 
 /* ---------- Shared shapes ---------- */
@@ -330,9 +332,120 @@ export const ApplyResultSchema = z.object({
   ),
 });
 
+/* ---------- Tasks: contract and triage (M3-02, M3-03; docs/design/planner.md) ---------- */
+
+/** Task tiers: S (one agent → gates) up to XL (sub-tasks in worktrees). */
+export const TIERS = ["S", "M", "L", "XL"] as const;
+export type Tier = (typeof TIERS)[number];
+export const TierSchema = z.enum(TIERS);
+
+/** Gates the sidecar runs from the workspace profile's commands (M3-08). */
+export const GATE_KINDS = ["format", "lint", "typecheck", "test", "build", "smoke"] as const;
+export type GateKind = (typeof GATE_KINDS)[number];
+
+/** How a criterion is proved: by a gate run (`gate:test`), judged by the independent reviewer, or checked by the user. */
+export const CriterionCheckSchema = z.union([
+  z.enum(["review", "manual"]),
+  z.templateLiteral(["gate:", z.enum(GATE_KINDS)]),
+]);
+export type CriterionCheck = z.infer<typeof CriterionCheckSchema>;
+
+const ContractLine = z.string().min(1).max(2000);
+
+export const AcceptanceCriterionSchema = z.object({
+  id: z.string().min(1).max(20),
+  text: ContractLine,
+  check: CriterionCheckSchema,
+});
+export type AcceptanceCriterion = z.infer<typeof AcceptanceCriterionSchema>;
+
+/** What will be done and what counts as done, approved by the user before anything changes (`contract.json`). */
+export const TaskContractSchema = z.object({
+  /** The user's request, verbatim. */
+  task: z.string(),
+  /** The outcome in one or two sentences, not the steps. */
+  objective: z.string().max(4000),
+  acceptanceCriteria: z.array(AcceptanceCriterionSchema).max(30),
+  /** e.g. "no new dependencies", "keep the public API". */
+  constraints: z.array(ContractLine).max(30),
+  /** What the task explicitly won't touch. */
+  outOfScope: z.array(ContractLine).max(30),
+  /** What could go wrong; feeds triage and the report. */
+  risks: z.array(ContractLine).max(30),
+  /** Workspace paths or globs Claude expects to touch: relative, `/`-separated. */
+  affectedAreas: z.array(z.string().min(1).max(500)).max(50),
+  /** What the request leaves undecided. The user answers by editing the contract. */
+  openQuestions: z.array(ContractLine).max(20),
+  /** Set on approval; the contract is read-only after that, except through `task.revise`. */
+  approvedAt: z.string().optional(),
+});
+export type TaskContract = z.infer<typeof TaskContractSchema>;
+
+/** One deterministic triage signal, computed without a model. */
+export const TriageSignalSchema = z.object({
+  /** The rule: risk-keywords, breadth, scope, repo-size, tests or new-areas. */
+  signal: z.string(),
+  detail: z.string(),
+  /** The lowest tier this signal allows; null when it only informs. */
+  floor: TierSchema.nullable(),
+});
+export type TriageSignal = z.infer<typeof TriageSignalSchema>;
+
+/** `triage.json`: the tier proposal, why, and the user's choice. */
+export const TriageSchema = z.object({
+  signals: z.array(TriageSignalSchema),
+  /** The highest floor among the signals. */
+  floor: TierSchema,
+  /** The cheap model's classification; null when it failed (`modelError`), and the proposal is then the floor. */
+  model: z
+    .object({ tier: TierSchema, rationale: z.string(), confidence: z.enum(["low", "medium", "high"]) })
+    .nullable(),
+  modelError: z.string().optional(),
+  /** The higher of the model's tier and the floor: a risk keyword can't be talked down. */
+  proposed: TierSchema,
+  /** What the task runs at: the proposal, unless the user picked another tier with a reason. */
+  chosen: TierSchema,
+  override: z.object({ reason: z.string().min(1) }).optional(),
+  /** The task's spend cap, defaulting by tier. */
+  budgetUsd: z.number().positive(),
+  at: z.string(),
+});
+export type Triage = z.infer<typeof TriageSchema>;
+
+/** `<date>-<8 hex>`, e.g. 2026-10-30-1a2b3c4d. Checked before it becomes part of a path. */
+export const TaskIdSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}-[0-9a-f]{8}$/);
+
+export const TaskSchema = z.object({
+  id: TaskIdSchema,
+  /** What the user asked for, verbatim. */
+  request: z.string(),
+  /** `draft` until the user approves the contract and the tier, then `ready`. Running arrives with M3-06. */
+  state: z.enum(["draft", "ready"]),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+  contract: TaskContractSchema.nullable(),
+  triage: TriageSchema.nullable(),
+  /** Gates the profile has commands for. A criterion checked by another gate can't be proved. */
+  availableGates: z.array(z.enum(GATE_KINDS)),
+  /** Model spend so far on drafting and triage, an estimate. */
+  costUsd: z.number(),
+});
+export type Task = z.infer<typeof TaskSchema>;
+
+export const TaskSummarySchema = TaskSchema.pick({
+  id: true,
+  request: true,
+  state: true,
+  createdAt: true,
+  updatedAt: true,
+  costUsd: true,
+}).extend({ tier: TierSchema.nullable() });
+export type TaskSummary = z.infer<typeof TaskSummarySchema>;
+
 const WorkspaceRef = z.object({ cwd: z.string().min(1) });
 /** A file inside the workspace; the sidecar rejects absolute paths and `..`. */
 const WorkspacePath = WorkspaceRef.extend({ path: z.string().min(1) });
+const TaskRef = WorkspaceRef.extend({ id: TaskIdSchema });
 
 /** Normalized agent activity, independent of raw SDK message shapes (ARCHITECTURE §5.2). */
 export const AgentEventSchema = z.discriminatedUnion("type", [
@@ -671,6 +784,36 @@ export const methodSchemas = {
   "git.push": { params: WorkspaceRef, result: z.object({ output: z.string() }) },
   /** A commit message drafted by Claude (haiku, no tools) from the staged diff, for the user to edit. */
   "git.draftMessage": { params: WorkspaceRef, result: z.object({ message: z.string() }) },
+
+  /* Tasks (M3-02, M3-03). Files in `.agentchainer/tasks/<id>/`, kept out of git. */
+  "task.create": { params: WorkspaceRef.extend({ request: z.string().min(1).max(20_000) }), result: TaskSchema },
+  /**
+   * A read-only Claude session drafts the contract from the request and the repo, then triage runs on the draft
+   * (signals and a haiku classification). Writes nothing but the task's own files. Costs model calls (`costUsd`).
+   */
+  "task.draft": { params: TaskRef.extend({ model: z.string().optional() }), result: TaskSchema },
+  /** Saves the user's edits to a draft contract and triages it again. */
+  "task.retriage": { params: TaskRef.extend({ contract: TaskContractSchema }), result: TaskSchema },
+  /**
+   * Approves the contract and the tier together. Refused if the contract differs from the one last triaged; a tier
+   * other than the proposal needs a reason, which is recorded.
+   */
+  "task.approve": {
+    params: TaskRef.extend({
+      contract: TaskContractSchema,
+      tier: TierSchema,
+      reason: z.string().optional(),
+      budgetUsd: z.number().positive().max(1000),
+    }),
+    result: TaskSchema,
+  },
+  /** Reopens an approved contract for editing. Edits then need a new triage before approval. */
+  "task.revise": { params: TaskRef, result: TaskSchema },
+  /** Stops a draft or triage in progress. */
+  "task.cancel": { params: TaskRef, result: z.object({ cancelled: z.boolean() }) },
+  "task.list": { params: WorkspaceRef, result: z.object({ tasks: z.array(TaskSummarySchema) }) },
+  "task.get": { params: TaskRef, result: TaskSchema },
+  "task.delete": { params: TaskRef, result: Ok },
 } as const;
 
 export type MethodName = keyof typeof methodSchemas;

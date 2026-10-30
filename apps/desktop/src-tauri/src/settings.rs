@@ -29,6 +29,8 @@ pub struct Settings {
     pub theme: Option<String>,
     /// Apply safe setup (first-party and official items, low-risk fixes) before each new session (M2-18). Off unless set.
     pub auto_apply: Option<bool>,
+    /// Show "New task" (M3, contract and triage) before tasks can run. Off unless set.
+    pub tasks_preview: Option<bool>,
     /// Most recent first.
     pub recent_workspaces: Vec<String>,
 }
@@ -105,6 +107,7 @@ mod tests {
             show_thinking: None,
             theme: Some(" dark ".into()),
             auto_apply: None,
+            tasks_preview: None,
             recent_workspaces: (0..12)
                 .map(|i| format!("/p/{}", i % 10))
                 .chain([" ".into()])
@@ -129,6 +132,7 @@ mod tests {
             s.auto_apply, None,
             "auto-apply is off unless the user turns it on"
         );
+        assert_eq!(s.tasks_preview, None, "the tasks preview is off by default");
     }
 
     #[test]

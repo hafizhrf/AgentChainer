@@ -26,6 +26,8 @@ import { log, notify, RpcFailure, serve } from "./rpc.ts";
 import { loadSdk } from "./sdk-loader.ts";
 import { Session } from "./session.ts";
 import { historyEvents, retention, toSessionInfo } from "./stored-sessions.ts";
+import { approveTask, type Claude, cancelTask, draftTask, newTask, retriageTask, reviseTask } from "./tasks/service.ts";
+import { deleteTask, listTasks, loadTask } from "./tasks/store.ts";
 import { fileDiff, gitInit, listFiles, revert } from "./workspace.ts";
 
 /** Live sessions by SDK session id, one per workspace tab (M1-08). */
@@ -58,6 +60,14 @@ function cliFor(cwd: string): Cli | null {
 
 function requireFolder(cwd: string): void {
   if (!existsSync(cwd)) throw new RpcFailure(RpcErrorCode.invalidParams, `Folder not found: ${cwd}`);
+}
+
+/** The SDK and the CLI, for methods that make model calls. */
+async function claude(): Promise<Claude> {
+  const claudePath = findClaude();
+  if (!claudePath) throw new RpcFailure(RpcErrorCode.claudeNotFound, "Claude Code CLI not found.");
+  const { sdk } = await prepareSdk();
+  return { sdk, claudePath };
 }
 
 function rejectIfOpen(sessionId: string, action: string): void {
@@ -379,6 +389,49 @@ serve(
       if (!claudePath) throw new RpcFailure(RpcErrorCode.claudeNotFound, "Claude Code CLI not found.");
       const { sdk } = await prepareSdk();
       return { message: await draftMessage(sdk, claudePath, cwd) };
+    },
+
+    "task.create": ({ cwd, request }) => {
+      requireFolder(cwd);
+      return newTask(cwd, request);
+    },
+
+    "task.draft": async ({ cwd, id, model }) => {
+      requireFolder(cwd);
+      return draftTask(cwd, id, await claude(), model);
+    },
+
+    "task.retriage": async ({ cwd, id, contract }) => {
+      requireFolder(cwd);
+      return retriageTask(cwd, id, contract, await claude());
+    },
+
+    "task.approve": ({ cwd, id, contract, tier, reason, budgetUsd }) => {
+      requireFolder(cwd);
+      return approveTask(cwd, id, contract, tier, reason, budgetUsd);
+    },
+
+    "task.revise": ({ cwd, id }) => {
+      requireFolder(cwd);
+      return reviseTask(cwd, id);
+    },
+
+    "task.cancel": ({ id }) => ({ cancelled: cancelTask(id) }),
+
+    "task.list": ({ cwd }) => {
+      requireFolder(cwd);
+      return { tasks: listTasks(cwd) };
+    },
+
+    "task.get": ({ cwd, id }) => {
+      requireFolder(cwd);
+      return loadTask(cwd, id);
+    },
+
+    "task.delete": ({ cwd, id }) => {
+      requireFolder(cwd);
+      deleteTask(cwd, id);
+      return { ok: true };
     },
   },
   () => {

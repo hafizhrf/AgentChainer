@@ -80,24 +80,29 @@ button.chip:hover {
   display: flex;
 }
 
+/*
+ * The page's own section list, styled as part of the page (its surface, like the header) and not as a second app
+ * sidebar: the active section is marked by an accent bar, not the sidebar's highlighted row.
+ */
 .setup-nav {
   flex: 0 0 200px;
   display: flex;
   flex-direction: column;
   gap: 2px;
-  padding: var(--space-3) var(--space-2);
+  padding: var(--space-3) 0;
   border-right: 1px solid var(--border);
-  background: var(--surface-2);
+  background: var(--surface);
 }
 
 .setup-nav-item {
   justify-content: flex-start;
   text-align: left;
   gap: var(--space-2);
-  padding: 0 var(--space-2);
+  padding: 0 var(--space-3) 0 var(--space-4);
   border: none;
+  border-radius: 0;
   background: none;
-  color: var(--fg);
+  color: var(--muted);
   font-weight: 400;
 }
 
@@ -106,11 +111,14 @@ button.chip:hover {
 }
 
 .setup-nav-item:hover {
-  background: var(--surface-3);
+  background: var(--surface-2);
+  color: var(--fg);
 }
 
 .setup-nav-item.active {
-  background: var(--accent-soft);
+  background: var(--surface-2);
+  box-shadow: inset 2px 0 0 var(--accent);
+  color: var(--fg);
   font-weight: 500;
 }
 

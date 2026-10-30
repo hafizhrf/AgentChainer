@@ -110,6 +110,10 @@ Planned surface (v0.1):
 | request | `workspace.gitInit` | `git init`, offered when the workspace isn't a repository |
 | request | `git.branches` / `git.switch` / `git.stage` / `git.unstage` / `git.commit` / `git.push` | Git panel (M1-30). Push is never forced and runs with `GIT_TERMINAL_PROMPT=0` |
 | request | `git.draftMessage` | Commit message from the staged diff: a one-shot haiku `query()` with `tools: []`, `settingSources: []`, `persistSession: false` |
+| request | `task.create` / `task.list` / `task.get` / `task.delete` | Tasks (M3, preview): files in `.agentchainer/tasks/<id>/`, git-ignored ([planner.md](design/planner.md)) |
+| request | `task.draft` | A read-only session (Read, Grep, Glob; the generators' hook and the workspace guard) drafts the contract as structured output, then triage runs on it: deterministic signals plus a haiku classification |
+| request | `task.retriage` / `task.approve` / `task.revise` | Save an edited draft and triage it again; approve the contract and tier together (refused if the contract changed since triage; another tier needs a reason); reopen for editing |
+| request | `task.cancel` | Stops a draft or triage in progress; the stopped request fails with `cancelled` (-32007) |
 | request | `workspace.scan` | Detect stack, commands, and audit the setup → `WorkspaceProfile` + findings (read-only) |
 | request | `workspace.saveProfile` | Write the profile to `.agentchainer/profile.json` |
 | request | `bootstrap.plan` | Fixes + catalog items + generators for the workspace, each with a preview (read-only; M2-11) |
@@ -328,6 +332,9 @@ flowchart LR
     flagged.
 - **Profile file** (M2-10): `.agentchainer/profile.json`, written on request. It is derived from the repo, so
   `.agentchainer/.gitignore` keeps it out of git. The bootstrap lockfile next to it will be committed.
+- **Task files** (M3): `.agentchainer/tasks/<id>/` holds `task.json`, `contract.json` and `triage.json`, also kept out of
+  git. They're read back through the protocol's zod schemas, and a task folder that's a symlink or resolves outside
+  the workspace is refused.
 - **Actions:** `install-skill`, `install-plugin`, `add-mcp`, `write-file`, `merge-file`, `run-command`. Each implements
   `preview()`, `apply()`, `verify()` and `rollback()`.
 - **Generators** are agent sessions:

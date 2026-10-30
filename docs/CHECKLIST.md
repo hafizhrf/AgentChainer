@@ -942,6 +942,9 @@ for the desktop shell, start screen and session view to be cleaned up (UX-02, UX
       - The setup page is now **Workspace settings**: Overview, Setup plan, Commands, Permissions, History.
       - A new session shows its composer mid-screen with the starter prompts below it, like a chat app's first
         screen; after the first message the composer moves to the bottom.
+    - Owner note (2026-10-30): Workspace settings' section list looked like a second app sidebar next to the real
+      one. It now has the page's surface with an accent bar on the active section, and the sidebar marks no session
+      while a page is open over it.
     - Open: owner click-through, and the in-app guide.
 - [ ] **UX-07** Keyboard shortcuts and a command palette.
   - Progress (2026-10-30), the command palette (⇧⌘P / Ctrl+Shift+P, View → Command Palette…):
@@ -1050,15 +1053,31 @@ Decisions: [ADR-0009](adr/0009-release-signing-and-updates.md). Maintainer steps
 
 → PRD [F3](PRD.md#f3--adaptive-planner-task-contracts-and-evidence-p1)
 
-- [ ] **M3-01** Design doc `docs/design/planner.md`, approved before any code.
-      - Draft (2026-10-30): [planner.md](design/planner.md), with six open questions for the owner (§15).
-      - Remaining: owner review and approval.
+- [x] **M3-01** Design doc `docs/design/planner.md`, approved before any code.
+      - Draft merged in #33; the owner decided §15's questions on 2026-10-30, and marked it approved in the step 1
+        plan. Two later decisions are recorded there too: triage runs on the draft, and tasks stay behind a preview
+        toggle until they can run.
 - [ ] **M3-02** TaskContract schema: task, objective, constraints, acceptance criteria / Definition of Done, out-of-scope,
       risk notes. The agent drafts it as structured output; the user edits and approves it.
+      Progress (step 1, behind Settings → Tasks (preview)):
+      - Schema in `packages/protocol` (criteria checked by `gate:<kind>`, `review` or `manual`; open questions);
+        files in `.agentchainer/tasks/<id>/`, git-ignored, read back through zod (forged or symlinked folders are
+        refused).
+      - Drafting is a read-only session (Read, Grep, Glob; the generators' hook; the workspace guard) with structured
+        output. Tests use a stand-in SDK and check the options and that a stray write is reverted.
+      - The task page: request, contract form, approval. Live on a `ts-pnpm-vite` copy: drafted and triaged in under
+        25 s for ≈$0.11; the draft noticed the missing `index.html` and asked about it; git saw only
+        `.agentchainer/.gitignore` afterwards.
+      - Remaining: owner click-through in the app.
 - [ ] **M3-03** Triage into tiers S/M/L/XL, with a rationale the user can override. Inputs:
   - deterministic signals: estimated scope (via the code graph when available), risk keywords (auth, payments, migrations,
     infra, secrets), repo size, whether tests exist;
   - a cheap-model classification.
+
+  Progress (step 1): signals and floors in `tasks/triage.ts` (planner.md §4), haiku classification with structured
+  output (checked live: it arrives with `tools: []`), proposal = the higher of the two. The triage card shows the
+  signals and the rationale; another tier needs a reason, recorded in `triage.json`. An edited contract must be
+  triaged again before approval. Remaining: owner click-through, and tuning after the labels (M3-E1).
 - [ ] **M3-04** Workflow templates as versioned YAML in `catalog/workflows/`, one per tier as described in the PRD.
 - [ ] **M3-05** Agent library, installable into `.claude/agents/`: architect, test-planner, security-reviewer, docs-writer,
       and independent-reviewer (fresh context: it gets the diff and contract, not the implementer's transcript).
@@ -1080,6 +1099,10 @@ Decisions: [ADR-0009](adr/0009-release-signing-and-updates.md). Maintainer steps
 
 - [ ] **M3-E1** On a benchmark of ≥ 20 fixture tasks, triage agrees with a human reviewer's tier in ≥ 80% of cases
       (measure the baseline first, then tune).
+      - 24 tasks in `packages/sidecar/test/triage-benchmark.json`, run by `scripts/benchmark-triage.ts`.
+      - First baseline (2026-10-30), against the author's suggested tiers, not yet human labels: 20/24 (83%), about
+        $0.02.
+      - Remaining: the owner labels the tasks (`label`), then the real baseline and tuning.
 - [ ] **M3-E2** Every completed task has an evidence report whose gate results match the actual command outputs.
 
 ---

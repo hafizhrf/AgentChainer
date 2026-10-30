@@ -207,7 +207,10 @@ export function WorkspaceCard({
         </div>
       ) : (
         <div className="workspace-empty">
-          <p className="muted">The agent works inside this folder and can't change anything outside it.</p>
+          <p className="muted">
+            The agent works in this folder. In Safe and Standard, an edit outside it waits for your approval, except
+            Claude Code's own plan files.
+          </p>
           <button type="button" onClick={() => void browse()}>
             <FolderOpen size={16} />
             Open folder…

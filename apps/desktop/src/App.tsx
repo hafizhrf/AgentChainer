@@ -577,10 +577,12 @@ export function App() {
       });
       if (!ok) return;
       const done = await request("session.rewind", { sessionId, messageId });
+      // The SDK lists the files only on the dry run (CLI 2.1.314), so the count comes from the preview the user confirmed.
+      const count = done.filesChanged.length || preview.filesChanged.length;
       addNotice(
         sessionId,
         done.canRewind
-          ? `Rewound ${done.filesChanged.length} file(s) to before that message.`
+          ? `Rewound ${count} file(s) to before that message.`
           : `Rewind failed: ${done.error ?? "unknown error"}`,
       );
     } catch (err) {

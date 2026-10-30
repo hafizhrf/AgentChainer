@@ -29,13 +29,23 @@ export type AgentItem = {
   durationMs?: number;
   children: (ToolItem | AgentTextItem)[];
 };
+export type ThinkingItem = { kind: "thinking"; id: number; text: string; open: boolean; at?: number };
+/** `at` (epoch ms) is when a message arrived, for live sessions; replayed history has none (UX-04). */
 export type Item =
   /** `messageId` is the SDK's uuid for the message: the anchor for rewinding files (M1-23). */
-  | { kind: "user"; id: number; text: string; messageId?: string; images?: string[]; imageCount?: number }
-  | { kind: "assistant"; id: number; text: string; open: boolean }
+  | {
+      kind: "user";
+      id: number;
+      text: string;
+      messageId?: string;
+      images?: string[];
+      imageCount?: number;
+      at?: number;
+    }
+  | { kind: "assistant"; id: number; text: string; open: boolean; at?: number }
   /** The main agent's visible thinking, collapsed by default (M1-10). */
-  | { kind: "thinking"; id: number; text: string; open: boolean }
-  | { kind: "notice"; id: number; text: string }
+  | ThinkingItem
+  | { kind: "notice"; id: number; text: string; at?: number }
   | ToolItem
   | AgentItem;
 
@@ -61,7 +71,10 @@ export function applyEvent(items: Item[], e: AgentEvent, now?: number): Item[] {
       const kind = e.type === "text.delta" ? "assistant" : "thinking";
       const last = items.at(-1);
       if (last?.kind === kind && last.open) return [...items.slice(0, -1), { ...last, text: last.text + e.text }];
-      return [...closeAssistant(items), { kind, id: nextId(), text: e.text, open: true }];
+      return [
+        ...closeAssistant(items),
+        { kind, id: nextId(), text: e.text, open: true, ...(now !== undefined ? { at: now } : {}) },
+      ];
     }
 
     case "user.message":
@@ -73,6 +86,7 @@ export function applyEvent(items: Item[], e: AgentEvent, now?: number): Item[] {
           text: e.text,
           messageId: e.messageId,
           ...(e.imageCount ? { imageCount: e.imageCount } : {}),
+          ...(now !== undefined ? { at: now } : {}),
         },
       ];
 
@@ -158,7 +172,10 @@ export function applyEvent(items: Item[], e: AgentEvent, now?: number): Item[] {
       return closeAssistant(items);
 
     case "error":
-      return [...closeAssistant(items), { kind: "notice", id: nextId(), text: e.message }];
+      return [
+        ...closeAssistant(items),
+        { kind: "notice", id: nextId(), text: e.message, ...(now !== undefined ? { at: now } : {}) },
+      ];
 
     default:
       return items;
@@ -176,4 +193,35 @@ function hasAgent(items: Item[], id: string): boolean {
 
 function updateAgent(items: Item[], id: string, fn: (a: AgentItem) => AgentItem): Item[] {
   return items.map((it) => (it.kind === "agent" && it.id === id ? fn(it) : it));
+}
+
+/** Two or more tool calls in a row (with the thinking between them), shown as one collapsible row (UX-04). */
+export type ToolGroup = { kind: "tools"; id: string; members: (ToolItem | ThinkingItem)[] };
+export type Row = Item | ToolGroup;
+
+/**
+ * Groups runs of top-level tool calls. Closed thinking between two calls joins the run; thinking at its end stays
+ * outside, next to the text it leads to. A single call stays a row of its own.
+ */
+export function groupItems(items: Item[]): Row[] {
+  const rows: Row[] = [];
+  let run: (ToolItem | ThinkingItem)[] = [];
+  const flush = () => {
+    const trailing: ThinkingItem[] = [];
+    while (run.at(-1)?.kind === "thinking") trailing.unshift(run.pop() as ThinkingItem);
+    const tools = run.filter((m) => m.kind === "tool");
+    if (tools.length >= 2) rows.push({ kind: "tools", id: `tools-${tools[0]?.id}`, members: run });
+    else rows.push(...run);
+    rows.push(...trailing);
+    run = [];
+  };
+  for (const it of items) {
+    if (it.kind === "tool" || (it.kind === "thinking" && !it.open && run.length > 0)) run.push(it);
+    else {
+      flush();
+      rows.push(it);
+    }
+  }
+  flush();
+  return rows;
 }

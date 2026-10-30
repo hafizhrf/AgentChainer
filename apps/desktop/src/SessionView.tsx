@@ -1,5 +1,5 @@
 import type { Effort, PermissionMode } from "@agentchainer/protocol";
-import { Loader2 } from "lucide-react";
+import { ArrowDown, Loader2 } from "lucide-react";
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { Group, Panel, Separator, useDefaultLayout, usePanelRef } from "react-resizable-panels";
 import { type Attachment, Composer } from "./Composer.tsx";
@@ -85,6 +85,9 @@ export function SessionView({
   const [selected, setSelected] = useState<string | null>(null);
   const [seed, setSeed] = useState<{ text: string } | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
+  // Follow new output only while the reader is at the bottom; reading earlier output isn't interrupted (UX-04).
+  const following = useRef(true);
+  const [atBottom, setAtBottom] = useState(true);
   const right = usePanelRef();
   /** The right panel's width before a diff widened it. */
   const narrow = useRef<number | null>(null);
@@ -114,7 +117,14 @@ export function SessionView({
   }, [firstChange]);
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: scroll to the bottom whenever the transcript changes.
-  useEffect(() => bottomRef.current?.scrollIntoView({ block: "end" }), [tab.items]);
+  useEffect(() => {
+    if (following.current) bottomRef.current?.scrollIntoView({ block: "end" });
+  }, [tab.items]);
+  const jumpToLatest = () => {
+    following.current = true;
+    setAtBottom(true);
+    bottomRef.current?.scrollIntoView({ block: "end" });
+  };
 
   // A finished turn may have changed files through Bash, which the watcher can miss on Linux (new folders).
   useEffect(() => {
@@ -178,7 +188,15 @@ export function SessionView({
             >
               <Panel id="chat" minSize={200}>
                 <div className={`chat${fresh ? " fresh" : ""}`}>
-                  <div className="transcript-scroll">
+                  <div
+                    className="transcript-scroll"
+                    onScroll={(e) => {
+                      const el = e.currentTarget;
+                      const near = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+                      following.current = near;
+                      setAtBottom(near);
+                    }}
+                  >
                     <div className="transcript">
                       <TranscriptView
                         cwd={tab.cwd}
@@ -194,6 +212,12 @@ export function SessionView({
                       )}
                       <div ref={bottomRef} />
                     </div>
+                    {!atBottom && (
+                      <button type="button" className="secondary small jump-latest" onClick={jumpToLatest}>
+                        <ArrowDown size={13} />
+                        Jump to latest
+                      </button>
+                    )}
                   </div>
                   {fresh ? (
                     <div className="fresh-heading">
@@ -205,7 +229,10 @@ export function SessionView({
                     tab={tab}
                     files={paths}
                     seed={seed}
-                    onSend={onSend}
+                    onSend={(text, images) => {
+                      jumpToLatest();
+                      onSend(text, images);
+                    }}
                     onInterrupt={onInterrupt}
                     onResume={onResume}
                     onModeChange={onModeChange}

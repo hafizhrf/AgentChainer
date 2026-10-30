@@ -2,6 +2,7 @@ import { type Effort, type Image, PERMISSION_MODES, type PermissionMode } from "
 import { ArrowUp, ListPlus, Play, Square, X } from "lucide-react";
 import { type ClipboardEvent, type KeyboardEvent, useEffect, useMemo, useRef, useState } from "react";
 import { fuzzyFilter, tokenAt } from "./fuzzy.ts";
+import { ModeHelp } from "./ModeHelp.tsx";
 import { EFFORT_OPTIONS, MODELS, modeOptions } from "./options.ts";
 import { asMode, type Tab } from "./tabs.ts";
 import { Select } from "./ui/Select.tsx";
@@ -240,6 +241,7 @@ export function Composer({
             onChange={(m) => onModeChange(asMode(m))}
             disabled={tab.ended}
           />
+          <ModeHelp current={tab.mode} />
           <Select
             compact
             label="Model"

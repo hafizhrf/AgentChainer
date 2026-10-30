@@ -1,12 +1,9 @@
 import type { FileDiff } from "@agentchainer/protocol";
 import { ArrowLeft, ExternalLink, Undo2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { isDark, onThemeChange } from "./appearance.ts";
 import type { Confirm } from "./Dialog.tsx";
-import { languageFor, monaco } from "./monaco.ts";
+import { languageFor, monaco, monacoTheme } from "./monaco.ts";
 import { request } from "./sidecar.ts";
-
-const monacoTheme = () => (isDark() ? "vs-dark" : "vs");
 
 /**
  * HEAD vs working tree for one file in a read-only Monaco diff (M1-27), with revert per file or per hunk through
@@ -60,10 +57,7 @@ export default function DiffView({
       theme: monacoTheme(),
     });
     editor.current = ed;
-    // Monaco's theme is global, so any open diff follows a theme switch.
-    const offTheme = onThemeChange(() => monaco.editor.setTheme(monacoTheme()));
     return () => {
-      offTheme();
       const model = ed.getModel();
       ed.dispose();
       model?.original.dispose();

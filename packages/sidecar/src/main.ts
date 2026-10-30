@@ -224,10 +224,10 @@ serve(
       return retention(sdk, cwd);
     },
 
-    "permissions.list": ({ cwd }) => listRules(cwd),
+    "permissions.list": ({ cwd }) => ({ workspace: listRules(cwd, "workspace"), team: listRules(cwd, "team") }),
 
-    "permissions.remove": ({ cwd, behavior, rule }) => {
-      removeRule(cwd, behavior, rule);
+    "permissions.remove": ({ cwd, behavior, rule, scope }) => {
+      removeRule(cwd, behavior, rule, scope ?? "workspace");
       return { ok: true };
     },
 

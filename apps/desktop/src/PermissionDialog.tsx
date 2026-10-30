@@ -1,6 +1,8 @@
-import type { Methods, PermissionMode, PermissionRequest } from "@agentchainer/protocol";
+import type { AlwaysScope, Methods, PermissionMode, PermissionRequest } from "@agentchainer/protocol";
 import { useState } from "react";
+import { describeRequest, displayPath, type RiskLevel } from "./approval.ts";
 import { Modal } from "./Dialog.tsx";
+import { editDiffs, InlineDiff } from "./InlineDiff.tsx";
 import { Markdown } from "./Markdown.tsx";
 import { MODE_HELP, modeOptions } from "./options.ts";
 import { asMode } from "./tabs.ts";
@@ -13,16 +15,20 @@ export type PermissionAnswer = Omit<Methods["permission.respond"]["params"], "se
 const EXECUTE_MODES: PermissionMode[] = ["default", "acceptEdits", "auto"];
 
 /**
- * A pending tool approval (M1-17): the tool, who asks (main agent or subagent) and its input, which the user can
- * edit. Allow once, always allow (saves the CLI's suggested rule to `.claude/settings.local.json`), or deny with a
- * message to the agent. ExitPlanMode gets the plan review instead (M1-16).
+ * A pending tool approval (M1-17, UX-05): what it does in plain words (the command and Claude's own explanation, or
+ * the file and its diff), a risk level from fixed rules (`approval.ts`), and the raw input, which the user can edit.
+ * Allow once, always allow (the CLI's suggested rule, saved for the session, for this user, or for the team), or deny
+ * with a message to the agent. ExitPlanMode gets the plan review instead (M1-16).
  */
 export function PermissionDialog({
   request,
+  cwd,
   canAutonomous,
   onAnswer,
 }: {
   request: PermissionRequest;
+  /** The session's workspace: paths inside it read as relative and count as safer. */
+  cwd: string;
   /** The Autonomous profile needs a budget cap on the session. */
   canAutonomous: boolean;
   onAnswer: (answer: PermissionAnswer) => void;
@@ -30,24 +36,62 @@ export function PermissionDialog({
   return request.toolName === "ExitPlanMode" ? (
     <PlanReview request={request} canAutonomous={canAutonomous} onAnswer={onAnswer} />
   ) : (
-    <Approval request={request} onAnswer={onAnswer} />
+    <Approval request={request} cwd={cwd} onAnswer={onAnswer} />
   );
 }
 
-function Approval({ request, onAnswer }: { request: PermissionRequest; onAnswer: (a: PermissionAnswer) => void }) {
+const SCOPES: { value: AlwaysScope; label: string; hint: string }[] = [
+  { value: "session", label: "Only this session", hint: "Forgotten when the session ends." },
+  {
+    value: "workspace",
+    label: "This workspace, just me",
+    hint: "Saved in .claude/settings.local.json, which stays out of git.",
+  },
+  {
+    value: "team",
+    label: "This workspace, shared with the team",
+    hint: "Saved in .claude/settings.json, which is committed: your teammates get this rule too.",
+  },
+];
+const asScope = (v: string): AlwaysScope => SCOPES.find((s) => s.value === v)?.value ?? "workspace";
+
+const RISK_LABEL: Record<RiskLevel, string> = { low: "Low risk", medium: "Review first", high: "High risk" };
+
+function Approval({
+  request,
+  cwd,
+  onAnswer,
+}: {
+  request: PermissionRequest;
+  cwd: string;
+  onAnswer: (a: PermissionAnswer) => void;
+}) {
   const original = JSON.stringify(request.input, null, 2);
   const [input, setInput] = useState(original);
   const [editing, setEditing] = useState(false);
   const [message, setMessage] = useState("");
+  const [scope, setScope] = useState<AlwaysScope>("workspace");
   const [error, setError] = useState<string | null>(null);
+  const described = describeRequest(request.toolName, request.input, cwd, request.defaultToNo === true);
+  const diffs = editDiffs(request.toolName, request.input);
+  const risky = described.risk.level === "high";
+  // The CLI's own description often repeats what's shown above (the command's explanation, the file): skip it then.
+  const shown = [
+    described.kind === "command" ? described.explanation : null,
+    described.kind === "edit" ? described.path : null,
+    described.kind === "read" || described.kind === "web" ? described.target : null,
+  ];
+  const extraDescription =
+    request.description && !shown.includes(displayPath(request.description, cwd)) ? request.description : null;
 
   function allow(always: boolean) {
-    if (input === original) return onAnswer({ allow: true, ...(always ? { always } : {}) });
+    const saved = always ? { always, scope } : {};
+    if (input === original) return onAnswer({ allow: true, ...saved });
     try {
       const parsed: unknown = JSON.parse(input);
       if (!parsed || typeof parsed !== "object" || Array.isArray(parsed))
         throw new Error("The input must be a JSON object.");
-      onAnswer({ allow: true, updatedInput: parsed as Record<string, unknown>, ...(always ? { always } : {}) });
+      onAnswer({ allow: true, updatedInput: parsed as Record<string, unknown>, ...saved });
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     }
@@ -58,6 +102,7 @@ function Approval({ request, onAnswer }: { request: PermissionRequest; onAnswer:
       open
       onOpenChange={() => undefined}
       dismissible={false}
+      size={diffs ? "lg" : "md"}
       title={request.title ?? `Allow ${request.toolName}?`}
       description={
         <>
@@ -70,8 +115,8 @@ function Approval({ request, onAnswer }: { request: PermissionRequest; onAnswer:
           <button
             type="button"
             className="secondary"
-            // biome-ignore lint/a11y/noAutofocus: the CLI marks some asks "default to no" so a stray key can't approve.
-            autoFocus={request.defaultToNo === true}
+            // biome-ignore lint/a11y/noAutofocus: on risky asks a stray key must not approve.
+            autoFocus={risky}
             onClick={() => onAnswer({ allow: false, ...(message.trim() ? { message } : {}) })}
           >
             Deny
@@ -87,46 +132,91 @@ function Approval({ request, onAnswer }: { request: PermissionRequest; onAnswer:
         </>
       }
     >
-      {request.description && <p>{request.description}</p>}
+      <div className={`approval-risk risk-${described.risk.level}`}>
+        <span className={`badge risk-${described.risk.level}`}>{RISK_LABEL[described.risk.level]}</span>
+        <span>{described.risk.reasons.join(" · ")}</span>
+      </div>
+      {described.kind === "command" && (
+        <>
+          {described.explanation && (
+            <p>
+              <span className="muted">Claude says:</span> {described.explanation}
+            </p>
+          )}
+          <pre className="approval-command">{described.command}</pre>
+        </>
+      )}
+      {described.kind === "edit" && (
+        <>
+          <p>
+            <code>{described.path}</code>
+          </p>
+          {diffs && <InlineDiff diffs={diffs} />}
+        </>
+      )}
+      {(described.kind === "read" || described.kind === "web") && described.target && (
+        <p>
+          <code>{described.target}</code>
+        </p>
+      )}
+      {described.kind === "mcp" && (
+        <p>
+          Tool <code>{described.tool}</code> from the <strong>{described.server}</strong> MCP server.
+        </p>
+      )}
+      {extraDescription && <p>{extraDescription}</p>}
       {request.decisionReason && <p className="muted">Why it asks: {request.decisionReason}</p>}
       {request.blockedPath && (
         <p className="muted">
           Path: <code>{request.blockedPath}</code>
         </p>
       )}
-      {editing ? (
-        <textarea
-          className="input-editor"
-          value={input}
-          onChange={(e) => {
-            setInput(e.target.value);
-            setError(null);
-          }}
-          rows={Math.min(16, input.split("\n").length + 1)}
-          spellCheck={false}
-          aria-label="Tool input (JSON)"
-        />
-      ) : (
-        <pre className="tool-input">{input}</pre>
-      )}
-      <div>
+      <details className="approval-details" open={described.kind === "other" || editing}>
+        <summary>Details</summary>
+        {editing ? (
+          <textarea
+            className="input-editor"
+            value={input}
+            onChange={(e) => {
+              setInput(e.target.value);
+              setError(null);
+            }}
+            rows={Math.min(16, input.split("\n").length + 1)}
+            spellCheck={false}
+            aria-label="Tool input (JSON)"
+          />
+        ) : (
+          <pre className="tool-input">{input}</pre>
+        )}
         <button type="button" className="link" onClick={() => setEditing((v) => !v)}>
           {editing ? "Stop editing" : "Edit input before allowing"}
         </button>
-      </div>
+      </details>
       {error && <p className="warn">{error}</p>}
       <Field label="Message to Claude if you deny" help="Optional, e.g. “use pnpm instead”.">
         <input value={message} onChange={(e) => setMessage(e.target.value)} />
       </Field>
       {request.alwaysRules.length > 0 && (
-        <p className="muted">
-          "Always allow" saves to <code>.claude/settings.local.json</code>:{" "}
-          {request.alwaysRules.map((r) => (
-            <code key={r} className="rule">
-              {r}
-            </code>
-          ))}
-        </p>
+        <Field
+          label="“Always allow” saves"
+          help={
+            <>
+              {SCOPES.find((s) => s.value === scope)?.hint}{" "}
+              {request.alwaysRules.map((r) => (
+                <code key={r} className="rule">
+                  {r}
+                </code>
+              ))}
+            </>
+          }
+        >
+          <Select
+            label="Where Always allow saves the rule"
+            value={scope}
+            options={SCOPES.map(({ value, label }) => ({ value, label }))}
+            onChange={(v) => setScope(asScope(v))}
+          />
+        </Field>
       )}
     </Modal>
   );

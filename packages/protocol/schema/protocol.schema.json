@@ -663,6 +663,14 @@
               "auto",
               "plan"
             ]
+          },
+          "scope": {
+            "type": "string",
+            "enum": [
+              "session",
+              "workspace",
+              "team"
+            ]
           }
         },
         "required": [
@@ -706,29 +714,68 @@
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
-          "allow": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
+          "workspace": {
+            "type": "object",
+            "properties": {
+              "allow": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "ask": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "deny": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            },
+            "required": [
+              "allow",
+              "ask",
+              "deny"
+            ],
+            "additionalProperties": false
           },
-          "ask": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          },
-          "deny": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
+          "team": {
+            "type": "object",
+            "properties": {
+              "allow": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "ask": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "deny": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            },
+            "required": [
+              "allow",
+              "ask",
+              "deny"
+            ],
+            "additionalProperties": false
           }
         },
         "required": [
-          "allow",
-          "ask",
-          "deny"
+          "workspace",
+          "team"
         ],
         "additionalProperties": false
       }
@@ -753,6 +800,13 @@
           "rule": {
             "type": "string",
             "minLength": 1
+          },
+          "scope": {
+            "type": "string",
+            "enum": [
+              "workspace",
+              "team"
+            ]
           }
         },
         "required": [

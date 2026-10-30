@@ -235,9 +235,20 @@ sequenceDiagram
   - `curl|wget … | sh`;
   - credential file reads (`~/.ssh`, `~/.aws`, `.env*` outside the workspace);
   - production deploy commands.
-- **"Always allow"** writes a rule to `.claude/settings.local.json` (uncommitted), listed in the Permissions panel.
-  - It returns the CLI's `addRules` / `addDirectories` suggestions as `updatedPermissions`, with destination
-    `localSettings`. `setMode` suggestions are left out, so "always" never changes the mode.
+- **The approval dialog** (UX-05, `apps/desktop/src/approval.ts`) explains a request before the user answers:
+  - the command, with Claude's own `description`, or the file with a diff of the edit;
+  - a risk level (low / review first / high) from fixed rules: deletes, pushes, history rewrites and uploads are high;
+    installs, downloads, project scripts and file writes need review; read-only commands are low.
+  - It's deterministic: no model call. Claude Code's own `defaultToNo` raises the level to high, and high keeps the
+    focus on Deny.
+- **"Always allow"** saves the CLI's suggested rule where the user picks. Workspace settings → Permissions lists both
+  rule files.
+  - The places:
+    - this session only (`session`);
+    - this workspace for this user (`.claude/settings.local.json`, uncommitted; the default);
+    - the workspace for the whole team (`.claude/settings.json`, committed).
+  - It returns the CLI's `addRules` / `addDirectories` suggestions as `updatedPermissions`, re-targeted to that
+    destination. `setMode` suggestions are left out, so "always" never changes the mode.
   - The CLI escapes `(` and `)` inside saved rule content, e.g. `Bash(node -e "console.log\('x'\)")`.
 - **Plan mode:** ExitPlanMode reaches `canUseTool` with `input.plan` (markdown) and `input.planFilePath`.
   - The CLI writes the plan file under `~/.claude/plans/`.

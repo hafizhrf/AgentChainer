@@ -46,6 +46,17 @@ export const PermissionModeSchema = z.enum(["default", "acceptEdits", "auto", "p
 export const PERMISSION_MODES = PermissionModeSchema.options;
 export type PermissionMode = z.infer<typeof PermissionModeSchema>;
 
+/**
+ * Where an "Always allow" rule is saved (UX-05): this session only, the workspace for this user
+ * (`.claude/settings.local.json`, not committed), or the workspace for the whole team (`.claude/settings.json`).
+ */
+export const AlwaysScopeSchema = z.enum(["session", "workspace", "team"]);
+export type AlwaysScope = z.infer<typeof AlwaysScopeSchema>;
+/** The two rule files a workspace has; session rules aren't stored. */
+export const RuleScopeSchema = z.enum(["workspace", "team"]);
+export type RuleScope = z.infer<typeof RuleScopeSchema>;
+const RulesSchema = z.object({ allow: z.array(z.string()), ask: z.array(z.string()), deny: z.array(z.string()) });
+
 /** How hard Claude thinks (the SDK's `effort`, M1-15). Unset means the CLI's default for the model. */
 export const EffortSchema = z.enum(["low", "medium", "high", "xhigh", "max"]);
 export const EFFORTS = EffortSchema.options;
@@ -512,16 +523,26 @@ export const methodSchemas = {
       updatedInput: z.record(z.string(), z.unknown()).optional(),
       message: z.string().optional(),
       mode: PermissionModeSchema.optional(),
+      /** Where "Always allow" saves its rules (UX-05); the workspace's local settings when left out. */
+      scope: AlwaysScopeSchema.optional(),
     }),
     result: Ok,
   },
-  /** Permission rules in the workspace's `.claude/settings.local.json` (M1-20). Other settings never leave the sidecar. */
+  /**
+   * Permission rules (M1-20): the workspace's `.claude/settings.local.json` (just this user, not committed) and its
+   * `.claude/settings.json` (shared with the team, committed). Other settings never leave the sidecar.
+   */
   "permissions.list": {
     params: z.object({ cwd: z.string().min(1) }),
-    result: z.object({ allow: z.array(z.string()), ask: z.array(z.string()), deny: z.array(z.string()) }),
+    result: z.object({ workspace: RulesSchema, team: RulesSchema }),
   },
   "permissions.remove": {
-    params: z.object({ cwd: z.string().min(1), behavior: z.enum(["allow", "ask", "deny"]), rule: z.string().min(1) }),
+    params: z.object({
+      cwd: z.string().min(1),
+      behavior: z.enum(["allow", "ask", "deny"]),
+      rule: z.string().min(1),
+      scope: RuleScopeSchema.optional(),
+    }),
     result: Ok,
   },
 

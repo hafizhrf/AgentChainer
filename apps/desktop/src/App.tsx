@@ -4,6 +4,7 @@ import {
   type Effort,
   type EnvCheck,
   type Methods,
+  PERMISSION_MODES,
   type PermissionMode,
   type PermissionRequest,
   PROTOCOL_VERSION,
@@ -13,16 +14,19 @@ import {
 import * as Tooltip from "@radix-ui/react-tooltip";
 import { invoke } from "@tauri-apps/api/core";
 import { save } from "@tauri-apps/plugin-dialog";
+import { openUrl } from "@tauri-apps/plugin-opener";
 import { X } from "lucide-react";
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { Group, Panel, Separator, useDefaultLayout } from "react-resizable-panels";
 import { applyTheme } from "./appearance.ts";
+import { CommandPalette, type PaletteCommand } from "./CommandPalette.tsx";
 import type { Attachment } from "./Composer.tsx";
 import { useConfirm } from "./Dialog.tsx";
 import { joinPath } from "./files.ts";
 import { HomeView, pickFolder } from "./HomeView.tsx";
+import { MODE_NAMES, MODELS, THEMES } from "./options.ts";
 import { type PermissionAnswer, PermissionDialog } from "./PermissionDialog.tsx";
-import { type PanelTab, parseHidden, serializeHidden } from "./panelTabs.ts";
+import { PANEL_TAB_LABEL, PANEL_TABS, type PanelTab, parseHidden, serializeHidden, toggleHidden } from "./panelTabs.ts";
 import { SessionView } from "./SessionView.tsx";
 import { SettingsDialog } from "./SettingsDialog.tsx";
 import { Sidebar } from "./Sidebar.tsx";
@@ -36,9 +40,10 @@ import { applyEvent, closeAssistant, type Item, nextId, setMessageId } from "./t
 import { UpdateDialog } from "./UpdateDialog.tsx";
 import { IconButton } from "./ui/IconButton.tsx";
 import { layoutStorage, usePersistentFlag, usePersistentValue } from "./ui/layoutStorage.ts";
-import { useMenuCommands } from "./useMenuCommands.ts";
+import { menuShortcut, useMenuCommands } from "./useMenuCommands.ts";
 
 // The setup page shares the file-type icon set with the workspace panel; both load on first use.
+const REPO = "https://github.com/hafizhrf/AgentChainer";
 const SetupPage = lazy(() => import("./setup/SetupPage.tsx").then((m) => ({ default: m.SetupPage })));
 
 /** Guards against React StrictMode running the mount effect twice in dev. */
@@ -71,6 +76,7 @@ export function App() {
   const [active, setActive] = useState<string | null>(null);
   const [confirm, confirmDialog] = useConfirm();
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [paletteOpen, setPaletteOpen] = useState(false);
   const [updatesOpen, setUpdatesOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = usePersistentFlag("agentchainer.sidebar", true);
   const [rightOpen, setRightOpen] = usePersistentFlag("agentchainer.right", true);
@@ -397,7 +403,13 @@ export function App() {
       title: t.title === NEW_TITLE ? text.slice(0, 60) : t.title,
       items: [
         ...closeAssistant(t.items),
-        { kind: "user", id: itemId, text, ...(images.length ? { images: images.map((i) => i.preview) } : {}) },
+        {
+          kind: "user",
+          id: itemId,
+          text,
+          at: Date.now(),
+          ...(images.length ? { images: images.map((i) => i.preview) } : {}),
+        },
       ],
     }));
     try {
@@ -593,11 +605,112 @@ export function App() {
     "toggle-terminal": () => active && toggleTerminal(active),
     "export-diagnostics": () => void exportFromMenu(),
     "check-updates": () => setUpdatesOpen(true),
+    "command-palette": () => setPaletteOpen(true),
   });
 
   const activeTab = tabs.find((t) => t.sessionId === active);
   const permission = activeTab?.permissions[0];
   const workspace = cwd.trim();
+
+  /** Everything the command palette offers (UX-07), built from the same actions as the menu and the views. */
+  function paletteCommands(): PaletteCommand[] {
+    const t = activeTab;
+    const cmds: PaletteCommand[] = [];
+    const add = (group: string, id: string, title: string, run: () => void, extra: Partial<PaletteCommand> = {}) =>
+      cmds.push({ group, id, title, run, ...extra });
+
+    add("Session", "new-session", "New session", () => show(null), { shortcut: menuShortcut("new-session") });
+    add("Session", "open-folder", "Open folder…", () => void openFolder(), { shortcut: menuShortcut("open-folder") });
+    if (t) {
+      if (t.running)
+        add(
+          "Session",
+          "stop",
+          "Stop the running turn",
+          () => void request("session.interrupt", { sessionId: t.sessionId }),
+          {
+            shortcut: "Esc",
+          },
+        );
+      if (t.ended) add("Session", "resume", "Resume this session", () => void resume(t.sessionId, t.cwd, t.title));
+      add("Session", "fork", "Fork into a new session", () => void forkTab(t.sessionId));
+      add("Session", "close-session", "Close session", () => closeTab(t.sessionId), {
+        shortcut: menuShortcut("close-session"),
+      });
+      if (!t.ended) {
+        for (const m of PERMISSION_MODES)
+          if (m !== t.mode)
+            add("Session", `mode-${m}`, `Permission profile: ${MODE_NAMES[m]}`, () => void changeMode(t.sessionId, m));
+        for (const m of MODELS)
+          if (m.value && m.value !== t.modelAlias)
+            add("Session", `model-${m.value}`, `Model: ${m.label}`, () => void changeModel(t.sessionId, m.value));
+      }
+    }
+
+    for (const tab of tabs)
+      if (tab.sessionId !== active)
+        add("Go to", `tab-${tab.sessionId}`, tab.title, () => show(tab.sessionId), { hint: folderName(tab.cwd) });
+    for (const dir of settings?.recentWorkspaces ?? [])
+      add("Go to", `workspace-${dir}`, `Open workspace: ${folderName(dir)}`, () => openWorkspace(dir), { hint: dir });
+
+    const dir = t?.cwd ?? (workspace || null);
+    if (dir) {
+      const views: [SetupView, string][] = [
+        ["overview", "Overview"],
+        ["plan", "Setup plan"],
+        ["commands", "Commands"],
+        ["permissions", "Permissions"],
+        ["history", "History"],
+      ];
+      for (const [view, label] of views)
+        add(
+          "Workspace",
+          `setup-${view}`,
+          `Workspace settings: ${label}`,
+          () => setSetup({ cwd: dir, model: t?.modelAlias ?? model, back: t?.sessionId ?? null, view }),
+          { hint: folderName(dir) },
+        );
+    }
+
+    add("View", "toggle-sidebar", "Toggle sidebar", () => setSidebarOpen((v) => !v), {
+      shortcut: menuShortcut("toggle-sidebar"),
+    });
+    add("View", "toggle-right-panel", "Toggle workspace panel", () => setRightOpen((v) => !v), {
+      shortcut: menuShortcut("toggle-right-panel"),
+    });
+    if (t)
+      add("View", "toggle-terminal", "Toggle terminal", () => toggleTerminal(t.sessionId), {
+        shortcut: menuShortcut("toggle-terminal"),
+      });
+    for (const tab of PANEL_TABS) {
+      const hidden = hiddenTabs.includes(tab);
+      add("View", `panel-${tab}`, `${hidden ? "Show" : "Hide"} the ${PANEL_TAB_LABEL[tab]} tab`, () =>
+        setHiddenTabs((h) => toggleHidden(h, tab)),
+      );
+    }
+    if (hiddenTabs.length) add("View", "panel-all", "Show all panel tabs", () => setHiddenTabs(() => []));
+    if (settings)
+      for (const theme of THEMES)
+        if (asTheme(settings.theme) !== theme.value)
+          add(
+            "View",
+            `theme-${theme.value}`,
+            `Theme: ${theme.label}`,
+            () => void onSaveSettings({ ...settings, theme: theme.value }),
+          );
+
+    add("App", "settings", "Settings…", () => setSettingsOpen(true), { shortcut: menuShortcut("settings") });
+    add("App", "check-updates", "Check for updates…", () => setUpdatesOpen(true));
+    add("App", "export-diagnostics", "Export diagnostics…", () => void exportFromMenu());
+    add(
+      "App",
+      "getting-started",
+      "Getting started guide",
+      () => void openUrl(`${REPO}/blob/main/docs/guides/AUTH_SETUP.md`),
+    );
+    add("App", "report-issue", "Report an issue", () => void openUrl(`${REPO}/issues/new`));
+    return cmds;
+  }
 
   return (
     <Tooltip.Provider delayDuration={400}>
@@ -688,7 +801,7 @@ export function App() {
                 {setup && (
                   <Suspense fallback={<div className="setup-page" />}>
                     <SetupPage
-                      key={setup.cwd}
+                      key={`${setup.cwd}-${setup.view ?? "overview"}`}
                       cwd={setup.cwd}
                       model={setup.model}
                       backLabel={setup.back ? "Back to session" : "Back to Home"}
@@ -707,6 +820,7 @@ export function App() {
           <PermissionDialog
             key={permission.requestId}
             request={permission}
+            cwd={activeTab.cwd}
             canAutonomous={activeTab.budgetUsd !== null}
             onAnswer={(reply) => void answer(permission, reply)}
           />
@@ -723,6 +837,11 @@ export function App() {
           />
         )}
         {updatesOpen && <UpdateDialog appVersion={appVersion} onClose={() => setUpdatesOpen(false)} />}
+        <CommandPalette
+          open={paletteOpen}
+          onOpenChange={setPaletteOpen}
+          commands={paletteOpen ? paletteCommands() : []}
+        />
         {confirmDialog}
       </div>
     </Tooltip.Provider>

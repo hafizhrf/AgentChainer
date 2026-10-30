@@ -456,7 +456,7 @@ async function approvals() {
   let before = permissionLog.length;
   await turn(`Use the Bash tool to run exactly this command and nothing else: ${command}`);
   const offered = permissionLog.at(-1)?.alwaysRules ?? [];
-  const rules = await request("permissions.list", { cwd });
+  const rules = (await request("permissions.list", { cwd })).workspace;
   before = permissionLog.length;
   state.answer = () => ({ allow: false, message: "should not be asked" });
   await turn(`Use the Bash tool to run exactly this command again and nothing else: ${command}`);
@@ -468,7 +468,11 @@ async function approvals() {
     `offered=${JSON.stringify(offered)} saved=${JSON.stringify(rules.allow)} later prompts=${permissionLog.length - before}`,
   );
   for (const rule of rules.allow) await request("permissions.remove", { cwd, behavior: "allow", rule });
-  check("rules can be removed", (await request("permissions.list", { cwd })).allow.length === 0, "allow list empty");
+  check(
+    "rules can be removed",
+    (await request("permissions.list", { cwd })).workspace.allow.length === 0,
+    "allow list empty",
+  );
 
   // Edited input and deny with a message.
   state.answer = (req) =>

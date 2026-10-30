@@ -18,7 +18,7 @@ import { type KeyboardEvent, type ReactNode, useMemo, useRef, useState } from "r
 import type { Confirm } from "./Dialog.tsx";
 import { agentEdits, buildTree, filterTree, folderPaths, visibleRows } from "./files.ts";
 import { GitPanel } from "./GitPanel.tsx";
-import { shortcut } from "./options.ts";
+
 import { PANEL_TAB_LABEL, PANEL_TABS, type PanelTab, pickTab, toggleHidden, visibleTabs } from "./panelTabs.ts";
 import { SetupSummary } from "./setup/SetupSummary.tsx";
 import { request } from "./sidecar.ts";
@@ -27,6 +27,7 @@ import { FileIcon } from "./ui/FileIcon.tsx";
 import { IconButton } from "./ui/IconButton.tsx";
 import { EmptyState, Section } from "./ui/Section.tsx";
 import { FileRow, TreeRow } from "./ui/TreeRow.tsx";
+import { menuShortcut } from "./useMenuCommands.ts";
 
 export type { PanelTab } from "./panelTabs.ts";
 
@@ -224,7 +225,7 @@ function TabsMenu({
           </Menu.Item>
           <Menu.Item className="menu-item" onSelect={onHidePanel}>
             Hide panel
-            <kbd>{shortcut("B")}</kbd>
+            <kbd>{menuShortcut("toggle-right-panel")}</kbd>
           </Menu.Item>
         </Menu.Content>
       </Menu.Portal>

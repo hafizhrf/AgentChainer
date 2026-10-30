@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { fuzzyFilter, fuzzyScore, tokenAt } from "./fuzzy.ts";
+import { fuzzyFilter, fuzzyFilterBy, fuzzyScore, tokenAt } from "./fuzzy.ts";
 
 describe("fuzzy", () => {
   it("needs the query's characters in order", () => {
@@ -23,5 +23,23 @@ describe("tokenAt", () => {
     assert.equal(tokenAt("email a@b.c", 11), null, "not after a word character");
     assert.equal(tokenAt("run /tmp", 8), null, "slash commands only at the start");
     assert.equal(tokenAt("/review this", 12), null);
+  });
+});
+
+describe("fuzzyFilterBy", () => {
+  const commands = [{ title: "Toggle terminal" }, { title: "Theme: Dark" }, { title: "New session" }];
+  it("ranks objects by a key, and keeps the given order with no query", () => {
+    assert.deepEqual(
+      fuzzyFilterBy("term", commands, (c) => c.title).map((c) => c.title),
+      ["Toggle terminal"],
+    );
+    assert.deepEqual(
+      fuzzyFilterBy("  ", commands, (c) => c.title),
+      commands,
+    );
+    assert.deepEqual(
+      fuzzyFilterBy("zzz", commands, (c) => c.title),
+      [],
+    );
   });
 });

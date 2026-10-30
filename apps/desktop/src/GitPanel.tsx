@@ -3,6 +3,7 @@ import * as Popover from "@radix-ui/react-popover";
 import {
   ArrowDown,
   ArrowDownToLine,
+  ArrowLeft,
   ArrowUp,
   Check,
   ChevronDown,
@@ -11,6 +12,7 @@ import {
   GitMerge,
   Loader2,
   Minus,
+  MoreHorizontal,
   Pencil,
   Plus,
   RefreshCw,
@@ -21,7 +23,7 @@ import {
 import { type ReactNode, useCallback, useEffect, useState } from "react";
 import type { Confirm } from "./Dialog.tsx";
 import { request } from "./sidecar.ts";
-import { ActionMenu, type MenuAction } from "./ui/ActionMenu.tsx";
+import type { MenuAction } from "./ui/ActionMenu.tsx";
 import { IconButton } from "./ui/IconButton.tsx";
 import { EmptyState, Section } from "./ui/Section.tsx";
 import { FileRow } from "./ui/TreeRow.tsx";
@@ -184,7 +186,8 @@ export function GitPanel({
   if (!files) return <p className="muted">Loading…</p>;
   if (!files.isGitRepo) return <EmptyState icon={<GitBranch size={14} />}>Not a git repository.</EmptyState>;
 
-  const staged = files.files.filter((f) => f.staged);
+  // A conflicted file has both sides in git's index, but it isn't staged until it's resolved and added.
+  const staged = files.files.filter((f) => f.staged && f.status !== "conflicted");
   const unstaged = files.files.filter((f) => f.unstaged);
   const ahead = branches?.ahead ?? 0;
   const idle = busy === null;
@@ -230,7 +233,12 @@ export function GitPanel({
               : "Pull: this branch has no upstream yet"
           }
           disabled={!idle || !branches?.upstream}
-          onClick={() => void run("pull", () => request("git.pull", { cwd }), "Pulled.")}
+          onClick={() =>
+            void run("pull", async () => {
+              const r = await request("git.pull", { cwd });
+              setNote(/already up to date/i.test(r.output) ? "Already up to date." : "Pulled.");
+            })
+          }
         >
           {busy === "pull" ? <Loader2 size={14} className="spin" /> : <ArrowDownToLine size={14} />}
         </IconButton>
@@ -385,8 +393,9 @@ function count(n: number, noun: string): string {
 
 /**
  * The current branch with its sync state. Opens a searchable list of local and remote branches: pick one to switch (a
- * remote one is checked out as a tracking branch), or use a branch's ⋯ menu to merge, rename or delete it. The input
- * doubles as the name field when creating or renaming.
+ * remote one is checked out as a tracking branch), or use a branch's ⋯ to merge, rename or delete it. The input
+ * doubles as the name field when creating or renaming. A branch's actions are a view inside the picker, not a nested
+ * menu: a dropdown opened from inside the popover closed the popover, and itself with it.
  */
 function BranchPicker({
   branches,
@@ -411,6 +420,7 @@ function BranchPicker({
   const [query, setQuery] = useState("");
   const [creating, setCreating] = useState(false);
   const [renaming, setRenaming] = useState<string | null>(null);
+  const [actionsFor, setActionsFor] = useState<string | null>(null);
   const q = query.trim();
   const matches = (b: string) => b.toLowerCase().includes(q.toLowerCase());
   const local = (branches?.branches ?? []).filter(matches);
@@ -423,6 +433,7 @@ function BranchPicker({
     setQuery("");
     setCreating(false);
     setRenaming(null);
+    setActionsFor(null);
   }
 
   function pick(branch: string) {
@@ -452,10 +463,16 @@ function BranchPicker({
     const rename = {
       label: "Rename…",
       onSelect: () => {
+        setActionsFor(null);
         setRenaming(b);
         setQuery(b);
       },
     };
+    if (remoteBranch(b)) {
+      return [
+        { label: `Merge into ${current ?? "HEAD"}…`, disabled: !current, onSelect: () => closeThen(() => onMerge(b)) },
+      ];
+    }
     if (b === current) {
       const upstream = branches?.upstream;
       // After a pull refused to fast-forward, this is the way to bring the upstream's commits in.
@@ -469,6 +486,21 @@ function BranchPicker({
       { label: "Delete…", danger: true, onSelect: () => closeThen(() => onDelete(b)) },
     ];
   }
+
+  const remoteBranch = (b: string) => branches?.remote.includes(b) ?? false;
+  const more = (b: string) => (
+    <span className="branch-actions">
+      <button
+        type="button"
+        className="ghost icon"
+        aria-label={`Actions for ${b}`}
+        title={`Actions for ${b}`}
+        onClick={() => setActionsFor(b)}
+      >
+        <MoreHorizontal size={16} />
+      </button>
+    </span>
+  );
 
   return (
     <Popover.Root open={open} onOpenChange={(next) => (next ? setOpen(true) : close())}>
@@ -495,110 +527,125 @@ function BranchPicker({
       </Popover.Trigger>
       <Popover.Portal>
         <Popover.Content className="branch-popover" align="start" sideOffset={4}>
-          <form
-            className="branch-search"
-            onSubmit={(e) => {
-              e.preventDefault();
-              if (naming) submitName();
-              else if (local.length === 1 && remote.length === 0 && local[0]) pick(local[0]);
-              else if (remote.length === 1 && local.length === 0 && remote[0]) track(remote[0]);
-            }}
-          >
-            {creating ? (
-              <Plus size={13} aria-hidden />
-            ) : renaming !== null ? (
-              <Pencil size={13} aria-hidden />
-            ) : (
-              <Search size={13} aria-hidden />
-            )}
-            <input
-              // Remounts when the mode changes, so the field takes focus again (also after the ⋯ menu closes).
-              key={creating ? "create" : (renaming ?? "search")}
-              // biome-ignore lint/a11y/noAutofocus: the picker was just opened, or switched mode, to type in it.
-              autoFocus
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder={creating ? "New branch name" : renaming !== null ? "New name" : "Search branches"}
-              aria-label={
-                creating ? "New branch name" : renaming !== null ? `New name for ${renaming}` : "Search branches"
-              }
-              spellCheck={false}
-            />
-          </form>
-          {naming ? (
-            <div className="branch-create-hint">
-              <span className="muted">
-                {renaming !== null ? (
-                  <>
-                    Rename <code>{renaming}</code>. Enter renames it.
-                  </>
-                ) : (
-                  <>
-                    From <code>{current ?? "HEAD"}</code>. Enter creates it and switches to it.
-                  </>
-                )}
-              </span>
-              <button type="button" className="small" disabled={!q || q === renaming} onClick={submitName}>
-                {renaming !== null ? "Rename branch" : "Create branch"}
+          {actionsFor !== null ? (
+            <div className="branch-lists">
+              <button type="button" className="branch-item branch-back" onClick={() => setActionsFor(null)}>
+                <ArrowLeft size={14} />
+                <span>{actionsFor}</span>
               </button>
+              <ul className="branch-list" aria-label={`Actions for ${actionsFor}`}>
+                {actions(actionsFor).map((a, i) => (
+                  <li key={a.label}>
+                    <button
+                      type="button"
+                      className={`branch-item${a.danger ? " branch-danger" : ""}`}
+                      disabled={a.disabled}
+                      // biome-ignore lint/a11y/noAutofocus: the view was opened to pick one of these actions.
+                      autoFocus={i === 0}
+                      onClick={a.onSelect}
+                    >
+                      <span className="branch-check" />
+                      <span>{a.label}</span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
             </div>
           ) : (
             <>
-              <div className="branch-lists">
-                {local.length > 0 && remote.length > 0 && <div className="branch-group">Local</div>}
-                <ul className="branch-list" aria-label="Local branches">
-                  {local.map((b) => (
-                    <li key={b} className="branch-row">
-                      <button type="button" className="branch-item" onClick={() => pick(b)}>
-                        {b === current ? <Check size={14} /> : <span className="branch-check" />}
-                        <span>{b}</span>
-                      </button>
-                      <span className="branch-actions">
-                        <ActionMenu label={`Actions for ${b}`} items={actions(b)} />
-                      </span>
-                    </li>
-                  ))}
-                  {local.length === 0 && remote.length === 0 && (
-                    <li className="muted branch-none">No branch matches.</li>
-                  )}
-                </ul>
-                {remote.length > 0 && (
-                  <>
-                    <div className="branch-group">Remote</div>
-                    <ul className="branch-list" aria-label="Remote branches">
-                      {remote.map((b) => (
+              <form
+                className="branch-search"
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  if (naming) submitName();
+                  else if (local.length === 1 && remote.length === 0 && local[0]) pick(local[0]);
+                  else if (remote.length === 1 && local.length === 0 && remote[0]) track(remote[0]);
+                }}
+              >
+                {creating ? (
+                  <Plus size={13} aria-hidden />
+                ) : renaming !== null ? (
+                  <Pencil size={13} aria-hidden />
+                ) : (
+                  <Search size={13} aria-hidden />
+                )}
+                <input
+                  // Remounts when the mode changes, so the field takes focus again (also coming back from a branch's actions).
+                  key={creating ? "create" : (renaming ?? "search")}
+                  // biome-ignore lint/a11y/noAutofocus: the picker was just opened, or switched mode, to type in it.
+                  autoFocus
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  placeholder={creating ? "New branch name" : renaming !== null ? "New name" : "Search branches"}
+                  aria-label={
+                    creating ? "New branch name" : renaming !== null ? `New name for ${renaming}` : "Search branches"
+                  }
+                  spellCheck={false}
+                />
+              </form>
+              {naming ? (
+                <div className="branch-create-hint">
+                  <span className="muted">
+                    {renaming !== null ? (
+                      <>
+                        Rename <code>{renaming}</code>. Enter renames it.
+                      </>
+                    ) : (
+                      <>
+                        From <code>{current ?? "HEAD"}</code>. Enter creates it and switches to it.
+                      </>
+                    )}
+                  </span>
+                  <button type="button" className="small" disabled={!q || q === renaming} onClick={submitName}>
+                    {renaming !== null ? "Rename branch" : "Create branch"}
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <div className="branch-lists">
+                    {local.length > 0 && remote.length > 0 && <div className="branch-group">Local</div>}
+                    <ul className="branch-list" aria-label="Local branches">
+                      {local.map((b) => (
                         <li key={b} className="branch-row">
-                          <button
-                            type="button"
-                            className="branch-item"
-                            title={`Check out as a local branch that tracks ${b}`}
-                            onClick={() => track(b)}
-                          >
-                            <span className="branch-check" />
+                          <button type="button" className="branch-item" onClick={() => pick(b)}>
+                            {b === current ? <Check size={14} /> : <span className="branch-check" />}
                             <span>{b}</span>
                           </button>
-                          <span className="branch-actions">
-                            <ActionMenu
-                              label={`Actions for ${b}`}
-                              items={[
-                                {
-                                  label: `Merge into ${current ?? "HEAD"}…`,
-                                  disabled: !current,
-                                  onSelect: () => closeThen(() => onMerge(b)),
-                                },
-                              ]}
-                            />
-                          </span>
+                          {more(b)}
                         </li>
                       ))}
+                      {local.length === 0 && remote.length === 0 && (
+                        <li className="muted branch-none">No branch matches.</li>
+                      )}
                     </ul>
-                  </>
-                )}
-              </div>
-              <button type="button" className="branch-item branch-new" onClick={() => setCreating(true)}>
-                <Plus size={14} />
-                {q ? `New branch “${q}”…` : "New branch…"}
-              </button>
+                    {remote.length > 0 && (
+                      <>
+                        <div className="branch-group">Remote</div>
+                        <ul className="branch-list" aria-label="Remote branches">
+                          {remote.map((b) => (
+                            <li key={b} className="branch-row">
+                              <button
+                                type="button"
+                                className="branch-item"
+                                title={`Check out as a local branch that tracks ${b}`}
+                                onClick={() => track(b)}
+                              >
+                                <span className="branch-check" />
+                                <span>{b}</span>
+                              </button>
+                              {more(b)}
+                            </li>
+                          ))}
+                        </ul>
+                      </>
+                    )}
+                  </div>
+                  <button type="button" className="branch-item branch-new" onClick={() => setCreating(true)}>
+                    <Plus size={14} />
+                    {q ? `New branch “${q}”…` : "New branch…"}
+                  </button>
+                </>
+              )}
             </>
           )}
         </Popover.Content>

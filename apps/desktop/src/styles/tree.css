@@ -527,6 +527,23 @@
   padding: 0 var(--space-3);
 }
 
+/* A branch's actions, shown in place of the list. */
+.branch-back {
+  margin-bottom: var(--space-1);
+  border-bottom: 1px solid var(--border);
+  border-radius: 0;
+  color: var(--muted);
+}
+
+.branch-back svg {
+  color: var(--muted);
+}
+
+/* Not `.danger`: that's the global red button. */
+.branch-item.branch-danger {
+  color: var(--err);
+}
+
 .branch-create-hint {
   display: flex;
   flex-direction: column;

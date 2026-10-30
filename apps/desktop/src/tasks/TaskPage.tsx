@@ -8,7 +8,7 @@ import {
   type Triage,
 } from "@agentchainer/protocol";
 import { ArrowLeft, CircleHelp, ClipboardList, Loader2, Scale, X } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { Confirm } from "../Dialog.tsx";
 import { MODELS } from "../options.ts";
 import { isRpcError } from "../rpc-client.ts";
@@ -156,6 +156,11 @@ export function TaskPage({
   const stale = Boolean(task?.contract && edited && contractChanged(edited, task.contract));
   /** The contract as the form holds it, for the footer's actions. */
   const form = edited ?? task?.contract ?? null;
+  /** The page shows one stage at a time; a new stage starts at the top. */
+  const stage = !task ? "request" : busy === "draft" ? "drafting" : !task.contract ? "empty" : task.state;
+  const scroller = useRef<HTMLDivElement>(null);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: scrolls when the stage changes, not on every render.
+  useEffect(() => scroller.current?.scrollTo({ top: 0 }), [stage]);
   const blocker =
     edited && triage
       ? approveBlocker({ edited, stale, tier, proposed: triage.proposed, reason, budget })
@@ -189,7 +194,7 @@ export function TaskPage({
         </div>
       )}
 
-      <div className="setup-scroll task-scroll">
+      <div className="setup-scroll task-scroll" ref={scroller}>
         {!task && (
           <>
             <section className="card">
@@ -211,7 +216,9 @@ export function TaskPage({
                 as done, and what's out of scope. Triage then proposes a tier. You edit and approve both.
               </p>
               <div className="card-footer">
-                <Select value={modelAlias} onChange={setModelAlias} options={MODELS} label="Model for the draft" />
+                <div className="task-model">
+                  <Select value={modelAlias} onChange={setModelAlias} options={MODELS} label="Model for the draft" />
+                </div>
                 <span className="grow" />
                 <button type="button" disabled={!text.trim() || busy !== null} onClick={() => void start()}>
                   Draft contract
@@ -245,7 +252,9 @@ export function TaskPage({
           <section className="card">
             <Quote text={task.request} />
             <div className="card-footer">
-              <Select value={modelAlias} onChange={setModelAlias} options={MODELS} label="Model for the draft" />
+              <div className="task-model">
+                <Select value={modelAlias} onChange={setModelAlias} options={MODELS} label="Model for the draft" />
+              </div>
               <span className="grow" />
               <button type="button" className="secondary" onClick={() => void discard(task)}>
                 Discard

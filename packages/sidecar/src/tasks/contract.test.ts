@@ -7,7 +7,7 @@ import type { WorkspaceProfile } from "@agentchainer/protocol";
 import { detectWorkspace } from "../detect/detect.ts";
 import { copyFixture, removeFixtureCopies } from "../detect/fixture-copy.ts";
 import type { AgentSdkModule } from "../sdk-loader.ts";
-import { availableGates, cleanArea, draftContract, normalizeContract } from "./contract.ts";
+import { availableGates, cleanArea, cleanAreas, draftContract, normalizeContract } from "./contract.ts";
 
 const profile = (commands: string[]): WorkspaceProfile => ({
   stacks: ["node"],
@@ -75,6 +75,32 @@ describe("contract normalization", () => {
     assert.deepEqual(c.risks, ["a", "b"]);
     assert.equal(c.constraints.length, 30);
     assert.equal(cleanArea("a/../../b"), null);
+  });
+
+  it("strips the notes and alternatives models put in areas (seen live with haiku)", () => {
+    const c = normalizeContract(
+      "x",
+      {
+        affectedAreas: [
+          "src/Counter.tsx (new)",
+          "src/app.tsx or src/main.tsx (new mount entry; `src/main.ts` stays as is)",
+          "`vite.config.ts` (new, only if the test needs a DOM environment)",
+          "package.json, pnpm-lock.yaml",
+          "src/**/*.test.ts",
+        ],
+      },
+      [],
+    );
+    assert.deepEqual(c.affectedAreas, [
+      "src/Counter.tsx",
+      "src/app.tsx",
+      "src/main.tsx",
+      "vite.config.ts",
+      "package.json",
+      "pnpm-lock.yaml",
+      "src/**/*.test.ts",
+    ]);
+    assert.deepEqual(cleanAreas("/etc/x or ../y"), []);
   });
 
   it("survives garbage", () => {

@@ -61,7 +61,8 @@ export function toolPath(dir: string, item: Item, platform: string = process.pla
 }
 
 const sha256 = (data: Uint8Array) => createHash("sha256").update(data).digest("hex");
-const MARKER = ".agentchainer-tool.json";
+/** Next to each installed binary: its archive's and its own sha256, checked before it's used (hooks check it too). */
+export const MARKER = ".agentchainer-tool.json";
 type Marker = { archiveSha256: string; binarySha256: string };
 
 export type EnsuredTool = { path: string; version: string; archiveSha256: string; source: "cache" | "download" };

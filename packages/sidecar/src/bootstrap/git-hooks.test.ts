@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -61,12 +62,15 @@ describe("hookSetup", () => {
 });
 
 describe("hookChanges", () => {
-  it("local: .git/hooks/pre-commit runs the app's binary by its absolute path", () => {
+  it("local: .git/hooks/pre-commit checks the app's binary against its marker, then runs it by its absolute path", () => {
     const [file] = hookChanges(repo(), "local", hook, tool);
     assert.equal(file?.path, ".git/hooks/pre-commit");
     assert.equal(file?.executable, true);
     assert.match(file?.after ?? "", /^#!\/bin\/sh\n# Added by AgentChainer/);
-    assert.match(file?.after ?? "", /exec '\/Users\/me\/App Support\/tools\/gitleaks' git --pre-commit --staged/);
+    assert.match(file?.after ?? "", /bin='\/Users\/me\/App Support\/tools\/gitleaks'/);
+    assert.match(file?.after ?? "", /binarySha256.*\.agentchainer-tool\.json/);
+    assert.match(file?.after ?? "", /failed its hash check, so this commit was stopped/);
+    assert.match(file?.after ?? "", /exec "\$bin" git --pre-commit --staged/);
   });
 
   it("lefthook: adds the command and keeps comments and existing commands", () => {
@@ -81,7 +85,10 @@ describe("hookChanges", () => {
     });
     const script = files.get(".agentchainer/hooks/gitleaks.sh");
     assert.equal(script?.executable, true);
-    assert.match(script?.after ?? "", new RegExp(`${APP_ID.replaceAll(".", "\\.")}/tools/gitleaks/\\*/gitleaks`));
+    assert.match(
+      script?.after ?? "",
+      new RegExp(`${APP_ID.replaceAll(".", "\\.")}/tools/gitleaks/8\\.30\\.1/gitleaks`),
+    );
     assert.match(script?.after ?? "", /exec "\$bin" git --pre-commit --staged --redact --no-banner/);
   });
 
@@ -114,8 +121,37 @@ describe("hookChanges", () => {
     assert.equal(file?.after, "npx lint-staged\nsh .agentchainer/hooks/gitleaks.sh\n");
   });
 
-  it("the committed hook blocks a commit the tool rejects, and lets every commit through without the tool", {
-    skip: process.platform === "win32" ? "git hooks run through Git Bash on Windows; checked by hand" : false,
+  /** A stand-in gitleaks: says which copy ran, and fails when the staged diff contains "SECRET". */
+  const fakeTool = (file: string, label: string) => {
+    mkdirSync(join(file, ".."), { recursive: true });
+    writeFileSync(file, `#!/bin/sh\necho "ran ${label}" >&2\ngit diff --cached | grep -q SECRET && exit 1\nexit 0\n`);
+    chmodSync(file, 0o755);
+  };
+  /** Records the binary's sha256 next to it, as ensureTool does. */
+  const mark = (file: string) =>
+    writeFileSync(
+      join(file, "..", ".agentchainer-tool.json"),
+      JSON.stringify({
+        archiveSha256: "x",
+        binarySha256: createHash("sha256").update(readFileSync(file)).digest("hex"),
+      }),
+    );
+  /** Commits one file with the hook; a refused commit is unstaged again. */
+  const committer = (dir: string, env: Record<string, string>) => (file: string, text: string) => {
+    writeFileSync(join(dir, file), text);
+    execFileSync("git", ["add", file], { cwd: dir });
+    const r = spawnSync("git", ["-c", "user.name=t", "-c", "user.email=t@example.com", "commit", "-qm", file], {
+      cwd: dir,
+      env: { ...process.env, HOME: work, APPDATA: "", ...env },
+      encoding: "utf8",
+    });
+    if (r.status !== 0) execFileSync("git", ["reset", "-q"], { cwd: dir });
+    return r;
+  };
+  const skip = process.platform === "win32" ? "git hooks run through Git Bash on Windows; checked by hand" : false;
+
+  it("the committed hook prefers the pinned copy and stops a commit when it fails its hash check (M2-30)", {
+    skip,
   }, () => {
     const dir = repo({ ".husky/pre-commit": "" });
     // husky sets core.hooksPath; here git runs the script directly as its pre-commit hook.
@@ -125,27 +161,55 @@ describe("hookChanges", () => {
     }
     writeFileSync(join(dir, ".git/hooks/pre-commit"), "#!/bin/sh\nexec sh .agentchainer/hooks/gitleaks.sh\n");
     chmodSync(join(dir, ".git/hooks/pre-commit"), 0o755);
+    const data = join(work, `data-${n++}`);
+    const pinned = join(data, APP_ID, "tools", "gitleaks", "8.30.1", "gitleaks");
     const bin = join(work, `fake-bin-${n++}`);
-    mkdirSync(bin);
-    // A stand-in for gitleaks: fails when the staged diff contains "SECRET".
-    writeFileSync(join(bin, "gitleaks"), "#!/bin/sh\ngit diff --cached | grep -q SECRET && exit 1\nexit 0\n");
-    chmodSync(join(bin, "gitleaks"), 0o755);
-    const commit = (file: string, text: string, path: string) => {
-      writeFileSync(join(dir, file), text);
-      execFileSync("git", ["add", file], { cwd: dir });
-      return spawnSync("git", ["-c", "user.name=t", "-c", "user.email=t@example.com", "commit", "-qm", file], {
-        cwd: dir,
-        env: { ...process.env, PATH: path, HOME: work },
-        encoding: "utf8",
-      });
-    };
-    const withTool = `${bin}:/usr/bin:/bin`;
-    assert.notEqual(commit("leak.txt", "SECRET=1\n", withTool).status, 0, "the secret is blocked");
-    execFileSync("git", ["reset", "-q"], { cwd: dir });
-    assert.equal(commit("ok.txt", "hello\n", withTool).status, 0);
-    const without = commit("leak2.txt", "SECRET=2\n", "/usr/bin:/bin");
+    fakeTool(join(bin, "gitleaks"), "path");
+    const withPath = committer(dir, { PATH: `${bin}:/usr/bin:/bin`, XDG_DATA_HOME: data });
+    const bare = committer(dir, { PATH: "/usr/bin:/bin", XDG_DATA_HOME: data });
+
+    // Only PATH has it.
+    assert.notEqual(withPath("leak.txt", "SECRET=1\n").status, 0, "the secret is blocked");
+    const ok = withPath("ok.txt", "hello\n");
+    assert.equal(ok.status, 0);
+    assert.match(ok.stderr, /ran path/);
+    // Neither has it.
+    const without = bare("free.txt", "SECRET=2\n");
     assert.equal(without.status, 0, "no tool: the commit goes through");
     assert.match(without.stderr, /gitleaks isn't installed/);
+    // The pinned copy wins over PATH.
+    fakeTool(pinned, "pinned");
+    mark(pinned);
+    const viaPinned = withPath("a.txt", "a\n");
+    assert.equal(viaPinned.status, 0);
+    assert.match(viaPinned.stderr, /ran pinned/);
+    assert.doesNotMatch(viaPinned.stderr, /ran path/);
+    assert.notEqual(withPath("leak3.txt", "SECRET=3\n").status, 0, "the pinned copy blocks the secret");
+    // A changed pinned copy never runs, and the commit stops.
+    writeFileSync(pinned, `${readFileSync(pinned, "utf8")}# changed\n`);
+    const tampered = withPath("b.txt", "b\n");
+    assert.notEqual(tampered.status, 0);
+    assert.match(tampered.stderr, /failed its hash check, so this commit was stopped/);
+    assert.doesNotMatch(tampered.stderr, /ran /);
+  });
+
+  it("the local hook runs the pinned binary only while it matches its marker (M2-30)", { skip }, () => {
+    const dir = repo();
+    const pinned = join(work, `tools-${n++}`, "gitleaks", "8.30.1", "gitleaks");
+    fakeTool(pinned, "pinned");
+    mark(pinned);
+    for (const f of hookChanges(dir, "local", hook, { ...tool, binary: pinned })) {
+      writeFileSync(join(dir, f.path), f.after);
+      chmodSync(join(dir, f.path), 0o755);
+    }
+    const commit = committer(dir, { PATH: "/usr/bin:/bin" });
+    assert.equal(commit("ok.txt", "hello\n").status, 0);
+    assert.notEqual(commit("leak.txt", "SECRET=1\n").status, 0, "the secret is blocked");
+    writeFileSync(pinned, `${readFileSync(pinned, "utf8")}# changed\n`);
+    const tampered = commit("b.txt", "b\n");
+    assert.notEqual(tampered.status, 0);
+    assert.match(tampered.stderr, /failed its hash check/);
+    assert.doesNotMatch(tampered.stderr, /ran pinned/);
   });
 });
 

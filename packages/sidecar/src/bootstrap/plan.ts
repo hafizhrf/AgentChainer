@@ -396,7 +396,10 @@ function notePreview(item: Item): string {
   const src = item.source;
   const targets = item.install.steps.flatMap((s) => ("copy" in s ? [s.copy.to] : []));
   if (src.type === "git" && targets.length) {
-    return `Copies ${src.path} from ${src.repo} at ${src.ref.slice(0, 7)} into ${targets.join(", ")}, after checking it against the pinned tree sha256 (${src.sha256.slice(0, 12)}…). Nothing else changes.`;
+    const license = src.license
+      ? `, with its license notice (${src.license.path}, sha256 ${src.license.sha256.slice(0, 12)}…)`
+      : "";
+    return `Copies ${src.path} from ${src.repo} at ${src.ref.slice(0, 7)} into ${targets.join(", ")}${license}, after checking it against the pinned tree sha256 (${src.sha256.slice(0, 12)}…). Nothing else changes.`;
   }
   return item.install.steps.map((s) => Object.keys(s)[0]).join(", ");
 }

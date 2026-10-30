@@ -82,7 +82,11 @@
         "repo": "https://github.com/cloudflare/security-audit-skill",
         "ref": "c1c8a8c1471069fb0e188eeaff69b8e8db6564a8",
         "path": "skills/security-audit",
-        "sha256": "5db66b10cb1d1120eded16e443dd47ba8a54dfc40432afe9eb94a21b13351899"
+        "sha256": "5db66b10cb1d1120eded16e443dd47ba8a54dfc40432afe9eb94a21b13351899",
+        "license": {
+          "path": "LICENSE",
+          "sha256": "e598e694aa506650c7192d5ea3be0e50aca0d356ea00551c53429f0b01eb6391"
+        }
       },
       "platforms": [
         "darwin",
@@ -122,7 +126,7 @@
         ]
       },
       "reviews": [],
-      "notes": "Not approved yet (docs/catalog-reviews/2026-10-30.md). All 20 files at c1c8a8c were read (tree hash matches): no network calls or install steps, validators use only the file system. Blocking: its MIT notice lives at the repo root and isn't copied with the skill, which needs an app change. On Windows the validators reject all input, so a full audit can't finish there; guidance mode works."
+      "notes": "Not approved yet (docs/catalog-reviews/2026-10-30.md). All 20 files at c1c8a8c were read (tree hash matches): no network calls or install steps, validators use only the file system. Its MIT notice lives at the repo root and is copied into the skill folder as LICENSE, pinned by its own sha256 (M2-29). On Windows the validators reject all input, so a full audit can't finish there; guidance mode works."
     },
     {
       "id": "code-review",

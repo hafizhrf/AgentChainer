@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { type Catalog, catalogProblems, type Item } from "./schema.ts";
+import { type Catalog, catalogProblems, type Item, ItemSchema } from "./schema.ts";
 
 /** Install-step rules beyond the schema (M2-15): binaries, private registration, pins, secrets. */
 
@@ -81,5 +81,33 @@ describe("install step rules", () => {
     });
     assert.deepEqual(problems(withEnv(["API_TOKEN"])), []);
     assert.match(problems(withEnv([])).join(), /API_TOKEN\} isn't one of its declared secrets/);
+  });
+});
+
+describe("git source license", () => {
+  const git = (path: string) =>
+    ItemSchema.safeParse({
+      ...base,
+      kind: "skill",
+      source: {
+        type: "git",
+        repo: "https://github.com/o/r",
+        ref: "a".repeat(40),
+        path: "skills/x",
+        sha256: "0".repeat(64),
+        license: { path, sha256: "1".repeat(64) },
+      },
+      install: { scope: "project", steps: [{ copy: { from: ".", to: ".claude/skills/x" } }] },
+    }).success;
+
+  it("takes a file inside the repository (M2-29)", () => {
+    assert.equal(git("LICENSE"), true);
+    assert.equal(git("docs/LICENSE.md"), true);
+  });
+
+  it("refuses paths that leave it", () => {
+    for (const bad of ["../LICENSE", "a/../../LICENSE", "/etc/passwd", "C:/x/LICENSE", "a\\..\\LICENSE", ".."]) {
+      assert.equal(git(bad), false, bad);
+    }
   });
 });

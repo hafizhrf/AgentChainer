@@ -185,17 +185,26 @@ describe("apply catalog items", () => {
     mkdirSync(join(src, "skill", "refs"), { recursive: true });
     writeFileSync(join(src, "skill", "SKILL.md"), "---\nname: demo\n---\nDo things.\n");
     writeFileSync(join(src, "skill", "refs", "a.md"), "ref\n");
+    writeFileSync(join(src, "LICENSE"), "MIT License\n\nCopyright (c) Demo\n");
+    // The whole repository, like the GitHub tarball: the skill folder and the license at the top.
     const fetchTree: FetchTree = async () => {
       const copy = mkdtempSync(join(tmpdir(), "ac-fetched-"));
-      cpSync(join(src, "skill"), copy, { recursive: true });
-      return { dir: copy, cleanup: () => rmSync(copy, { recursive: true, force: true }) };
+      cpSync(src, copy, { recursive: true });
+      return { dir: join(copy, "skill"), root: copy, cleanup: () => rmSync(copy, { recursive: true, force: true }) };
     };
-    const skill = (sha256: string): Item => ({
+    const skill = (sha256: string, license?: { path: string; sha256: string }): Item => ({
       ...pluginItem,
       id: "demo-skill",
       kind: "skill",
       tier: "verified-vendor",
-      source: { type: "git", repo: "https://github.com/o/skill", ref: "b".repeat(40), path: "skill", sha256 },
+      source: {
+        type: "git",
+        repo: "https://github.com/o/skill",
+        ref: "b".repeat(40),
+        path: "skill",
+        sha256,
+        ...(license ? { license } : {}),
+      },
       install: { scope: "project", steps: [{ copy: { from: ".", to: ".claude/skills/demo" } }] },
       uninstall: { steps: [{ remove: ".claude/skills/demo" }] },
     });
@@ -219,6 +228,41 @@ describe("apply catalog items", () => {
       ]);
       rollback(dir, runId, ctx(dir));
       assert.equal(existsSync(join(dir, ".claude")), false, "copied files and their folders are gone");
+
+      // M2-29: the license at the repository's top goes next to the copied files, pinned by its own hash.
+      const tree = treeHash(join(src, "skill"));
+      const licensed = (sha256: string) => catalogOf([skill(tree, { path: "LICENSE", sha256 })]);
+      const wrong = await applyActions(
+        dir,
+        ["item:demo-skill"],
+        ctx(dir, { catalog: licensed("0".repeat(64)), fetchTree }),
+      );
+      assert.match(wrong.results[0]?.message ?? "", /Hash mismatch for demo-skill's license/);
+      assert.equal(existsSync(join(dir, ".claude")), false, "nothing is copied when the license doesn't match");
+      const licenseSha = createHash("sha256")
+        .update(readFileSync(join(src, "LICENSE")))
+        .digest("hex");
+      const withLicense = await applyActions(
+        dir,
+        ["item:demo-skill"],
+        ctx(dir, { catalog: licensed(licenseSha), fetchTree }),
+      );
+      assert.equal(withLicense.results[0]?.status, "applied");
+      assert.equal(read(dir, ".claude/skills/demo/LICENSE"), "MIT License\n\nCopyright (c) Demo\n");
+      assert.deepEqual(JSON.parse(read(dir, ".agentchainer/lock.json")).items[0].files, [
+        ".claude/skills/demo/SKILL.md",
+        ".claude/skills/demo/refs/a.md",
+        ".claude/skills/demo/LICENSE",
+      ]);
+      rollback(dir, withLicense.runId, ctx(dir));
+      assert.equal(existsSync(join(dir, ".claude")), false, "the license goes with the rest");
+
+      // A skill folder with its own LICENSE would be overwritten: refused.
+      writeFileSync(join(src, "skill", "LICENSE"), "other\n");
+      const clash = catalogOf([skill(treeHash(join(src, "skill")), { path: "LICENSE", sha256: licenseSha })]);
+      const refused = await applyActions(dir, ["item:demo-skill"], ctx(dir, { catalog: clash, fetchTree }));
+      assert.match(refused.results[0]?.message ?? "", /already has a LICENSE in its files/);
+      assert.equal(existsSync(join(dir, ".claude")), false);
     } finally {
       rmSync(src, { recursive: true, force: true });
     }

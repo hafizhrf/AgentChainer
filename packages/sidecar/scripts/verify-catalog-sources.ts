@@ -7,7 +7,7 @@
 // Usage: node packages/sidecar/scripts/verify-catalog-sources.ts
 import { createHash } from "node:crypto";
 import { fileURLToPath } from "node:url";
-import { fetchGitHubTree, listFiles, treeHash } from "../src/bootstrap/git-source.ts";
+import { fetchGitHubTree, listFiles, readLicense, treeHash } from "../src/bootstrap/git-source.ts";
 import { readCatalogSource } from "../src/catalog/source.ts";
 
 const catalog = readCatalogSource(fileURLToPath(new URL("../../../catalog/", import.meta.url)));
@@ -25,6 +25,17 @@ for (const item of catalog.items) {
     );
     if (!ok && process.env.GITHUB_ACTIONS)
       console.log(`::error::${item.id}: sha256 is ${got}, the catalog says ${src.sha256}`);
+    if (src.license) {
+      let problem = "";
+      try {
+        readLicense(tree.root, src.license, item.id);
+      } catch (err) {
+        problem = err instanceof Error ? err.message : String(err);
+        failed++;
+      }
+      console.log(`${problem ? "FAIL" : "ok  "} ${item.id} license ${src.license.path} ${problem}`);
+      if (problem && process.env.GITHUB_ACTIONS) console.log(`::error::${item.id}: ${problem}`);
+    }
   } finally {
     tree.cleanup();
   }

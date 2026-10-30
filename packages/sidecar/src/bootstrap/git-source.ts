@@ -47,8 +47,33 @@ export function listFiles(dir: string): string[] {
   return out;
 }
 
-export type FetchedTree = { dir: string; cleanup: () => void };
+/** `dir` is the folder at the source's path; `root` is the repository's top folder, for its license file. */
+export type FetchedTree = { dir: string; root: string; cleanup: () => void };
 export type FetchTree = (repo: string, ref: string, subpath: string) => Promise<FetchedTree>;
+
+/**
+ * The bytes of a source's pinned license file (M2-29), read from the fetched repository: a regular file inside it
+ * whose sha256 matches the catalog's, or an error.
+ */
+export function readLicense(root: string, license: { path: string; sha256: string }, id: string): Buffer {
+  const file = path.join(root, ...license.path.split("/"));
+  const rel = path.relative(root, file);
+  if (!rel || rel.startsWith("..") || path.isAbsolute(rel))
+    throw new Error(`Bad license path for ${id}: ${license.path}`);
+  let st: ReturnType<typeof lstatSync>;
+  try {
+    st = lstatSync(file);
+  } catch {
+    throw new Error(`${id}'s license file ${license.path} isn't in the source. Not installed.`);
+  }
+  if (!st.isFile()) throw new Error(`${id}'s license file ${license.path} isn't a regular file. Not installed.`);
+  const bytes = readFileSync(file);
+  const got = createHash("sha256").update(bytes).digest("hex");
+  if (got !== license.sha256) {
+    throw new Error(`Hash mismatch for ${id}'s license: expected ${license.sha256}, got ${got}. Not installed.`);
+  }
+  return bytes;
+}
 
 /** Downloads `repo` (a github.com URL) at `ref` and returns the folder at `subpath` inside it. */
 export const fetchGitHubTree: FetchTree = async (repo, ref, subpath) => {
@@ -69,9 +94,10 @@ export const fetchGitHubTree: FetchTree = async (repo, ref, subpath) => {
     if (tar.status !== 0) throw new Error(`Extracting the source failed: ${tar.stderr.trim()}`);
     const top = readdirSync(work).find((n) => n !== "source.tar.gz");
     if (!top) throw new Error("The source archive was empty.");
-    const dir = path.join(work, top, ...subpath.split("/").filter((p) => p && p !== "."));
-    if (path.relative(path.join(work, top), dir).startsWith("..")) throw new Error(`Bad source path: ${subpath}`);
-    return { dir, cleanup };
+    const root = path.join(work, top);
+    const dir = path.join(root, ...subpath.split("/").filter((p) => p && p !== "."));
+    if (path.relative(root, dir).startsWith("..")) throw new Error(`Bad source path: ${subpath}`);
+    return { dir, root, cleanup };
   } catch (err) {
     cleanup();
     throw err;

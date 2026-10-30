@@ -56,6 +56,9 @@ source:
   ref: "<40-char commit SHA>"          # never a branch or tag
   path: skills/security-audit
   sha256: "<hash of the normalized tree at path>"
+  license:                             # optional: a license file outside `path`, copied next to the files
+    path: LICENSE                      # inside the repository, no `..`
+    sha256: "<sha256 of that file>"
 platforms: [darwin, linux, win32]
 requires:
   - { tool: node, version: ">=18" }
@@ -129,7 +132,7 @@ shared by workspaces, so rollbacks leave binaries there.
 | Field | Required | Notes |
 |---|---|---|
 | `id`, `name`, `kind`, `tier`, `license`, `summary`, `why` | yes | `why` is shown to users in plain language |
-| `source` | yes | `git` (repo + SHA + path + sha256), `marketplace` (plugin), `release-asset` (per-platform URL + sha256), `npm` (name + exact version + integrity) |
+| `source` | yes | `git` (repo + SHA + path + sha256, plus `license` {path, sha256} when the license file lives outside `path`: it is checked and copied into each copy target), `marketplace` (plugin), `release-asset` (per-platform URL + sha256), `npm` (name + exact version + integrity) |
 | `platforms`, `requires` | yes | Unmet requirements make the item unavailable, with an explanation |
 | `detect` | no | Signals: files (`package.json`, `pubspec.yaml`), dependencies (`next`, `django`), git remote host, etc. |
 | `risk`, `permissions` | yes | Shown in the review UI |
@@ -196,7 +199,7 @@ Profiles live in `catalog/profiles/<id>.yaml` with `suggest: {always | stacks | 
 | `playwright-mcp` (0.0.83) | mcp | verified-vendor | Apache-2.0 | `npx -y @playwright/mcp@0.0.83 --isolated` merged into the project's `.mcp.json` | Reviewed |
 | `github` | plugin | verified-vendor | Apache-2.0 (plugin files); GitHub's hosted server (source MIT) | Partner plugin: the remote MCP `api.githubcopilot.com` with `GITHUB_PERSONAL_ACCESS_TOKEN` from your environment | Reviewed |
 | `firebase` | plugin | verified-vendor | per plugin | Partner plugin | Seed **(verify)** |
-| `cloudflare-security-audit` | skill | verified-vendor | MIT | Copy `skills/security-audit/` at a pinned SHA | **Not approved yet**: the MIT notice isn't copied (M2-29) |
+| `cloudflare-security-audit` | skill | verified-vendor | MIT | Copy `skills/security-audit/` at a pinned SHA, with the root `LICENSE` (pinned) | **Not approved yet**: the MIT notice is now copied (M2-29); waiting for its review |
 | `codebase-memory-mcp` (0.11.0) | mcp | community | MIT | Pinned release binary + `claude mcp add --scope local` | **Not approved at 0.11.0**: re-pin to 0.12.1 (M2-32), then 2 reviews |
 | `anthropic-example-skills` | plugin | official | Apache-2.0 (subset) | `example-skills@anthropic-agent-skills` | Optional; exclude source-available document skills |
 | `gitleaks` (8.30.1) | hook | verified-vendor | MIT | Pinned release binary; pre-commit hook via the repo's hook manager, or a local hook | Reviewed |

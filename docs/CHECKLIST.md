@@ -395,7 +395,8 @@
       never write `.git/index` (`--no-optional-locks`, plumbing `diff-index`; regression test in
       `workspace.test.ts`), so a refresh can't trigger another through the file watcher; an unchanged listing keeps
       its object (`sameListing`), and the diff keeps its scroll position and folds when the text does change.
-      Remaining: click through in the app.
+      Clicked through on macOS (2026-10-30, debug build): a scrolled 300-line diff stays put while idle, and
+      `.git/index` keeps its mtime. Remaining: revert a hunk and a file in the app.
 - [ ] **M1-28** "Open in editor" at `file:line` (VS Code, Cursor, JetBrains, system default).
       Progress: `open_in_editor` for VS Code, Cursor, Zed, IntelliJ (`idea`) and the system default, from the diff
       pane and tool cards; editor chosen in Settings. Argument building is unit-tested. Remaining: try each editor.
@@ -423,7 +424,11 @@
         passes `--force`.
       - "Draft with Claude" is a one-shot haiku query: no tools, no settings, not saved as a session. Live: a
         Conventional Commits message in 3.6 s, and no session left behind.
-      - Remaining: click through in the app.
+      - Clicked through on macOS (2026-10-30, debug build): remote checkout with tracking, fetch, pull, merge with a
+        conflict then Abort, rename, and delete with the unmerged second confirm. The ⋯ was first a dropdown nested
+        in the picker's popover, which closed both; it's now an actions view inside the picker. A conflicted file no
+        longer counts as staged.
+      - Remaining: commit and push in the app.
 
 ### Cost & limits
 
@@ -1077,6 +1082,10 @@ Decisions: [ADR-0009](adr/0009-release-signing-and-updates.md). Maintainer steps
       - The task page: request, contract form, approval. Live on a `ts-pnpm-vite` copy: drafted and triaged in under
         25 s for ≈$0.11; the draft noticed the missing `index.html` and asked about it; git saw only
         `.agentchainer/.gitignore` afterwards.
+      - Clicked through on macOS (2026-10-30, debug build, a haiku draft): request, drafting with Cancel, the review
+        with editable lists, an override with its reason, approval and the ready view. Haiku annotated paths
+        ("index.html (new)", "a.tsx or b.tsx"), which inflated the scope signal; drafted areas are now cleaned to
+        paths.
       - Remaining: owner click-through in the app.
 - [ ] **M3-03** Triage into tiers S/M/L/XL, with a rationale the user can override. Inputs:
   - deterministic signals: estimated scope (via the code graph when available), risk keywords (auth, payments, migrations,

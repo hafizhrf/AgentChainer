@@ -39,7 +39,10 @@ const DRAFT_JSON_SCHEMA = {
     constraints: { type: "array", items: { type: "string" } },
     outOfScope: { type: "array", items: { type: "string" } },
     risks: { type: "array", items: { type: "string" } },
-    affectedAreas: { type: "array", items: { type: "string" } },
+    affectedAreas: {
+      type: "array",
+      items: { type: "string", description: "One workspace-relative path or glob, with no notes or alternatives" },
+    },
     openQuestions: { type: "array", items: { type: "string" } },
   },
   required: ["objective", "acceptanceCriteria", "constraints", "outOfScope", "risks", "affectedAreas", "openQuestions"],
@@ -58,7 +61,8 @@ the structured output:
 - constraints: limits the work must respect, only those the request or the repository implies.
 - outOfScope: related work this task won't do.
 - risks: what could go wrong, such as breaking callers, losing data or weakening security.
-- affectedAreas: workspace-relative paths or globs you expect to change, from what you read. New files are fine.
+- affectedAreas: workspace-relative paths or globs you expect to change, from what you read. One path per item and
+  nothing else: no notes such as "(new)", no alternatives such as "a.ts or b.ts". New files are fine.
 - openQuestions: decisions the request leaves open that change the work. Empty when the request is clear. Don't ask
   what the repository answers.
 Keep every item short. Don't plan the implementation.`;
@@ -89,6 +93,18 @@ function lines(value: unknown, max: number, maxLength = MAX.line): string[] {
   return out.slice(0, max);
 }
 
+/**
+ * The paths in one drafted area. Models annotate them anyway ("index.html (new)", "a.ts or b.ts", backticks); the
+ * notes are dropped and alternatives split, so the scope signal measures paths, not prose.
+ */
+export function cleanAreas(entry: string): string[] {
+  const text = entry.replace(/`/g, "").replace(/\s+\(.*$/, "");
+  return text
+    .split(/\s*,\s*|\s+or\s+|\s+and\s+/)
+    .map(cleanArea)
+    .filter((a): a is string => a !== null);
+}
+
 /** A workspace-relative, `/`-separated area; null for anything absolute or leaving the workspace. */
 export function cleanArea(area: string): string | null {
   const a = area.trim().replace(/\\/g, "/").replace(/^\.\//, "");
@@ -115,9 +131,7 @@ export function normalizeContract(request: string, draft: unknown, gates: GateKi
       if (check.startsWith("gate:") && !gates.includes(check.slice(5) as GateKind)) check = "manual";
       return { id: `c${i + 1}`, text: c.text, check };
     });
-  const areas = lines(d.affectedAreas, MAX.areas, MAX.area)
-    .map(cleanArea)
-    .filter((a): a is string => a !== null);
+  const areas = lines(d.affectedAreas, MAX.areas, MAX.area).flatMap(cleanAreas);
   return {
     task: request,
     objective: typeof d.objective === "string" ? d.objective.trim().slice(0, MAX.objective) : "",
@@ -125,7 +139,7 @@ export function normalizeContract(request: string, draft: unknown, gates: GateKi
     constraints: lines(d.constraints, MAX.list),
     outOfScope: lines(d.outOfScope, MAX.list),
     risks: lines(d.risks, MAX.list),
-    affectedAreas: [...new Set(areas)],
+    affectedAreas: [...new Set(areas)].slice(0, MAX.areas),
     openQuestions: lines(d.openQuestions, MAX.questions),
   };
 }

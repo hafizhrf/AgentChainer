@@ -42,6 +42,10 @@
   white-space: pre-wrap;
 }
 
+.task-model {
+  flex: 0 0 220px;
+}
+
 .task-drafting {
   flex-direction: row;
   align-items: center;

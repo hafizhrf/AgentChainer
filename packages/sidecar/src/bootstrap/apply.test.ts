@@ -463,4 +463,35 @@ describe("release binaries, MCP servers and hooks (M2-15)", () => {
     assert.equal(read(dir, ".mcp.json"), before);
     assert.equal(status(dir), "");
   });
+
+  it("adds a deny rule to .claude/settings.json next to the rules there, and restores it byte for byte", async () => {
+    const dir = copyFixture("go-service");
+    mkdirSync(join(dir, ".claude"), { recursive: true });
+    const before = '{\n  "permissions": { "allow": ["Bash(go test ./...)"], "deny": ["Read(./.env)"] }\n}\n';
+    writeFileSync(join(dir, ".claude", "settings.json"), before);
+    git(dir, "add", ".claude/settings.json");
+    git(dir, "-c", "user.name=t", "-c", "user.email=t@example.invalid", "commit", "-qm", "settings");
+    const item: Item = {
+      ...pluginItem,
+      id: "fake-deny",
+      kind: "mcp",
+      tier: "verified-vendor",
+      source: { type: "npm", name: "@example/mcp", version: "1.2.3", integrity: "sha512-x" },
+      install: {
+        scope: "project",
+        steps: [
+          { "merge-json": { path: ".claude/settings.json", value: { permissions: { deny: ["Read(./keys/**)"] } } } },
+        ],
+      },
+    };
+    const c = ctx(dir, { catalog: catalogOf([item]), env: toolEnv });
+    const { runId } = await applyActions(dir, ["item:fake-deny"], c);
+    assert.deepEqual(JSON.parse(read(dir, ".claude/settings.json")).permissions, {
+      allow: ["Bash(go test ./...)"],
+      deny: ["Read(./.env)", "Read(./keys/**)"],
+    });
+    rollback(dir, runId, c);
+    assert.equal(read(dir, ".claude/settings.json"), before);
+    assert.equal(status(dir), "");
+  });
 });

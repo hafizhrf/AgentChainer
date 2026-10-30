@@ -64,7 +64,11 @@ export function itemChanges(root: string, item: Item, env: { toolsDir: string | 
   return out;
 }
 
-/** `value` merged into the JSON object in `text` (objects merge key by key; anything else is replaced). */
+/**
+ * `value` merged into the JSON object in `text`: objects merge key by key, and the permission lists of a Claude settings
+ * file (`permissions.allow`, `ask`, `deny`) keep their rules and gain the new ones, so an item can add a deny rule
+ * (M2-31). Anything else, other arrays included (an MCP server's `args`), is replaced.
+ */
 export function mergeJson(text: string, value: Record<string, unknown>, label = "the file"): string {
   let base: unknown = {};
   if (text.trim()) {
@@ -80,11 +84,17 @@ export function mergeJson(text: string, value: Record<string, unknown>, label = 
 
 const isObject = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null && !Array.isArray(v);
 
-function merge(a: Record<string, unknown>, b: Record<string, unknown>): Record<string, unknown> {
+/** The lists merged as sets, by their path from the root. */
+const UNION_LISTS = new Set(["permissions.allow", "permissions.ask", "permissions.deny"]);
+
+function merge(a: Record<string, unknown>, b: Record<string, unknown>, at = ""): Record<string, unknown> {
   const out: Record<string, unknown> = { ...a };
   for (const [k, v] of Object.entries(b)) {
     const prev = out[k];
-    out[k] = isObject(prev) && isObject(v) ? merge(prev, v) : v;
+    const path = at ? `${at}.${k}` : k;
+    if (isObject(prev) && isObject(v)) out[k] = merge(prev, v, path);
+    else if (UNION_LISTS.has(path) && Array.isArray(prev) && Array.isArray(v)) out[k] = [...new Set([...prev, ...v])];
+    else out[k] = v;
   }
   return out;
 }

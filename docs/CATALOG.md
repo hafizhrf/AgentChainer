@@ -133,7 +133,7 @@ shared by workspaces, so rollbacks leave binaries there.
 | `platforms`, `requires` | yes | Unmet requirements make the item unavailable, with an explanation |
 | `detect` | no | Signals: files (`package.json`, `pubspec.yaml`), dependencies (`next`, `django`), git remote host, etc. |
 | `risk`, `permissions` | yes | Shown in the review UI |
-| `install` | yes | Declarative steps only: `copy`, `remove`, `run` (argv array, no shell), `download-binary` (`{binary}`), `mcp-add` (`{name, command}`, registered with the item's scope), `pre-commit-hook` (`{id, run}`, see below), `merge-json`, `write-file`. In an argv, `{binary}` is the downloaded binary |
+| `install` | yes | Declarative steps only: `copy`, `remove`, `run` (argv array, no shell), `download-binary` (`{binary}`), `mcp-add` (`{name, command}`, registered with the item's scope), `pre-commit-hook` (`{id, run}`, see below), `merge-json` (`{path, value}`: objects merge key by key, the `permissions.allow`/`ask`/`deny` lists of a Claude settings file keep their rules and gain new ones, other values and arrays are replaced), `write-file`. In an argv, `{binary}` is the downloaded binary |
 | `uninstall` | no | What removing the item takes, for reviewers. Rollback restores files from backups and undoes the CLI registrations it made, so items that only write files or download a tool leave it out |
 | `secrets` | no | Env var names the item needs (e.g. `GITHUB_TOKEN`). The installer references them and never writes values to files |
 | `reviews` | no | `{by, date, ref, notes}` per maintainer review against §4. An item is offered only once its tier's count is met: first-party 0, official 1, verified-vendor 1, community 2. Until then the plan shows it as "not reviewed yet" |

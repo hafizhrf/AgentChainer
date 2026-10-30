@@ -835,8 +835,12 @@ All of these run on macOS, Windows and Ubuntu against a sample repo in `fixtures
       the files. This unblocks cloudflare-security-audit.
 - [ ] **M2-30** The gitleaks hook wrapper prefers a gitleaks on PATH and doesn't hash-check the tools-folder copy:
       prefer the pinned copy and check it against its marker.
-- [ ] **M2-31** `merge-json` replaces arrays. Merge permission lists (allow/deny) by union, so an item can add a deny
+- [x] **M2-31** `merge-json` replaces arrays. Merge permission lists (allow/deny) by union, so an item can add a deny
       rule to `.claude/settings.json`.
+      — evidence: `mergeJson` (`bootstrap/steps.ts`) keeps the rules in `permissions.allow`, `ask` and `deny` and adds
+      new ones once each; other arrays (an MCP server's `args`) are still replaced. Tests: `steps.test.ts` (unit) and
+      `apply.test.ts` (a deny rule added next to existing ones in `.claude/settings.json`, then a rollback restores it
+      byte for byte).
 - [ ] **M2-32** Re-pin codebase-memory-mcp to 0.12.1 (the weekly bot proposes it) and review it again; it needs two
       reviews as a community item.
 

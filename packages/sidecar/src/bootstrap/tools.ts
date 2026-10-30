@@ -14,6 +14,7 @@ import {
 } from "node:fs";
 import path from "node:path";
 import type { Item } from "../catalog/schema.ts";
+import { compareVersions } from "../catalog/updates.ts";
 
 /**
  * Pinned release binaries (M2-15, ADR-0005): downloaded from the catalog's URL, checked against its sha256, unpacked
@@ -142,6 +143,10 @@ export async function ensureTool(
     const binary = path.join(staged, path.basename(target));
     copyFileSync(found, binary);
     chmodSync(binary, 0o755);
+    // The license and third-party notices travel with the binary (catalog review, 2026-10-30).
+    for (const notice of noticeFiles([path.dirname(found), unpacked])) {
+      copyFileSync(notice, path.join(staged, path.basename(notice)));
+    }
     if (platform === "darwin") adHocSign(binary);
     const marker: Marker = { archiveSha256: asset.sha256, binarySha256: sha256(readFileSync(binary)) };
     writeFileSync(path.join(staged, MARKER), `${JSON.stringify(marker, null, 2)}\n`);
@@ -163,6 +168,20 @@ function readMarker(dir: string): Marker | null {
 }
 
 /** The first regular file named one of `names`, at most `depth` folders down. Symlinks are ignored. */
+const NOTICE = /^(licen[sc]e|copying|notice|third[_-]party[_-]notices?)(\.[\w-]+)?$/i;
+
+/** License and notice files directly in `dirs` (the binary's folder and the archive's root), without duplicates. */
+function noticeFiles(dirs: string[]): string[] {
+  const byName = new Map<string, string>();
+  for (const dir of dirs) {
+    for (const entry of readdirSync(dir)) {
+      const p = path.join(dir, entry);
+      if (NOTICE.test(entry) && lstatSync(p).isFile() && !byName.has(entry)) byName.set(entry, p);
+    }
+  }
+  return [...byName.values()];
+}
+
 function findFile(dir: string, names: string[], depth: number): string | null {
   for (const entry of readdirSync(dir).sort()) {
     const p = path.join(dir, entry);
@@ -185,14 +204,15 @@ function adHocSign(binary: string): void {
   spawnSync("codesign", ["--force", "--sign", "-", binary]);
 }
 
-/** An installed copy of a tool in the app's folder (any version), or the first one on PATH. */
+/** An installed copy of a tool in the app's folder (the newest version), or the first one on PATH. */
 export function findTool(name: string, dir: string | null, env: NodeJS.ProcessEnv = process.env): string | null {
   const file = exe(name, process.platform);
   if (dir && existsSync(dir)) {
     for (const id of readdirSync(dir).filter((d) => !d.startsWith("."))) {
       const itemDir = path.join(dir, id);
       if (!lstatSync(itemDir).isDirectory()) continue;
-      for (const version of readdirSync(itemDir).sort().reverse()) {
+      // Newest first by version, not by string: 1.7.12 is newer than 1.7.9.
+      for (const version of readdirSync(itemDir).sort((a, b) => compareVersions(b, a))) {
         const p = path.join(itemDir, version, file);
         if (existsSync(p) && readMarker(path.dirname(p))) return p;
       }

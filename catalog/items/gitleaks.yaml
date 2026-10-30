@@ -33,7 +33,7 @@ platforms: [darwin, linux, win32]
 risk: low
 permissions:
   - "Reads the staged changes of each commit, locally; nothing is sent anywhere"
-  - "Stops a commit that contains a secret (skip one check with SKIP=gitleaks, or git commit --no-verify)"
+  - "Stops a commit that contains a secret. Mark a false positive with a gitleaks:allow comment or .gitleaksignore; skip the check once with git commit --no-verify"
 install:
   # project when the repo has a hook manager (lefthook, pre-commit, husky): its committed config gets the hook.
   # Without one, the hook is a local .git/hooks/pre-commit, and the plan shows local scope.
@@ -46,7 +46,14 @@ install:
 uninstall:
   steps:
     - remove: ".agentchainer/hooks/gitleaks.sh"
-reviews: []
+reviews:
+  - by: hafizhrf
+    date: "2026-10-30"
+    ref: "v8.30.1"
+    notes: >-
+      All 5 sha256 pins equal GitHub's digests and the upstream checksums file; no signatures or attestations (the
+      maintainer builds the binaries), so the pin is the protection. MIT. Runs only git diff --staged; no network
+      calls. docs/catalog-reviews/2026-10-30.md
 notes: >-
   Teammates without gitleaks (or AgentChainer) aren't blocked: the committed hook prints a hint and lets the commit
   through.

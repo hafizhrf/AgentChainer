@@ -15,10 +15,12 @@ source:
   version: "0.0.83"
   integrity: "sha512-oNcl+Ae2/IAjhfPeP46BfIkSakfmprY+aOtkv5MjrQ4lPav4/yNtPhL0iq8SlIM90oApWgBDUxaNKvktazUKOg=="
 platforms: [darwin, linux, win32]
-risk: medium
+risk: high
 permissions:
-  - "Starts a browser and visits the pages Claude chooses"
-  - "Runs npx, which downloads the pinned @playwright/mcp and its browser on first use"
+  - "Starts your installed Google Chrome and visits the pages Claude chooses"
+  - "Runs npx, which downloads the pinned @playwright/mcp and two Playwright packages from npm on first use"
+  - "Has a tool that runs any JavaScript on your computer (browser_run_code_unsafe); Claude Code asks before each use unless you allow it"
+  - "Starts each session with a fresh browser profile (--isolated): no cookies or logins are kept"
 install:
   # Portable (npx with an exact version), so it can be shared in the project's .mcp.json.
   scope: project
@@ -29,8 +31,16 @@ install:
           mcpServers:
             playwright:
               command: npx
-              args: ["-y", "@playwright/mcp@0.0.83"]
-reviews: []
+              args: ["-y", "@playwright/mcp@0.0.83", "--isolated"]
+reviews:
+  - by: hafizhrf
+    date: "2026-10-30"
+    ref: "0.0.83"
+    notes: >-
+      The 0.0.83 tarball's sha512 matches the pin and the registry, published with npm provenance. Read package.json,
+      cli.js, index.js, README and LICENSE (Apache-2.0); dependencies are exact Playwright versions with no install
+      scripts; no telemetry. Uses the system Chrome; browser_run_code_unsafe is on by default. docs/catalog-reviews/2026-10-30.md
 notes: >-
   Pinned to an exact version, unlike the playwright plugin, which runs @playwright/mcp@latest. Claude Code asks
-  before using servers from a project's .mcp.json.
+  before using servers from a project's .mcp.json. Needs Google Chrome (or run npx @playwright/mcp@0.0.83
+  install-browser chrome) and a display.

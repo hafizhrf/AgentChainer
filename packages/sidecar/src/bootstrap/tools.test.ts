@@ -71,6 +71,26 @@ describe("ensureTool", () => {
     assert.equal(second.source, "cache");
     assert.equal(fetchImpl.calls, 1, "the cached copy is used");
     assert.equal(findTool("demo-tool", dir, { PATH: "" }), first.path);
+    assert.equal(
+      readFileSync(join(first.path, "..", "LICENSE"), "utf8"),
+      "MIT\n",
+      "the license travels with the binary",
+    );
+  });
+
+  it("finds the newest installed version by number, not by string", async () => {
+    const dir = join(work, "tools-versions");
+    const fetchImpl = fakeFetch();
+    const { path } = await ensureTool(item(), { dir, fetchImpl, key });
+    // Copy the installed 1.0.0 to 1.7.9 and 1.7.12; as strings, "1.7.9" sorts after "1.7.12".
+    for (const v of ["1.7.9", "1.7.12"]) {
+      const to = join(dir, "demo-tool", v);
+      mkdirSync(to, { recursive: true });
+      for (const f of [name, ".agentchainer-tool.json"]) {
+        if (existsSync(join(path, "..", f))) writeFileSync(join(to, f), readFileSync(join(path, "..", f)));
+      }
+    }
+    assert.equal(findTool("demo-tool", dir, { PATH: "" }), join(dir, "demo-tool", "1.7.12", name));
   });
 
   it("downloads again when the cached binary was changed", async () => {

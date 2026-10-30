@@ -1,10 +1,10 @@
 {
-  "catalogVersion": "2026.10.29",
+  "catalogVersion": "2026.10.30",
   "profiles": [
     {
       "id": "baseline",
       "name": "Baseline",
-      "description": "Every workspace: review, commit and security help that pays off in any project.",
+      "description": "Every workspace: review, commit and secret-scan help that pays off in any project.",
       "suggested": true
     },
     {
@@ -82,16 +82,17 @@
       "id": "item:code-review",
       "kind": "catalog",
       "title": "Code Review",
-      "why": "A second pair of eyes on every pull request: separate agents look at bugs, conventions and history, and only findings they are confident about are reported.",
+      "why": "Before you merge, several review agents check a GitHub pull request for clear bugs and for breaks of your CLAUDE.md rules. Each finding is double-checked, so only issues they are sure about are reported.",
       "risk": "low",
       "scope": "project",
       "tier": "official",
-      "license": "Apache-2.0 (marketplace repo)",
+      "license": "Apache-2.0",
       "source": "code-review@claude-plugins-official, reviewed v1.0.1 at f8c5e7a",
       "profile": "baseline",
       "permissions": [
         "Adds a /code-review command",
-        "When you run it: reads the pull request and the repository, and runs several review agents"
+        "When you run it: reads a GitHub pull request with gh and runs 7 or more review agents (Haiku, Sonnet and Opus) that count against your Claude plan",
+        "With --comment: posts the review on the pull request with your gh login, without asking each time"
       ],
       "secrets": [],
       "preview": {
@@ -108,9 +109,8 @@
           ]
         ]
       },
-      "state": "unavailable",
-      "selected": false,
-      "reason": "Not reviewed yet: needs 1 more maintainer review(s) against docs/CATALOG.md §4."
+      "state": "recommended",
+      "selected": true
     },
     {
       "id": "item:commit-commands",
@@ -120,14 +120,17 @@
       "risk": "medium",
       "scope": "project",
       "tier": "official",
-      "license": "Apache-2.0 (marketplace repo)",
+      "license": "Apache-2.0",
       "source": "commit-commands@claude-plugins-official, reviewed v1.0.1 at f8c5e7a",
       "profile": "baseline",
       "permissions": [
         "Adds /commit, /commit-push-pr and /clean_gone commands",
-        "When you run them: runs git, and gh for pull requests"
+        "/commit stages and commits your changes; the git commands it needs run without asking",
+        "/commit-push-pr also pushes the branch to origin and opens a GitHub pull request with your gh login, without asking",
+        "/clean_gone deletes local branches whose remote branch is gone (git branch -D) and force-removes their worktrees, which can drop unpushed or uncommitted work"
       ],
       "secrets": [],
+      "notes": "/commit-push-pr needs the GitHub CLI (gh), installed and signed in. The plugin doesn't scan for secrets; the gitleaks hook covers that.",
       "preview": {
         "type": "commands",
         "commands": [
@@ -142,44 +145,8 @@
           ]
         ]
       },
-      "state": "unavailable",
-      "selected": false,
-      "reason": "Not reviewed yet: needs 1 more maintainer review(s) against docs/CATALOG.md §4."
-    },
-    {
-      "id": "item:security-guidance",
-      "kind": "catalog",
-      "title": "Security Guidance",
-      "why": "Catches injection, XSS, SSRF, hardcoded secrets and similar mistakes while Claude writes the code, not after it ships.",
-      "risk": "medium",
-      "scope": "project",
-      "tier": "official",
-      "license": "Apache-2.0 (marketplace repo)",
-      "source": "security-guidance@claude-plugins-official, reviewed v2.0.17 at f8c5e7a",
-      "profile": "baseline",
-      "permissions": [
-        "Adds hooks that check every edit Claude makes for risky patterns",
-        "Runs an extra model review of the diff when Claude stops (uses your Claude plan)",
-        "Adds a commit reviewer agent"
-      ],
-      "secrets": [],
-      "preview": {
-        "type": "commands",
-        "commands": [
-          [
-            "claude",
-            "plugin",
-            "install",
-            "security-guidance@claude-plugins-official",
-            "--scope",
-            "project",
-            "--json"
-          ]
-        ]
-      },
-      "state": "unavailable",
-      "selected": false,
-      "reason": "Not reviewed yet: needs 1 more maintainer review(s) against docs/CATALOG.md §4."
+      "state": "recommended",
+      "selected": true
     },
     {
       "id": "item:gitleaks",
@@ -194,7 +161,7 @@
       "profile": "baseline",
       "permissions": [
         "Reads the staged changes of each commit, locally; nothing is sent anywhere",
-        "Stops a commit that contains a secret (skip one check with SKIP=gitleaks, or git commit --no-verify)",
+        "Stops a commit that contains a secret. Mark a false positive with a gitleaks:allow comment or .gitleaksignore; skip the check once with git commit --no-verify",
         "Downloads gitleaks 8.30.1 for linux-x64 from github.com (sha256 551f6fc83ea4…) into AgentChainer's tools folder; it stays there after a rollback"
       ],
       "secrets": [],
@@ -205,7 +172,7 @@
       },
       "state": "unavailable",
       "selected": false,
-      "reason": "Not reviewed yet: needs 1 more maintainer review(s) against docs/CATALOG.md §4."
+      "reason": "AgentChainer's tools folder isn't set up. Restart the app."
     },
     {
       "id": "gen:generate-claude-md",

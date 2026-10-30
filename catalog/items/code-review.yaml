@@ -3,11 +3,11 @@ id: code-review
 name: "Code Review"
 kind: plugin
 tier: official
-license: "Apache-2.0 (marketplace repo)"
+license: "Apache-2.0"
 summary: "Reviews a pull request with several specialized agents and keeps only confident findings."
 why: >-
-  A second pair of eyes on every pull request: separate agents look at bugs, conventions and history, and only
-  findings they are confident about are reported.
+  Before you merge, several review agents check a GitHub pull request for clear bugs and for breaks of your CLAUDE.md
+  rules. Each finding is double-checked, so only issues they are sure about are reported.
 source:
   type: marketplace
   marketplace: claude-plugins-official
@@ -16,10 +16,14 @@ source:
   reviewedVersion: "1.0.1"
   reviewedRef: "f8c5e7a1dcb71b10cb74586224b5401f3de5db28"
 platforms: [darwin, linux, win32]
+requires:
+  - tool: gh
+    hint: "Install the GitHub CLI (https://cli.github.com) and run gh auth login in your own terminal"
 risk: low
 permissions:
   - "Adds a /code-review command"
-  - "When you run it: reads the pull request and the repository, and runs several review agents"
+  - "When you run it: reads a GitHub pull request with gh and runs 7 or more review agents (Haiku, Sonnet and Opus) that count against your Claude plan"
+  - "With --comment: posts the review on the pull request with your gh login, without asking each time"
 install:
   scope: project
   steps:
@@ -27,4 +31,11 @@ install:
 uninstall:
   steps:
     - run: [claude, plugin, uninstall, "code-review@claude-plugins-official", --scope, project, --json]
-reviews: []
+reviews:
+  - by: hafizhrf
+    date: "2026-10-30"
+    ref: "f8c5e7a1dcb71b10cb74586224b5401f3de5db28"
+    notes: >-
+      Read plugin.json, commands/code-review.md, README and LICENSE at f8c5e7a (1.0.1): Apache-2.0; one command, no
+      hooks, MCP servers, scripts or telemetry. Pre-approves read-only gh calls and gh pr comment; posts only with
+      --comment; spawns review agents including Opus. docs/catalog-reviews/2026-10-30.md

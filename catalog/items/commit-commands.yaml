@@ -3,7 +3,7 @@ id: commit-commands
 name: "Commit Commands"
 kind: plugin
 tier: official
-license: "Apache-2.0 (marketplace repo)"
+license: "Apache-2.0"
 summary: "Commands for committing, pushing and opening pull requests."
 why: >-
   Turns the usual git routine into one command: Claude writes the commit message, pushes and can open the pull
@@ -16,10 +16,15 @@ source:
   reviewedVersion: "1.0.1"
   reviewedRef: "f8c5e7a1dcb71b10cb74586224b5401f3de5db28"
 platforms: [darwin, linux, win32]
+requires:
+  - tool: git
+    hint: "Install Git (https://git-scm.com)"
 risk: medium
 permissions:
   - "Adds /commit, /commit-push-pr and /clean_gone commands"
-  - "When you run them: runs git, and gh for pull requests"
+  - "/commit stages and commits your changes; the git commands it needs run without asking"
+  - "/commit-push-pr also pushes the branch to origin and opens a GitHub pull request with your gh login, without asking"
+  - "/clean_gone deletes local branches whose remote branch is gone (git branch -D) and force-removes their worktrees, which can drop unpushed or uncommitted work"
 install:
   scope: project
   steps:
@@ -27,4 +32,14 @@ install:
 uninstall:
   steps:
     - run: [claude, plugin, uninstall, "commit-commands@claude-plugins-official", --scope, project, --json]
-reviews: []
+reviews:
+  - by: hafizhrf
+    date: "2026-10-30"
+    ref: "f8c5e7a1dcb71b10cb74586224b5401f3de5db28"
+    notes: >-
+      Read the 3 commands, plugin.json, README and LICENSE at f8c5e7a (1.0.1): Apache-2.0; no hooks, MCP servers or
+      telemetry. Pre-approves git add/commit/push and gh pr create; /clean_gone uses branch -D and worktree remove
+      --force. docs/catalog-reviews/2026-10-30.md
+notes: >-
+  /commit-push-pr needs the GitHub CLI (gh), installed and signed in. The plugin doesn't scan for secrets; the
+  gitleaks hook covers that.

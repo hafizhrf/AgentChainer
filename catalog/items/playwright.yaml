@@ -3,7 +3,7 @@ id: playwright
 name: "Playwright browser (Microsoft)"
 kind: plugin
 tier: verified-vendor
-license: "Apache-2.0 (verify)"
+license: "Apache-2.0"
 homepage: https://github.com/microsoft/playwright-mcp
 summary: "Lets Claude drive a real browser: open pages, click, fill forms and take screenshots."
 why: >-
@@ -18,10 +18,12 @@ platforms: [darwin, linux, win32]
 requires:
   - tool: npx
     hint: "Install Node.js (npx comes with it)"
-risk: medium
+risk: high
 permissions:
-  - "Starts a browser that Claude controls; it can open any URL"
-  - "Runs npx to fetch the Playwright MCP server"
+  - "Starts your installed Google Chrome, which Claude controls; it can open any URL"
+  - "Runs npx @playwright/mcp@latest on every start: whatever version is newest at that moment, not a reviewed one"
+  - "Has a tool that runs any JavaScript on your computer (browser_run_code_unsafe)"
+  - "Keeps the browser's cookies and logins between sessions"
 install:
   scope: project
   steps:
@@ -31,5 +33,5 @@ uninstall:
     - run: [claude, plugin, uninstall, "playwright@claude-plugins-official", --scope, project, --json]
 reviews: []
 notes: >-
-  At the reviewed marketplace commit the plugin runs `npx @playwright/mcp@latest`, an unpinned version. ADR-0005
-  asks for pinned sources, so reviewers should weigh this or prefer a pinned MCP item.
+  Not approved (docs/catalog-reviews/2026-10-30.md): the plugin runs `npx @playwright/mcp@latest`, a floating tag,
+  which ADR-0005 rules out. Use playwright-mcp, the same server pinned to a reviewed version.

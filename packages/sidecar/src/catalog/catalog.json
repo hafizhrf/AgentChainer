@@ -1,5 +1,5 @@
 {
-  "version": "2026.10.29",
+  "version": "2026.10.30",
   "items": [
     {
       "id": "actionlint",
@@ -45,7 +45,8 @@
       "requires": [],
       "risk": "low",
       "permissions": [
-        "Reads workflow files; makes no network calls"
+        "Reads the workflow files it's given; makes no network calls",
+        "Runs shellcheck and pyflakes on run: scripts when they're on your PATH"
       ],
       "secrets": [],
       "install": {
@@ -58,7 +59,14 @@
           }
         ]
       },
-      "reviews": []
+      "reviews": [
+        {
+          "by": "hafizhrf",
+          "date": "2026-10-30",
+          "ref": "v1.7.12",
+          "notes": "All 5 sha256 pins equal GitHub's digests and the upstream checksums file; SLSA provenance verified (gh attestation verify, darwin-x64) to release.yaml at v1.7.12 (914e7df). MIT. No network code in the binary. docs/catalog-reviews/2026-10-30.md"
+        }
+      ]
     },
     {
       "id": "cloudflare-security-audit",
@@ -68,7 +76,7 @@
       "license": "MIT",
       "homepage": "https://github.com/cloudflare/security-audit-skill",
       "summary": "Six-phase security audit that produces machine-readable findings.",
-      "why": "Finds real vulnerabilities, each with steps to validate it, instead of generic advice. It's thorough and slow, so run it on demand (before a release), not on every change.",
+      "why": "Claude reviews your code like a security auditor and reports only problems it can back with evidence, each with steps to check it, instead of generic advice. A full audit is thorough, slow and uses many model calls, so run it on demand (for example before a release), not on every change.",
       "source": {
         "type": "git",
         "repo": "https://github.com/cloudflare/security-audit-skill",
@@ -89,8 +97,9 @@
       ],
       "risk": "medium",
       "permissions": [
-        "Spawns several subagents during an audit",
-        "Runs the project's build and test commands while validating findings",
+        "In a full audit, spawns many subagents (4 to map the code, then hunters, reviewers and verifiers), which uses a lot of model usage",
+        "Writes its reports outside the project, by default in ~/security-audit-skill/<repo>/run-<N>",
+        "Runs the project's build and tests only inside an OS sandbox without network; without one it only reads code",
         "Runs node to check its own report files (the validators use only the file system)"
       ],
       "secrets": [],
@@ -113,16 +122,16 @@
         ]
       },
       "reviews": [],
-      "notes": "Pre-review scan at c1c8a8c (20 files): the two validator scripts require only fs, path and util; their tests spawn node locally; eval/exec appear only as text in ATTACK-CLASSES.md. No network calls found. A maintainer still has to read every file (docs/CATALOG.md §4)."
+      "notes": "Not approved yet (docs/catalog-reviews/2026-10-30.md). All 20 files at c1c8a8c were read (tree hash matches): no network calls or install steps, validators use only the file system. Blocking: its MIT notice lives at the repo root and isn't copied with the skill, which needs an app change. On Windows the validators reject all input, so a full audit can't finish there; guidance mode works."
     },
     {
       "id": "code-review",
       "name": "Code Review",
       "kind": "plugin",
       "tier": "official",
-      "license": "Apache-2.0 (marketplace repo)",
+      "license": "Apache-2.0",
       "summary": "Reviews a pull request with several specialized agents and keeps only confident findings.",
-      "why": "A second pair of eyes on every pull request: separate agents look at bugs, conventions and history, and only findings they are confident about are reported.",
+      "why": "Before you merge, several review agents check a GitHub pull request for clear bugs and for breaks of your CLAUDE.md rules. Each finding is double-checked, so only issues they are sure about are reported.",
       "source": {
         "type": "marketplace",
         "marketplace": "claude-plugins-official",
@@ -136,11 +145,17 @@
         "linux",
         "win32"
       ],
-      "requires": [],
+      "requires": [
+        {
+          "tool": "gh",
+          "hint": "Install the GitHub CLI (https://cli.github.com) and run gh auth login in your own terminal"
+        }
+      ],
       "risk": "low",
       "permissions": [
         "Adds a /code-review command",
-        "When you run it: reads the pull request and the repository, and runs several review agents"
+        "When you run it: reads a GitHub pull request with gh and runs 7 or more review agents (Haiku, Sonnet and Opus) that count against your Claude plan",
+        "With --comment: posts the review on the pull request with your gh login, without asking each time"
       ],
       "secrets": [],
       "install": {
@@ -174,7 +189,14 @@
           }
         ]
       },
-      "reviews": []
+      "reviews": [
+        {
+          "by": "hafizhrf",
+          "date": "2026-10-30",
+          "ref": "f8c5e7a1dcb71b10cb74586224b5401f3de5db28",
+          "notes": "Read plugin.json, commands/code-review.md, README and LICENSE at f8c5e7a (1.0.1): Apache-2.0; one command, no hooks, MCP servers, scripts or telemetry. Pre-approves read-only gh calls and gh pr comment; posts only with --comment; spawns review agents including Opus. docs/catalog-reviews/2026-10-30.md"
+        }
+      ]
     },
     {
       "id": "codebase-memory-mcp",
@@ -220,9 +242,10 @@
       "requires": [],
       "risk": "medium",
       "permissions": [
-        "Indexes the workspace into a local graph database in its own cache folder",
-        "Starts a background daemon that watches indexed git projects for changes",
-        "Runs locally; the project states it makes no network requests and collects no telemetry"
+        "Indexes code into a local database in ~/.cache/codebase-memory-mcp, shared by every project and agent on this account",
+        "Starts a per-account background process that watches the git projects of open sessions and re-indexes them",
+        "Claude can ask it to index any folder on this machine, delete an index, or save design notes in the index",
+        "Runs git; makes no network requests and collects no telemetry (checked in the 0.11.0 source and binary)"
       ],
       "secrets": [],
       "install": {
@@ -258,14 +281,14 @@
         ]
       },
       "reviews": [],
-      "notes": "AgentChainer never runs the project's install script: it edits the global config of every coding agent it finds and adds hooks, agents and skills. Only the binary is used, registered for this workspace."
+      "notes": "AgentChainer never runs the project's install script: it edits the global config of every coding agent it finds and adds hooks, agents and skills. Only the binary is used, registered for this workspace. Not approved at 0.11.0 (docs/catalog-reviews/2026-10-30.md): 0.12.0 fixed a heap overflow reachable through query_graph and two symlink escapes. Re-pin to 0.12.1 and review again; as a community item it needs two reviews. Every cbm process on the machine must run the same version, so another installed version conflicts."
     },
     {
       "id": "commit-commands",
       "name": "Commit Commands",
       "kind": "plugin",
       "tier": "official",
-      "license": "Apache-2.0 (marketplace repo)",
+      "license": "Apache-2.0",
       "summary": "Commands for committing, pushing and opening pull requests.",
       "why": "Turns the usual git routine into one command: Claude writes the commit message, pushes and can open the pull request.",
       "source": {
@@ -281,11 +304,18 @@
         "linux",
         "win32"
       ],
-      "requires": [],
+      "requires": [
+        {
+          "tool": "git",
+          "hint": "Install Git (https://git-scm.com)"
+        }
+      ],
       "risk": "medium",
       "permissions": [
         "Adds /commit, /commit-push-pr and /clean_gone commands",
-        "When you run them: runs git, and gh for pull requests"
+        "/commit stages and commits your changes; the git commands it needs run without asking",
+        "/commit-push-pr also pushes the branch to origin and opens a GitHub pull request with your gh login, without asking",
+        "/clean_gone deletes local branches whose remote branch is gone (git branch -D) and force-removes their worktrees, which can drop unpushed or uncommitted work"
       ],
       "secrets": [],
       "install": {
@@ -319,14 +349,22 @@
           }
         ]
       },
-      "reviews": []
+      "reviews": [
+        {
+          "by": "hafizhrf",
+          "date": "2026-10-30",
+          "ref": "f8c5e7a1dcb71b10cb74586224b5401f3de5db28",
+          "notes": "Read the 3 commands, plugin.json, README and LICENSE at f8c5e7a (1.0.1): Apache-2.0; no hooks, MCP servers or telemetry. Pre-approves git add/commit/push and gh pr create; /clean_gone uses branch -D and worktree remove --force. docs/catalog-reviews/2026-10-30.md"
+        }
+      ],
+      "notes": "/commit-push-pr needs the GitHub CLI (gh), installed and signed in. The plugin doesn't scan for secrets; the gitleaks hook covers that."
     },
     {
       "id": "context7",
       "name": "Context7 docs (Upstash)",
       "kind": "plugin",
       "tier": "verified-vendor",
-      "license": "see plugin (verify)",
+      "license": "Apache-2.0 (plugin files); the hosted service is under Context7's terms",
       "homepage": "https://github.com/upstash/context7",
       "summary": "Up-to-date, version-specific library documentation from Upstash's hosted Context7 service.",
       "why": "Claude looks up the current docs of the libraries you use instead of relying on what it remembers, which avoids outdated APIs.",
@@ -345,7 +383,7 @@
       "requires": [],
       "risk": "low",
       "permissions": [
-        "Sends library names and your questions to Upstash's hosted service (mcp.context7.com)",
+        "Sends library names and your questions (written by Claude, may include project details) to Upstash's hosted service (mcp.context7.com)",
         "May ask you to sign in to Context7"
       ],
       "secrets": [],
@@ -380,14 +418,22 @@
           }
         ]
       },
-      "reviews": []
+      "reviews": [
+        {
+          "by": "hafizhrf",
+          "date": "2026-10-30",
+          "ref": "f8c5e7a1dcb71b10cb74586224b5401f3de5db28",
+          "notes": "Read all 3 plugin files at f8c5e7a: an HTTP MCP server at mcp.context7.com; nothing runs locally; no environment variables or secrets are read; any sign-in goes through Claude Code's MCP OAuth. docs/catalog-reviews/2026-10-30.md"
+        }
+      ],
+      "notes": "Hosted MCP only: the service can change without a new pin. At f8c5e7a the plugin no longer reads CONTEXT7_API_KEY (removed upstream in #6333), although its README still says so. The marketplace tags this entry community-managed; it's listed here as verified-vendor (author: Upstash)."
     },
     {
       "id": "github",
       "name": "GitHub (official MCP)",
       "kind": "plugin",
       "tier": "verified-vendor",
-      "license": "MIT (verify)",
+      "license": "Apache-2.0 (plugin files); GitHub's hosted server (source MIT)",
       "homepage": "https://github.com/github/github-mcp-server",
       "summary": "GitHub's own MCP server: issues, pull requests, code search and the rest of the GitHub API.",
       "why": "Claude can read and update issues and pull requests directly, so tasks can start from an issue and end in a PR.",
@@ -406,8 +452,8 @@
       "requires": [],
       "risk": "high",
       "permissions": [
-        "Acts on GitHub with your personal access token: read and, depending on the token, write repositories, issues and pull requests",
-        "Talks to api.githubcopilot.com"
+        "Acts on GitHub as you with your personal access token: reads and, if the token allows, creates or changes files, branches, repositories, issues and pull requests (including merging)",
+        "Sends your token and every request to GitHub's hosted MCP server (api.githubcopilot.com)"
       ],
       "secrets": [
         "GITHUB_PERSONAL_ACCESS_TOKEN"
@@ -443,8 +489,15 @@
           }
         ]
       },
-      "reviews": [],
-      "notes": "The token is read from the environment by the CLI; AgentChainer never stores it (ADR-0002). Use a fine-grained token limited to the repositories you need."
+      "reviews": [
+        {
+          "by": "hafizhrf",
+          "date": "2026-10-30",
+          "ref": "f8c5e7a1dcb71b10cb74586224b5401f3de5db28",
+          "notes": "Read both plugin files at f8c5e7a: a remote MCP server at api.githubcopilot.com with Authorization: Bearer ${GITHUB_PERSONAL_ACCESS_TOKEN}; nothing runs locally; the server's default tool sets include write and merge tools. docs/catalog-reviews/2026-10-30.md"
+        }
+      ],
+      "notes": "The token is read from the environment by the CLI; AgentChainer never stores it (ADR-0002). Use a fine-grained token limited to the repositories you need. The plugin uses GitHub's full default tool set (read and write). If the variable isn't set, the server fails to connect."
     },
     {
       "id": "gitleaks",
@@ -491,7 +544,7 @@
       "risk": "low",
       "permissions": [
         "Reads the staged changes of each commit, locally; nothing is sent anywhere",
-        "Stops a commit that contains a secret (skip one check with SKIP=gitleaks, or git commit --no-verify)"
+        "Stops a commit that contains a secret. Mark a false positive with a gitleaks:allow comment or .gitleaksignore; skip the check once with git commit --no-verify"
       ],
       "secrets": [],
       "install": {
@@ -524,7 +577,14 @@
           }
         ]
       },
-      "reviews": [],
+      "reviews": [
+        {
+          "by": "hafizhrf",
+          "date": "2026-10-30",
+          "ref": "v8.30.1",
+          "notes": "All 5 sha256 pins equal GitHub's digests and the upstream checksums file; no signatures or attestations (the maintainer builds the binaries), so the pin is the protection. MIT. Runs only git diff --staged; no network calls. docs/catalog-reviews/2026-10-30.md"
+        }
+      ],
       "notes": "Teammates without gitleaks (or AgentChainer) aren't blocked: the committed hook prints a hint and lets the commit through."
     },
     {
@@ -532,7 +592,7 @@
       "name": "Go language server (gopls)",
       "kind": "plugin",
       "tier": "official",
-      "license": "Apache-2.0 (marketplace repo)",
+      "license": "Apache-2.0",
       "summary": "Gives Claude Go code intelligence and refactoring through gopls.",
       "why": "Claude can navigate Go packages and see compiler errors as it edits.",
       "source": {
@@ -551,7 +611,7 @@
       "requires": [
         {
           "tool": "gopls",
-          "hint": "go install golang.org/x/tools/gopls@latest"
+          "hint": "go install golang.org/x/tools/gopls@latest, then add $(go env GOPATH)/bin to your PATH"
         }
       ],
       "risk": "low",
@@ -590,7 +650,14 @@
           }
         ]
       },
-      "reviews": []
+      "reviews": [
+        {
+          "by": "hafizhrf",
+          "date": "2026-10-30",
+          "ref": "f8c5e7a1dcb71b10cb74586224b5401f3de5db28",
+          "notes": "Read the marketplace entry, README and LICENSE at f8c5e7a (1.0.0, the whole folder): Apache-2.0; a config-only LSP plugin that starts gopls from PATH; no hooks, MCP servers, scripts or telemetry. gopls may download the modules go.mod lists. docs/catalog-reviews/2026-10-30.md"
+        }
+      ]
     },
     {
       "id": "playwright-mcp",
@@ -613,10 +680,12 @@
         "win32"
       ],
       "requires": [],
-      "risk": "medium",
+      "risk": "high",
       "permissions": [
-        "Starts a browser and visits the pages Claude chooses",
-        "Runs npx, which downloads the pinned @playwright/mcp and its browser on first use"
+        "Starts your installed Google Chrome and visits the pages Claude chooses",
+        "Runs npx, which downloads the pinned @playwright/mcp and two Playwright packages from npm on first use",
+        "Has a tool that runs any JavaScript on your computer (browser_run_code_unsafe); Claude Code asks before each use unless you allow it",
+        "Starts each session with a fresh browser profile (--isolated): no cookies or logins are kept"
       ],
       "secrets": [],
       "install": {
@@ -631,7 +700,8 @@
                     "command": "npx",
                     "args": [
                       "-y",
-                      "@playwright/mcp@0.0.83"
+                      "@playwright/mcp@0.0.83",
+                      "--isolated"
                     ]
                   }
                 }
@@ -640,15 +710,22 @@
           }
         ]
       },
-      "reviews": [],
-      "notes": "Pinned to an exact version, unlike the playwright plugin, which runs @playwright/mcp@latest. Claude Code asks before using servers from a project's .mcp.json."
+      "reviews": [
+        {
+          "by": "hafizhrf",
+          "date": "2026-10-30",
+          "ref": "0.0.83",
+          "notes": "The 0.0.83 tarball's sha512 matches the pin and the registry, published with npm provenance. Read package.json, cli.js, index.js, README and LICENSE (Apache-2.0); dependencies are exact Playwright versions with no install scripts; no telemetry. Uses the system Chrome; browser_run_code_unsafe is on by default. docs/catalog-reviews/2026-10-30.md"
+        }
+      ],
+      "notes": "Pinned to an exact version, unlike the playwright plugin, which runs @playwright/mcp@latest. Claude Code asks before using servers from a project's .mcp.json. Needs Google Chrome (or run npx @playwright/mcp@0.0.83 install-browser chrome) and a display."
     },
     {
       "id": "playwright",
       "name": "Playwright browser (Microsoft)",
       "kind": "plugin",
       "tier": "verified-vendor",
-      "license": "Apache-2.0 (verify)",
+      "license": "Apache-2.0",
       "homepage": "https://github.com/microsoft/playwright-mcp",
       "summary": "Lets Claude drive a real browser: open pages, click, fill forms and take screenshots.",
       "why": "Claude can check a web UI end to end, the way a tester would, instead of only reading the code.",
@@ -670,10 +747,12 @@
           "hint": "Install Node.js (npx comes with it)"
         }
       ],
-      "risk": "medium",
+      "risk": "high",
       "permissions": [
-        "Starts a browser that Claude controls; it can open any URL",
-        "Runs npx to fetch the Playwright MCP server"
+        "Starts your installed Google Chrome, which Claude controls; it can open any URL",
+        "Runs npx @playwright/mcp@latest on every start: whatever version is newest at that moment, not a reviewed one",
+        "Has a tool that runs any JavaScript on your computer (browser_run_code_unsafe)",
+        "Keeps the browser's cookies and logins between sessions"
       ],
       "secrets": [],
       "install": {
@@ -708,14 +787,14 @@
         ]
       },
       "reviews": [],
-      "notes": "At the reviewed marketplace commit the plugin runs `npx @playwright/mcp@latest`, an unpinned version. ADR-0005 asks for pinned sources, so reviewers should weigh this or prefer a pinned MCP item."
+      "notes": "Not approved (docs/catalog-reviews/2026-10-30.md): the plugin runs `npx @playwright/mcp@latest`, a floating tag, which ADR-0005 rules out. Use playwright-mcp, the same server pinned to a reviewed version."
     },
     {
       "id": "pyright-lsp",
       "name": "Python language server (Pyright)",
       "kind": "plugin",
       "tier": "official",
-      "license": "Apache-2.0 (marketplace repo)",
+      "license": "Apache-2.0",
       "summary": "Gives Claude Python type checking and code intelligence through Pyright.",
       "why": "Claude sees type errors and definitions in Python code like an editor does.",
       "source": {
@@ -734,7 +813,7 @@
       "requires": [
         {
           "tool": "pyright-langserver",
-          "hint": "npm install -g pyright (or pip install pyright)"
+          "hint": "npm install -g pyright (or pipx install pyright)"
         }
       ],
       "risk": "low",
@@ -773,14 +852,21 @@
           }
         ]
       },
-      "reviews": []
+      "reviews": [
+        {
+          "by": "hafizhrf",
+          "date": "2026-10-30",
+          "ref": "f8c5e7a1dcb71b10cb74586224b5401f3de5db28",
+          "notes": "Read the marketplace entry, README and LICENSE at f8c5e7a (1.0.0, the whole folder): Apache-2.0; a config-only LSP plugin that starts pyright-langserver --stdio from PATH; no hooks, MCP servers, scripts or telemetry. docs/catalog-reviews/2026-10-30.md"
+        }
+      ]
     },
     {
       "id": "rust-analyzer-lsp",
       "name": "Rust language server (rust-analyzer)",
       "kind": "plugin",
       "tier": "official",
-      "license": "Apache-2.0 (marketplace repo)",
+      "license": "Apache-2.0",
       "summary": "Gives Claude Rust code intelligence through rust-analyzer.",
       "why": "Claude sees Rust type and borrow errors and definitions as it edits.",
       "source": {
@@ -804,7 +890,7 @@
       ],
       "risk": "low",
       "permissions": [
-        "Starts rust-analyzer in the project"
+        "Starts rust-analyzer in the project; it runs cargo, which can build and run the project's build scripts and macros and download crates"
       ],
       "secrets": [],
       "install": {
@@ -838,14 +924,21 @@
           }
         ]
       },
-      "reviews": []
+      "reviews": [
+        {
+          "by": "hafizhrf",
+          "date": "2026-10-30",
+          "ref": "f8c5e7a1dcb71b10cb74586224b5401f3de5db28",
+          "notes": "Read the marketplace entry, README and LICENSE at f8c5e7a (1.0.0, the whole folder): Apache-2.0; a config-only LSP plugin that starts rust-analyzer from PATH; no hooks, MCP servers, scripts or telemetry. The server runs cargo build scripts and proc macros, as any Rust editor does. docs/catalog-reviews/2026-10-30.md"
+        }
+      ]
     },
     {
       "id": "security-guidance",
       "name": "Security Guidance",
       "kind": "plugin",
       "tier": "official",
-      "license": "Apache-2.0 (marketplace repo)",
+      "license": "Apache-2.0",
       "summary": "Flags insecure patterns in Claude's edits and reviews the diff for vulnerabilities.",
       "why": "Catches injection, XSS, SSRF, hardcoded secrets and similar mistakes while Claude writes the code, not after it ships.",
       "source": {
@@ -861,12 +954,21 @@
         "linux",
         "win32"
       ],
-      "requires": [],
-      "risk": "medium",
+      "requires": [
+        {
+          "tool": "python3",
+          "hint": "Python 3.10 or newer (macOS's built-in 3.9 runs only the pattern warnings)"
+        }
+      ],
+      "risk": "high",
       "permissions": [
-        "Adds hooks that check every edit Claude makes for risky patterns",
-        "Runs an extra model review of the diff when Claude stops (uses your Claude plan)",
-        "Adds a commit reviewer agent"
+        "Checks every file Claude edits for risky code patterns and warns Claude (local, no network)",
+        "After each turn, sends the changed code to Claude Opus for a security review that isn't shown in your session's cost (uses your Claude plan or API key)",
+        "After git commit or push, a background reviewer reads related project files and sends them to the model",
+        "Can wake Claude after it finishes so it fixes the findings",
+        "On first use, installs the latest claude-agent-sdk from PyPI (a few hundred MB, not pinned) into ~/.claude/security",
+        "Keeps a log and state in ~/.claude/security, which uninstall doesn't remove",
+        "Reports usage counts to Anthropic through Claude Code's hook metrics"
       ],
       "secrets": [],
       "install": {
@@ -900,14 +1002,15 @@
           }
         ]
       },
-      "reviews": []
+      "reviews": [],
+      "notes": "Not approved at f8c5e7a (docs/catalog-reviews/2026-10-30.md): its hooks pip-install an unpinned claude-agent-sdk at runtime, which ADR-0005 rules out, and its model reviews spend outside the session's visible cost. It's no longer in the baseline profile. If you use it anyway: ENABLE_CODE_SECURITY_REVIEW=0 turns off the model reviews and the SDK install; SECURITY_GUIDANCE_DISABLE=1 turns the plugin off."
     },
     {
       "id": "typescript-lsp",
       "name": "TypeScript language server",
       "kind": "plugin",
       "tier": "official",
-      "license": "Apache-2.0 (marketplace repo)",
+      "license": "Apache-2.0",
       "summary": "Gives Claude TypeScript/JavaScript code intelligence through typescript-language-server.",
       "why": "Claude can jump to definitions and see type errors like an editor does, instead of guessing from text search.",
       "source": {
@@ -965,21 +1068,27 @@
           }
         ]
       },
-      "reviews": []
+      "reviews": [
+        {
+          "by": "hafizhrf",
+          "date": "2026-10-30",
+          "ref": "f8c5e7a1dcb71b10cb74586224b5401f3de5db28",
+          "notes": "Read the marketplace entry, README and LICENSE at f8c5e7a (1.0.0, the whole folder): Apache-2.0; a config-only LSP plugin that starts typescript-language-server --stdio from PATH; no hooks, MCP servers, scripts or telemetry. docs/catalog-reviews/2026-10-30.md"
+        }
+      ]
     }
   ],
   "profiles": [
     {
       "id": "baseline",
       "name": "Baseline",
-      "description": "Every workspace: review, commit and security help that pays off in any project.",
+      "description": "Every workspace: review, commit and secret-scan help that pays off in any project.",
       "suggest": {
         "always": true
       },
       "items": [
         "code-review",
         "commit-commands",
-        "security-guidance",
         "gitleaks"
       ]
     },

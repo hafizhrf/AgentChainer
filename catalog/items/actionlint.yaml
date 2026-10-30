@@ -31,9 +31,17 @@ source:
 platforms: [darwin, linux, win32]
 risk: low
 permissions:
-  - "Reads workflow files; makes no network calls"
+  - "Reads the workflow files it's given; makes no network calls"
+  - "Runs shellcheck and pyflakes on run: scripts when they're on your PATH"
 install:
   scope: local
   steps:
     - download-binary: { binary: actionlint }
-reviews: []
+reviews:
+  - by: hafizhrf
+    date: "2026-10-30"
+    ref: "v1.7.12"
+    notes: >-
+      All 5 sha256 pins equal GitHub's digests and the upstream checksums file; SLSA provenance verified (gh
+      attestation verify, darwin-x64) to release.yaml at v1.7.12 (914e7df). MIT. No network code in the binary.
+      docs/catalog-reviews/2026-10-30.md

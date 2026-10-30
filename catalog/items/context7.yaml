@@ -3,7 +3,7 @@ id: context7
 name: "Context7 docs (Upstash)"
 kind: plugin
 tier: verified-vendor
-license: "see plugin (verify)"
+license: "Apache-2.0 (plugin files); the hosted service is under Context7's terms"
 homepage: https://github.com/upstash/context7
 summary: "Up-to-date, version-specific library documentation from Upstash's hosted Context7 service."
 why: >-
@@ -18,7 +18,7 @@ source:
 platforms: [darwin, linux, win32]
 risk: low
 permissions:
-  - "Sends library names and your questions to Upstash's hosted service (mcp.context7.com)"
+  - "Sends library names and your questions (written by Claude, may include project details) to Upstash's hosted service (mcp.context7.com)"
   - "May ask you to sign in to Context7"
 install:
   scope: project
@@ -27,4 +27,14 @@ install:
 uninstall:
   steps:
     - run: [claude, plugin, uninstall, "context7@claude-plugins-official", --scope, project, --json]
-reviews: []
+reviews:
+  - by: hafizhrf
+    date: "2026-10-30"
+    ref: "f8c5e7a1dcb71b10cb74586224b5401f3de5db28"
+    notes: >-
+      Read all 3 plugin files at f8c5e7a: an HTTP MCP server at mcp.context7.com; nothing runs locally; no environment
+      variables or secrets are read; any sign-in goes through Claude Code's MCP OAuth. docs/catalog-reviews/2026-10-30.md
+notes: >-
+  Hosted MCP only: the service can change without a new pin. At f8c5e7a the plugin no longer reads
+  CONTEXT7_API_KEY (removed upstream in #6333), although its README still says so. The marketplace tags this entry
+  community-managed; it's listed here as verified-vendor (author: Upstash).

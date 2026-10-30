@@ -30,7 +30,25 @@ const SourceSchema = z.discriminatedUnion("type", [
     reviewedVersion: z.string().optional(),
     reviewedRef: Sha1,
   }),
-  z.object({ type: z.literal("git"), repo: z.url(), ref: Sha1, path: z.string(), sha256: Sha256 }),
+  z.object({
+    type: z.literal("git"),
+    repo: z.url(),
+    ref: Sha1,
+    path: z.string(),
+    sha256: Sha256,
+    /**
+     * The license file the copied folder needs with it, when it lives outside `path` (often at the repo root): pinned
+     * by its own sha256 and copied next to the files (M2-29).
+     */
+    license: z
+      .object({
+        path: z
+          .string()
+          .regex(/^(?!\/)(?!.*(?:^|\/)\.\.(?:\/|$))[^\\:]+$/, "a file path inside the repository, without `..`"),
+        sha256: Sha256,
+      })
+      .optional(),
+  }),
   z.object({
     type: z.literal("release-asset"),
     repo: z.url(),

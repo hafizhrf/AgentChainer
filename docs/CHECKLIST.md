@@ -831,8 +831,15 @@ All of these run on macOS, Windows and Ubuntu against a sample repo in `fixtures
 
 ### Follow-ups from the first catalog review ([2026-10-30](catalog-reviews/2026-10-30.md))
 
-- [ ] **M2-29** Carry license notices for git-source items: a `licensePath` pinned with its own hash and copied with
+- [x] **M2-29** Carry license notices for git-source items: a `licensePath` pinned with its own hash and copied with
       the files. This unblocks cloudflare-security-audit.
+      — evidence: git sources take `license: {path, sha256}` (a file inside the repository, no `..`). Apply checks it
+      with the tree hash before anything is written, copies it next to the files of each copy step (in the lock and
+      rolled back with them), and refuses when the copied folder already has a file of that name. The preview, the
+      weekly source check and the update bot cover it too. `cloudflare-security-audit` pins its root `LICENSE`
+      (sha256 `e598e694…`); `verify-catalog-sources.ts` passed for its tree and license (2026-10-30). Tests:
+      `apply.test.ts` (copied, wrong hash, name clash, rollback) and `schema.test.ts` (paths). The item still needs
+      its review before it's offered.
 - [x] **M2-30** The gitleaks hook wrapper prefers a gitleaks on PATH and doesn't hash-check the tools-folder copy:
       prefer the pinned copy and check it against its marker.
       — evidence: the committed wrapper (`git-hooks.ts`) looks for the item's exact pinned version in the app's tools

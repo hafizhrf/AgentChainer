@@ -64,14 +64,16 @@ type Update = {
   note: string;
 };
 
-/** Commits since `ref` on the default branch that touched files under `dir` (or anything, for ""). */
-async function changesSince(repo: string, ref: string, dir: string) {
+/** Commits since `ref` on the default branch that touched files under `dir` (or anything, for ""), or `alsoFile`. */
+async function changesSince(repo: string, ref: string, dir: string, alsoFile?: string) {
   const { default_branch } = await gh<{ default_branch: string }>(`repos/${repo}`);
   const head = (await gh<{ sha: string }>(`repos/${repo}/commits/${default_branch}`)).sha;
   if (head === ref) return { head, files: [] as string[], link: "" };
   const cmp = await gh<Compare>(`repos/${repo}/compare/${ref}...${head}`);
   const prefix = dir.replace(/^\.\//, "").replace(/\/?$/, "/");
-  const files = (cmp.files ?? []).map((f) => f.filename).filter((f) => !dir || dir === "." || f.startsWith(prefix));
+  const files = (cmp.files ?? [])
+    .map((f) => f.filename)
+    .filter((f) => !dir || dir === "." || f.startsWith(prefix) || f === alsoFile);
   return { head, files, link: cmp.html_url };
 }
 
@@ -112,10 +114,16 @@ async function check(item: Item): Promise<Update | null> {
   }
   if (src.type === "git") {
     const repo = repoOf(src.repo);
-    const { head, files, link } = await changesSince(repo, src.ref, src.path);
+    const { head, files, link } = await changesSince(repo, src.ref, src.path, src.license?.path);
     if (files.length === 0) return null;
     const tree = await fetchGitHubTree(src.repo, head, src.path);
     try {
+      // The license file is pinned too (M2-29); a bump re-hashes it (and fails when it's gone).
+      const license = src.license
+        ? createHash("sha256")
+            .update(readFileSync(path.join(tree.root, ...src.license.path.split("/"))))
+            .digest("hex")
+        : null;
       return {
         id: item.id,
         from: src.ref.slice(0, 7),
@@ -123,6 +131,7 @@ async function check(item: Item): Promise<Update | null> {
         changes: [
           [["source", "ref"], head],
           [["source", "sha256"], treeHash(tree.dir)],
+          ...(license ? [[["source", "license", "sha256"], license] as [(string | number)[], unknown]] : []),
         ],
         link,
         note: `${files.length} file(s) changed in ${src.path}`,

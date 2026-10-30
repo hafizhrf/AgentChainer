@@ -8,7 +8,7 @@ import { detectWorkspace } from "../detect/detect.ts";
 import type { CliResult } from "../installer.ts";
 import { git } from "../workspace.ts";
 import { type Check, GENERATORS, type Proposal } from "./generate.ts";
-import { type FetchTree, fetchGitHubTree, listFiles, treeHash } from "./git-source.ts";
+import { type FetchTree, fetchGitHubTree, listFiles, readLicense, treeHash } from "./git-source.ts";
 import { buildPlan, type PlanEnv } from "./plan.ts";
 import { itemChanges } from "./steps.ts";
 import { ensureTool, platformKey } from "./tools.ts";
@@ -440,6 +440,10 @@ async function applyOne(
       const got = treeHash(tree.dir);
       if (got !== src.sha256)
         throw new Error(`Hash mismatch for ${item.id}: expected ${src.sha256}, got ${got}. Not installed.`);
+      // The license the copied files need, from outside the copied folder (M2-29): checked before anything is written.
+      const notice = src.license
+        ? { name: path.posix.basename(src.license.path), bytes: readLicense(tree.root, src.license, item.id) }
+        : null;
       const written: string[] = [];
       for (const step of item.install.steps) {
         if (!("copy" in step)) throw new Error(`Unsupported install step for a git source: ${Object.keys(step)[0]}`);
@@ -447,10 +451,20 @@ async function applyOne(
         if (existsSync(abs(root, step.copy.to))) {
           throw new Error(`${step.copy.to} already exists. Remove it first, or keep your own version.`);
         }
-        for (const file of listFiles(from)) {
+        const files = listFiles(from);
+        if (notice && files.includes(notice.name)) {
+          throw new Error(
+            `${item.id} already has a ${notice.name} in its files, so its license can't go next to them.`,
+          );
+        }
+        for (const file of files) {
           const target = `${step.copy.to}/${file}`;
           tracker.write(rec.files, target, readFileSync(path.join(from, ...file.split("/"))));
           written.push(target);
+        }
+        if (notice) {
+          tracker.write(rec.files, `${step.copy.to}/${notice.name}`, notice.bytes);
+          written.push(`${step.copy.to}/${notice.name}`);
         }
       }
       rec.lock = { ...base, installedAt: now().toISOString(), files: written };

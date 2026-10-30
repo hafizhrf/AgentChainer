@@ -1,7 +1,14 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
-import { AgentEventSchema, methodSchemas, PERMISSION_MODES, PermissionRequestSchema } from "./index.ts";
+import {
+  AgentEventSchema,
+  CriterionCheckSchema,
+  methodSchemas,
+  PERMISSION_MODES,
+  PermissionRequestSchema,
+  TaskIdSchema,
+} from "./index.ts";
 import { schemaFileText } from "./schema-export.ts";
 
 describe("protocol schemas", () => {
@@ -40,6 +47,41 @@ describe("protocol schemas", () => {
       methodSchemas["session.tag"].params.parse({ cwd: "/r", sessionId, tag: " wip " }).tag,
       "wip",
       "tags are trimmed",
+    );
+  });
+
+  it("checks task contracts: criterion checks, task ids and tiers", () => {
+    for (const ok of ["gate:test", "gate:smoke", "review", "manual"])
+      assert.ok(CriterionCheckSchema.safeParse(ok).success, ok);
+    for (const bad of ["gate:", "gate:install", "gate:test ", "Review", ""]) {
+      assert.equal(CriterionCheckSchema.safeParse(bad).success, false, bad);
+    }
+    assert.ok(TaskIdSchema.safeParse("2026-10-30-1a2b3c4d").success);
+    for (const bad of ["../2026-10-30-1a2b3c4d", "2026-10-30-1A2B3C4D", "2026-10-30-1a2b3c4d/x"]) {
+      assert.equal(TaskIdSchema.safeParse(bad).success, false, bad);
+    }
+    const approve = methodSchemas["task.approve"].params;
+    const contract = {
+      task: "x",
+      objective: "y",
+      acceptanceCriteria: [{ id: "c1", text: "done", check: "manual" }],
+      constraints: [],
+      outOfScope: [],
+      risks: [],
+      affectedAreas: [],
+      openQuestions: [],
+    };
+    const base = { cwd: "/r", id: "2026-10-30-1a2b3c4d", contract, tier: "M", budgetUsd: 3 };
+    assert.ok(approve.safeParse(base).success);
+    assert.equal(approve.safeParse({ ...base, tier: "XXL" }).success, false);
+    assert.equal(approve.safeParse({ ...base, budgetUsd: 0 }).success, false);
+    assert.equal(
+      approve.safeParse({
+        ...base,
+        contract: { ...contract, acceptanceCriteria: [{ id: "c1", text: "", check: "manual" }] },
+      }).success,
+      false,
+      "empty criterion",
     );
   });
 

@@ -10,6 +10,7 @@ import { asMode } from "./tabs.ts";
 import { asTheme } from "./theme.ts";
 import { Field } from "./ui/Field.tsx";
 import { Select } from "./ui/Select.tsx";
+import { menuShortcut } from "./useMenuCommands.ts";
 
 type Hello = Methods["system.hello"]["result"];
 
@@ -157,6 +158,20 @@ export function SettingsDialog({
             Only reviewed first-party and official catalog items, plus fixes that only add lines (env rules in
             .gitignore, importing AGENTS.md). Never generators, git changes, or vendor and community items. What was
             applied shows in the session, and Workspace settings → History can roll it back.
+          </p>
+          <label className="check">
+            <input
+              type="checkbox"
+              checked={draft.tasksPreview === true}
+              onChange={(e) => setDraft({ ...draft, tasksPreview: e.target.checked || null })}
+            />
+            <span>
+              Tasks <span className="muted">(preview)</span>
+            </span>
+          </label>
+          <p className="field-help">
+            Adds New task ({menuShortcut("new-task")}): Claude drafts a contract for the work, triage proposes a tier,
+            and you approve both. Running tasks arrives in a later update.
           </p>
         </section>
 

@@ -3391,6 +3391,2445 @@
         ],
         "additionalProperties": false
       }
+    },
+    "task.create": {
+      "params": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "cwd": {
+            "type": "string",
+            "minLength": 1
+          },
+          "request": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 20000
+          }
+        },
+        "required": [
+          "cwd",
+          "request"
+        ],
+        "additionalProperties": false
+      },
+      "result": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}-[0-9a-f]{8}$"
+          },
+          "request": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "draft",
+              "ready"
+            ]
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "type": "string"
+          },
+          "contract": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "task": {
+                    "type": "string"
+                  },
+                  "objective": {
+                    "type": "string",
+                    "maxLength": 4000
+                  },
+                  "acceptanceCriteria": {
+                    "maxItems": 30,
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 20
+                        },
+                        "text": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 2000
+                        },
+                        "check": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "enum": [
+                                "review",
+                                "manual"
+                              ]
+                            },
+                            {
+                              "type": "string",
+                              "pattern": "^gate:(format|lint|typecheck|test|build|smoke)$"
+                            }
+                          ]
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "text",
+                        "check"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "constraints": {
+                    "maxItems": 30,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 2000
+                    }
+                  },
+                  "outOfScope": {
+                    "maxItems": 30,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 2000
+                    }
+                  },
+                  "risks": {
+                    "maxItems": 30,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 2000
+                    }
+                  },
+                  "affectedAreas": {
+                    "maxItems": 50,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 500
+                    }
+                  },
+                  "openQuestions": {
+                    "maxItems": 20,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 2000
+                    }
+                  },
+                  "approvedAt": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "task",
+                  "objective",
+                  "acceptanceCriteria",
+                  "constraints",
+                  "outOfScope",
+                  "risks",
+                  "affectedAreas",
+                  "openQuestions"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "triage": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "signals": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "signal": {
+                          "type": "string"
+                        },
+                        "detail": {
+                          "type": "string"
+                        },
+                        "floor": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "enum": [
+                                "S",
+                                "M",
+                                "L",
+                                "XL"
+                              ]
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        }
+                      },
+                      "required": [
+                        "signal",
+                        "detail",
+                        "floor"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "floor": {
+                    "type": "string",
+                    "enum": [
+                      "S",
+                      "M",
+                      "L",
+                      "XL"
+                    ]
+                  },
+                  "model": {
+                    "anyOf": [
+                      {
+                        "type": "object",
+                        "properties": {
+                          "tier": {
+                            "type": "string",
+                            "enum": [
+                              "S",
+                              "M",
+                              "L",
+                              "XL"
+                            ]
+                          },
+                          "rationale": {
+                            "type": "string"
+                          },
+                          "confidence": {
+                            "type": "string",
+                            "enum": [
+                              "low",
+                              "medium",
+                              "high"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "tier",
+                          "rationale",
+                          "confidence"
+                        ],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "modelError": {
+                    "type": "string"
+                  },
+                  "proposed": {
+                    "type": "string",
+                    "enum": [
+                      "S",
+                      "M",
+                      "L",
+                      "XL"
+                    ]
+                  },
+                  "chosen": {
+                    "type": "string",
+                    "enum": [
+                      "S",
+                      "M",
+                      "L",
+                      "XL"
+                    ]
+                  },
+                  "override": {
+                    "type": "object",
+                    "properties": {
+                      "reason": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    },
+                    "required": [
+                      "reason"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "budgetUsd": {
+                    "type": "number",
+                    "exclusiveMinimum": 0
+                  },
+                  "at": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "signals",
+                  "floor",
+                  "model",
+                  "proposed",
+                  "chosen",
+                  "budgetUsd",
+                  "at"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "availableGates": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "format",
+                "lint",
+                "typecheck",
+                "test",
+                "build",
+                "smoke"
+              ]
+            }
+          },
+          "costUsd": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "id",
+          "request",
+          "state",
+          "createdAt",
+          "updatedAt",
+          "contract",
+          "triage",
+          "availableGates",
+          "costUsd"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "task.draft": {
+      "params": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "cwd": {
+            "type": "string",
+            "minLength": 1
+          },
+          "id": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}-[0-9a-f]{8}$"
+          },
+          "model": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "cwd",
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "result": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}-[0-9a-f]{8}$"
+          },
+          "request": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "draft",
+              "ready"
+            ]
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "type": "string"
+          },
+          "contract": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "task": {
+                    "type": "string"
+                  },
+                  "objective": {
+                    "type": "string",
+                    "maxLength": 4000
+                  },
+                  "acceptanceCriteria": {
+                    "maxItems": 30,
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 20
+                        },
+                        "text": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 2000
+                        },
+                        "check": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "enum": [
+                                "review",
+                                "manual"
+                              ]
+                            },
+                            {
+                              "type": "string",
+                              "pattern": "^gate:(format|lint|typecheck|test|build|smoke)$"
+                            }
+                          ]
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "text",
+                        "check"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "constraints": {
+                    "maxItems": 30,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 2000
+                    }
+                  },
+                  "outOfScope": {
+                    "maxItems": 30,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 2000
+                    }
+                  },
+                  "risks": {
+                    "maxItems": 30,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 2000
+                    }
+                  },
+                  "affectedAreas": {
+                    "maxItems": 50,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 500
+                    }
+                  },
+                  "openQuestions": {
+                    "maxItems": 20,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 2000
+                    }
+                  },
+                  "approvedAt": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "task",
+                  "objective",
+                  "acceptanceCriteria",
+                  "constraints",
+                  "outOfScope",
+                  "risks",
+                  "affectedAreas",
+                  "openQuestions"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "triage": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "signals": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "signal": {
+                          "type": "string"
+                        },
+                        "detail": {
+                          "type": "string"
+                        },
+                        "floor": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "enum": [
+                                "S",
+                                "M",
+                                "L",
+                                "XL"
+                              ]
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        }
+                      },
+                      "required": [
+                        "signal",
+                        "detail",
+                        "floor"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "floor": {
+                    "type": "string",
+                    "enum": [
+                      "S",
+                      "M",
+                      "L",
+                      "XL"
+                    ]
+                  },
+                  "model": {
+                    "anyOf": [
+                      {
+                        "type": "object",
+                        "properties": {
+                          "tier": {
+                            "type": "string",
+                            "enum": [
+                              "S",
+                              "M",
+                              "L",
+                              "XL"
+                            ]
+                          },
+                          "rationale": {
+                            "type": "string"
+                          },
+                          "confidence": {
+                            "type": "string",
+                            "enum": [
+                              "low",
+                              "medium",
+                              "high"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "tier",
+                          "rationale",
+                          "confidence"
+                        ],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "modelError": {
+                    "type": "string"
+                  },
+                  "proposed": {
+                    "type": "string",
+                    "enum": [
+                      "S",
+                      "M",
+                      "L",
+                      "XL"
+                    ]
+                  },
+                  "chosen": {
+                    "type": "string",
+                    "enum": [
+                      "S",
+                      "M",
+                      "L",
+                      "XL"
+                    ]
+                  },
+                  "override": {
+                    "type": "object",
+                    "properties": {
+                      "reason": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    },
+                    "required": [
+                      "reason"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "budgetUsd": {
+                    "type": "number",
+                    "exclusiveMinimum": 0
+                  },
+                  "at": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "signals",
+                  "floor",
+                  "model",
+                  "proposed",
+                  "chosen",
+                  "budgetUsd",
+                  "at"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "availableGates": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "format",
+                "lint",
+                "typecheck",
+                "test",
+                "build",
+                "smoke"
+              ]
+            }
+          },
+          "costUsd": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "id",
+          "request",
+          "state",
+          "createdAt",
+          "updatedAt",
+          "contract",
+          "triage",
+          "availableGates",
+          "costUsd"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "task.retriage": {
+      "params": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "cwd": {
+            "type": "string",
+            "minLength": 1
+          },
+          "id": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}-[0-9a-f]{8}$"
+          },
+          "contract": {
+            "type": "object",
+            "properties": {
+              "task": {
+                "type": "string"
+              },
+              "objective": {
+                "type": "string",
+                "maxLength": 4000
+              },
+              "acceptanceCriteria": {
+                "maxItems": 30,
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 20
+                    },
+                    "text": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 2000
+                    },
+                    "check": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "enum": [
+                            "review",
+                            "manual"
+                          ]
+                        },
+                        {
+                          "type": "string",
+                          "pattern": "^gate:(format|lint|typecheck|test|build|smoke)$"
+                        }
+                      ]
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "text",
+                    "check"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "constraints": {
+                "maxItems": 30,
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 2000
+                }
+              },
+              "outOfScope": {
+                "maxItems": 30,
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 2000
+                }
+              },
+              "risks": {
+                "maxItems": 30,
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 2000
+                }
+              },
+              "affectedAreas": {
+                "maxItems": 50,
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 500
+                }
+              },
+              "openQuestions": {
+                "maxItems": 20,
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 2000
+                }
+              },
+              "approvedAt": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "task",
+              "objective",
+              "acceptanceCriteria",
+              "constraints",
+              "outOfScope",
+              "risks",
+              "affectedAreas",
+              "openQuestions"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "cwd",
+          "id",
+          "contract"
+        ],
+        "additionalProperties": false
+      },
+      "result": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}-[0-9a-f]{8}$"
+          },
+          "request": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "draft",
+              "ready"
+            ]
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "type": "string"
+          },
+          "contract": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "task": {
+                    "type": "string"
+                  },
+                  "objective": {
+                    "type": "string",
+                    "maxLength": 4000
+                  },
+                  "acceptanceCriteria": {
+                    "maxItems": 30,
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 20
+                        },
+                        "text": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 2000
+                        },
+                        "check": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "enum": [
+                                "review",
+                                "manual"
+                              ]
+                            },
+                            {
+                              "type": "string",
+                              "pattern": "^gate:(format|lint|typecheck|test|build|smoke)$"
+                            }
+                          ]
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "text",
+                        "check"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "constraints": {
+                    "maxItems": 30,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 2000
+                    }
+                  },
+                  "outOfScope": {
+                    "maxItems": 30,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 2000
+                    }
+                  },
+                  "risks": {
+                    "maxItems": 30,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 2000
+                    }
+                  },
+                  "affectedAreas": {
+                    "maxItems": 50,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 500
+                    }
+                  },
+                  "openQuestions": {
+                    "maxItems": 20,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 2000
+                    }
+                  },
+                  "approvedAt": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "task",
+                  "objective",
+                  "acceptanceCriteria",
+                  "constraints",
+                  "outOfScope",
+                  "risks",
+                  "affectedAreas",
+                  "openQuestions"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "triage": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "signals": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "signal": {
+                          "type": "string"
+                        },
+                        "detail": {
+                          "type": "string"
+                        },
+                        "floor": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "enum": [
+                                "S",
+                                "M",
+                                "L",
+                                "XL"
+                              ]
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        }
+                      },
+                      "required": [
+                        "signal",
+                        "detail",
+                        "floor"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "floor": {
+                    "type": "string",
+                    "enum": [
+                      "S",
+                      "M",
+                      "L",
+                      "XL"
+                    ]
+                  },
+                  "model": {
+                    "anyOf": [
+                      {
+                        "type": "object",
+                        "properties": {
+                          "tier": {
+                            "type": "string",
+                            "enum": [
+                              "S",
+                              "M",
+                              "L",
+                              "XL"
+                            ]
+                          },
+                          "rationale": {
+                            "type": "string"
+                          },
+                          "confidence": {
+                            "type": "string",
+                            "enum": [
+                              "low",
+                              "medium",
+                              "high"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "tier",
+                          "rationale",
+                          "confidence"
+                        ],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "modelError": {
+                    "type": "string"
+                  },
+                  "proposed": {
+                    "type": "string",
+                    "enum": [
+                      "S",
+                      "M",
+                      "L",
+                      "XL"
+                    ]
+                  },
+                  "chosen": {
+                    "type": "string",
+                    "enum": [
+                      "S",
+                      "M",
+                      "L",
+                      "XL"
+                    ]
+                  },
+                  "override": {
+                    "type": "object",
+                    "properties": {
+                      "reason": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    },
+                    "required": [
+                      "reason"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "budgetUsd": {
+                    "type": "number",
+                    "exclusiveMinimum": 0
+                  },
+                  "at": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "signals",
+                  "floor",
+                  "model",
+                  "proposed",
+                  "chosen",
+                  "budgetUsd",
+                  "at"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "availableGates": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "format",
+                "lint",
+                "typecheck",
+                "test",
+                "build",
+                "smoke"
+              ]
+            }
+          },
+          "costUsd": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "id",
+          "request",
+          "state",
+          "createdAt",
+          "updatedAt",
+          "contract",
+          "triage",
+          "availableGates",
+          "costUsd"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "task.approve": {
+      "params": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "cwd": {
+            "type": "string",
+            "minLength": 1
+          },
+          "id": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}-[0-9a-f]{8}$"
+          },
+          "contract": {
+            "type": "object",
+            "properties": {
+              "task": {
+                "type": "string"
+              },
+              "objective": {
+                "type": "string",
+                "maxLength": 4000
+              },
+              "acceptanceCriteria": {
+                "maxItems": 30,
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 20
+                    },
+                    "text": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 2000
+                    },
+                    "check": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "enum": [
+                            "review",
+                            "manual"
+                          ]
+                        },
+                        {
+                          "type": "string",
+                          "pattern": "^gate:(format|lint|typecheck|test|build|smoke)$"
+                        }
+                      ]
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "text",
+                    "check"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "constraints": {
+                "maxItems": 30,
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 2000
+                }
+              },
+              "outOfScope": {
+                "maxItems": 30,
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 2000
+                }
+              },
+              "risks": {
+                "maxItems": 30,
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 2000
+                }
+              },
+              "affectedAreas": {
+                "maxItems": 50,
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 500
+                }
+              },
+              "openQuestions": {
+                "maxItems": 20,
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 2000
+                }
+              },
+              "approvedAt": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "task",
+              "objective",
+              "acceptanceCriteria",
+              "constraints",
+              "outOfScope",
+              "risks",
+              "affectedAreas",
+              "openQuestions"
+            ],
+            "additionalProperties": false
+          },
+          "tier": {
+            "type": "string",
+            "enum": [
+              "S",
+              "M",
+              "L",
+              "XL"
+            ]
+          },
+          "reason": {
+            "type": "string"
+          },
+          "budgetUsd": {
+            "type": "number",
+            "exclusiveMinimum": 0,
+            "maximum": 1000
+          }
+        },
+        "required": [
+          "cwd",
+          "id",
+          "contract",
+          "tier",
+          "budgetUsd"
+        ],
+        "additionalProperties": false
+      },
+      "result": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}-[0-9a-f]{8}$"
+          },
+          "request": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "draft",
+              "ready"
+            ]
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "type": "string"
+          },
+          "contract": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "task": {
+                    "type": "string"
+                  },
+                  "objective": {
+                    "type": "string",
+                    "maxLength": 4000
+                  },
+                  "acceptanceCriteria": {
+                    "maxItems": 30,
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 20
+                        },
+                        "text": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 2000
+                        },
+                        "check": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "enum": [
+                                "review",
+                                "manual"
+                              ]
+                            },
+                            {
+                              "type": "string",
+                              "pattern": "^gate:(format|lint|typecheck|test|build|smoke)$"
+                            }
+                          ]
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "text",
+                        "check"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "constraints": {
+                    "maxItems": 30,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 2000
+                    }
+                  },
+                  "outOfScope": {
+                    "maxItems": 30,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 2000
+                    }
+                  },
+                  "risks": {
+                    "maxItems": 30,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 2000
+                    }
+                  },
+                  "affectedAreas": {
+                    "maxItems": 50,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 500
+                    }
+                  },
+                  "openQuestions": {
+                    "maxItems": 20,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 2000
+                    }
+                  },
+                  "approvedAt": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "task",
+                  "objective",
+                  "acceptanceCriteria",
+                  "constraints",
+                  "outOfScope",
+                  "risks",
+                  "affectedAreas",
+                  "openQuestions"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "triage": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "signals": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "signal": {
+                          "type": "string"
+                        },
+                        "detail": {
+                          "type": "string"
+                        },
+                        "floor": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "enum": [
+                                "S",
+                                "M",
+                                "L",
+                                "XL"
+                              ]
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        }
+                      },
+                      "required": [
+                        "signal",
+                        "detail",
+                        "floor"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "floor": {
+                    "type": "string",
+                    "enum": [
+                      "S",
+                      "M",
+                      "L",
+                      "XL"
+                    ]
+                  },
+                  "model": {
+                    "anyOf": [
+                      {
+                        "type": "object",
+                        "properties": {
+                          "tier": {
+                            "type": "string",
+                            "enum": [
+                              "S",
+                              "M",
+                              "L",
+                              "XL"
+                            ]
+                          },
+                          "rationale": {
+                            "type": "string"
+                          },
+                          "confidence": {
+                            "type": "string",
+                            "enum": [
+                              "low",
+                              "medium",
+                              "high"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "tier",
+                          "rationale",
+                          "confidence"
+                        ],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "modelError": {
+                    "type": "string"
+                  },
+                  "proposed": {
+                    "type": "string",
+                    "enum": [
+                      "S",
+                      "M",
+                      "L",
+                      "XL"
+                    ]
+                  },
+                  "chosen": {
+                    "type": "string",
+                    "enum": [
+                      "S",
+                      "M",
+                      "L",
+                      "XL"
+                    ]
+                  },
+                  "override": {
+                    "type": "object",
+                    "properties": {
+                      "reason": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    },
+                    "required": [
+                      "reason"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "budgetUsd": {
+                    "type": "number",
+                    "exclusiveMinimum": 0
+                  },
+                  "at": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "signals",
+                  "floor",
+                  "model",
+                  "proposed",
+                  "chosen",
+                  "budgetUsd",
+                  "at"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "availableGates": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "format",
+                "lint",
+                "typecheck",
+                "test",
+                "build",
+                "smoke"
+              ]
+            }
+          },
+          "costUsd": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "id",
+          "request",
+          "state",
+          "createdAt",
+          "updatedAt",
+          "contract",
+          "triage",
+          "availableGates",
+          "costUsd"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "task.revise": {
+      "params": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "cwd": {
+            "type": "string",
+            "minLength": 1
+          },
+          "id": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}-[0-9a-f]{8}$"
+          }
+        },
+        "required": [
+          "cwd",
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "result": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}-[0-9a-f]{8}$"
+          },
+          "request": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "draft",
+              "ready"
+            ]
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "type": "string"
+          },
+          "contract": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "task": {
+                    "type": "string"
+                  },
+                  "objective": {
+                    "type": "string",
+                    "maxLength": 4000
+                  },
+                  "acceptanceCriteria": {
+                    "maxItems": 30,
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 20
+                        },
+                        "text": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 2000
+                        },
+                        "check": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "enum": [
+                                "review",
+                                "manual"
+                              ]
+                            },
+                            {
+                              "type": "string",
+                              "pattern": "^gate:(format|lint|typecheck|test|build|smoke)$"
+                            }
+                          ]
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "text",
+                        "check"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "constraints": {
+                    "maxItems": 30,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 2000
+                    }
+                  },
+                  "outOfScope": {
+                    "maxItems": 30,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 2000
+                    }
+                  },
+                  "risks": {
+                    "maxItems": 30,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 2000
+                    }
+                  },
+                  "affectedAreas": {
+                    "maxItems": 50,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 500
+                    }
+                  },
+                  "openQuestions": {
+                    "maxItems": 20,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 2000
+                    }
+                  },
+                  "approvedAt": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "task",
+                  "objective",
+                  "acceptanceCriteria",
+                  "constraints",
+                  "outOfScope",
+                  "risks",
+                  "affectedAreas",
+                  "openQuestions"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "triage": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "signals": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "signal": {
+                          "type": "string"
+                        },
+                        "detail": {
+                          "type": "string"
+                        },
+                        "floor": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "enum": [
+                                "S",
+                                "M",
+                                "L",
+                                "XL"
+                              ]
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        }
+                      },
+                      "required": [
+                        "signal",
+                        "detail",
+                        "floor"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "floor": {
+                    "type": "string",
+                    "enum": [
+                      "S",
+                      "M",
+                      "L",
+                      "XL"
+                    ]
+                  },
+                  "model": {
+                    "anyOf": [
+                      {
+                        "type": "object",
+                        "properties": {
+                          "tier": {
+                            "type": "string",
+                            "enum": [
+                              "S",
+                              "M",
+                              "L",
+                              "XL"
+                            ]
+                          },
+                          "rationale": {
+                            "type": "string"
+                          },
+                          "confidence": {
+                            "type": "string",
+                            "enum": [
+                              "low",
+                              "medium",
+                              "high"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "tier",
+                          "rationale",
+                          "confidence"
+                        ],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "modelError": {
+                    "type": "string"
+                  },
+                  "proposed": {
+                    "type": "string",
+                    "enum": [
+                      "S",
+                      "M",
+                      "L",
+                      "XL"
+                    ]
+                  },
+                  "chosen": {
+                    "type": "string",
+                    "enum": [
+                      "S",
+                      "M",
+                      "L",
+                      "XL"
+                    ]
+                  },
+                  "override": {
+                    "type": "object",
+                    "properties": {
+                      "reason": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    },
+                    "required": [
+                      "reason"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "budgetUsd": {
+                    "type": "number",
+                    "exclusiveMinimum": 0
+                  },
+                  "at": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "signals",
+                  "floor",
+                  "model",
+                  "proposed",
+                  "chosen",
+                  "budgetUsd",
+                  "at"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "availableGates": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "format",
+                "lint",
+                "typecheck",
+                "test",
+                "build",
+                "smoke"
+              ]
+            }
+          },
+          "costUsd": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "id",
+          "request",
+          "state",
+          "createdAt",
+          "updatedAt",
+          "contract",
+          "triage",
+          "availableGates",
+          "costUsd"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "task.cancel": {
+      "params": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "cwd": {
+            "type": "string",
+            "minLength": 1
+          },
+          "id": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}-[0-9a-f]{8}$"
+          }
+        },
+        "required": [
+          "cwd",
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "result": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "cancelled": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "cancelled"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "task.list": {
+      "params": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "cwd": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "cwd"
+        ],
+        "additionalProperties": false
+      },
+      "result": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "tasks": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "pattern": "^\\d{4}-\\d{2}-\\d{2}-[0-9a-f]{8}$"
+                },
+                "request": {
+                  "type": "string"
+                },
+                "state": {
+                  "type": "string",
+                  "enum": [
+                    "draft",
+                    "ready"
+                  ]
+                },
+                "createdAt": {
+                  "type": "string"
+                },
+                "updatedAt": {
+                  "type": "string"
+                },
+                "costUsd": {
+                  "type": "number"
+                },
+                "tier": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "enum": [
+                        "S",
+                        "M",
+                        "L",
+                        "XL"
+                      ]
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              },
+              "required": [
+                "id",
+                "request",
+                "state",
+                "createdAt",
+                "updatedAt",
+                "costUsd",
+                "tier"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "tasks"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "task.get": {
+      "params": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "cwd": {
+            "type": "string",
+            "minLength": 1
+          },
+          "id": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}-[0-9a-f]{8}$"
+          }
+        },
+        "required": [
+          "cwd",
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "result": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}-[0-9a-f]{8}$"
+          },
+          "request": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "draft",
+              "ready"
+            ]
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "type": "string"
+          },
+          "contract": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "task": {
+                    "type": "string"
+                  },
+                  "objective": {
+                    "type": "string",
+                    "maxLength": 4000
+                  },
+                  "acceptanceCriteria": {
+                    "maxItems": 30,
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 20
+                        },
+                        "text": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 2000
+                        },
+                        "check": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "enum": [
+                                "review",
+                                "manual"
+                              ]
+                            },
+                            {
+                              "type": "string",
+                              "pattern": "^gate:(format|lint|typecheck|test|build|smoke)$"
+                            }
+                          ]
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "text",
+                        "check"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "constraints": {
+                    "maxItems": 30,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 2000
+                    }
+                  },
+                  "outOfScope": {
+                    "maxItems": 30,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 2000
+                    }
+                  },
+                  "risks": {
+                    "maxItems": 30,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 2000
+                    }
+                  },
+                  "affectedAreas": {
+                    "maxItems": 50,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 500
+                    }
+                  },
+                  "openQuestions": {
+                    "maxItems": 20,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 2000
+                    }
+                  },
+                  "approvedAt": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "task",
+                  "objective",
+                  "acceptanceCriteria",
+                  "constraints",
+                  "outOfScope",
+                  "risks",
+                  "affectedAreas",
+                  "openQuestions"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "triage": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "signals": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "signal": {
+                          "type": "string"
+                        },
+                        "detail": {
+                          "type": "string"
+                        },
+                        "floor": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "enum": [
+                                "S",
+                                "M",
+                                "L",
+                                "XL"
+                              ]
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        }
+                      },
+                      "required": [
+                        "signal",
+                        "detail",
+                        "floor"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "floor": {
+                    "type": "string",
+                    "enum": [
+                      "S",
+                      "M",
+                      "L",
+                      "XL"
+                    ]
+                  },
+                  "model": {
+                    "anyOf": [
+                      {
+                        "type": "object",
+                        "properties": {
+                          "tier": {
+                            "type": "string",
+                            "enum": [
+                              "S",
+                              "M",
+                              "L",
+                              "XL"
+                            ]
+                          },
+                          "rationale": {
+                            "type": "string"
+                          },
+                          "confidence": {
+                            "type": "string",
+                            "enum": [
+                              "low",
+                              "medium",
+                              "high"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "tier",
+                          "rationale",
+                          "confidence"
+                        ],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "modelError": {
+                    "type": "string"
+                  },
+                  "proposed": {
+                    "type": "string",
+                    "enum": [
+                      "S",
+                      "M",
+                      "L",
+                      "XL"
+                    ]
+                  },
+                  "chosen": {
+                    "type": "string",
+                    "enum": [
+                      "S",
+                      "M",
+                      "L",
+                      "XL"
+                    ]
+                  },
+                  "override": {
+                    "type": "object",
+                    "properties": {
+                      "reason": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    },
+                    "required": [
+                      "reason"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "budgetUsd": {
+                    "type": "number",
+                    "exclusiveMinimum": 0
+                  },
+                  "at": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "signals",
+                  "floor",
+                  "model",
+                  "proposed",
+                  "chosen",
+                  "budgetUsd",
+                  "at"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "availableGates": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "format",
+                "lint",
+                "typecheck",
+                "test",
+                "build",
+                "smoke"
+              ]
+            }
+          },
+          "costUsd": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "id",
+          "request",
+          "state",
+          "createdAt",
+          "updatedAt",
+          "contract",
+          "triage",
+          "availableGates",
+          "costUsd"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "task.delete": {
+      "params": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "cwd": {
+            "type": "string",
+            "minLength": 1
+          },
+          "id": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}-[0-9a-f]{8}$"
+          }
+        },
+        "required": [
+          "cwd",
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "result": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "const": true
+          }
+        },
+        "required": [
+          "ok"
+        ],
+        "additionalProperties": false
+      }
     }
   },
   "notifications": {

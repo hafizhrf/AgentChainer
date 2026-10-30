@@ -1,0 +1,468 @@
+{
+  "version": 1,
+  "about": "Triage benchmark (M3-E1): tasks against fixtures/, each with a written contract. `suggested` is the author's tier; `label` is the human reviewer's tier, which is what agreement is measured against. Run: node packages/sidecar/scripts/benchmark-triage.ts",
+  "tasks": [
+    {
+      "id": "sample-total-quantity",
+      "fixture": "sample-app",
+      "request": "total() ignores the quantity: multiply each item's price by its quantity.",
+      "contract": {
+        "objective": "Cart totals count every unit of each item.",
+        "acceptanceCriteria": [
+          { "text": "total() returns the sum of price × quantity", "check": "gate:test" },
+          { "text": "A test covers an item with quantity above 1", "check": "gate:test" }
+        ],
+        "constraints": ["Keep amounts in cents"],
+        "outOfScope": ["applyDiscount"],
+        "risks": ["Callers that already multiply by quantity would double-count"],
+        "affectedAreas": ["src/cart.js", "test/cart.test.js"],
+        "openQuestions": []
+      },
+      "suggested": "S",
+      "label": null
+    },
+    {
+      "id": "empty-readme-description",
+      "fixture": "empty",
+      "request": "Add a short description of the project to the README.",
+      "contract": {
+        "objective": "The README says what the project is in a few sentences.",
+        "acceptanceCriteria": [{ "text": "README has a description paragraph under the title", "check": "review" }],
+        "constraints": [],
+        "outOfScope": ["Setup instructions"],
+        "risks": [],
+        "affectedAreas": ["README.md"],
+        "openQuestions": ["What the project is for isn't in the repository yet"]
+      },
+      "suggested": "S",
+      "label": null
+    },
+    {
+      "id": "go-vet-in-lint",
+      "fixture": "go-service",
+      "request": "Make `make lint` also run go vet.",
+      "contract": {
+        "objective": "The lint target runs go vet before golangci-lint.",
+        "acceptanceCriteria": [{ "text": "make lint runs go vet ./... and fails when it fails", "check": "gate:lint" }],
+        "constraints": [],
+        "outOfScope": ["New linters"],
+        "risks": [],
+        "affectedAreas": ["Makefile"],
+        "openQuestions": []
+      },
+      "suggested": "S",
+      "label": null
+    },
+    {
+      "id": "fastapi-health-version",
+      "fixture": "python-uv-fastapi",
+      "request": "Include the app version in the /health response.",
+      "contract": {
+        "objective": "/health reports the version from pyproject.toml.",
+        "acceptanceCriteria": [
+          { "text": "/health returns {status, version}", "check": "gate:test" },
+          { "text": "The version matches pyproject.toml", "check": "gate:test" }
+        ],
+        "constraints": ["Keep the status field"],
+        "outOfScope": [],
+        "risks": [],
+        "affectedAreas": ["app/main.py", "tests/test_main.py"],
+        "openQuestions": []
+      },
+      "suggested": "S",
+      "label": null
+    },
+    {
+      "id": "vite-strict-index",
+      "fixture": "ts-pnpm-vite",
+      "request": "Turn on noUncheckedIndexedAccess in tsconfig.",
+      "contract": {
+        "objective": "Index access is checked by the compiler.",
+        "acceptanceCriteria": [
+          { "text": "tsconfig.json sets noUncheckedIndexedAccess", "check": "review" },
+          { "text": "The project still typechecks", "check": "gate:typecheck" }
+        ],
+        "constraints": [],
+        "outOfScope": ["Other compiler options"],
+        "risks": ["New type errors in existing code"],
+        "affectedAreas": ["tsconfig.json"],
+        "openQuestions": []
+      },
+      "suggested": "S",
+      "label": null
+    },
+    {
+      "id": "flutter-title",
+      "fixture": "flutter-app",
+      "request": "Change the app title to \"Shopping List\".",
+      "contract": {
+        "objective": "The app shows Shopping List as its title.",
+        "acceptanceCriteria": [
+          { "text": "MaterialApp title is Shopping List", "check": "review" },
+          { "text": "Analysis passes", "check": "gate:lint" }
+        ],
+        "constraints": [],
+        "outOfScope": [],
+        "risks": [],
+        "affectedAreas": ["lib/main.dart"],
+        "openQuestions": []
+      },
+      "suggested": "S",
+      "label": null
+    },
+    {
+      "id": "sample-coupons",
+      "fixture": "sample-app",
+      "request": "Add coupons: applyCoupon(cart, code) with percentage and fixed-amount coupons, and tests.",
+      "contract": {
+        "objective": "Carts can take a percentage or fixed-amount coupon.",
+        "acceptanceCriteria": [
+          { "text": "Percentage coupons reuse applyDiscount", "check": "review" },
+          { "text": "Fixed-amount coupons never make the total negative", "check": "gate:test" },
+          { "text": "Unknown codes leave the total unchanged", "check": "gate:test" }
+        ],
+        "constraints": ["Amounts stay in cents"],
+        "outOfScope": ["Coupon storage"],
+        "risks": ["Rounding differences between coupon types"],
+        "affectedAreas": ["src/coupons.js", "src/cart.js", "test/coupons.test.js"],
+        "openQuestions": []
+      },
+      "suggested": "M",
+      "label": null
+    },
+    {
+      "id": "go-sum-endpoint",
+      "fixture": "go-service",
+      "request": "Add GET /sum?a=&b= with chi that returns Add's result as JSON, with a test.",
+      "contract": {
+        "objective": "The service answers sums over HTTP.",
+        "acceptanceCriteria": [
+          { "text": "GET /sum?a=2&b=3 returns {\"sum\":5}", "check": "gate:test" },
+          { "text": "Invalid numbers return 400", "check": "gate:test" }
+        ],
+        "constraints": ["Use chi, which go.mod already declares"],
+        "outOfScope": ["Other operations"],
+        "risks": [],
+        "affectedAreas": ["main.go", "main_test.go", "handler.go"],
+        "openQuestions": []
+      },
+      "suggested": "M",
+      "label": null
+    },
+    {
+      "id": "fastapi-items",
+      "fixture": "python-uv-fastapi",
+      "request": "Add /items endpoints (create, list, get, delete) backed by an in-memory store, with tests.",
+      "contract": {
+        "objective": "The API manages items in memory.",
+        "acceptanceCriteria": [
+          { "text": "Each endpoint has a test", "check": "gate:test" },
+          { "text": "Unknown ids return 404", "check": "gate:test" },
+          { "text": "Types check", "check": "gate:typecheck" }
+        ],
+        "constraints": [],
+        "outOfScope": ["Persistence"],
+        "risks": ["Items are lost on restart"],
+        "affectedAreas": ["app/main.py", "app/items.py", "tests/test_items.py"],
+        "openQuestions": []
+      },
+      "suggested": "M",
+      "label": null
+    },
+    {
+      "id": "vite-counter",
+      "fixture": "ts-pnpm-vite",
+      "request": "Add a counter component with increment and reset, wired into main.ts, with a vitest test.",
+      "contract": {
+        "objective": "The page has a working counter.",
+        "acceptanceCriteria": [
+          { "text": "Increment and reset are tested", "check": "gate:test" },
+          { "text": "Lint and types pass", "check": "gate:lint" }
+        ],
+        "constraints": ["No new dependencies"],
+        "outOfScope": ["Styling"],
+        "risks": [],
+        "affectedAreas": ["src/counter.ts", "src/counter.test.ts", "src/main.ts"],
+        "openQuestions": []
+      },
+      "suggested": "M",
+      "label": null
+    },
+    {
+      "id": "flutter-todo-screen",
+      "fixture": "flutter-app",
+      "request": "Add a todo screen where items can be added and removed, with widget tests.",
+      "contract": {
+        "objective": "Users can keep a simple todo list.",
+        "acceptanceCriteria": [
+          { "text": "Adding and removing are covered by widget tests", "check": "gate:test" },
+          { "text": "Analysis passes", "check": "gate:lint" }
+        ],
+        "constraints": [],
+        "outOfScope": ["Saving the list"],
+        "risks": [],
+        "affectedAreas": ["lib/main.dart", "lib/todo_screen.dart", "test/todo_screen_test.dart"],
+        "openQuestions": []
+      },
+      "suggested": "M",
+      "label": null
+    },
+    {
+      "id": "monorepo-button",
+      "fixture": "monorepo-pnpm",
+      "request": "Implement the ui package's Button with a label and an onClick prop, and a test.",
+      "contract": {
+        "objective": "packages/ui exports a usable Button.",
+        "acceptanceCriteria": [
+          { "text": "Button renders its label and calls onClick", "check": "gate:test" },
+          { "text": "Biome passes", "check": "gate:lint" }
+        ],
+        "constraints": ["Keep the export name"],
+        "outOfScope": ["Using it in apps/web"],
+        "risks": [],
+        "affectedAreas": ["packages/ui/src/index.ts", "packages/ui/src/button.test.ts"],
+        "openQuestions": []
+      },
+      "suggested": "M",
+      "label": null
+    },
+    {
+      "id": "fastapi-jwt",
+      "fixture": "python-uv-fastapi",
+      "request": "Add JWT authentication: a /login endpoint, and protect every route except /health.",
+      "contract": {
+        "objective": "Only logged-in users can call the API.",
+        "acceptanceCriteria": [
+          { "text": "Requests without a valid token get 401", "check": "gate:test" },
+          { "text": "/health stays public", "check": "gate:test" },
+          { "text": "The signing key comes from the environment", "check": "review" }
+        ],
+        "constraints": ["No secrets in the repository"],
+        "outOfScope": ["User registration"],
+        "risks": ["A weak key or missing expiry weakens every route"],
+        "affectedAreas": ["app/main.py", "app/auth.py", "tests/test_auth.py", "pyproject.toml"],
+        "openQuestions": ["Where users and passwords come from"]
+      },
+      "suggested": "L",
+      "label": null
+    },
+    {
+      "id": "legacy-env",
+      "fixture": "legacy-messy",
+      "request": "Stop committing .env: load settings from environment variables and document them, without leaking secrets.",
+      "contract": {
+        "objective": "Configuration comes from the environment, and nothing secret is tracked.",
+        "acceptanceCriteria": [
+          { "text": ".env is untracked and ignored", "check": "review" },
+          { "text": "Both servers read DEBUG from the environment", "check": "review" },
+          { "text": "The README lists every variable", "check": "manual" }
+        ],
+        "constraints": [],
+        "outOfScope": ["Rewriting the servers"],
+        "risks": ["Secrets already in git history stay there"],
+        "affectedAreas": [".env", ".gitignore", "server.js", "app.py", "README.md"],
+        "openQuestions": []
+      },
+      "suggested": "L",
+      "label": null
+    },
+    {
+      "id": "monorepo-shared-lint",
+      "fixture": "monorepo-pnpm",
+      "request": "Use the ui Button in apps/web, and share one Biome config across all packages.",
+      "contract": {
+        "objective": "The web app uses the shared Button, and every package lints the same way.",
+        "acceptanceCriteria": [
+          { "text": "apps/web depends on and imports Button", "check": "review" },
+          { "text": "One Biome config applies to every package", "check": "gate:lint" }
+        ],
+        "constraints": [],
+        "outOfScope": ["Next.js pages beyond one example"],
+        "risks": ["Workspace dependency resolution", "Lint rules that newly fail"],
+        "affectedAreas": ["apps/web/package.json", "apps/web/app/page.tsx", "packages/ui/package.json", "biome.json"],
+        "openQuestions": []
+      },
+      "suggested": "L",
+      "label": null
+    },
+    {
+      "id": "sample-payment",
+      "fixture": "sample-app",
+      "request": "Add a checkout step that charges the cart total through a PaymentProvider interface, with a fake provider for tests.",
+      "contract": {
+        "objective": "Carts can be paid through a pluggable payment provider.",
+        "acceptanceCriteria": [
+          { "text": "checkout charges total() once", "check": "gate:test" },
+          { "text": "A declined payment leaves the cart unpaid", "check": "gate:test" }
+        ],
+        "constraints": ["No real provider SDK"],
+        "outOfScope": ["Refunds"],
+        "risks": ["Double charges on retry"],
+        "affectedAreas": ["src/checkout.js", "src/payment.js", "test/checkout.test.js"],
+        "openQuestions": []
+      },
+      "suggested": "L",
+      "label": null
+    },
+    {
+      "id": "go-postgres",
+      "fixture": "go-service",
+      "request": "Store sums in PostgreSQL through a repository, with a schema migration.",
+      "contract": {
+        "objective": "Computed sums are persisted.",
+        "acceptanceCriteria": [
+          { "text": "The repository is tested against a test database", "check": "gate:test" },
+          { "text": "The migration creates the table and can be rolled back", "check": "review" }
+        ],
+        "constraints": ["Connection settings from the environment"],
+        "outOfScope": ["Reading sums back over HTTP"],
+        "risks": ["Migrations that can't be reversed"],
+        "affectedAreas": ["repository.go", "repository_test.go", "migrations/", "go.mod"],
+        "openQuestions": ["Which migration tool to use"]
+      },
+      "suggested": "L",
+      "label": null
+    },
+    {
+      "id": "vite-pages-deploy",
+      "fixture": "ts-pnpm-vite",
+      "request": "Add a CI job that builds the app and deploys it to GitHub Pages on pushes to main.",
+      "contract": {
+        "objective": "main is published to GitHub Pages automatically.",
+        "acceptanceCriteria": [
+          { "text": "The deploy job runs only on main, after build", "check": "review" },
+          { "text": "The job's permissions are the minimum Pages needs", "check": "review" }
+        ],
+        "constraints": ["Pin actions by SHA"],
+        "outOfScope": ["Preview deployments"],
+        "risks": ["Over-broad workflow permissions"],
+        "affectedAreas": [".github/workflows/ci.yml", "vite.config.ts"],
+        "openQuestions": []
+      },
+      "suggested": "L",
+      "label": null
+    },
+    {
+      "id": "flutter-secure-token",
+      "fixture": "flutter-app",
+      "request": "Keep the user's login token in flutter_secure_storage instead of memory.",
+      "contract": {
+        "objective": "The login token survives restarts without being stored in plain text.",
+        "acceptanceCriteria": [
+          { "text": "The token is written and read through flutter_secure_storage", "check": "gate:test" },
+          { "text": "Logging out deletes it", "check": "gate:test" }
+        ],
+        "constraints": [],
+        "outOfScope": ["The login flow itself"],
+        "risks": ["Platform keychain differences"],
+        "affectedAreas": ["lib/token_store.dart", "lib/main.dart", "pubspec.yaml", "test/token_store_test.dart"],
+        "openQuestions": []
+      },
+      "suggested": "L",
+      "label": null
+    },
+    {
+      "id": "legacy-express-to-flask",
+      "fixture": "legacy-messy",
+      "request": "Migrate the Express server to Flask so the project has a single Python backend, keeping every route.",
+      "contract": {
+        "objective": "One Python backend serves everything the Express server did.",
+        "acceptanceCriteria": [
+          { "text": "Every Express route exists in Flask with the same behavior", "check": "review" },
+          { "text": "package.json and server.js are gone", "check": "review" },
+          { "text": "The app starts with make run", "check": "manual" }
+        ],
+        "constraints": [],
+        "outOfScope": ["New features"],
+        "risks": ["Behavior differences between the frameworks", "Clients that call the Node port"],
+        "affectedAreas": ["server.js", "app.py", "package.json", "requirements.txt", "Makefile"],
+        "openQuestions": ["Which port the merged server listens on"]
+      },
+      "suggested": "XL",
+      "label": null
+    },
+    {
+      "id": "monorepo-to-nx",
+      "fixture": "monorepo-pnpm",
+      "request": "Move the monorepo to Nx: project graph, caching and build, test and lint targets for every package.",
+      "contract": {
+        "objective": "Nx runs every package's tasks with caching.",
+        "acceptanceCriteria": [
+          { "text": "nx run-many runs build, test and lint for each package", "check": "manual" },
+          { "text": "Existing scripts keep working", "check": "gate:test" }
+        ],
+        "constraints": ["Keep pnpm as the package manager"],
+        "outOfScope": ["Remote caching"],
+        "risks": ["CI and scripts that call pnpm -r directly"],
+        "affectedAreas": [
+          "package.json",
+          "nx.json",
+          "apps/web/project.json",
+          "packages/ui/project.json",
+          "pnpm-workspace.yaml"
+        ],
+        "openQuestions": []
+      },
+      "suggested": "XL",
+      "label": null
+    },
+    {
+      "id": "vite-spa",
+      "fixture": "ts-pnpm-vite",
+      "request": "Build the app out into a React SPA: routing, a state store, an API client, five pages, and tests for each page.",
+      "contract": {
+        "objective": "A multi-page SPA with shared state and an API layer.",
+        "acceptanceCriteria": [
+          { "text": "Each page has tests", "check": "gate:test" },
+          { "text": "Lint, types and build pass", "check": "gate:build" }
+        ],
+        "constraints": [],
+        "outOfScope": ["A backend"],
+        "risks": ["Scope creep", "Large dependency additions"],
+        "affectedAreas": ["src/", "package.json", "index.html"],
+        "openQuestions": ["What the five pages are"]
+      },
+      "suggested": "XL",
+      "label": null
+    },
+    {
+      "id": "fastapi-services",
+      "fixture": "python-uv-fastapi",
+      "request": "Split the API into users, items and orders services, each with its own database, behind a gateway.",
+      "contract": {
+        "objective": "Three services and a gateway replace the single app.",
+        "acceptanceCriteria": [
+          { "text": "Each service has its own tests", "check": "gate:test" },
+          { "text": "The gateway routes to all three", "check": "gate:test" }
+        ],
+        "constraints": [],
+        "outOfScope": ["Deployment"],
+        "risks": ["Data consistency across services"],
+        "affectedAreas": ["services/users/", "services/items/", "services/orders/", "gateway/", "app/"],
+        "openQuestions": ["How services authenticate to each other"]
+      },
+      "suggested": "XL",
+      "label": null
+    },
+    {
+      "id": "go-multitenant",
+      "fixture": "go-service",
+      "request": "Add multi-tenancy: tenant isolation in every handler, per-tenant configuration, and partitioned data.",
+      "contract": {
+        "objective": "Each tenant's requests and data are isolated.",
+        "acceptanceCriteria": [
+          { "text": "Requests without a tenant are rejected", "check": "gate:test" },
+          { "text": "One tenant can't read another's data", "check": "gate:test" },
+          { "text": "Per-tenant config loads at startup", "check": "review" }
+        ],
+        "constraints": [],
+        "outOfScope": ["Billing per tenant"],
+        "risks": ["Data leaking between tenants"],
+        "affectedAreas": ["main.go", "tenant/", "config/", "handlers/"],
+        "openQuestions": ["How a tenant is identified"]
+      },
+      "suggested": "XL",
+      "label": null
+    }
+  ]
+}

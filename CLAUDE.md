@@ -69,6 +69,7 @@ Prerequisites:
 | Rust tests | `cargo test --workspace` |
 | Spike harness: real model calls with your own `claude` login (haiku, a few cents) | `node packages/sidecar/scripts/spike-host.ts --cwd <empty scratch dir> [--scenario basic\|mode\|interrupt\|guard\|auto\|subagents\|sessions\|approvals\|plan\|fixtures\|image\|all] [--record raw.jsonl]` |
 | M1 exit criteria E1–E5 on `fixtures/sample-app` (real model calls; a few cents to ~$0.30) | `node packages/sidecar/scripts/spike-host.ts --cwd <empty dir> --scenario exit` |
+| Triage benchmark (M3-E1): agreement with the labeled tiers in `test/triage-benchmark.json` (haiku, ~$0.02; `--signals-only` makes no model calls) | `node packages/sidecar/scripts/benchmark-triage.ts [--signals-only] [--draft]` |
 | Re-download every pinned git source in `catalog/` and check its sha256 (network) | `node packages/sidecar/scripts/verify-catalog-sources.ts` |
 | Validate `catalog/` and compile the snapshot the app ships (after changing catalog items or profiles) | `node packages/sidecar/scripts/build-catalog.ts` |
 | Regenerate the detector/audit/plan snapshots of `fixtures/` after changing detection, the plan or the catalog | `UPDATE_SNAPSHOTS=1 node --test packages/sidecar/src/detect/detect.test.ts packages/sidecar/src/bootstrap/plan.test.ts` |

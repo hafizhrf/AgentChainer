@@ -1,7 +1,7 @@
 # Design: adaptive planner, task contracts and evidence (M3)
 
-- **Status:** Draft, for owner review. M3-01 says no M3 code is written before this is approved. The owner's
-  decisions of 2026-10-30 are in §15.
+- **Status:** Approved (owner, 2026-10-30; decisions in §15). Delivery step 1 (contract and triage) is built behind
+  the **Tasks (preview)** setting.
 - **Date:** 2026-10-30
 - **Covers:** M3-02…M3-10 and the exit criteria M3-E1/E2. Scope source: PRD [F3](../PRD.md#f3--adaptive-planner-task-contracts-and-evidence-p1).
 - **Builds on:**
@@ -43,9 +43,11 @@ The model can propose. It never certifies.
 ```mermaid
 stateDiagram-v2
   [*] --> Draft: user describes the task
-  Draft --> Contracted: Claude drafts the contract, the user edits and approves
-  Contracted --> Triaged: tier proposed (signals + cheap model), the user accepts or overrides
-  Triaged --> Running: the workflow template for the tier runs
+  Draft --> Proposed: Claude drafts the contract, triage proposes a tier on the draft
+  Proposed --> Proposed: the user edits; an edited contract is triaged again
+  Proposed --> Ready: the user approves the contract and the tier together
+  Ready --> Proposed: Revise
+  Ready --> Running: the workflow template for the tier runs
   Running --> Gating: write steps finished
   Gating --> Fixing: a required gate failed and the fix budget is left
   Fixing --> Gating
@@ -62,14 +64,15 @@ stateDiagram-v2
 
 1. **New task.** It's next to "New session" (Home, ⌘⇧N, the palette). The user writes the request as they would in
    chat.
-2. **Contract.**
+2. **Contract and triage, on one screen.**
    - A read-only session drafts a `TaskContract` as structured output. It's grounded in the repo: it reads files
      (Read, Grep, Glob) but can't write.
-   - The user edits it in a form and approves it. Nothing can change files before approval.
-   - S tasks show it too, with a single **Approve and run**.
-3. **Triage.**
-   - A card shows the proposed tier, the signals behind it, and the cheap model's rationale.
-   - The user can pick another tier. The override and its reason are recorded.
+   - Triage runs on the draft right away. A card next to the contract form shows the proposed tier, the signals
+     behind it, and the cheap model's rationale.
+   - The user edits the contract and can pick another tier; the override and its reason are recorded. An edited
+     contract must be triaged again before approval, so the tier always matches the contract.
+   - One approval covers the contract and the tier. Nothing can change files before it. S tasks get a single
+     **Approve and run** once tasks can run (step 2); it's why triage runs on the draft (owner, 2026-10-30).
 4. **Run.**
    - The tier's workflow runs as a sequence of steps. Each step is its own Claude session, visible in the UI like any
      session, with approvals in the user's profile.
@@ -94,28 +97,37 @@ Stored as `contract.json` (schema in `packages/protocol`, zod):
 | `outOfScope` | string[] | What the task explicitly won't touch |
 | `risks` | string[] | What could go wrong; feeds triage and the report |
 | `affectedAreas` | string[] | Workspace paths or globs Claude expects to touch (from reading the repo) |
-| `approvedAt`, `approvedBy` | | Set when the user approves; the contract is read-only after that, except through "Revise" |
+| `openQuestions` | string[] | What the request leaves undecided. The user settles them by editing the contract |
+| `approvedAt` | | Set when the user approves; the contract is read-only after that, except through "Revise". There's no `approvedBy`: the approver is always the local user, and no identity is stored (ADR-0002) |
 
 **Drafting:**
 - The draft comes from a read-only session using `outputFormat: { type: "json_schema" }`, the same mechanism the M2
   generators use for structured output.
 - The model is the user's default model (§15).
-- If the request is too vague for criteria, the draft says so in `risks`, and the form asks the user to clarify.
+- If the request is too vague for criteria, the draft lists `openQuestions`, and the form shows them first.
+- The output is normalized before anyone sees it: criteria are numbered, a check that names a gate the profile has
+  no command for becomes `manual`, and areas outside the workspace are dropped.
 
 **Editing:** the form lets the user add, remove and reword every field. A criterion with no `check` is `manual` by
 default, so it can't silently count as proved.
 
 ## 4. Triage (M3-03)
 
-**Deterministic signals.** All are computed in the sidecar, without a model, and shown on the triage card:
+**Deterministic signals.** All are computed in the sidecar (`tasks/triage.ts`), without a model, and shown on the
+triage card. The thresholds are first values, tuned with the benchmark:
 
-| Signal | How | Pushes towards |
+| Signal | How | Floor |
 |---|---|---|
-| Scope | Files and folders in `affectedAreas` that exist; how many top-level areas they span. The code graph replaces this when it's available | M/L/XL as it grows |
-| Risk keywords | In the task and contract: auth, login, password, token, secret, payment, billing, migration, schema, database, infra, deploy, permissions, crypto, delete | At least L |
-| Repo size | File count and lines of code from the workspace listing | Larger repos raise the floor slightly |
-| Tests exist | The profile has a `test` command | No tests: a warning, and the template adds "write tests first" for M and above |
-| Breadth words | "everywhere", "all", "migrate", "refactor the", "rename across" | L/XL |
+| Risk keywords | auth, login, password, token, secret, credential, payment, billing, migration, schema, database, infra, deploy, permission, crypto, encryption, as whole words with common endings. Read from the request, objective, criteria, risks and area paths; not from constraints or out-of-scope, which name what the task won't touch | L |
+| Breadth | "everywhere", "across the codebase", "migrate", "rename across", "refactor the", … in the request or objective | L |
+| Scope | The parts `affectedAreas` span: a monorepo package, or a top-level folder (root files count as one). Test paths don't count: tests sit next to the code they cover. The code graph replaces this when it's available | 2–3 parts: M. 4 or more, or 40+ existing files under the areas: L |
+| Repo size | File count from the workspace listing | Above 10 000 files: M |
+| Tests exist | The profile has a `test` command | None: a warning; the template adds "write tests first" for M and above |
+| New areas | Areas with no existing files | None: listed only |
+
+`delete` from the first keyword list is left out for now, because it would make small clean-ups ("delete an unused
+import") L; the labeled benchmark decides whether it comes back. No rule forces XL; only the model or the user picks
+it.
 
 **Classification:**
 - A cheap model call (Haiku, structured output) gets the contract and the signals, and returns `{ tier, rationale,
@@ -125,10 +137,14 @@ default, so it can't silently count as proved.
 - The user's override always wins and is recorded in the evidence.
 
 **Measuring it (M3-E1):**
-- `scripts/benchmark-triage.ts` runs triage over at least 20 fixture tasks written against `fixtures/`. The tiers are
-  labeled by a person (the owner).
-- It reports agreement. The target is 80% or more; we measure the baseline first, then tune keywords and the prompt.
-- One run costs cents (Haiku).
+- `packages/sidecar/scripts/benchmark-triage.ts` runs triage over the 24 tasks in
+  `packages/sidecar/test/triage-benchmark.json`, written against `fixtures/` with a contract each. The tiers are
+  labeled by a person (the owner) in `label`; until then the script compares with the author's `suggested` tier.
+- It reports agreement for the floor alone, the model alone and combined, and a confusion matrix. The target is 80%
+  or more; we measure the baseline first, then tune keywords and the prompt. One run costs about $0.02 (Haiku).
+- A unit test checks that no rule sets a floor above a task's tier, which catches over-eager keywords.
+- **First baseline (2026-10-30), against the suggested tiers:** floor alone 12/24, model alone 19/24, triage 20/24
+  (83%). The misses: two small fixes the model called M, and two XL tasks it called L.
 
 ## 5. Workflow templates (M3-04) and the agent library (M3-05)
 
@@ -204,9 +220,10 @@ A sidecar module (`packages/sidecar/src/tasks/`) runs a template as a state mach
 - **Cancel** interrupts the running steps and leaves the working tree as it is: rewind and git still work as in
   sessions.
 
-**Protocol (sketch):**
-- **Requests:** `task.create`, `task.draftContract`, `task.approveContract`, `task.triage`, `task.start`,
-  `task.cancel`, `task.acceptRisk`, `task.list`, `task.get`, `task.exportEvidence`.
+**Protocol:**
+- **Requests in step 1:** `task.create`, `task.draft` (contract, then triage), `task.retriage`, `task.approve`,
+  `task.revise`, `task.cancel`, `task.list`, `task.get`, `task.delete`.
+- **Later steps add** `task.start`, `task.acceptRisk` and `task.exportEvidence`.
 - **Events:**
   - `task.updated` carries the state and step changes;
   - step sessions emit the normal agent events, tagged with `taskId` and `stepId`, so the transcript UI and the later
@@ -355,8 +372,11 @@ Grouped into fewer, larger PRs:
      budget accounts for the higher price.
 4. **Budgets:** S $1, M $3, L $8, XL $5 per sub-task. Fix rounds are capped at 2. These are tuned after the
    benchmark, and the user can change them on the triage card.
+5. **Triage runs on the draft,** and one approval covers the contract and the tier (§2).
+6. **Preview:** until tasks can run (step 2), New task appears only with **Tasks (preview)** on in Settings, so a
+   release from `main` shows nothing half-finished.
 
 **Still open:**
-5. **Benchmark labels:** the owner labels the fixture tasks' tiers before tuning. M3-E1 needs a human reviewer; this
-   is needed with delivery step 1.
-6. **Name in the UI:** "Task" is used unless the owner prefers another name.
+7. **Benchmark labels:** the owner labels the 24 benchmark tasks (`label` in `triage-benchmark.json`) before tuning.
+   M3-E1 needs a human reviewer.
+8. **Name in the UI:** "Task" is used unless the owner prefers another name.

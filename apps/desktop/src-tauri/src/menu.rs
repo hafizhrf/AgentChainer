@@ -14,6 +14,7 @@ const REPO: &str = "https://github.com/hafizhrf/AgentChainer";
 /// Item ids the UI handles. Keep in sync with `MENU_COMMANDS` in `src/useMenuCommands.ts` (a UI test checks this).
 pub const UI_COMMANDS: &[&str] = &[
     "new-session",
+    "new-task",
     "open-folder",
     "close-session",
     "settings",
@@ -53,11 +54,14 @@ fn item<R: Runtime>(
 pub fn build<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
     let settings = item(app, "settings", "Settings…", Some("CmdOrCtrl+Comma"))?;
     let new_session = item(app, "new-session", "New Session", Some("CmdOrCtrl+N"))?;
+    // Only acts when the Tasks preview is on (Settings); the UI ignores it otherwise.
+    let new_task = item(app, "new-task", "New Task", Some("CmdOrCtrl+Shift+N"))?;
     let open_folder = item(app, "open-folder", "Open Folder…", Some("CmdOrCtrl+O"))?;
     let close_session = item(app, "close-session", "Close Session", Some("CmdOrCtrl+W"))?;
 
     let file = SubmenuBuilder::new(app, "File")
         .item(&new_session)
+        .item(&new_task)
         .item(&open_folder)
         .separator()
         .item(&close_session);

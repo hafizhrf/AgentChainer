@@ -1,4 +1,4 @@
-import { CircleAlert, CircleCheck, Folder, Loader2, Plus, Settings } from "lucide-react";
+import { CircleAlert, CircleCheck, ClipboardList, Folder, Loader2, Plus, Settings } from "lucide-react";
 
 import { folderName, type Tab } from "./tabs.ts";
 import { ActionMenu } from "./ui/ActionMenu.tsx";
@@ -15,6 +15,7 @@ export function Sidebar({
   recent,
   ready,
   onNew,
+  onNewTask,
   onSelect,
   onClose,
   onOpenWorkspace,
@@ -27,6 +28,8 @@ export function Sidebar({
   /** null while the readiness check hasn't run yet. */
   ready: boolean | null;
   onNew: () => void;
+  /** Set only while the Tasks preview is on. */
+  onNewTask?: () => void;
   onSelect: (sessionId: string) => void;
   onClose: (sessionId: string) => void;
   onOpenWorkspace: (dir: string) => void;
@@ -41,6 +44,13 @@ export function Sidebar({
           New session
           <kbd>{menuShortcut("new-session")}</kbd>
         </button>
+        {onNewTask && (
+          <button type="button" className="new-session secondary" onClick={onNewTask}>
+            <ClipboardList size={16} />
+            New task
+            <kbd>{menuShortcut("new-task")}</kbd>
+          </button>
+        )}
       </div>
 
       <div className="sidebar-scroll">

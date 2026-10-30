@@ -45,6 +45,7 @@ import { menuShortcut, useMenuCommands } from "./useMenuCommands.ts";
 // The setup page shares the file-type icon set with the workspace panel; both load on first use.
 const REPO = "https://github.com/hafizhrf/AgentChainer";
 const SetupPage = lazy(() => import("./setup/SetupPage.tsx").then((m) => ({ default: m.SetupPage })));
+const TaskPage = lazy(() => import("./tasks/TaskPage.tsx").then((m) => ({ default: m.TaskPage })));
 
 /** Guards against React StrictMode running the mount effect twice in dev. */
 let selftestStarted = false;
@@ -95,6 +96,8 @@ export function App() {
     back: string | null;
     view?: SetupView;
   } | null>(null);
+  /** The task page (M3 preview), open over the session it came from (or Home when `back` is null). */
+  const [taskView, setTaskView] = useState<{ cwd: string; model: string; back: string | null } | null>(null);
   /** Self-test screenshots only: the right panel's tab. */
   const [panelTab, setPanelTab] = useState<PanelTab | undefined>(undefined);
   const [showFirstChange, setShowFirstChange] = useState(false);
@@ -567,9 +570,10 @@ export function App() {
     }
   }
 
-  /** Shows a session, or Home for null; closes the setup page if it's open. */
+  /** Shows a session, or Home for null; closes the setup and task pages if they're open. */
   function show(sessionId: string | null) {
     setSetup(null);
+    setTaskView(null);
     setActive(sessionId);
   }
 
@@ -592,11 +596,26 @@ export function App() {
     }
   }
 
+  /** Opens the task page for the active session's folder, or Home's; only with the Tasks preview on. */
+  function newTask() {
+    if (settings?.tasksPreview !== true) return;
+    const t = tabs.find((x) => x.sessionId === active);
+    const dir = t?.cwd ?? cwd.trim();
+    if (!dir) {
+      show(null);
+      setRuntimeNotice("Choose a workspace folder first, then start a task.");
+      return;
+    }
+    setSetup(null);
+    setTaskView({ cwd: dir, model: t?.modelAlias ?? model, back: t?.sessionId ?? null });
+  }
+
   const toggleTerminal = (sessionId: string) =>
     setTerminals((open) => withToggled(open, sessionId, !open.has(sessionId)));
 
   useMenuCommands({
     "new-session": () => show(null),
+    "new-task": newTask,
     "open-folder": () => void openFolder(),
     "close-session": () => active && closeTab(active),
     settings: () => setSettingsOpen(true),
@@ -620,6 +639,8 @@ export function App() {
       cmds.push({ group, id, title, run, ...extra });
 
     add("Session", "new-session", "New session", () => show(null), { shortcut: menuShortcut("new-session") });
+    if (settings?.tasksPreview === true)
+      add("Session", "new-task", "New task (preview)", newTask, { shortcut: menuShortcut("new-task") });
     add("Session", "open-folder", "Open folder…", () => void openFolder(), { shortcut: menuShortcut("open-folder") });
     if (t) {
       if (t.running)
@@ -725,10 +746,12 @@ export function App() {
             <Panel id="sidebar" defaultSize={248} minSize={200} maxSize={400} groupResizeBehavior="preserve-pixel-size">
               <Sidebar
                 tabs={tabs}
-                active={active}
+                // A page over the session (Workspace settings, a task) is what's shown, not the session.
+                active={setup || taskView ? null : active}
                 recent={settings?.recentWorkspaces ?? []}
                 ready={env ? env.ready : null}
                 onNew={() => show(null)}
+                {...(settings?.tasksPreview === true ? { onNewTask: newTask } : {})}
                 onSelect={show}
                 onClose={closeTab}
                 onOpenWorkspace={openWorkspace}
@@ -748,7 +771,7 @@ export function App() {
                 </div>
               )}
               <div className="main-body">
-                {active === null && !setup && (
+                {active === null && !setup && !taskView && (
                   <HomeView
                     env={env}
                     checking={checking}
@@ -774,7 +797,7 @@ export function App() {
                   <SessionView
                     key={t.sessionId}
                     tab={t}
-                    hidden={t.sessionId !== active || setup !== null}
+                    hidden={t.sessionId !== active || setup !== null || taskView !== null}
                     panelTab={panelTab}
                     hiddenTabs={hiddenTabs}
                     onHiddenTabsChange={(next) => setHiddenTabs(() => next)}
@@ -808,6 +831,18 @@ export function App() {
                       confirm={confirm}
                       onBack={() => setSetup(null)}
                       {...(setup.view ? { initialView: setup.view } : {})}
+                    />
+                  </Suspense>
+                )}
+                {taskView && !setup && (
+                  <Suspense fallback={<div className="setup-page" />}>
+                    <TaskPage
+                      key={taskView.cwd}
+                      cwd={taskView.cwd}
+                      model={taskView.model}
+                      backLabel={taskView.back ? "Back to session" : "Back to Home"}
+                      confirm={confirm}
+                      onBack={() => setTaskView(null)}
                     />
                   </Suspense>
                 )}

@@ -29,12 +29,15 @@ AgentChainer never signs you in, and never reads or stores your credentials ([AD
 | Crash logs | `sidecar-crash-*.log` in Logs | The last lines the agent runtime printed before it stopped. |
 | Layout | The app's web storage | Panel sizes, and whether panels are open. |
 
-**In your project folder**, AgentChainer only writes when you apply a workspace setup:
+**In your project folder**, AgentChainer only writes when you apply a workspace setup, save the workspace profile, or
+work on a task (preview):
 - the files the plan showed you;
 - `.agentchainer/`, which holds:
   - backups and run records, so you can roll back;
   - hook scripts;
-  - a record of items installed only for you, which is kept out of git.
+  - a record of items installed only for you, which is kept out of git;
+  - the profile, kept out of git;
+  - your tasks: each one's request, contract and triage (`tasks/`), kept out of git.
 
 **Sessions** are the Claude CLI's own session files. AgentChainer lists and resumes them through the Agent SDK and
 doesn't keep a copy ([ADR-0004](adr/0004-session-data.md)).

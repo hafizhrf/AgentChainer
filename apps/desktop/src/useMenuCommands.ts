@@ -5,6 +5,7 @@ import { shortcut } from "./options.ts";
 /** Native menu items that reach the UI (UX-07). Keep in sync with `UI_COMMANDS` in `src-tauri/src/menu.rs`. */
 export const MENU_COMMANDS = [
   "new-session",
+  "new-task",
   "open-folder",
   "close-session",
   "settings",
@@ -26,6 +27,7 @@ export const asMenuCommand = (id: unknown): MenuCommand | null => MENU_COMMANDS.
  */
 export const MENU_SHORTCUTS: Partial<Record<MenuCommand, { key: string; shift?: boolean }>> = {
   "new-session": { key: "N" },
+  "new-task": { key: "N", shift: true },
   "open-folder": { key: "O" },
   "close-session": { key: "W" },
   settings: { key: "," },

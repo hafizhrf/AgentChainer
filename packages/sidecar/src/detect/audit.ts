@@ -1,6 +1,7 @@
-import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import type { Finding, WorkspaceProfile } from "@agentchainer/protocol";
+import { AC_DIR, ensureIgnored } from "../ac-dir.ts";
 import { git, repoOf } from "../workspace.ts";
 
 /**
@@ -299,14 +300,8 @@ function parseJson(text: string | null): Record<string, unknown> | null {
  * keeps it out of git; the bootstrap lockfile that lands next to it later is meant to be committed.
  */
 export function saveProfile(root: string, profile: WorkspaceProfile): string {
-  const dir = path.join(root, ".agentchainer");
-  mkdirSync(dir, { recursive: true });
-  const ignore = path.join(dir, ".gitignore");
-  const current = existsSync(ignore) ? readFileSync(ignore, "utf8") : "";
-  if (!current.split("\n").includes("profile.json")) {
-    writeFileSync(ignore, `${current}${current && !current.endsWith("\n") ? "\n" : ""}profile.json\n`);
-  }
-  const file = path.join(dir, "profile.json");
+  ensureIgnored(root, "profile.json");
+  const file = path.join(root, AC_DIR, "profile.json");
   writeFileSync(file, `${JSON.stringify(profile, null, 2)}\n`);
   return file;
 }

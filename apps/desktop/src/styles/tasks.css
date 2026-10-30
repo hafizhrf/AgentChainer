@@ -1,0 +1,263 @@
+/*
+ * Tasks (M3 preview): the request, then the contract form and the triage card side by side, approved together.
+ * The page reuses Workspace settings' frame (`.setup-page`, `.setup-header`, `.setup-scroll`, `.plan-footer`).
+ */
+
+.task-review {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 340px;
+  gap: var(--space-4);
+  align-items: start;
+}
+
+.task-scroll > .task-review {
+  max-width: 1180px;
+}
+
+.task-triage {
+  position: sticky;
+  top: 0;
+}
+
+@media (max-width: 1180px) {
+  .task-review {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .task-triage {
+    position: static;
+  }
+}
+
+.task-request {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  border-left: 3px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  font-size: var(--text-sm);
+  white-space: pre-wrap;
+}
+
+.task-drafting {
+  flex-direction: row;
+  align-items: center;
+}
+
+.task-drafting p {
+  margin: 2px 0 0;
+}
+
+.task-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+fieldset.task-field {
+  margin: 0;
+  padding: 0;
+  border: none;
+}
+
+fieldset.task-field legend {
+  margin-bottom: var(--space-1);
+  padding: 0;
+}
+
+.task-columns {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: var(--space-4);
+}
+
+.task-questions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.task-questions strong {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.task-questions p {
+  margin: 0;
+}
+
+/* Editable lists (ui/EditableList.tsx) */
+
+.editable-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.editable-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.editable-row input {
+  flex: 1;
+  min-width: 0;
+  padding-top: 5px;
+  padding-bottom: 5px;
+  font-size: var(--text-sm);
+}
+
+.editable-row input.mono {
+  font-family: var(--font-mono);
+}
+
+.editable-add {
+  align-self: flex-start;
+}
+
+.editable-empty {
+  margin: 0;
+  font-size: var(--text-sm);
+}
+
+/* Triage */
+
+.task-why {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.task-signals,
+.task-criteria,
+.task-list {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.task-signals {
+  gap: var(--space-2);
+  font-size: var(--text-sm);
+}
+
+.task-signals li,
+.task-criteria li {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+}
+
+.task-signal-name {
+  flex-shrink: 0;
+  width: 88px;
+  color: var(--muted);
+  font-size: var(--text-xs);
+  text-transform: capitalize;
+}
+
+.task-tiers {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}
+
+.task-tiers .chip {
+  min-height: 28px;
+  padding: 0 var(--space-3);
+  font-size: var(--text-sm);
+}
+
+.tier-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 28px;
+  height: 22px;
+  padding: 0 6px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-3);
+  color: var(--fg);
+  font-size: var(--text-xs);
+  font-weight: 700;
+}
+
+.tier-badge.tier-M {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.tier-badge.tier-L {
+  background: var(--warn-bg);
+  color: var(--warn);
+}
+
+.tier-badge.tier-XL {
+  background: var(--err-bg);
+  color: var(--err);
+}
+
+.task-criteria {
+  gap: var(--space-2);
+  font-size: var(--text-sm);
+}
+
+.task-fact {
+  display: contents;
+}
+
+/* The list of tasks */
+
+.task-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 0 var(--space-1);
+  border-radius: var(--radius-sm);
+}
+
+.task-row:hover {
+  background: var(--surface-2);
+}
+
+.task-row-main {
+  flex: 1;
+  min-width: 0;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0;
+  padding: var(--space-2) 0;
+  border: none;
+  background: none;
+  color: var(--fg);
+  font-weight: 400;
+  text-align: left;
+}
+
+.task-row-main:hover:not(:disabled) {
+  background: none;
+}
+
+.task-row-main .muted {
+  font-size: var(--text-xs);
+}
+
+.task-row-title {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* New task sits right under New session in the sidebar. */
+.sidebar-top .new-session + .new-session {
+  margin-top: calc(var(--space-2) * -1);
+}

@@ -242,7 +242,7 @@ Sources: [cloudflare/security-audit-skill](https://github.com/cloudflare/securit
 ```
 
 - `backups/<run-id>/` holds `run.json` (what the run did, including CLI changes to undo) and the previous content of
-  every file the run changed. `.agentchainer/.gitignore` keeps it (and `profile.json`) out of git. It's used for
+  every file the run changed. `.agentchainer/.gitignore` keeps it (and `profile.json` and `tasks/`) out of git. It's used for
   byte-exact rollback, and a whole-run rollback removes it.
 - `fixes` records deterministic fixes from the readiness audit (`.gitignore` env rules, untracking `.env`, …).
 - `local`-scope items are private to the user, so they're recorded in `.agentchainer/local.json`, which

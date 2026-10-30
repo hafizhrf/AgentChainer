@@ -1025,6 +1025,8 @@ Decisions: [ADR-0009](adr/0009-release-signing-and-updates.md). Maintainer steps
 → PRD [F3](PRD.md#f3--adaptive-planner-task-contracts-and-evidence-p1)
 
 - [ ] **M3-01** Design doc `docs/design/planner.md`, approved before any code.
+      - Draft (2026-10-30): [planner.md](design/planner.md), with six open questions for the owner (§15).
+      - Remaining: owner review and approval.
 - [ ] **M3-02** TaskContract schema: task, objective, constraints, acceptance criteria / Definition of Done, out-of-scope,
       risk notes. The agent drafts it as structured output; the user edits and approves it.
 - [ ] **M3-03** Triage into tiers S/M/L/XL, with a rationale the user can override. Inputs:

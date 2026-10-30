@@ -75,3 +75,14 @@ export function duration(start: string, end: string | undefined, now = Date.now(
 }
 
 export const passedGate = (g: GateRun) => g.exitCode === 0 && !g.timedOut;
+
+/**
+ * The version of a task to show. A run's notifications can overtake the reply of the request that started it, so a
+ * reply only replaces what's shown when it's strictly newer; a notification also when it's as new.
+ */
+export function newer(current: Task | null, next: Task, from: "reply" | "notification"): Task {
+  if (!current || current.id !== next.id) return next;
+  const a = Date.parse(current.updatedAt);
+  const b = Date.parse(next.updatedAt);
+  return b > a || (from === "notification" && b === a) ? next : current;
+}

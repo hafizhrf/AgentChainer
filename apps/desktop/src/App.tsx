@@ -525,6 +525,18 @@ export function App() {
     }
   }
 
+  /** Stops the run a step's approval belongs to; its other pending approvals go with it. */
+  async function stopTaskStep(req: PermissionRequest) {
+    const task = req.task;
+    if (!task) return;
+    setTaskApprovals((q) => q.filter((p) => p.task?.id !== task.id));
+    try {
+      await request("task.cancel", { cwd: task.cwd, id: task.id });
+    } catch (err) {
+      setRuntimeNotice(`Couldn't stop the task: ${err}`);
+    }
+  }
+
   /** "Rewind files to here" (M1-23): preview, confirm with the documented limits, then restore. */
   async function rewind(sessionId: string, messageId: string) {
     try {
@@ -917,6 +929,7 @@ export function App() {
             cwd={stepApproval.task.cwd}
             canAutonomous={false}
             onAnswer={(reply) => void answerTaskStep(stepApproval, reply)}
+            onStopTask={() => void stopTaskStep(stepApproval)}
           />
         )}
         {settingsOpen && settings && (

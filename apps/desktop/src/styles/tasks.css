@@ -427,3 +427,8 @@ fieldset.task-field legend {
   padding: var(--space-1) var(--space-4) var(--space-2);
   border-top: 1px solid var(--border);
 }
+
+/* A task step's approval offers Stop task, set apart from the answers. */
+.approval-stop {
+  margin-right: auto;
+}

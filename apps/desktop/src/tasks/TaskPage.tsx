@@ -41,6 +41,7 @@ import {
   duration,
   fromHistory,
   gateRounds,
+  newer,
   passedGate,
   RUNNABLE_TIERS,
   runBlocker,
@@ -123,7 +124,7 @@ export function TaskPage({
       subscribe((n) => {
         if (n.method === "task.updated" && n.params.cwd === cwd) {
           const updated = n.params.task;
-          setTask((current) => (current?.id === updated.id ? updated : current));
+          setTask((current) => (current?.id === updated.id ? newer(current, updated, "notification") : current));
           if (!taskId.current) void loadList();
         } else if (n.method === "agent.event" && n.params.task && n.params.task.id === taskId.current) {
           const { sessionId, event } = n.params;
@@ -134,7 +135,7 @@ export function TaskPage({
   );
 
   function show(t: Task) {
-    setTask(t);
+    setTask((current) => newer(current, t, "reply"));
     setEdited(t.contract);
     setTier(t.triage?.chosen ?? "S");
     setReason(t.triage?.override?.reason ?? "");

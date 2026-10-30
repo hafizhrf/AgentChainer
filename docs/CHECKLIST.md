@@ -1113,8 +1113,12 @@ Decisions: [ADR-0009](adr/0009-release-signing-and-updates.md). Maintainer steps
   write steps with approvals in the profile picked at Run), with hand-off files, a base snapshot, persistence, Stop
   and Resume; tested with a fake runner (9 cases). Live (2026-10-30, `scripts/live-task.ts` on `sample-app`): an S task
   done in 8 s for ≈$0.01; an M task through plan, implement, gates and an Opus review in 38 s for ≈$0.13, the review
-  arriving as structured output; and an M task that failed honestly after 2 fix rounds. Remaining: parallel steps (L),
-  owner click-through.
+  arriving as structured output; and an M task that failed honestly after 2 fix rounds; Stop (`--stop-after`) ends a
+  run `cancelled` and leaves no process behind. Clicked through on macOS (2026-10-30, debug build): Approve and run,
+  the step's Edit and Bash approvals over the task page, the timeline with the step's transcript, the gates panel, Run
+  again. Two fixes from it: the reply to `task.start` could overwrite newer step updates (the timeline stayed empty
+  while a step ran), and a step's approval covered the page's Stop, so it now offers Stop task itself. Remaining:
+  parallel steps (L).
 - [ ] **M3-07** XL path: split into sub-tasks, each with its own contract and worktree. Evaluate the SDK `Workflow` tool
       where the user's plan supports it.
 - [ ] **M3-08** Verification gates from WorkspaceProfile commands (format, lint, typecheck, test, smoke), with a bounded fix loop

@@ -4,6 +4,7 @@
 // exit codes (M3-E2).
 //
 // Usage: node scripts/live-task.ts [--fixture sample-app] [--request "…"] [--model haiku] [--tier S] [--keep]
+//   [--stop-after <seconds>]: stops the run that long after it starts, to check it ends `cancelled`
 //   cost: a few cents with haiku for an S task; an M task's review runs on Opus (≈$1–3).
 import { execSync, spawn } from "node:child_process";
 import { createInterface } from "node:readline";
@@ -18,6 +19,7 @@ const { values } = parseArgs({
     model: { type: "string", default: "haiku" },
     tier: { type: "string" },
     keep: { type: "boolean", default: false },
+    "stop-after": { type: "string" },
   },
 });
 
@@ -80,6 +82,12 @@ try {
   });
   const t0 = Date.now();
   await request("task.start", { cwd, id: created.id, permissionMode: "acceptEdits", model: values.model });
+  if (values["stop-after"]) {
+    setTimeout(() => {
+      console.log("  ✋ stopping");
+      void request("task.cancel", { cwd, id: created.id }).then((r) => console.log(`  cancel → ${JSON.stringify(r)}`));
+    }, Number(values["stop-after"]) * 1000);
+  }
   const end = await done;
   console.log(
     `\n${end.state}: ${end.run?.outcome} (${((Date.now() - t0) / 1000).toFixed(0)} s, ≈$${end.costUsd.toFixed(3)})`,

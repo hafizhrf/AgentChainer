@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import type { GateRun, Task } from "@agentchainer/protocol";
-import { duration, fromHistory, gateRounds, runBlocker, runsOfEntry, stateLabel, withStepEvent } from "./run.ts";
+import { duration, fromHistory, gateRounds, newer, runBlocker, runsOfEntry, stateLabel, withStepEvent } from "./run.ts";
 
 const gate = (round: number, exitCode = 0): GateRun => ({
   kind: "test",
@@ -114,6 +114,22 @@ describe("task runs on the page", () => {
     assert.deepEqual(
       runsOfEntry(t, second).map((g) => g.exitCode),
       [0],
+    );
+  });
+
+  it("keeps the newest version: a run's notifications can overtake the reply that started it", () => {
+    const at = (t: string) => task({ updatedAt: t });
+    const started = at("2026-10-30T00:00:01.000Z");
+    const stepRunning = at("2026-10-30T00:00:01.005Z");
+    assert.equal(newer(stepRunning, started, "reply"), stepRunning, "an older reply doesn't win");
+    assert.equal(newer(started, stepRunning, "notification"), stepRunning);
+    const same = at("2026-10-30T00:00:01.005Z");
+    assert.equal(newer(stepRunning, same, "reply"), stepRunning, "a reply needs to be strictly newer");
+    assert.equal(newer(stepRunning, same, "notification"), same);
+    assert.equal(newer(null, started, "reply"), started);
+    assert.equal(
+      newer(at("2026-10-30T00:00:09.000Z"), { ...started, id: "2026-10-30-ffffffff" }, "reply").id,
+      "2026-10-30-ffffffff",
     );
   });
 

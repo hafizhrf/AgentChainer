@@ -24,15 +24,36 @@ export function loadSdk(): Promise<LoadedSdk> {
   loading ??= (async (): Promise<LoadedSdk> => {
     const dataDir = process.env.AGENTCHAINER_DATA_DIR;
     if (!dataDir) {
-      return { sdk: await import("@anthropic-ai/claude-agent-sdk"), version: pin.version, source: "node_modules" };
+      const sdk = foregroundOnly(await import("@anthropic-ai/claude-agent-sdk"));
+      return { sdk, version: pin.version, source: "node_modules" };
     }
     const { entry, source } = await ensureSdk(join(dataDir, "sdk"), pin);
-    return { sdk: (await import(pathToFileURL(entry).href)) as AgentSdkModule, version: pin.version, source };
+    const sdk = foregroundOnly((await import(pathToFileURL(entry).href)) as AgentSdkModule);
+    return { sdk, version: pin.version, source };
   })();
   loading.catch(() => {
     loading = null; // let the next session.start retry, e.g. after the user goes back online
   });
   return loading;
+}
+
+/**
+ * Every `query()` runs with background tasks off. From CLI 2.1.314 the Agent tool backgrounds subagents by default:
+ * the turn ends before they work, and they die with the session, while the app's turns, gates and evidence expect
+ * them to finish inside the turn (spike S4). Background work gets its own panel in M4-07.
+ */
+export function foregroundOnly(sdk: AgentSdkModule): AgentSdkModule {
+  return {
+    ...sdk,
+    query: ({ prompt, options }) =>
+      sdk.query({
+        prompt,
+        options: {
+          ...options,
+          env: { ...process.env, ...options?.env, CLAUDE_CODE_DISABLE_BACKGROUND_TASKS: "1" },
+        },
+      }),
+  };
 }
 
 export function sriOf(data: Uint8Array): string {

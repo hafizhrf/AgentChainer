@@ -165,6 +165,7 @@ enables follow-ups, `interrupt()` and `setPermissionMode()`. Key options:
 | `includePartialMessages` | `true` | Token streaming |
 | `forwardSubagentText` | `true` | Subagent text and thinking for observability |
 | `enableFileCheckpointing` | `true` | Rewind (M1-23) |
+| `env` | inherited, plus `CLAUDE_CODE_DISABLE_BACKGROUND_TASKS=1` (every `query()`, in `sdk-loader.ts`) | Subagents and Bash finish inside the turn: from CLI 2.1.314 the Agent tool backgrounds subagents by default ([S4](spikes/S4-S5-S6.md)); a background panel is M4-07 |
 | `canUseTool` | broker → UI | Approvals (§6) |
 | `hooks` | `PreToolUse` guard; `PostToolUse` (file change tracking, M1) | Safety and observability |
 | `permissionMode` | from profile | §6 |

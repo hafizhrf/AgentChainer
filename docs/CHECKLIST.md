@@ -486,8 +486,15 @@ All of these run on macOS, Windows and Ubuntu against a sample repo in `fixtures
   - E4: stopped 24 ms after the interrupt.
   - E2: after the restart, the agent named the fixed file.
   - E5: ExitPlanMode approved, then executed with a subagent; the tests pass.
-- Still to do: the same run on Windows and Ubuntu; E6 by hand on each OS (never automated: it would mean signing
-  the user out); and the UI click-through of the same flows.
+- **Windows 11: E1–E5 pass**, 8/8 checks on CLI 2.1.314 with haiku (2026-10-30, `pnpm dev` checkout):
+  - The first run failed E5 (7/8): CLI 2.1.314 runs Agent-tool subagents in the background by default, so the turn
+    ended before the subagent wrote the test. The sidecar now turns background tasks off for every `query()`
+    ([S4 update](spikes/S4-S5-S6.md)).
+  - After that change: E1 approvals for Bash, Edit, Bash and a commit; E3 back to the seeded bug; E4 stopped 18 ms
+    after the interrupt; E2 named the fixed file after the restart; E5 ExitPlanMode approved, then a foreground
+    subagent, tests pass. `--scenario subagents`: 2/2, no async launch.
+- Still to do: the same run on Ubuntu; E6 by hand on each OS (never automated: it would mean signing the user out);
+  and the UI click-through of the same flows.
 
 - [ ] **M1-E1** Fix a seeded bug with tool approvals in the Safe profile, review the diff, commit.
 - [ ] **M1-E2** Quit the app mid-session, relaunch, resume, and continue the conversation.
@@ -1214,6 +1221,10 @@ Decisions: [ADR-0009](adr/0009-release-signing-and-updates.md). Maintainer steps
 - [ ] **M4-05** Controls: interrupt the session; stop a single subagent if the SDK supports it (verify).
 - [ ] **M4-06** Agent library manager: list, create and edit `.claude/agents/*.md` and programmatic agents; mark each as manual or auto-spawned.
 - [ ] **M4-07** Background tasks and shells panel.
+      Note: until then the sidecar runs every `query()` with `CLAUDE_CODE_DISABLE_BACKGROUND_TASKS=1`, because CLI
+      2.1.314 backgrounds subagents by default ([S4 update](spikes/S4-S5-S6.md)). This item lifts it: the session
+      stays busy while background tasks live (`background_tasks_changed`), each one can be stopped, and a task step
+      waits for them before its gates.
 - [ ] **M4-08** Replay a finished session as a graph.
 
 ### Exit criteria

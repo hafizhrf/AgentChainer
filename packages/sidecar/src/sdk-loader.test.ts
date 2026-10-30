@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { after, describe, it } from "node:test";
 import { pathToFileURL } from "node:url";
-import { ensureSdk, sriOf } from "./sdk-loader.ts";
+import { type AgentSdkModule, ensureSdk, foregroundOnly, sriOf } from "./sdk-loader.ts";
 import type { SdkPin } from "./sdk-pin.ts";
 
 // A tiny stand-in for the npm tarball: package/sdk.mjs, packed with the system tar like npm does.
@@ -67,5 +67,29 @@ describe("ensureSdk", () => {
         init?.signal?.addEventListener("abort", () => reject(init.signal?.reason)),
       )) as typeof fetch;
     await assert.rejects(ensureSdk(join(work, "data-stalled"), pin, stalled, 50), /timed out after 0 s/);
+  });
+});
+
+describe("foregroundOnly", () => {
+  it("turns background tasks off for every query and keeps the caller's options and env", () => {
+    const calls: Parameters<AgentSdkModule["query"]>[0][] = [];
+    const sdk = foregroundOnly({
+      query: (args: Parameters<AgentSdkModule["query"]>[0]) => {
+        calls.push(args);
+        return "the query" as unknown as ReturnType<AgentSdkModule["query"]>;
+      },
+    } as unknown as AgentSdkModule);
+
+    const q = sdk.query({ prompt: "hi", options: { cwd: "/work", env: { EXTRA: "1" } } });
+    assert.equal(q, "the query");
+    assert.equal(calls[0]?.prompt, "hi");
+    assert.equal(calls[0]?.options?.cwd, "/work");
+    assert.equal(calls[0]?.options?.env?.EXTRA, "1");
+    assert.equal(calls[0]?.options?.env?.CLAUDE_CODE_DISABLE_BACKGROUND_TASKS, "1");
+    // The env replaces the inherited one in the SDK, so it must still carry PATH and the rest.
+    assert.equal(calls[0]?.options?.env?.PATH ?? calls[0]?.options?.env?.Path, process.env.PATH ?? process.env.Path);
+
+    sdk.query({ prompt: "no options" });
+    assert.equal(calls[1]?.options?.env?.CLAUDE_CODE_DISABLE_BACKGROUND_TASKS, "1");
   });
 });

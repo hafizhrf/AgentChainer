@@ -3,9 +3,19 @@ import { applyEvent, closeAssistant, type Item } from "../transcript.ts";
 
 /** A task's run on the task page (M3-06): what may run, how states read, step transcripts and gate rounds. */
 
-/** Tiers that run in this version; L and XL arrive with their workflows. */
-export const RUNNABLE_TIERS: ReadonlySet<string> = new Set(["S", "M"]);
-const STARTABLE: ReadonlySet<Task["state"]> = new Set(["ready", "done", "failed", "unverified", "cancelled"]);
+/** Tiers that run in this version; XL arrives with its workflow. */
+export const RUNNABLE_TIERS: ReadonlySet<string> = new Set(["S", "M", "L"]);
+const STARTABLE: ReadonlySet<Task["state"]> = new Set([
+  "ready",
+  "done",
+  "accepted",
+  "failed",
+  "unverified",
+  "cancelled",
+]);
+
+/** Failed and not verified runs can end as accepted with risk, with a reason (M3-10). */
+export const canAcceptRisk = (task: Task) => (task.state === "failed" || task.state === "unverified") && !!task.run;
 
 /** Why the task can't run now, or null when it can. */
 export function runBlocker(task: Task): string | null {
@@ -14,7 +24,7 @@ export function runBlocker(task: Task): string | null {
   if (task.state === "interrupted") return "Resume the interrupted run, or revise the task.";
   if (!tier || !task.contract?.approvedAt || !STARTABLE.has(task.state))
     return "Approve the contract and the tier first.";
-  if (!RUNNABLE_TIERS.has(tier)) return `${tier} tasks run in a later update; S and M tasks run now.`;
+  if (!RUNNABLE_TIERS.has(tier)) return `${tier} tasks run in a later update; S, M and L tasks run now.`;
   return null;
 }
 
@@ -26,6 +36,8 @@ export function stateLabel(state: Task["state"]): { label: string; tone: Tone } 
       return { label: "Running", tone: "busy" };
     case "done":
       return { label: "Done", tone: "ok" };
+    case "accepted":
+      return { label: "Accepted with risk", tone: "warn" };
     case "failed":
       return { label: "Failed", tone: "err" };
     case "unverified":
@@ -60,9 +72,10 @@ export function gateRounds(runs: GateRun[]): GateRun[][] {
   return [...rounds.entries()].sort(([a], [b]) => a - b).map(([, rs]) => rs);
 }
 
-/** The gate runs a timeline entry stands for: its gates entries are rounds 0, 1, 2, … in order. */
+/** The gate runs a timeline entry stands for: the baseline entry its own, gates entries rounds 0, 1, 2, … in order. */
 export function runsOfEntry(task: Task, entry: StepRun): GateRun[] {
   const run = task.run;
+  if (run && entry.kind === "baseline") return run.baseline;
   if (!run || entry.kind !== "gates") return [];
   const round = run.steps.filter((s) => s.kind === "gates").findIndex((s) => s.id === entry.id);
   return run.gates.filter((g) => g.round === round);
@@ -75,6 +88,13 @@ export function duration(start: string, end: string | undefined, now = Date.now(
 }
 
 export const passedGate = (g: GateRun) => g.exitCode === 0 && !g.timedOut;
+
+/** A gate is the same gate in another round when its kind and package match. */
+export const gateKey = (g: GateRun) => `${g.kind}:${g.package}`;
+
+/** The gates that already failed before the task started: their failures aren't the task's doing. */
+export const failedBefore = (task: Task): ReadonlySet<string> =>
+  new Set((task.run?.baseline ?? []).filter((g) => !passedGate(g)).map(gateKey));
 
 /**
  * The version of a task to show. A run's notifications can overtake the reply of the request that started it, so a

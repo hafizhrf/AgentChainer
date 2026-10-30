@@ -42,6 +42,7 @@ import { Session } from "./session.ts";
 import { historyEvents, retention, toSessionInfo } from "./stored-sessions.ts";
 import type { SessionHost } from "./tasks/runner.ts";
 import {
+  acceptRisk,
   approveTask,
   type Claude,
   cancelTask,
@@ -55,6 +56,7 @@ import {
   reviseTask,
   shutdownRuns,
   startTask,
+  taskEvidence,
 } from "./tasks/service.ts";
 import { loadTask } from "./tasks/store.ts";
 import { fileDiff, gitInit, listFiles, revert } from "./workspace.ts";
@@ -491,6 +493,16 @@ serve(
     "task.resume": async ({ cwd, id }) => {
       requireFolder(cwd);
       return resumeTask(cwd, id, sessionHost(await claude()), taskUpdated(cwd));
+    },
+
+    "task.acceptRisk": ({ cwd, id, reason }) => {
+      requireFolder(cwd);
+      return acceptRisk(cwd, id, reason);
+    },
+
+    "task.evidence": ({ cwd, id }) => {
+      requireFolder(cwd);
+      return taskEvidence(cwd, id);
     },
 
     "task.list": ({ cwd }) => {

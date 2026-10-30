@@ -3434,7 +3434,8 @@
               "failed",
               "unverified",
               "cancelled",
-              "interrupted"
+              "interrupted",
+              "accepted"
             ]
           },
           "createdAt": {
@@ -3807,10 +3808,14 @@
                           "enum": [
                             "agent",
                             "fix",
-                            "gates"
+                            "gates",
+                            "baseline"
                           ]
                         },
                         "role": {
+                          "type": "string"
+                        },
+                        "group": {
                           "type": "string"
                         },
                         "status": {
@@ -3936,6 +3941,184 @@
                       ]
                     }
                   },
+                  "baseline": {
+                    "default": [],
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "kind": {
+                          "type": "string",
+                          "enum": [
+                            "format",
+                            "lint",
+                            "typecheck",
+                            "test",
+                            "build",
+                            "smoke"
+                          ]
+                        },
+                        "command": {
+                          "type": "string"
+                        },
+                        "package": {
+                          "type": "string"
+                        },
+                        "exitCode": {
+                          "anyOf": [
+                            {
+                              "type": "integer",
+                              "minimum": -9007199254740991,
+                              "maximum": 9007199254740991
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "timedOut": {
+                          "type": "boolean"
+                        },
+                        "durationMs": {
+                          "type": "number"
+                        },
+                        "tail": {
+                          "type": "string"
+                        },
+                        "round": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        "at": {
+                          "type": "string"
+                        },
+                        "changed": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        }
+                      },
+                      "required": [
+                        "kind",
+                        "command",
+                        "package",
+                        "exitCode",
+                        "timedOut",
+                        "durationMs",
+                        "tail",
+                        "round",
+                        "at"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "approvals": {
+                    "default": [],
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "stepId": {
+                          "type": "string"
+                        },
+                        "label": {
+                          "type": "string"
+                        },
+                        "tool": {
+                          "type": "string"
+                        },
+                        "target": {
+                          "type": "string"
+                        },
+                        "risk": {
+                          "type": "string",
+                          "enum": [
+                            "low",
+                            "medium",
+                            "high"
+                          ]
+                        },
+                        "reasons": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "allowed": {
+                          "type": "boolean"
+                        },
+                        "always": {
+                          "type": "boolean"
+                        },
+                        "at": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "stepId",
+                        "label",
+                        "tool",
+                        "target",
+                        "risk",
+                        "reasons",
+                        "allowed",
+                        "always",
+                        "at"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "guardBlocks": {
+                    "default": [],
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "stepId": {
+                          "type": "string"
+                        },
+                        "tool": {
+                          "type": "string"
+                        },
+                        "target": {
+                          "type": "string"
+                        },
+                        "reason": {
+                          "type": "string"
+                        },
+                        "at": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "stepId",
+                        "tool",
+                        "target",
+                        "reason",
+                        "at"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "acceptance": {
+                    "type": "object",
+                    "properties": {
+                      "reason": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "at": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "reason",
+                      "at"
+                    ],
+                    "additionalProperties": false
+                  },
                   "costUsd": {
                     "type": "number"
                   },
@@ -3954,6 +4137,9 @@
                   "steps",
                   "gates",
                   "notRun",
+                  "baseline",
+                  "approvals",
+                  "guardBlocks",
                   "costUsd"
                 ],
                 "additionalProperties": false
@@ -4023,7 +4209,8 @@
               "failed",
               "unverified",
               "cancelled",
-              "interrupted"
+              "interrupted",
+              "accepted"
             ]
           },
           "createdAt": {
@@ -4396,10 +4583,14 @@
                           "enum": [
                             "agent",
                             "fix",
-                            "gates"
+                            "gates",
+                            "baseline"
                           ]
                         },
                         "role": {
+                          "type": "string"
+                        },
+                        "group": {
                           "type": "string"
                         },
                         "status": {
@@ -4525,6 +4716,184 @@
                       ]
                     }
                   },
+                  "baseline": {
+                    "default": [],
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "kind": {
+                          "type": "string",
+                          "enum": [
+                            "format",
+                            "lint",
+                            "typecheck",
+                            "test",
+                            "build",
+                            "smoke"
+                          ]
+                        },
+                        "command": {
+                          "type": "string"
+                        },
+                        "package": {
+                          "type": "string"
+                        },
+                        "exitCode": {
+                          "anyOf": [
+                            {
+                              "type": "integer",
+                              "minimum": -9007199254740991,
+                              "maximum": 9007199254740991
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "timedOut": {
+                          "type": "boolean"
+                        },
+                        "durationMs": {
+                          "type": "number"
+                        },
+                        "tail": {
+                          "type": "string"
+                        },
+                        "round": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        "at": {
+                          "type": "string"
+                        },
+                        "changed": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        }
+                      },
+                      "required": [
+                        "kind",
+                        "command",
+                        "package",
+                        "exitCode",
+                        "timedOut",
+                        "durationMs",
+                        "tail",
+                        "round",
+                        "at"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "approvals": {
+                    "default": [],
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "stepId": {
+                          "type": "string"
+                        },
+                        "label": {
+                          "type": "string"
+                        },
+                        "tool": {
+                          "type": "string"
+                        },
+                        "target": {
+                          "type": "string"
+                        },
+                        "risk": {
+                          "type": "string",
+                          "enum": [
+                            "low",
+                            "medium",
+                            "high"
+                          ]
+                        },
+                        "reasons": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "allowed": {
+                          "type": "boolean"
+                        },
+                        "always": {
+                          "type": "boolean"
+                        },
+                        "at": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "stepId",
+                        "label",
+                        "tool",
+                        "target",
+                        "risk",
+                        "reasons",
+                        "allowed",
+                        "always",
+                        "at"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "guardBlocks": {
+                    "default": [],
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "stepId": {
+                          "type": "string"
+                        },
+                        "tool": {
+                          "type": "string"
+                        },
+                        "target": {
+                          "type": "string"
+                        },
+                        "reason": {
+                          "type": "string"
+                        },
+                        "at": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "stepId",
+                        "tool",
+                        "target",
+                        "reason",
+                        "at"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "acceptance": {
+                    "type": "object",
+                    "properties": {
+                      "reason": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "at": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "reason",
+                      "at"
+                    ],
+                    "additionalProperties": false
+                  },
                   "costUsd": {
                     "type": "number"
                   },
@@ -4543,6 +4912,9 @@
                   "steps",
                   "gates",
                   "notRun",
+                  "baseline",
+                  "approvals",
+                  "guardBlocks",
                   "costUsd"
                 ],
                 "additionalProperties": false
@@ -4721,7 +5093,8 @@
               "failed",
               "unverified",
               "cancelled",
-              "interrupted"
+              "interrupted",
+              "accepted"
             ]
           },
           "createdAt": {
@@ -5094,10 +5467,14 @@
                           "enum": [
                             "agent",
                             "fix",
-                            "gates"
+                            "gates",
+                            "baseline"
                           ]
                         },
                         "role": {
+                          "type": "string"
+                        },
+                        "group": {
                           "type": "string"
                         },
                         "status": {
@@ -5223,6 +5600,184 @@
                       ]
                     }
                   },
+                  "baseline": {
+                    "default": [],
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "kind": {
+                          "type": "string",
+                          "enum": [
+                            "format",
+                            "lint",
+                            "typecheck",
+                            "test",
+                            "build",
+                            "smoke"
+                          ]
+                        },
+                        "command": {
+                          "type": "string"
+                        },
+                        "package": {
+                          "type": "string"
+                        },
+                        "exitCode": {
+                          "anyOf": [
+                            {
+                              "type": "integer",
+                              "minimum": -9007199254740991,
+                              "maximum": 9007199254740991
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "timedOut": {
+                          "type": "boolean"
+                        },
+                        "durationMs": {
+                          "type": "number"
+                        },
+                        "tail": {
+                          "type": "string"
+                        },
+                        "round": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        "at": {
+                          "type": "string"
+                        },
+                        "changed": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        }
+                      },
+                      "required": [
+                        "kind",
+                        "command",
+                        "package",
+                        "exitCode",
+                        "timedOut",
+                        "durationMs",
+                        "tail",
+                        "round",
+                        "at"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "approvals": {
+                    "default": [],
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "stepId": {
+                          "type": "string"
+                        },
+                        "label": {
+                          "type": "string"
+                        },
+                        "tool": {
+                          "type": "string"
+                        },
+                        "target": {
+                          "type": "string"
+                        },
+                        "risk": {
+                          "type": "string",
+                          "enum": [
+                            "low",
+                            "medium",
+                            "high"
+                          ]
+                        },
+                        "reasons": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "allowed": {
+                          "type": "boolean"
+                        },
+                        "always": {
+                          "type": "boolean"
+                        },
+                        "at": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "stepId",
+                        "label",
+                        "tool",
+                        "target",
+                        "risk",
+                        "reasons",
+                        "allowed",
+                        "always",
+                        "at"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "guardBlocks": {
+                    "default": [],
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "stepId": {
+                          "type": "string"
+                        },
+                        "tool": {
+                          "type": "string"
+                        },
+                        "target": {
+                          "type": "string"
+                        },
+                        "reason": {
+                          "type": "string"
+                        },
+                        "at": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "stepId",
+                        "tool",
+                        "target",
+                        "reason",
+                        "at"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "acceptance": {
+                    "type": "object",
+                    "properties": {
+                      "reason": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "at": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "reason",
+                      "at"
+                    ],
+                    "additionalProperties": false
+                  },
                   "costUsd": {
                     "type": "number"
                   },
@@ -5241,6 +5796,9 @@
                   "steps",
                   "gates",
                   "notRun",
+                  "baseline",
+                  "approvals",
+                  "guardBlocks",
                   "costUsd"
                 ],
                 "additionalProperties": false
@@ -5438,7 +5996,8 @@
               "failed",
               "unverified",
               "cancelled",
-              "interrupted"
+              "interrupted",
+              "accepted"
             ]
           },
           "createdAt": {
@@ -5811,10 +6370,14 @@
                           "enum": [
                             "agent",
                             "fix",
-                            "gates"
+                            "gates",
+                            "baseline"
                           ]
                         },
                         "role": {
+                          "type": "string"
+                        },
+                        "group": {
                           "type": "string"
                         },
                         "status": {
@@ -5940,6 +6503,184 @@
                       ]
                     }
                   },
+                  "baseline": {
+                    "default": [],
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "kind": {
+                          "type": "string",
+                          "enum": [
+                            "format",
+                            "lint",
+                            "typecheck",
+                            "test",
+                            "build",
+                            "smoke"
+                          ]
+                        },
+                        "command": {
+                          "type": "string"
+                        },
+                        "package": {
+                          "type": "string"
+                        },
+                        "exitCode": {
+                          "anyOf": [
+                            {
+                              "type": "integer",
+                              "minimum": -9007199254740991,
+                              "maximum": 9007199254740991
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "timedOut": {
+                          "type": "boolean"
+                        },
+                        "durationMs": {
+                          "type": "number"
+                        },
+                        "tail": {
+                          "type": "string"
+                        },
+                        "round": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        "at": {
+                          "type": "string"
+                        },
+                        "changed": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        }
+                      },
+                      "required": [
+                        "kind",
+                        "command",
+                        "package",
+                        "exitCode",
+                        "timedOut",
+                        "durationMs",
+                        "tail",
+                        "round",
+                        "at"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "approvals": {
+                    "default": [],
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "stepId": {
+                          "type": "string"
+                        },
+                        "label": {
+                          "type": "string"
+                        },
+                        "tool": {
+                          "type": "string"
+                        },
+                        "target": {
+                          "type": "string"
+                        },
+                        "risk": {
+                          "type": "string",
+                          "enum": [
+                            "low",
+                            "medium",
+                            "high"
+                          ]
+                        },
+                        "reasons": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "allowed": {
+                          "type": "boolean"
+                        },
+                        "always": {
+                          "type": "boolean"
+                        },
+                        "at": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "stepId",
+                        "label",
+                        "tool",
+                        "target",
+                        "risk",
+                        "reasons",
+                        "allowed",
+                        "always",
+                        "at"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "guardBlocks": {
+                    "default": [],
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "stepId": {
+                          "type": "string"
+                        },
+                        "tool": {
+                          "type": "string"
+                        },
+                        "target": {
+                          "type": "string"
+                        },
+                        "reason": {
+                          "type": "string"
+                        },
+                        "at": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "stepId",
+                        "tool",
+                        "target",
+                        "reason",
+                        "at"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "acceptance": {
+                    "type": "object",
+                    "properties": {
+                      "reason": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "at": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "reason",
+                      "at"
+                    ],
+                    "additionalProperties": false
+                  },
                   "costUsd": {
                     "type": "number"
                   },
@@ -5958,6 +6699,9 @@
                   "steps",
                   "gates",
                   "notRun",
+                  "baseline",
+                  "approvals",
+                  "guardBlocks",
                   "costUsd"
                 ],
                 "additionalProperties": false
@@ -6024,7 +6768,8 @@
               "failed",
               "unverified",
               "cancelled",
-              "interrupted"
+              "interrupted",
+              "accepted"
             ]
           },
           "createdAt": {
@@ -6397,10 +7142,14 @@
                           "enum": [
                             "agent",
                             "fix",
-                            "gates"
+                            "gates",
+                            "baseline"
                           ]
                         },
                         "role": {
+                          "type": "string"
+                        },
+                        "group": {
                           "type": "string"
                         },
                         "status": {
@@ -6526,6 +7275,184 @@
                       ]
                     }
                   },
+                  "baseline": {
+                    "default": [],
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "kind": {
+                          "type": "string",
+                          "enum": [
+                            "format",
+                            "lint",
+                            "typecheck",
+                            "test",
+                            "build",
+                            "smoke"
+                          ]
+                        },
+                        "command": {
+                          "type": "string"
+                        },
+                        "package": {
+                          "type": "string"
+                        },
+                        "exitCode": {
+                          "anyOf": [
+                            {
+                              "type": "integer",
+                              "minimum": -9007199254740991,
+                              "maximum": 9007199254740991
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "timedOut": {
+                          "type": "boolean"
+                        },
+                        "durationMs": {
+                          "type": "number"
+                        },
+                        "tail": {
+                          "type": "string"
+                        },
+                        "round": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        "at": {
+                          "type": "string"
+                        },
+                        "changed": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        }
+                      },
+                      "required": [
+                        "kind",
+                        "command",
+                        "package",
+                        "exitCode",
+                        "timedOut",
+                        "durationMs",
+                        "tail",
+                        "round",
+                        "at"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "approvals": {
+                    "default": [],
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "stepId": {
+                          "type": "string"
+                        },
+                        "label": {
+                          "type": "string"
+                        },
+                        "tool": {
+                          "type": "string"
+                        },
+                        "target": {
+                          "type": "string"
+                        },
+                        "risk": {
+                          "type": "string",
+                          "enum": [
+                            "low",
+                            "medium",
+                            "high"
+                          ]
+                        },
+                        "reasons": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "allowed": {
+                          "type": "boolean"
+                        },
+                        "always": {
+                          "type": "boolean"
+                        },
+                        "at": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "stepId",
+                        "label",
+                        "tool",
+                        "target",
+                        "risk",
+                        "reasons",
+                        "allowed",
+                        "always",
+                        "at"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "guardBlocks": {
+                    "default": [],
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "stepId": {
+                          "type": "string"
+                        },
+                        "tool": {
+                          "type": "string"
+                        },
+                        "target": {
+                          "type": "string"
+                        },
+                        "reason": {
+                          "type": "string"
+                        },
+                        "at": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "stepId",
+                        "tool",
+                        "target",
+                        "reason",
+                        "at"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "acceptance": {
+                    "type": "object",
+                    "properties": {
+                      "reason": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "at": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "reason",
+                      "at"
+                    ],
+                    "additionalProperties": false
+                  },
                   "costUsd": {
                     "type": "number"
                   },
@@ -6544,6 +7471,9 @@
                   "steps",
                   "gates",
                   "notRun",
+                  "baseline",
+                  "approvals",
+                  "guardBlocks",
                   "costUsd"
                 ],
                 "additionalProperties": false
@@ -6622,7 +7552,8 @@
               "failed",
               "unverified",
               "cancelled",
-              "interrupted"
+              "interrupted",
+              "accepted"
             ]
           },
           "createdAt": {
@@ -6995,10 +7926,14 @@
                           "enum": [
                             "agent",
                             "fix",
-                            "gates"
+                            "gates",
+                            "baseline"
                           ]
                         },
                         "role": {
+                          "type": "string"
+                        },
+                        "group": {
                           "type": "string"
                         },
                         "status": {
@@ -7124,6 +8059,184 @@
                       ]
                     }
                   },
+                  "baseline": {
+                    "default": [],
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "kind": {
+                          "type": "string",
+                          "enum": [
+                            "format",
+                            "lint",
+                            "typecheck",
+                            "test",
+                            "build",
+                            "smoke"
+                          ]
+                        },
+                        "command": {
+                          "type": "string"
+                        },
+                        "package": {
+                          "type": "string"
+                        },
+                        "exitCode": {
+                          "anyOf": [
+                            {
+                              "type": "integer",
+                              "minimum": -9007199254740991,
+                              "maximum": 9007199254740991
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "timedOut": {
+                          "type": "boolean"
+                        },
+                        "durationMs": {
+                          "type": "number"
+                        },
+                        "tail": {
+                          "type": "string"
+                        },
+                        "round": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        "at": {
+                          "type": "string"
+                        },
+                        "changed": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        }
+                      },
+                      "required": [
+                        "kind",
+                        "command",
+                        "package",
+                        "exitCode",
+                        "timedOut",
+                        "durationMs",
+                        "tail",
+                        "round",
+                        "at"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "approvals": {
+                    "default": [],
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "stepId": {
+                          "type": "string"
+                        },
+                        "label": {
+                          "type": "string"
+                        },
+                        "tool": {
+                          "type": "string"
+                        },
+                        "target": {
+                          "type": "string"
+                        },
+                        "risk": {
+                          "type": "string",
+                          "enum": [
+                            "low",
+                            "medium",
+                            "high"
+                          ]
+                        },
+                        "reasons": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "allowed": {
+                          "type": "boolean"
+                        },
+                        "always": {
+                          "type": "boolean"
+                        },
+                        "at": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "stepId",
+                        "label",
+                        "tool",
+                        "target",
+                        "risk",
+                        "reasons",
+                        "allowed",
+                        "always",
+                        "at"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "guardBlocks": {
+                    "default": [],
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "stepId": {
+                          "type": "string"
+                        },
+                        "tool": {
+                          "type": "string"
+                        },
+                        "target": {
+                          "type": "string"
+                        },
+                        "reason": {
+                          "type": "string"
+                        },
+                        "at": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "stepId",
+                        "tool",
+                        "target",
+                        "reason",
+                        "at"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "acceptance": {
+                    "type": "object",
+                    "properties": {
+                      "reason": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "at": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "reason",
+                      "at"
+                    ],
+                    "additionalProperties": false
+                  },
                   "costUsd": {
                     "type": "number"
                   },
@@ -7142,6 +8255,9 @@
                   "steps",
                   "gates",
                   "notRun",
+                  "baseline",
+                  "approvals",
+                  "guardBlocks",
                   "costUsd"
                 ],
                 "additionalProperties": false
@@ -7208,7 +8324,8 @@
               "failed",
               "unverified",
               "cancelled",
-              "interrupted"
+              "interrupted",
+              "accepted"
             ]
           },
           "createdAt": {
@@ -7581,10 +8698,14 @@
                           "enum": [
                             "agent",
                             "fix",
-                            "gates"
+                            "gates",
+                            "baseline"
                           ]
                         },
                         "role": {
+                          "type": "string"
+                        },
+                        "group": {
                           "type": "string"
                         },
                         "status": {
@@ -7710,6 +8831,184 @@
                       ]
                     }
                   },
+                  "baseline": {
+                    "default": [],
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "kind": {
+                          "type": "string",
+                          "enum": [
+                            "format",
+                            "lint",
+                            "typecheck",
+                            "test",
+                            "build",
+                            "smoke"
+                          ]
+                        },
+                        "command": {
+                          "type": "string"
+                        },
+                        "package": {
+                          "type": "string"
+                        },
+                        "exitCode": {
+                          "anyOf": [
+                            {
+                              "type": "integer",
+                              "minimum": -9007199254740991,
+                              "maximum": 9007199254740991
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "timedOut": {
+                          "type": "boolean"
+                        },
+                        "durationMs": {
+                          "type": "number"
+                        },
+                        "tail": {
+                          "type": "string"
+                        },
+                        "round": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        "at": {
+                          "type": "string"
+                        },
+                        "changed": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        }
+                      },
+                      "required": [
+                        "kind",
+                        "command",
+                        "package",
+                        "exitCode",
+                        "timedOut",
+                        "durationMs",
+                        "tail",
+                        "round",
+                        "at"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "approvals": {
+                    "default": [],
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "stepId": {
+                          "type": "string"
+                        },
+                        "label": {
+                          "type": "string"
+                        },
+                        "tool": {
+                          "type": "string"
+                        },
+                        "target": {
+                          "type": "string"
+                        },
+                        "risk": {
+                          "type": "string",
+                          "enum": [
+                            "low",
+                            "medium",
+                            "high"
+                          ]
+                        },
+                        "reasons": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "allowed": {
+                          "type": "boolean"
+                        },
+                        "always": {
+                          "type": "boolean"
+                        },
+                        "at": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "stepId",
+                        "label",
+                        "tool",
+                        "target",
+                        "risk",
+                        "reasons",
+                        "allowed",
+                        "always",
+                        "at"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "guardBlocks": {
+                    "default": [],
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "stepId": {
+                          "type": "string"
+                        },
+                        "tool": {
+                          "type": "string"
+                        },
+                        "target": {
+                          "type": "string"
+                        },
+                        "reason": {
+                          "type": "string"
+                        },
+                        "at": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "stepId",
+                        "tool",
+                        "target",
+                        "reason",
+                        "at"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "acceptance": {
+                    "type": "object",
+                    "properties": {
+                      "reason": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "at": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "reason",
+                      "at"
+                    ],
+                    "additionalProperties": false
+                  },
                   "costUsd": {
                     "type": "number"
                   },
@@ -7728,6 +9027,9 @@
                   "steps",
                   "gates",
                   "notRun",
+                  "baseline",
+                  "approvals",
+                  "guardBlocks",
                   "costUsd"
                 ],
                 "additionalProperties": false
@@ -7749,6 +9051,822 @@
           "availableGates",
           "costUsd",
           "run"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "task.acceptRisk": {
+      "params": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "cwd": {
+            "type": "string",
+            "minLength": 1
+          },
+          "id": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}-[0-9a-f]{8}$"
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2000
+          }
+        },
+        "required": [
+          "cwd",
+          "id",
+          "reason"
+        ],
+        "additionalProperties": false
+      },
+      "result": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}-[0-9a-f]{8}$"
+          },
+          "request": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "draft",
+              "ready",
+              "running",
+              "done",
+              "failed",
+              "unverified",
+              "cancelled",
+              "interrupted",
+              "accepted"
+            ]
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "type": "string"
+          },
+          "contract": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "task": {
+                    "type": "string"
+                  },
+                  "objective": {
+                    "type": "string",
+                    "maxLength": 4000
+                  },
+                  "acceptanceCriteria": {
+                    "maxItems": 30,
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 20
+                        },
+                        "text": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 2000
+                        },
+                        "check": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "enum": [
+                                "review",
+                                "manual"
+                              ]
+                            },
+                            {
+                              "type": "string",
+                              "pattern": "^gate:(format|lint|typecheck|test|build|smoke)$"
+                            }
+                          ]
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "text",
+                        "check"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "constraints": {
+                    "maxItems": 30,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 2000
+                    }
+                  },
+                  "outOfScope": {
+                    "maxItems": 30,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 2000
+                    }
+                  },
+                  "risks": {
+                    "maxItems": 30,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 2000
+                    }
+                  },
+                  "affectedAreas": {
+                    "maxItems": 50,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 500
+                    }
+                  },
+                  "openQuestions": {
+                    "maxItems": 20,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 2000
+                    }
+                  },
+                  "approvedAt": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "task",
+                  "objective",
+                  "acceptanceCriteria",
+                  "constraints",
+                  "outOfScope",
+                  "risks",
+                  "affectedAreas",
+                  "openQuestions"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "triage": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "signals": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "signal": {
+                          "type": "string"
+                        },
+                        "detail": {
+                          "type": "string"
+                        },
+                        "floor": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "enum": [
+                                "S",
+                                "M",
+                                "L",
+                                "XL"
+                              ]
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        }
+                      },
+                      "required": [
+                        "signal",
+                        "detail",
+                        "floor"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "floor": {
+                    "type": "string",
+                    "enum": [
+                      "S",
+                      "M",
+                      "L",
+                      "XL"
+                    ]
+                  },
+                  "model": {
+                    "anyOf": [
+                      {
+                        "type": "object",
+                        "properties": {
+                          "tier": {
+                            "type": "string",
+                            "enum": [
+                              "S",
+                              "M",
+                              "L",
+                              "XL"
+                            ]
+                          },
+                          "rationale": {
+                            "type": "string"
+                          },
+                          "confidence": {
+                            "type": "string",
+                            "enum": [
+                              "low",
+                              "medium",
+                              "high"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "tier",
+                          "rationale",
+                          "confidence"
+                        ],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "modelError": {
+                    "type": "string"
+                  },
+                  "proposed": {
+                    "type": "string",
+                    "enum": [
+                      "S",
+                      "M",
+                      "L",
+                      "XL"
+                    ]
+                  },
+                  "chosen": {
+                    "type": "string",
+                    "enum": [
+                      "S",
+                      "M",
+                      "L",
+                      "XL"
+                    ]
+                  },
+                  "override": {
+                    "type": "object",
+                    "properties": {
+                      "reason": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    },
+                    "required": [
+                      "reason"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "budgetUsd": {
+                    "type": "number",
+                    "exclusiveMinimum": 0
+                  },
+                  "at": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "signals",
+                  "floor",
+                  "model",
+                  "proposed",
+                  "chosen",
+                  "budgetUsd",
+                  "at"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "availableGates": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "format",
+                "lint",
+                "typecheck",
+                "test",
+                "build",
+                "smoke"
+              ]
+            }
+          },
+          "costUsd": {
+            "type": "number"
+          },
+          "run": {
+            "default": null,
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "workflow": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string"
+                      },
+                      "version": {
+                        "type": "integer",
+                        "minimum": -9007199254740991,
+                        "maximum": 9007199254740991
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "version"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "permissionMode": {
+                    "type": "string",
+                    "enum": [
+                      "default",
+                      "acceptEdits",
+                      "auto",
+                      "plan"
+                    ]
+                  },
+                  "model": {
+                    "type": "string"
+                  },
+                  "base": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "untrackedAtStart": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "startedAt": {
+                    "type": "string"
+                  },
+                  "endedAt": {
+                    "type": "string"
+                  },
+                  "position": {
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991
+                  },
+                  "fixRounds": {
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991
+                  },
+                  "steps": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "step": {
+                          "type": "string"
+                        },
+                        "label": {
+                          "type": "string"
+                        },
+                        "kind": {
+                          "type": "string",
+                          "enum": [
+                            "agent",
+                            "fix",
+                            "gates",
+                            "baseline"
+                          ]
+                        },
+                        "role": {
+                          "type": "string"
+                        },
+                        "group": {
+                          "type": "string"
+                        },
+                        "status": {
+                          "type": "string",
+                          "enum": [
+                            "running",
+                            "done",
+                            "failed",
+                            "cancelled"
+                          ]
+                        },
+                        "sessionId": {
+                          "type": "string"
+                        },
+                        "startedAt": {
+                          "type": "string"
+                        },
+                        "endedAt": {
+                          "type": "string"
+                        },
+                        "costUsd": {
+                          "type": "number"
+                        },
+                        "note": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "step",
+                        "label",
+                        "kind",
+                        "status",
+                        "startedAt",
+                        "costUsd"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "gates": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "kind": {
+                          "type": "string",
+                          "enum": [
+                            "format",
+                            "lint",
+                            "typecheck",
+                            "test",
+                            "build",
+                            "smoke"
+                          ]
+                        },
+                        "command": {
+                          "type": "string"
+                        },
+                        "package": {
+                          "type": "string"
+                        },
+                        "exitCode": {
+                          "anyOf": [
+                            {
+                              "type": "integer",
+                              "minimum": -9007199254740991,
+                              "maximum": 9007199254740991
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "timedOut": {
+                          "type": "boolean"
+                        },
+                        "durationMs": {
+                          "type": "number"
+                        },
+                        "tail": {
+                          "type": "string"
+                        },
+                        "round": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        "at": {
+                          "type": "string"
+                        },
+                        "changed": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        }
+                      },
+                      "required": [
+                        "kind",
+                        "command",
+                        "package",
+                        "exitCode",
+                        "timedOut",
+                        "durationMs",
+                        "tail",
+                        "round",
+                        "at"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "notRun": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "enum": [
+                        "format",
+                        "lint",
+                        "typecheck",
+                        "test",
+                        "build",
+                        "smoke"
+                      ]
+                    }
+                  },
+                  "baseline": {
+                    "default": [],
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "kind": {
+                          "type": "string",
+                          "enum": [
+                            "format",
+                            "lint",
+                            "typecheck",
+                            "test",
+                            "build",
+                            "smoke"
+                          ]
+                        },
+                        "command": {
+                          "type": "string"
+                        },
+                        "package": {
+                          "type": "string"
+                        },
+                        "exitCode": {
+                          "anyOf": [
+                            {
+                              "type": "integer",
+                              "minimum": -9007199254740991,
+                              "maximum": 9007199254740991
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "timedOut": {
+                          "type": "boolean"
+                        },
+                        "durationMs": {
+                          "type": "number"
+                        },
+                        "tail": {
+                          "type": "string"
+                        },
+                        "round": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        "at": {
+                          "type": "string"
+                        },
+                        "changed": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        }
+                      },
+                      "required": [
+                        "kind",
+                        "command",
+                        "package",
+                        "exitCode",
+                        "timedOut",
+                        "durationMs",
+                        "tail",
+                        "round",
+                        "at"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "approvals": {
+                    "default": [],
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "stepId": {
+                          "type": "string"
+                        },
+                        "label": {
+                          "type": "string"
+                        },
+                        "tool": {
+                          "type": "string"
+                        },
+                        "target": {
+                          "type": "string"
+                        },
+                        "risk": {
+                          "type": "string",
+                          "enum": [
+                            "low",
+                            "medium",
+                            "high"
+                          ]
+                        },
+                        "reasons": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "allowed": {
+                          "type": "boolean"
+                        },
+                        "always": {
+                          "type": "boolean"
+                        },
+                        "at": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "stepId",
+                        "label",
+                        "tool",
+                        "target",
+                        "risk",
+                        "reasons",
+                        "allowed",
+                        "always",
+                        "at"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "guardBlocks": {
+                    "default": [],
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "stepId": {
+                          "type": "string"
+                        },
+                        "tool": {
+                          "type": "string"
+                        },
+                        "target": {
+                          "type": "string"
+                        },
+                        "reason": {
+                          "type": "string"
+                        },
+                        "at": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "stepId",
+                        "tool",
+                        "target",
+                        "reason",
+                        "at"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "acceptance": {
+                    "type": "object",
+                    "properties": {
+                      "reason": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "at": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "reason",
+                      "at"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "costUsd": {
+                    "type": "number"
+                  },
+                  "outcome": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "workflow",
+                  "permissionMode",
+                  "base",
+                  "untrackedAtStart",
+                  "startedAt",
+                  "position",
+                  "fixRounds",
+                  "steps",
+                  "gates",
+                  "notRun",
+                  "baseline",
+                  "approvals",
+                  "guardBlocks",
+                  "costUsd"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "request",
+          "state",
+          "createdAt",
+          "updatedAt",
+          "contract",
+          "triage",
+          "availableGates",
+          "costUsd",
+          "run"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "task.evidence": {
+      "params": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "cwd": {
+            "type": "string",
+            "minLength": 1
+          },
+          "id": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}-[0-9a-f]{8}$"
+          }
+        },
+        "required": [
+          "cwd",
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "result": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "markdown": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "markdown",
+          "path"
         ],
         "additionalProperties": false
       }
@@ -7828,7 +9946,8 @@
                     "failed",
                     "unverified",
                     "cancelled",
-                    "interrupted"
+                    "interrupted",
+                    "accepted"
                   ]
                 },
                 "createdAt": {
@@ -7917,7 +10036,8 @@
               "failed",
               "unverified",
               "cancelled",
-              "interrupted"
+              "interrupted",
+              "accepted"
             ]
           },
           "createdAt": {
@@ -8290,10 +10410,14 @@
                           "enum": [
                             "agent",
                             "fix",
-                            "gates"
+                            "gates",
+                            "baseline"
                           ]
                         },
                         "role": {
+                          "type": "string"
+                        },
+                        "group": {
                           "type": "string"
                         },
                         "status": {
@@ -8419,6 +10543,184 @@
                       ]
                     }
                   },
+                  "baseline": {
+                    "default": [],
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "kind": {
+                          "type": "string",
+                          "enum": [
+                            "format",
+                            "lint",
+                            "typecheck",
+                            "test",
+                            "build",
+                            "smoke"
+                          ]
+                        },
+                        "command": {
+                          "type": "string"
+                        },
+                        "package": {
+                          "type": "string"
+                        },
+                        "exitCode": {
+                          "anyOf": [
+                            {
+                              "type": "integer",
+                              "minimum": -9007199254740991,
+                              "maximum": 9007199254740991
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "timedOut": {
+                          "type": "boolean"
+                        },
+                        "durationMs": {
+                          "type": "number"
+                        },
+                        "tail": {
+                          "type": "string"
+                        },
+                        "round": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        "at": {
+                          "type": "string"
+                        },
+                        "changed": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        }
+                      },
+                      "required": [
+                        "kind",
+                        "command",
+                        "package",
+                        "exitCode",
+                        "timedOut",
+                        "durationMs",
+                        "tail",
+                        "round",
+                        "at"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "approvals": {
+                    "default": [],
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "stepId": {
+                          "type": "string"
+                        },
+                        "label": {
+                          "type": "string"
+                        },
+                        "tool": {
+                          "type": "string"
+                        },
+                        "target": {
+                          "type": "string"
+                        },
+                        "risk": {
+                          "type": "string",
+                          "enum": [
+                            "low",
+                            "medium",
+                            "high"
+                          ]
+                        },
+                        "reasons": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "allowed": {
+                          "type": "boolean"
+                        },
+                        "always": {
+                          "type": "boolean"
+                        },
+                        "at": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "stepId",
+                        "label",
+                        "tool",
+                        "target",
+                        "risk",
+                        "reasons",
+                        "allowed",
+                        "always",
+                        "at"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "guardBlocks": {
+                    "default": [],
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "stepId": {
+                          "type": "string"
+                        },
+                        "tool": {
+                          "type": "string"
+                        },
+                        "target": {
+                          "type": "string"
+                        },
+                        "reason": {
+                          "type": "string"
+                        },
+                        "at": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "stepId",
+                        "tool",
+                        "target",
+                        "reason",
+                        "at"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "acceptance": {
+                    "type": "object",
+                    "properties": {
+                      "reason": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "at": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "reason",
+                      "at"
+                    ],
+                    "additionalProperties": false
+                  },
                   "costUsd": {
                     "type": "number"
                   },
@@ -8437,6 +10739,9 @@
                   "steps",
                   "gates",
                   "notRun",
+                  "baseline",
+                  "approvals",
+                  "guardBlocks",
                   "costUsd"
                 ],
                 "additionalProperties": false
@@ -8992,7 +11297,8 @@
                 "failed",
                 "unverified",
                 "cancelled",
-                "interrupted"
+                "interrupted",
+                "accepted"
               ]
             },
             "createdAt": {
@@ -9365,10 +11671,14 @@
                             "enum": [
                               "agent",
                               "fix",
-                              "gates"
+                              "gates",
+                              "baseline"
                             ]
                           },
                           "role": {
+                            "type": "string"
+                          },
+                          "group": {
                             "type": "string"
                           },
                           "status": {
@@ -9494,6 +11804,184 @@
                         ]
                       }
                     },
+                    "baseline": {
+                      "default": [],
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "kind": {
+                            "type": "string",
+                            "enum": [
+                              "format",
+                              "lint",
+                              "typecheck",
+                              "test",
+                              "build",
+                              "smoke"
+                            ]
+                          },
+                          "command": {
+                            "type": "string"
+                          },
+                          "package": {
+                            "type": "string"
+                          },
+                          "exitCode": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "timedOut": {
+                            "type": "boolean"
+                          },
+                          "durationMs": {
+                            "type": "number"
+                          },
+                          "tail": {
+                            "type": "string"
+                          },
+                          "round": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991
+                          },
+                          "at": {
+                            "type": "string"
+                          },
+                          "changed": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          }
+                        },
+                        "required": [
+                          "kind",
+                          "command",
+                          "package",
+                          "exitCode",
+                          "timedOut",
+                          "durationMs",
+                          "tail",
+                          "round",
+                          "at"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "approvals": {
+                      "default": [],
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "stepId": {
+                            "type": "string"
+                          },
+                          "label": {
+                            "type": "string"
+                          },
+                          "tool": {
+                            "type": "string"
+                          },
+                          "target": {
+                            "type": "string"
+                          },
+                          "risk": {
+                            "type": "string",
+                            "enum": [
+                              "low",
+                              "medium",
+                              "high"
+                            ]
+                          },
+                          "reasons": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          },
+                          "allowed": {
+                            "type": "boolean"
+                          },
+                          "always": {
+                            "type": "boolean"
+                          },
+                          "at": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "stepId",
+                          "label",
+                          "tool",
+                          "target",
+                          "risk",
+                          "reasons",
+                          "allowed",
+                          "always",
+                          "at"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "guardBlocks": {
+                      "default": [],
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "stepId": {
+                            "type": "string"
+                          },
+                          "tool": {
+                            "type": "string"
+                          },
+                          "target": {
+                            "type": "string"
+                          },
+                          "reason": {
+                            "type": "string"
+                          },
+                          "at": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "stepId",
+                          "tool",
+                          "target",
+                          "reason",
+                          "at"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "acceptance": {
+                      "type": "object",
+                      "properties": {
+                        "reason": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "at": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "reason",
+                        "at"
+                      ],
+                      "additionalProperties": false
+                    },
                     "costUsd": {
                       "type": "number"
                     },
@@ -9512,6 +12000,9 @@
                     "steps",
                     "gates",
                     "notRun",
+                    "baseline",
+                    "approvals",
+                    "guardBlocks",
                     "costUsd"
                   ],
                   "additionalProperties": false

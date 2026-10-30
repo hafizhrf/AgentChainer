@@ -1,3 +1,5 @@
+import { spawnSync } from "node:child_process";
+import path from "node:path";
 import {
   type PermissionMode,
   RpcErrorCode,
@@ -8,15 +10,17 @@ import {
   type Triage,
 } from "@agentchainer/protocol";
 import { AC_DIR } from "../ac-dir.ts";
+import { findTool, toolsDir } from "../bootstrap/tools.ts";
 import { detectWorkspace } from "../detect/detect.ts";
 import { RpcFailure } from "../rpc.ts";
 import type { AgentSdkModule } from "../sdk-loader.ts";
 import { listFiles } from "../workspace.ts";
 import { availableGates, draftContract, normalizeContract } from "./contract.ts";
+import { buildEvidence, type FileChange, renderEvidence, type SecretsScan } from "./evidence.ts";
 import shipped from "./library.json" with { type: "json" };
 import { LibrarySchema } from "./library.ts";
-import { newRun, Orchestrator } from "./orchestrator.ts";
-import { type SessionHost, sessionRunner, startBase } from "./runner.ts";
+import { newRun, Orchestrator, parseReview } from "./orchestrator.ts";
+import { fileStats, type SessionHost, sessionRunner, startBase } from "./runner.ts";
 import { createTask, deleteTask, listTasks, loadTask, readTaskFile, saveTask, writeTaskFile } from "./store.ts";
 import { classify, classifyPrompt, signals, triageRecord } from "./triage.ts";
 
@@ -223,14 +227,20 @@ export function deleteTaskSafe(root: string, id: string): void {
 }
 
 /** Tasks a new run can start from. */
-const STARTABLE = new Set<Task["state"]>(["ready", "done", "failed", "unverified", "cancelled"]);
+const STARTABLE = new Set<Task["state"]>(["ready", "done", "accepted", "failed", "unverified", "cancelled"]);
 
 function launch(root: string, task: Task, host: SessionHost, notify: (task: Task) => void, resume: boolean): void {
   const workflow = Object.values(library.workflows).find((w) => w.id === task.run?.workflow.id);
   if (!workflow) throw invalid(`The workflow ${task.run?.workflow.id} isn't in this version of the app.`);
-  const orchestrator = new Orchestrator(task, {
+  // The runner reports approvals and guard blocks as they happen; they go into the run's records.
+  let orchestrator: Orchestrator | undefined;
+  const runner = sessionRunner(root, task, library, host, {
+    approval: (record) => orchestrator?.recordApproval(record),
+    guardBlock: (block) => orchestrator?.recordGuardBlock(block),
+  });
+  orchestrator = new Orchestrator(task, {
     workflow,
-    runner: sessionRunner(root, task, library, host),
+    runner,
     files: {
       read: (name) => readTaskFile(root, task.id, name),
       write: (name, text) => writeTaskFile(root, task.id, name, text),
@@ -242,14 +252,22 @@ function launch(root: string, task: Task, host: SessionHost, notify: (task: Task
     },
     resume,
   });
-  runs.set(task.id, orchestrator);
-  void orchestrator.run().finally(() => {
+  const running = orchestrator;
+  runs.set(task.id, running);
+  void running.run().finally(() => {
     runs.delete(task.id);
-    if (!shuttingDown) notify(present(orchestrator.current));
+    if (shuttingDown) return;
+    const ended = present(running.current);
+    try {
+      writeEvidence(root, ended);
+    } catch {
+      // The report can be built again on request (task.evidence).
+    }
+    notify(ended);
   });
 }
 
-/** Starts a run of an approved task (S or M for now). It continues in the background and reports through `notify`. */
+/** Starts a run of an approved task (S, M or L; XL comes later). It continues in the background and reports through `notify`. */
 export function startTask(
   root: string,
   id: string,
@@ -265,7 +283,7 @@ export function startTask(
   }
   const workflow = library.workflows[task.triage.chosen];
   if (!workflow) {
-    throw invalid(`${task.triage.chosen} tasks can run in a later update; S and M tasks can run now.`);
+    throw invalid(`${task.triage.chosen} tasks can run in a later update; S, M and L tasks can run now.`);
   }
   const started: Task = {
     ...task,
@@ -299,4 +317,99 @@ export function stopRun(id: string): boolean {
 /** The sidecar is shutting down: runs still going stay `running` on disk and read back as interrupted. */
 export function shutdownRuns(): void {
   shuttingDown = true;
+}
+
+/* ---------- Accepted risk (M3-10) and evidence (M3-09) ---------- */
+
+/** Ends a failed or unverified run as accepted with risk, with the user's reason; the report keeps it. */
+export function acceptRisk(root: string, id: string, reason: string, now = new Date()): Task {
+  const task = present(loadTask(root, id));
+  if (runs.has(id)) throw invalid("The task is running. Stop it first.");
+  if ((task.state !== "failed" && task.state !== "unverified") || !task.run) {
+    throw invalid("Only a failed or unverified run can be accepted with risk.");
+  }
+  const why = reason.trim();
+  if (!why) throw invalid("Say why the risk is acceptable.");
+  const at = now.toISOString();
+  const next: Task = {
+    ...task,
+    state: "accepted",
+    run: { ...task.run, acceptance: { reason: why, at } },
+    updatedAt: at,
+  };
+  saveTask(root, next);
+  writeEvidence(root, next);
+  return next;
+}
+
+/** gitleaks over the changed files, when it's installed (the catalog's copy, or one on PATH). */
+export function scanSecrets(root: string, files: FileChange[]): SecretsScan {
+  const gitleaks = findTool("gitleaks", toolsDir());
+  if (!gitleaks) return { ran: false, why: "gitleaks isn't installed" };
+  const targets = files.filter((f) => f.status !== "deleted");
+  const flagged: string[] = [];
+  for (const f of targets) {
+    // Exit code 3 means "leaks found"; anything else non-zero is gitleaks failing.
+    const r = spawnSync(
+      gitleaks,
+      ["dir", path.join(root, ...f.path.split("/")), "--no-banner", "--redact", "--exit-code", "3"],
+      {
+        cwd: root,
+        encoding: "utf8",
+        timeout: 60_000,
+      },
+    );
+    if (r.status === 3) flagged.push(f.path);
+    else if (r.status !== 0)
+      return {
+        ran: false,
+        why: `gitleaks failed: ${(r.stderr || r.stdout || "").trim().slice(0, 200) || `exit ${r.status}`}`,
+      };
+  }
+  return { ran: true, scanned: targets.length, flagged };
+}
+
+/** Builds the evidence from the task's records and writes `evidence.json` and `evidence.md` in its folder. */
+export function writeEvidence(root: string, task: Task, now = new Date()): { markdown: string; path: string } {
+  if (!task.run) throw invalid("The task hasn't run yet.");
+  const files = fileStats(root, task.run.base, task.run.untrackedAtStart);
+  const reviewText = readTaskFile(root, task.id, "review.json");
+  let review = null;
+  try {
+    review = reviewText ? parseReview(JSON.parse(reviewText), reviewText) : null;
+  } catch {
+    review = null;
+  }
+  const evidence = buildEvidence({
+    task,
+    files,
+    summary: readTaskFile(root, task.id, "summary.md"),
+    review,
+    secrets: scanSecrets(root, files),
+    now,
+  });
+  const markdown = renderEvidence(evidence);
+  writeTaskFile(root, task.id, "evidence.json", `${JSON.stringify(evidence, null, 2)}\n`);
+  writeTaskFile(root, task.id, "evidence.md", markdown);
+  return { markdown, path: path.join(root, AC_DIR, "tasks", task.id, "evidence.md") };
+}
+
+/**
+ * The stored report while nothing in the task changed after it was written; otherwise (a newer run, an interrupted
+ * one, a run from before reports existed) it's built again from the records.
+ */
+export function taskEvidence(root: string, id: string): { markdown: string; path: string } {
+  const task = present(loadTask(root, id));
+  if (!task.run || task.state === "running") throw invalid("The report is written when the run ends.");
+  const stored = readTaskFile(root, id, "evidence.md");
+  let generatedAt = Number.NaN;
+  try {
+    generatedAt = Date.parse(JSON.parse(readTaskFile(root, id, "evidence.json") ?? "{}").generatedAt);
+  } catch {
+    // Unreadable: built again below.
+  }
+  if (stored && generatedAt >= Date.parse(task.updatedAt)) {
+    return { markdown: stored, path: path.join(root, AC_DIR, "tasks", id, "evidence.md") };
+  }
+  return writeEvidence(root, task);
 }

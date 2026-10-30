@@ -1098,12 +1098,14 @@ Decisions: [ADR-0009](adr/0009-release-signing-and-updates.md). Maintainer steps
   triaged again before approval. Remaining: owner click-through, and tuning after the labels (M3-E1).
 - [ ] **M3-04** Workflow templates as versioned YAML in `catalog/workflows/`, one per tier as described in the PRD.
       Progress (step 2): S and M in `catalog/workflows/`, validated by zod and compiled with the roles into
-      `tasks/library.json` (`library.test.ts` fails while it's stale). Remaining: L and XL with their steps.
+      `tasks/library.json` (`library.test.ts` fails while it's stale). Step 3: L, with a `parallel` step of read-only
+      planners (the schema refuses write steps there). Remaining: XL (M3-07).
 - [ ] **M3-05** Agent library, installable into `.claude/agents/`: architect, test-planner, security-reviewer, docs-writer,
       and independent-reviewer (fresh context: it gets the diff and contract, not the implementer's transcript).
       Progress (step 2): all six roles in `agents/ac-*.md` (`.claude/agents/` format), used as step prompts; the
-      reviewer runs fresh on Opus with only the contract, the diff and the gate results. Remaining: Install into
-      project.
+      reviewer runs fresh on Opus with only the contract, the diff and the gate results. Step 3: Install into project
+      as the setup plan's optional fix `fix:install-agents` (files preview; apply and rollback tested in
+      `apply.test.ts`; a test checks each role renders back to its exact file). Remaining: owner click-through.
 - [ ] **M3-06** Orchestrator that executes a template:
   - sequential and parallel steps;
   - hand-offs as files (`plan.md`, `contract.json`);
@@ -1117,8 +1119,11 @@ Decisions: [ADR-0009](adr/0009-release-signing-and-updates.md). Maintainer steps
   run `cancelled` and leaves no process behind. Clicked through on macOS (2026-10-30, debug build): Approve and run,
   the step's Edit and Bash approvals over the task page, the timeline with the step's transcript, the gates panel, Run
   again. Two fixes from it: the reply to `task.start` could overwrite newer step updates (the timeline stayed empty
-  while a step ran), and a step's approval covered the page's Stop, so it now offers Stop task itself. Remaining:
-  parallel steps (L).
+  while a step ran), and a step's approval covered the page's Stop, so it now offers Stop task itself.
+
+  Step 3: parallel steps (L's planners, up to 3 at once, merged into `plan.md`) and baseline gates before the first
+  step. Live (2026-10-30): an L task on `sample-app` ran the three planners at the same time, then implement, gates
+  and the Opus review, and ended Done in 65 s for ≈$0.18. Remaining: owner click-through.
 - [ ] **M3-07** XL path: split into sub-tasks, each with its own contract and worktree. Evaluate the SDK `Workflow` tool
       where the user's plan supports it.
 - [ ] **M3-08** Verification gates from WorkspaceProfile commands (format, lint, typecheck, test, smoke), with a bounded fix loop
@@ -1126,12 +1131,24 @@ Decisions: [ADR-0009](adr/0009-release-signing-and-updates.md). Maintainer steps
       Progress (step 2): `tasks/gates.ts` resolves gates from the profile (root or per package) plus `scripts/smoke.*`,
       runs format in write mode and checks under the workspace guard, all gates after a failure, with fix rounds
       capped (2) across the run. In the live runs, every recorded exit code matched the command re-run by hand.
+      Step 3: a baseline run before the task; failures already there don't use fix rounds and are marked for the
+      implementer and the reviewer. Live (2026-10-30): the coupon M task that spent 2 rounds and failed in step 2 now
+      spends none, still gets its review, and ends Failed with "test was already failing before the task".
       Remaining: owner click-through.
 - [ ] **M3-09** Evidence report per task, stored and exportable as markdown:
   - changed files and their purpose;
   - gates run, with real exit codes; gates not run, with reasons;
   - security notes, remaining risks and manual steps.
+
+  Progress (step 3): `tasks/evidence.ts` builds `evidence.json` and `evidence.md` from the run's records only
+  (planner.md §9), including the approvals Claude asked for and guard blocks, and a gitleaks scan when it's
+  installed; `task.evidence`; the task page's Evidence card with Copy and Open in editor. Live (2026-10-30):
+  `live-task.ts` checks that the report's gate runs are the recorded ones (they were, on two M runs and an L run).
+  Remaining: owner click-through.
 - [ ] **M3-10** The UI shows a task as "Done" only when the required gates passed, or the user explicitly accepted the risk.
+      Progress (step 3): Done only when every gate's latest run passed; otherwise Failed or Not verified, and Accept
+      risk… (`task.acceptRisk`, a reason required) ends it as Accepted with risk, which the report records. Live
+      (2026-10-30): the coupon M task accepted with a reason over JSON-RPC. Remaining: owner click-through.
 
 ### Exit criteria
 
@@ -1142,6 +1159,8 @@ Decisions: [ADR-0009](adr/0009-release-signing-and-updates.md). Maintainer steps
         $0.02.
       - Remaining: the owner labels the tasks (`label`), then the real baseline and tuning.
 - [ ] **M3-E2** Every completed task has an evidence report whose gate results match the actual command outputs.
+      - `live-task.ts` re-runs the last round's commands by hand and compares the report's gate runs with the
+        recorded ones; a unit test checks the same (`evidence.test.ts`). Remaining: the run over benchmark tasks.
 
 ---
 

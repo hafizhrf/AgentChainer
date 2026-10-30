@@ -418,7 +418,8 @@ export const TaskIdSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}-[0-9a-f]{8}$/);
 /**
  * `draft` until the user approves the contract and the tier, then `ready`. A run (M3-06) ends `done` (every gate's
  * latest run passed after the last change), `failed`, `unverified` (no gates to run), or `cancelled`. `interrupted`
- * is a run the app stopped in the middle of (computed when read back), which can be resumed.
+ * is a run the app stopped in the middle of (computed when read back), which can be resumed. A failed or unverified
+ * run can end `accepted`: the user took the risk, with a reason (M3-10).
  */
 export const TASK_STATES = [
   "draft",
@@ -429,6 +430,7 @@ export const TASK_STATES = [
   "unverified",
   "cancelled",
   "interrupted",
+  "accepted",
 ] as const;
 export type TaskState = (typeof TASK_STATES)[number];
 
@@ -439,8 +441,10 @@ export const StepRunSchema = z.object({
   /** The template step it belongs to. */
   step: z.string(),
   label: z.string(),
-  kind: z.enum(["agent", "fix", "gates"]),
+  kind: z.enum(["agent", "fix", "gates", "baseline"]),
   role: z.string().optional(),
+  /** Steps that run at the same time (L's planners) share their parallel step's label. */
+  group: z.string().optional(),
   status: z.enum(["running", "done", "failed", "cancelled"]),
   sessionId: z.string().optional(),
   startedAt: z.string(),
@@ -469,6 +473,32 @@ export const GateRunSchema = z.object({
 });
 export type GateRun = z.infer<typeof GateRunSchema>;
 
+/** An approval a task step asked for during a run, and the answer (M3-09 security notes). */
+export const ApprovalRecordSchema = z.object({
+  stepId: z.string(),
+  label: z.string(),
+  tool: z.string(),
+  /** The command, file or target, as the approval dialog shows it. */
+  target: z.string(),
+  risk: z.enum(["low", "medium", "high"]),
+  reasons: z.array(z.string()),
+  allowed: z.boolean(),
+  /** Saved as a rule ("Always allow"). */
+  always: z.boolean(),
+  at: z.string(),
+});
+export type ApprovalRecord = z.infer<typeof ApprovalRecordSchema>;
+
+/** A tool call the guard hook denied during a run. */
+export const GuardBlockSchema = z.object({
+  stepId: z.string(),
+  tool: z.string(),
+  target: z.string(),
+  reason: z.string(),
+  at: z.string(),
+});
+export type GuardBlock = z.infer<typeof GuardBlockSchema>;
+
 export const TaskRunSchema = z.object({
   workflow: z.object({ id: z.string(), version: z.number().int() }),
   permissionMode: PermissionModeSchema,
@@ -486,6 +516,12 @@ export const TaskRunSchema = z.object({
   gates: z.array(GateRunSchema),
   /** Gates the workflow asks for that the workspace has no command for: reported as not run, never as passed. */
   notRun: z.array(z.enum(GATE_KINDS)),
+  /** The gates run once before the first step: what already failed before the task. */
+  baseline: z.array(GateRunSchema).default([]),
+  approvals: z.array(ApprovalRecordSchema).default([]),
+  guardBlocks: z.array(GuardBlockSchema).default([]),
+  /** Set when the user accepted a failed or unverified run's risk (M3-10). */
+  acceptance: z.object({ reason: z.string().min(1), at: z.string() }).optional(),
   costUsd: z.number(),
   /** Why the run ended, in a sentence. */
   outcome: z.string().optional(),
@@ -924,6 +960,13 @@ export const methodSchemas = {
   },
   /** Continues an interrupted run from the step it stopped in. */
   "task.resume": { params: TaskRef, result: TaskSchema },
+  /** Ends a failed or unverified run as accepted with risk; the reason goes into the evidence (M3-10). */
+  "task.acceptRisk": { params: TaskRef.extend({ reason: z.string().min(1).max(2000) }), result: TaskSchema },
+  /**
+   * The task's evidence report (M3-09), built from the run's records: markdown, and where it's kept
+   * (`.agentchainer/tasks/<id>/evidence.md`).
+   */
+  "task.evidence": { params: TaskRef, result: z.object({ markdown: z.string(), path: z.string() }) },
   /** Stops a draft, a triage or a run in progress. A stopped run leaves the working tree as it is. */
   "task.cancel": { params: TaskRef, result: z.object({ cancelled: z.boolean() }) },
   "task.list": { params: WorkspaceRef, result: z.object({ tasks: z.array(TaskSummarySchema) }) },
@@ -1002,3 +1045,15 @@ export const isNotificationName = (name: string): name is NotificationName => Ob
 export function describeIssues(error: z.ZodError): string {
   return z.prettifyError(error);
 }
+
+/* ---------- Approval risk (UX-05), shared by the approval dialog and a task's evidence (M3-09) ---------- */
+
+export {
+  commandRisk,
+  type Described,
+  describeRequest,
+  displayPath,
+  insideWorkspace,
+  type Risk,
+  type RiskLevel,
+} from "./approval.ts";

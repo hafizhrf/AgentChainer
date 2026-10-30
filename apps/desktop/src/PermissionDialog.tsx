@@ -1,6 +1,6 @@
 import type { AlwaysScope, Methods, PermissionMode, PermissionRequest } from "@agentchainer/protocol";
+import { describeRequest, displayPath, type RiskLevel } from "@agentchainer/protocol";
 import { useState } from "react";
-import { describeRequest, displayPath, type RiskLevel } from "./approval.ts";
 import { Modal } from "./Dialog.tsx";
 import { editDiffs, InlineDiff } from "./InlineDiff.tsx";
 import { Markdown } from "./Markdown.tsx";

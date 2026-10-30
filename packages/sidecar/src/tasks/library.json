@@ -1,5 +1,92 @@
 {
   "workflows": {
+    "L": {
+      "id": "tier-l",
+      "tier": "L",
+      "version": 1,
+      "description": "Architecture, security and test planning in parallel, implement, run the gates (with fix rounds), then an independent review.",
+      "steps": [
+        {
+          "id": "plan",
+          "label": "Plan",
+          "parallel": [
+            {
+              "id": "architecture",
+              "label": "Architecture",
+              "role": "architect",
+              "access": "read",
+              "inputs": ["contract"],
+              "limits": {
+                "maxTurns": 30,
+                "maxBudgetUsd": 1
+              }
+            },
+            {
+              "id": "security",
+              "label": "Security review",
+              "role": "security-reviewer",
+              "access": "read",
+              "inputs": ["contract"],
+              "limits": {
+                "maxTurns": 30,
+                "maxBudgetUsd": 1
+              }
+            },
+            {
+              "id": "tests",
+              "label": "Test plan",
+              "role": "test-planner",
+              "access": "read",
+              "inputs": ["contract"],
+              "limits": {
+                "maxTurns": 30,
+                "maxBudgetUsd": 0.75
+              }
+            }
+          ],
+          "output": "plan"
+        },
+        {
+          "id": "implement",
+          "label": "Implement",
+          "role": "implementer",
+          "access": "write",
+          "inputs": ["contract", "plan"],
+          "limits": {
+            "maxTurns": 120,
+            "maxBudgetUsd": 4
+          }
+        },
+        {
+          "id": "gates",
+          "label": "Gates",
+          "gates": ["format", "lint", "typecheck", "test", "build", "smoke"],
+          "fix": {
+            "step": "implement",
+            "maxRounds": 2,
+            "maxBudgetUsd": 1.5
+          }
+        },
+        {
+          "id": "review",
+          "label": "Independent review",
+          "role": "independent-reviewer",
+          "access": "read",
+          "inputs": ["contract", "diff", "gates"],
+          "output": "review",
+          "fresh": true,
+          "fix": {
+            "step": "implement",
+            "maxRounds": 1,
+            "maxBudgetUsd": 1.5
+          },
+          "limits": {
+            "maxTurns": 40,
+            "maxBudgetUsd": 1.5
+          }
+        }
+      ]
+    },
     "M": {
       "id": "tier-m",
       "tier": "M",

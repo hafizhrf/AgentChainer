@@ -384,6 +384,23 @@ fieldset.task-field legend {
   font-size: var(--text-sm);
 }
 
+.task-evidence-body {
+  max-height: 36rem;
+  overflow: auto;
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg);
+}
+
+.task-evidence-toggle svg {
+  transition: transform var(--duration);
+}
+
+.task-evidence-toggle[aria-expanded="true"] svg {
+  transform: rotate(90deg);
+}
+
 .task-gate-round {
   display: flex;
   flex-direction: column;

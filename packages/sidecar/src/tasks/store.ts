@@ -138,7 +138,7 @@ export function listTasks(root: string): TaskSummary[] {
 }
 
 /** Files steps hand to each other (planner.md §6), kept in the task's folder. */
-const HAND_OFF_FILES = new Set(["plan.md", "review.json"]);
+const HAND_OFF_FILES = new Set(["plan.md", "review.json", "summary.md", "evidence.json", "evidence.md"]);
 
 export function readTaskFile(root: string, id: string, name: string): string | null {
   if (!HAND_OFF_FILES.has(name)) throw new Error(`Not a task file: ${name}`);

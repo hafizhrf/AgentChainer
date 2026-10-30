@@ -1,0 +1,49 @@
+# Tier L (docs/design/planner.md §5): a cross-module feature or a security-relevant change. Three read-only planners
+# work at the same time (architecture, security, tests) and their plans merge into plan.md; then the implementation,
+# the gates with fix rounds, and an independent review in a fresh context.
+id: tier-l
+tier: L
+version: 1
+description: Architecture, security and test planning in parallel, implement, run the gates (with fix rounds), then an independent review.
+steps:
+  - id: plan
+    label: Plan
+    output: plan
+    parallel:
+      - id: architecture
+        label: Architecture
+        role: architect
+        access: read
+        inputs: [contract]
+        limits: { maxTurns: 30, maxBudgetUsd: 1 }
+      - id: security
+        label: Security review
+        role: security-reviewer
+        access: read
+        inputs: [contract]
+        limits: { maxTurns: 30, maxBudgetUsd: 1 }
+      - id: tests
+        label: Test plan
+        role: test-planner
+        access: read
+        inputs: [contract]
+        limits: { maxTurns: 30, maxBudgetUsd: 0.75 }
+  - id: implement
+    label: Implement
+    role: implementer
+    access: write
+    inputs: [contract, plan]
+    limits: { maxTurns: 120, maxBudgetUsd: 4 }
+  - id: gates
+    label: Gates
+    gates: [format, lint, typecheck, test, build, smoke]
+    fix: { step: implement, maxRounds: 2, maxBudgetUsd: 1.5 }
+  - id: review
+    label: Independent review
+    role: independent-reviewer
+    access: read
+    fresh: true
+    inputs: [contract, diff, gates]
+    output: review
+    fix: { step: implement, maxRounds: 1, maxBudgetUsd: 1.5 }
+    limits: { maxTurns: 40, maxBudgetUsd: 1.5 }

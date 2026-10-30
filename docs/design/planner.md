@@ -187,7 +187,7 @@ steps:
 |---|---|---|
 | S | implement → gates | No plan step; the contract is the plan. Built (step 2) |
 | M | plan → implement → gates → review | Built (step 2) |
-| L | in parallel: architect, security-reviewer, test-planner (all read-only) → implement → gates → independent review | The parallel group only reads; their outputs merge into `plan.md`. Step 3 |
+| L | in parallel: architect, security-reviewer, test-planner (all read-only) → implement → gates → independent review | The parallel group only reads; their outputs merge into `plan.md`, a section per role. Built (step 3) |
 | XL | split into sub-tasks (each with its own contract, tier and worktree) → per sub-task flow → integration gates | §8 |
 
 **Agent library** (`agents/ac-<role>.md` at the repo root, like `skills/`):
@@ -197,7 +197,10 @@ steps:
   inherit the task's model.
 - The orchestrator appends a step's role to the default system prompt of that step's session, so nothing has to be
   installed for tasks to work.
-- **Install into project** (writing them into `.claude/agents/` through the plan and rollback flow) comes with step 3.
+- **Install roles** (step 3): the setup plan offers `fix:install-agents`, optional and unselected, whenever a
+  `.claude/agents/ac-<role>.md` is missing or differs from the library. Its preview is the files, each role rendered
+  back to its markdown; apply and rollback are the plan's own (backups, lock entry), so nothing new writes to the
+  project. Installed roles let the CLI and other Claude surfaces use the same roles; tasks don't need them.
 
 ## 6. The orchestrator (M3-06)
 
@@ -225,14 +228,19 @@ change. The world comes through a `Runner` (`tasks/runner.ts`), so the machine i
 - **Budgets.** The task's total cap (from the triage card) holds. Read steps are fresh sessions with their own caps; a
   write step's session also takes its fix rounds, and the SDK caps a session as a whole, so it gets what's left of the
   task's budget. A step that can't start for lack of budget ends the task as Failed.
-- **Parallel steps** (L) and the end-state rules for Done vs accepted risk (M3-10) come with step 3.
+- **Parallel steps** (L, step 3): a `parallel` step groups read-only steps (the schema rejects write steps, outputs
+  and fixes there, since two writers would edit the same tree). Up to 3 run at once, each with its own session, cap and
+  timeline entry (sharing the group's label, shown as "parallel"). Their answers merge into `plan.md`, one `##`
+  section per role, with each answer's own headings a level down. If any member stops, the task fails, naming it.
+- **Baseline** (step 3): before the first step, the workflow's gates run once, as the "Gates before the task" entry,
+  stored in `run.baseline`. See §7 for how it changes the fix loop.
 - **Stop** closes the running session or kills the running gate and ends the run `cancelled`; the working tree is
   left as it is (rewind and git still work).
 
 **Protocol:**
 - **Requests:** `task.create`, `task.draft`, `task.retriage`, `task.approve`, `task.revise`, `task.cancel` (also
-  stops a run), `task.list`, `task.get`, `task.delete`, `task.start`, `task.resume`. Later: `task.acceptRisk` and
-  `task.exportEvidence`.
+  stops a run), `task.list`, `task.get`, `task.delete`, `task.start`, `task.resume`, and since step 3
+  `task.acceptRisk` and `task.evidence` (§9).
 - **Events:**
   - `task.updated {cwd, task}` on every change of a run;
   - step sessions emit the normal `agent.event`s, and their `permission.request`s, with a `task` tag (task id, step,
@@ -265,9 +273,19 @@ change. The world comes through a `Runner` (`tasks/runner.ts`), so the machine i
 **The independent reviewer's must-fix findings** get one fix round of their own, then the gates run again under the
 same cap. Other findings stay in `review.json` for the report.
 
-**Seen in live runs (2026-10-30):** a gate that already failed before the task (the sample app's seeded bug) can't be
-fixed inside a contract that puts it out of scope, so the task ends Failed although it did its own part. Step 3
-should run the gates once at the start, so the report can tell "already failing before the task" apart.
+**New vs pre-existing failures (step 3).** Seen in step 2's live runs: a gate that already failed before the task
+(the sample app's seeded bug) can't be fixed inside a contract that puts it out of scope, so the task spent both fix
+rounds and ended Failed although it did its own part. Now:
+- a failure counts as **new** unless the same gate (kind and package) failed in the baseline;
+- only new failures go to the implementer and use fix rounds; the prompt lists the pre-existing ones as "not part of
+  this fix unless the contract asks for it";
+- when only pre-existing failures remain, no round is spent and the run goes on, so the review still runs (the
+  reviewer's gate list marks those failures as already there). It then ends **Failed**: "test was already failing
+  before the task and still fails. Accept the risk if that's expected.";
+- a gate that failed in the baseline and passes now is reported as fixed by the task.
+
+The Done rule doesn't change (§9): every gate's latest run must pass, so a pre-existing failure can only end as
+Accepted with risk.
 
 ## 8. XL tasks, worktrees and the Workflow tool (M3-07)
 
@@ -291,24 +309,31 @@ should run the gates once at the start, so the report can tell "already failing 
 
 ## 9. Evidence report (M3-09) and "Done" (M3-10)
 
-`evidence.json` is rendered to `evidence.md` and exported on demand. It's **built only from recorded facts**:
+`tasks/evidence.ts` builds `evidence.json` and renders `evidence.md`, both in the task folder, when a run ends and
+again after an acceptance. `task.evidence` returns the markdown and the file's path; a report older than the task
+(a newer run, an interrupted one) is built again. It's **built only from recorded facts**:
 
 | Section | Source |
 |---|---|
 | Task, contract, tier and why, overrides | `contract.json`, triage record |
-| Changed files, with purpose | `git diff --numstat` against the task's base commit. The purpose of each file comes from the implementer's summary; files it doesn't explain are listed as "no explanation" |
-| Gates | Every gate run in order: command, exit code, duration, end of log, round. Gates not run, with the reason (no command detected, or skipped by the user) |
+| Changed files, with purpose | `git diff --numstat` against the task's base, plus files created since the start (not the ones already untracked, not `.agentchainer/`). The purpose of each file comes from the `## Changes` lines of the implementer's last summary (`summary.md`); files it doesn't explain are listed as "no explanation" |
+| Gates | The baseline, then every round: command, package, exit code, duration; the end of the log for the last failures (plain markdown, no HTML, so the app can render it). Gates not run, with the reason. Pre-existing failures and gates the task fixed are named |
 | Acceptance criteria | Per criterion: proved by a gate (with the gate run that proved it), judged by the reviewer (with the finding), or **manual: not checked by AgentChainer** |
 | Review | The reviewer's findings, with must-fix status |
-| Security notes | Guard blocks during the task, high-risk approvals (UX-05 rules), secrets-scan result if gitleaks is installed |
+| Security notes | Guard blocks during the task (`run.guardBlocks`); every approval Claude asked for, riskiest first, rated by the UX-05 rules now shared in `@agentchainer/protocol` (`run.approvals`; calls that settings rules or the permission profile allow without asking aren't listed, and the report says so); a gitleaks scan of the changed files when gitleaks is installed, otherwise "not run" with the reason |
 | Remaining risks and manual steps | From the contract's risks and the implementer's summary, marked as Claude's statements |
 | Cost and time | Per step and total, labeled as estimates |
 
 **Done (M3-10):**
 - A task is **Done** only when every required gate's latest run, after the last change, exited 0.
-- Otherwise it can only end as **Failed**, or as **Accepted with risk**: the user clicks it and gives a reason, and
-  the report records who, when and why.
+- Otherwise it can only end as **Failed** (or **Not verified** when no gate ran), or as **Accepted with risk**: on a
+  failed or not verified run, the user clicks Accept risk… and gives a reason (`task.acceptRisk`). The report
+  records when and why. The approver is the local user; no identity is stored (ADR-0002).
 - The UI never shows a check mark for a gate that didn't run.
+
+**In the app:** an Evidence card under the run, with Copy (the markdown) and Open in editor (`evidence.md` through the
+existing `open_in_editor`). The Gates card shows the baseline as "Before the task" and marks pre-existing failures in
+later rounds.
 
 **M3-E2** is checked by a test that re-runs the recorded gate commands for benchmark tasks and compares the exit codes
 with the report.
@@ -356,11 +381,12 @@ with the report.
 
 Grouped into fewer, larger PRs:
 
-1. **Contract and triage** (M3-02, M3-03):
+1. **Contract and triage** (M3-02, M3-03), done (#36, #37):
    - protocol, sidecar, contract form, triage card;
    - the benchmark harness, with the owner labeling the fixture tasks.
-2. **Orchestrator, templates, agents and gates** (M3-04, M3-05, M3-06, M3-08): the S and M tiers end to end.
-3. **Evidence and Done** (M3-09, M3-10), plus the L tier and the task view polish.
+2. **Orchestrator, templates, agents and gates** (M3-04, M3-05, M3-06, M3-08): the S and M tiers end to end, done
+   (#38).
+3. **Evidence and Done** (M3-09, M3-10), plus the L tier, baseline gates and Install roles: step 3.
 4. **XL** (M3-07): sub-tasks, worktrees, integration gates, and the Workflow tool evaluation.
 5. **Exit runs** (M3-E1, M3-E2).
 

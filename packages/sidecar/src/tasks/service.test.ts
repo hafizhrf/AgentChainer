@@ -1,11 +1,24 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
+import { existsSync } from "node:fs";
 import { after, describe, it } from "node:test";
 import { RpcErrorCode } from "@agentchainer/protocol";
 import { copyFixture, removeFixtureCopies } from "../detect/fixture-copy.ts";
 import type { AgentSdkModule } from "../sdk-loader.ts";
-import { approveTask, cancelTask, draftTask, newTask, retriageTask, reviseTask } from "./service.ts";
-import { listTasks, loadTask } from "./store.ts";
+import shipped from "./library.json" with { type: "json" };
+import { LibrarySchema } from "./library.ts";
+import { newRun } from "./orchestrator.ts";
+import {
+  acceptRisk,
+  approveTask,
+  cancelTask,
+  draftTask,
+  newTask,
+  retriageTask,
+  reviseTask,
+  taskEvidence,
+} from "./service.ts";
+import { listTasks, loadTask, saveTask } from "./store.ts";
 
 const DRAFT = {
   objective: "Totals count quantity.",
@@ -125,5 +138,59 @@ describe("task flow", () => {
     await assert.rejects(running, (err: { code?: number }) => err.code === RpcErrorCode.cancelled);
     assert.equal(cancelTask(task.id), false);
     assert.equal(loadTask(root, task.id).contract, null);
+  });
+
+  it("accepts a failed run's risk with a reason, and the evidence says so", () => {
+    const root = copyFixture("sample-app");
+    const created = newTask(root, "Fix total()");
+    const workflow = LibrarySchema.parse(shipped).workflows.S;
+    if (!workflow) throw new Error("no S workflow");
+    assert.throws(() => acceptRisk(root, created.id, "fine"), /Only a failed or unverified run/);
+    saveTask(root, {
+      ...created,
+      state: "failed",
+      run: {
+        ...newRun(workflow, { permissionMode: "default", base: null, untrackedAtStart: [] }, new Date()),
+        outcome: "test was already failing before the task and still fails.",
+      },
+    });
+    assert.throws(() => acceptRisk(root, created.id, "  "), /Say why/);
+    const accepted = acceptRisk(root, created.id, "The test is the planted bug.", new Date("2026-10-30T05:00:00Z"));
+    assert.equal(accepted.state, "accepted");
+    assert.deepEqual(accepted.run?.acceptance, {
+      reason: "The test is the planted bug.",
+      at: "2026-10-30T05:00:00.000Z",
+    });
+    const { markdown, path } = taskEvidence(root, created.id);
+    assert.ok(existsSync(path));
+    assert.match(markdown, /\*\*Outcome:\*\* \*\*Accepted with risk\.\*\*/);
+    assert.match(markdown, /Risk accepted\*\* by the user at 2026-10-30T05:00:00\.000Z: The test is the planted bug\./);
+    assert.throws(() => acceptRisk(root, created.id, "again"), /Only a failed or unverified run/);
+  });
+
+  it("builds the report again when the task changed after it was written", () => {
+    const root = copyFixture("sample-app");
+    const created = newTask(root, "Fix total()");
+    assert.throws(() => taskEvidence(root, created.id), /written when the run ends/);
+    const workflow = LibrarySchema.parse(shipped).workflows.S;
+    if (!workflow) throw new Error("no S workflow");
+    const run = newRun(workflow, { permissionMode: "default", base: null, untrackedAtStart: [] }, new Date());
+    saveTask(root, {
+      ...created,
+      state: "failed",
+      updatedAt: "2026-10-30T01:00:00.000Z",
+      run: { ...run, outcome: "First." },
+    });
+    assert.match(taskEvidence(root, created.id).markdown, /First\./);
+    // A newer run of the same task; the stored report is about the old one.
+    saveTask(root, {
+      ...created,
+      state: "done",
+      updatedAt: "2099-01-01T00:00:00.000Z",
+      run: { ...run, outcome: "Second." },
+    });
+    const again = taskEvidence(root, created.id).markdown;
+    assert.match(again, /Second\./);
+    assert.doesNotMatch(again, /First\./);
   });
 });

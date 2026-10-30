@@ -2,7 +2,17 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { fileURLToPath } from "node:url";
 import shipped from "./library.json" with { type: "json" };
-import { buildLibrary, isGates, LibrarySchema, libraryJsonText, parseRoleFile, WorkflowSchema } from "./library.ts";
+import {
+  buildLibrary,
+  isGates,
+  isParallel,
+  LibrarySchema,
+  libraryJsonText,
+  parseRoleFile,
+  RoleSchema,
+  renderRoleFile,
+  WorkflowSchema,
+} from "./library.ts";
 import { readLibrarySources } from "./library-source.ts";
 
 const repo = fileURLToPath(new URL("../../../../", import.meta.url));
@@ -16,7 +26,7 @@ describe("task library", () => {
 
   it("has the S and M workflows, with the gates after the write step and a fresh Opus review in M", () => {
     const lib = LibrarySchema.parse(shipped);
-    assert.deepEqual(Object.keys(lib.workflows).sort(), ["M", "S"]);
+    assert.deepEqual(Object.keys(lib.workflows).sort(), ["L", "M", "S"]);
     const m = lib.workflows.M;
     assert.ok(m);
     assert.deepEqual(
@@ -24,7 +34,7 @@ describe("task library", () => {
       ["plan", "implement", "gates", "review"],
     );
     const review = m.steps.find((s) => s.id === "review");
-    assert.ok(review && !isGates(review));
+    assert.ok(review && !isGates(review) && !isParallel(review));
     assert.equal(review.fresh, true);
     assert.equal(lib.roles[review.role]?.model, "opus");
   });
@@ -55,6 +65,38 @@ describe("task library", () => {
     assert.equal(WorkflowSchema.safeParse({ ...base, steps: [gates("implement"), implement] }).success, false);
     const writingReview = { ...implement, id: "review", output: "review" };
     assert.equal(WorkflowSchema.safeParse({ ...base, steps: [implement, writingReview] }).success, false);
+  });
+
+  it("has L plan in parallel with three read-only planners", () => {
+    const l = LibrarySchema.parse(shipped).workflows.L;
+    const plan = l?.steps[0];
+    assert.ok(plan && isParallel(plan));
+    assert.deepEqual(
+      plan.parallel.map((m) => m.role),
+      ["architect", "security-reviewer", "test-planner"],
+    );
+  });
+
+  it("rejects a parallel step that writes", () => {
+    const writer = {
+      id: "x",
+      label: "X",
+      role: "implementer",
+      access: "write",
+      inputs: [],
+      limits: { maxTurns: 1, maxBudgetUsd: 1 },
+    };
+    const reader = { ...writer, id: "y", role: "architect", access: "read" };
+    const w = { id: "tier-x", tier: "L", version: 1, description: "x" };
+    const group = (members: unknown[]) => ({ id: "plan", label: "Plan", output: "plan", parallel: members });
+    assert.ok(WorkflowSchema.safeParse({ ...w, steps: [group([reader, { ...reader, id: "z" }])] }).success);
+    assert.equal(WorkflowSchema.safeParse({ ...w, steps: [group([reader, writer])] }).success, false);
+  });
+
+  it("writes each role back exactly as its file (what Install roles copies)", () => {
+    for (const [file, text] of Object.entries(sources.roles)) {
+      assert.equal(renderRoleFile(RoleSchema.parse(parseRoleFile(text))), text, file);
+    }
   });
 
   it("reads role files and checks read steps use read-only roles", () => {

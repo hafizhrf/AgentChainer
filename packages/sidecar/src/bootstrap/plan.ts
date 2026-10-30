@@ -2,6 +2,8 @@ import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import type { BootstrapPlan, Finding, PlanAction, WorkspaceProfile } from "@agentchainer/protocol";
 import { type Catalog, type Item, type Profile, REQUIRED_REVIEWS } from "../catalog/schema.ts";
+import shippedLibrary from "../tasks/library.json" with { type: "json" };
+import { LibrarySchema, renderRoleFile } from "../tasks/library.ts";
 import { git, repoOf } from "../workspace.ts";
 import { GENERATORS, type Proposal } from "./generate.ts";
 import { itemChanges } from "./steps.ts";
@@ -70,6 +72,8 @@ export function buildPlan(
 ): BootstrapPlan {
   const fixes = new Set(findings.filter((f) => f.status !== "ok" && f.fix).map((f) => f.fix?.action ?? ""));
   const actions: PlanAction[] = [...fixActions(root, fixes, profile)];
+  const roles = rolesAction(root);
+  if (roles) actions.push(roles);
 
   const suggested = (p: Profile) =>
     "always" in p.suggest ||
@@ -149,6 +153,35 @@ export function buildPlan(
 }
 
 /** Deterministic fixes: file edits and git commands whose full effect the preview shows. */
+const ROLES = Object.values(LibrarySchema.parse(shippedLibrary).roles);
+
+/**
+ * AgentChainer's task roles as files in `.claude/agents/` (M3-05), so the CLI and other Claude surfaces can use them
+ * too (`claude --agent ac-implementer`). Offered when one is missing or differs; never selected by default, and not
+ * tied to a finding, so it doesn't count as something to fix. Applied and rolled back like any file fix.
+ */
+function rolesAction(root: string): PlanAction | null {
+  const files = ROLES.map((role) => {
+    const rel = `.claude/agents/${role.name}.md`;
+    const abs = path.join(root, ...rel.split("/"));
+    return { path: rel, before: existsSync(abs) ? readFileSync(abs, "utf8") : "", after: renderRoleFile(role) };
+  }).filter((f) => f.before !== f.after);
+  if (!files.length) return null;
+  return {
+    id: "fix:install-agents",
+    kind: "fix",
+    title: "Install AgentChainer's task roles",
+    why: "The roles tasks run with (implementer, architect, reviewers, planners) as project agents, so the CLI and other Claude surfaces can use them too.",
+    risk: "low",
+    scope: "project",
+    permissions: [],
+    secrets: [],
+    preview: { type: "files", files },
+    state: "optional",
+    selected: false,
+  };
+}
+
 function fixActions(root: string, fixes: Set<string>, profile: WorkspaceProfile): PlanAction[] {
   const read = (rel: string) => {
     const file = path.join(root, rel);

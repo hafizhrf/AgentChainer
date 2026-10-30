@@ -107,6 +107,9 @@ function secretPathMentioned(command: string, home: string): boolean {
   return SECRET_DIRS.some((dir) => prefixes.some((p) => command.includes(`${p}${dir}`)));
 }
 
+/** How a guard denial reads in a tool's result: what the transcript and a task's evidence look for. */
+export const GUARD_PREFIX = "Blocked by AgentChainer guard: ";
+
 /** The tools a read-only session gets: it can look, not change. */
 export const READ_TOOLS = ["Read", "Grep", "Glob"];
 

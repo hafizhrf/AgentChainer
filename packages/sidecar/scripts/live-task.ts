@@ -1,12 +1,16 @@
 // Runs a task end to end through the sidecar's JSON-RPC, with real model calls (M3-06): create, draft, approve, run.
 // Approvals are answered yes by this script, so use it only on a throwaway copy of a fixture; it makes one and
 // prints the timeline, the gate runs and the cost, then re-runs the last round's gate commands by hand to compare
-// exit codes (M3-E2).
+// exit codes, and checks that the evidence report's gate runs are the recorded ones (M3-E2).
 //
-// Usage: node scripts/live-task.ts [--fixture sample-app] [--request "…"] [--model haiku] [--tier S] [--keep]
+// Usage: node scripts/live-task.ts [--fixture sample-app] [--request "…"] [--model haiku] [--tier S|M|L] [--keep]
 //   [--stop-after <seconds>]: stops the run that long after it starts, to check it ends `cancelled`
-//   cost: a few cents with haiku for an S task; an M task's review runs on Opus (≈$1–3).
+//   [--accept "<reason>"]: accepts the risk when the run ends failed or not verified (M3-10)
+//   [--print-evidence]: prints the evidence report (M3-09)
+//   cost: a few cents with haiku for an S task; an M or L task's review runs on Opus (≈$0.2–3).
+
 import { execSync, spawn } from "node:child_process";
+import { readFileSync } from "node:fs";
 import { createInterface } from "node:readline";
 import { parseArgs } from "node:util";
 import type { MethodName, Methods, Task } from "@agentchainer/protocol";
@@ -20,6 +24,8 @@ const { values } = parseArgs({
     tier: { type: "string" },
     keep: { type: "boolean", default: false },
     "stop-after": { type: "string" },
+    accept: { type: "string" },
+    "print-evidence": { type: "boolean", default: false },
   },
 });
 
@@ -70,7 +76,7 @@ try {
   const created = await request("task.create", { cwd, request: values.request });
   const drafted = await request("task.draft", { cwd, id: created.id, model: values.model });
   if (!drafted.contract || !drafted.triage) throw new Error("no contract");
-  const tier = (values.tier ?? drafted.triage.proposed) as "S" | "M";
+  const tier = (values.tier ?? drafted.triage.proposed) as "S" | "M" | "L";
   console.log(`drafted ($${drafted.costUsd.toFixed(3)}); proposed ${drafted.triage.proposed}, running as ${tier}`);
   await request("task.approve", {
     cwd,
@@ -95,6 +101,8 @@ try {
   for (const s of end.run?.steps ?? []) {
     console.log(`  ${s.id.padEnd(18)} ${s.status.padEnd(9)} $${s.costUsd.toFixed(3)}  ${s.note ?? ""}`);
   }
+  for (const g of end.run?.baseline ?? [])
+    console.log(`  baseline ${g.kind} \`${g.command}\` → ${g.exitCode} (${g.durationMs} ms)`);
   const runs = end.run?.gates ?? [];
   for (const g of runs)
     console.log(`  gate ${g.kind} r${g.round} \`${g.command}\` → ${g.exitCode} (${g.durationMs} ms)`);
@@ -113,6 +121,21 @@ try {
     }
     console.log(`  by hand: ${g.command} → ${code} ${code === g.exitCode ? "✓ matches" : "✗ differs"}`);
   }
+  let final = end;
+  if (values.accept && (end.state === "failed" || end.state === "unverified")) {
+    final = await request("task.acceptRisk", { cwd, id: created.id, reason: values.accept });
+    console.log(`\naccepted: ${final.state} (${final.run?.acceptance?.reason})`);
+  }
+  // M3-09, M3-E2: the report exists, and its gate runs are exactly the recorded ones.
+  const evidence = await request("task.evidence", { cwd, id: created.id });
+  const stored = JSON.parse(readFileSync(evidence.path.replace(/\.md$/, ".json"), "utf8"));
+  const same =
+    JSON.stringify(stored.gates.runs) === JSON.stringify(final.run?.gates) &&
+    JSON.stringify(stored.gates.baseline) === JSON.stringify(final.run?.baseline);
+  console.log(`\nevidence: ${evidence.path}`);
+  console.log(`  gate runs in the report ${same ? "✓ match the recorded runs" : "✗ differ from the recorded runs"}`);
+  console.log(`  sections: ${[...evidence.markdown.matchAll(/^## (.+)$/gm)].map((m) => m[1]).join(" · ")}`);
+  if (values["print-evidence"]) console.log(`\n${evidence.markdown}`);
   console.log(`\ngit status:\n${execSync("git status --short", { cwd, encoding: "utf8" })}`);
 } finally {
   child.kill();

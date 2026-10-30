@@ -905,6 +905,9 @@ export function App() {
                       backLabel={taskView.back ? "Back to session" : "Back to Home"}
                       confirm={confirm}
                       onBack={() => setTaskView(null)}
+                      onOpenFile={(file) =>
+                        invoke("open_in_editor", { file, line: null, editor: settings?.editor ?? "system" })
+                      }
                     />
                   </Suspense>
                 )}

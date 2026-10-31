@@ -856,6 +856,11 @@ All of these run on macOS, Windows and Ubuntu against a sample repo in `fixtures
       byte for byte).
 - [ ] **M2-32** Re-pin codebase-memory-mcp to 0.12.1 (the weekly bot proposes it) and review it again; it needs two
       reviews as a community item.
+      Progress (2026-10-31): re-pinned to 0.12.1 by the update bot once it passed the 14-day minimum; hashes checked by
+      `verify-catalog-sources.ts`. A [draft review](catalog-reviews/2026-10-31-codebase-memory-mcp-0.12.1.md) proposes
+      approval. It found the binary makes no outbound requests and the 0.11.0 security fixes are in. It also found that
+      the web UI on 127.0.0.1:9749 is on by default with no sign-in (0.11.0 too). The owner chose to disclose it in
+      `permissions` rather than pass `--ui=false`, which is saved for the whole account. Remaining: two signed reviews.
 
 ### Exit criteria
 

@@ -200,7 +200,7 @@ Profiles live in `catalog/profiles/<id>.yaml` with `suggest: {always | stacks | 
 | `github` | plugin | verified-vendor | Apache-2.0 (plugin files); GitHub's hosted server (source MIT) | Partner plugin: the remote MCP `api.githubcopilot.com` with `GITHUB_PERSONAL_ACCESS_TOKEN` from your environment | Reviewed |
 | `firebase` | plugin | verified-vendor | per plugin | Partner plugin | Seed **(verify)** |
 | `cloudflare-security-audit` | skill | verified-vendor | MIT | Copy `skills/security-audit/` at a pinned SHA, with the root `LICENSE` (pinned) | **Not approved yet**: the MIT notice is now copied (M2-29); waiting for its review |
-| `codebase-memory-mcp` (0.11.0) | mcp | community | MIT | Pinned release binary + `claude mcp add --scope local` | **Not approved at 0.11.0**: re-pin to 0.12.1 (M2-32), then 2 reviews |
+| `codebase-memory-mcp` (0.12.1) | mcp | community | MIT | Pinned release binary + `claude mcp add --scope local` | **Waiting for 2 reviews** ([draft](catalog-reviews/2026-10-31-codebase-memory-mcp-0.12.1.md)). Its web UI on 127.0.0.1:9749 is on by default, without sign-in |
 | `anthropic-example-skills` | plugin | official | Apache-2.0 (subset) | `example-skills@anthropic-agent-skills` | Optional; exclude source-available document skills |
 | `gitleaks` (8.30.1) | hook | verified-vendor | MIT | Pinned release binary; pre-commit hook via the repo's hook manager, or a local hook | Reviewed |
 | `actionlint` (1.7.12) | tool | verified-vendor | MIT | Pinned release binary. The verifier downloads it on demand to check generated workflows (AgentChainer's own tool, like the Agent SDK); not offered as an install | Reviewed |

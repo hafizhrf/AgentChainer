@@ -182,7 +182,8 @@ mapped into a stable internal `AgentEvent` union so the UI never depends on raw 
 | `text.delta`, `thinking.delta` | `stream_event` (main agent only); subagent text via forwarded messages |
 | `message.completed` | `assistant` |
 | `tool.started {toolUseId, name, input, agentId}` / `tool.completed {toolUseId, ok, output, durationMs}` | `assistant` tool_use / `user` tool_result |
-| `agent.started {toolUseId, taskId, description, agentType, depth}` / `agent.text` / `agent.completed {status, summary, tokens, durationMs}` | `system/task_started` / subagent `assistant` messages / `system/task_notification` (spike S4) |
+| `agent.started {toolUseId, taskId, description, agentType, depth, parentTaskId, runId, prompt}` / `agent.text` / `agent.completed {status, reason, summary, tokens, durationMs}` | `system/task_started` / subagent `assistant` messages / `system/task_notification` (spike S4) |
+| `agent.progress {toolUseId, taskId, totalTokens, toolUses, durationMs, lastTool, summary}` / `agent.updated {taskId, status, endTime, pausedMs, error, background}` | `system/task_progress` / `system/task_updated`, which names the task only (M4-01) |
 | `permission.requested` / `permission.resolved` | `canUseTool` broker |
 | `turn.completed {costUsd, modelUsage, durationMs, numTurns, stopReason, denials}` | `result` |
 | `context.compacted` | `system/compact_boundary` |
@@ -200,10 +201,14 @@ consumers must treat `session.started` as idempotent.
 - Lifecycle comes from `system/task_started` and `system/task_notification`, which carry the same `tool_use_id`, a
   description, a type, depth, status, summary and usage. Spike S4 showed these are enough; the `SubagentStart/Stop`
   hooks aren't registered.
+- Nesting: a subagent's own Agent call has the outer subagent's `tool_use_id` as its parent, and its `task_started`
+  names the outer task in `parent_task_id` with `spawn_depth` 2 (fixture `subagents-nested`, CLI 2.1.314). The UI nests
+  the inner card inside the outer one ([design](design/observability.md) §3).
 
 Every mapping is covered by **recorded fixtures**: real SDK output saved as JSONL in `packages/sidecar/test/fixtures/`.
 - Record with `AGENTCHAINER_RECORD_SDK` (or `spike-host --record`), then run `scripts/make-fixture.ts`.
-- `make-fixture.ts` drops non-session messages, replaces plain and encoded paths and the username, and refuses to write
+- `make-fixture.ts` drops non-session messages, replaces plain, JSON-escaped (Windows) and encoded paths and the
+  username, and refuses to write
   if anything identifying survives.
 
 ### 5.3 Cost

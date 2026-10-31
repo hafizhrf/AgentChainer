@@ -398,6 +398,16 @@
   color: var(--muted);
 }
 
+.agent-error {
+  color: var(--err);
+}
+
+/* A stopped subagent is neither done nor failed. */
+.agent.stopped > summary .tool-status,
+.agent.paused > summary .tool-status {
+  color: var(--warn);
+}
+
 /* A new session (UX-06): the heading, the composer and the starter chips sit together mid-screen, like a chat app's
    first screen. The transcript (its "Session started" notice) and a spacer share the free space above and below. */
 .chat.fresh .transcript-scroll,

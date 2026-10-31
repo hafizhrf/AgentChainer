@@ -1,5 +1,5 @@
 import type { FileStatus, WorkspaceFile, WorkspaceFiles } from "@agentchainer/protocol";
-import type { Item, ToolItem } from "./transcript.ts";
+import type { AgentItem, Item, ToolItem } from "./transcript.ts";
 
 /** File tree, agent edits and path helpers for the workspace panels (M1-25/M1-26). Pure, so it's unit-tested. */
 
@@ -129,7 +129,13 @@ export function agentEdits(items: Item[], cwd: string): TurnEdits[] {
     } else if (item.kind === "tool") {
       add(item);
     } else if (item.kind === "agent") {
-      for (const child of item.children) if (child.kind === "tool") add(child);
+      const walk = (agent: AgentItem): void => {
+        for (const child of agent.children) {
+          if (child.kind === "tool") add(child);
+          else if (child.kind === "agent") walk(child);
+        }
+      };
+      walk(item);
     }
   }
   if (current?.files.length) turns.push(current);

@@ -69,12 +69,92 @@ describe("transcript reducer", () => {
     assert.equal(items[1]?.kind === "tool" && items[1].status, "error");
   });
 
-  it("marks failed or stopped subagents as errors", () => {
+  it("tells stopped subagents from failed ones", () => {
     const items = run([
       { type: "agent.started", toolUseId: "B", taskId: "t2", description: "Slow job" },
+      { type: "agent.started", toolUseId: "C", taskId: "t3", description: "Broken job" },
       { type: "agent.completed", toolUseId: "B", taskId: "t2", status: "stopped", summary: "Interrupted" },
+      { type: "agent.completed", toolUseId: "C", taskId: "t3", status: "failed", summary: "Crashed" },
     ]);
-    assert.equal((items[0] as AgentItem).status, "error");
+    assert.deepEqual(
+      items.map((i) => i.kind === "agent" && i.status),
+      ["stopped", "error"],
+    );
+  });
+});
+
+describe("transcript: the agent tree (M4-01)", () => {
+  const spawn = (id: string, parent: string | null): AgentEvent => ({
+    type: "tool.started",
+    toolUseId: id,
+    name: "Agent",
+    input: { description: `Agent ${id}`, prompt: `Do ${id}` },
+    parentToolUseId: parent,
+  });
+
+  it("nests a subagent's own subagent inside its card, with its tool calls", () => {
+    const items = run([
+      spawn("A", null),
+      { type: "agent.started", toolUseId: "A", taskId: "tA", description: "Outer", depth: 1 },
+      spawn("B", "A"),
+      { type: "agent.started", toolUseId: "B", taskId: "tB", description: "Inner", depth: 2, parentTaskId: "tA" },
+      { type: "tool.started", toolUseId: "b1", name: "Bash", input: {}, parentToolUseId: "B" },
+      { type: "tool.completed", toolUseId: "b1", isError: false, output: "ok", parentToolUseId: "B" },
+      { type: "agent.completed", toolUseId: "B", taskId: "tB", status: "completed", summary: "inner done" },
+      { type: "tool.completed", toolUseId: "B", isError: false, output: "hand-back", parentToolUseId: "A" },
+    ]);
+    assert.equal(items.length, 1);
+    const outer = items[0] as AgentItem;
+    const inner = outer.children[0] as AgentItem;
+    assert.equal(inner.kind, "agent");
+    assert.equal(inner.taskId, "tB");
+    assert.equal(inner.prompt, "Do B");
+    assert.equal(inner.status, "done");
+    assert.deepEqual(
+      inner.children.map((c) => c.kind === "tool" && [c.name, c.status]),
+      [["Bash", "done"]],
+    );
+  });
+
+  it("puts an agent with no spawn call under its parent task", () => {
+    const items = run([
+      { type: "agent.started", toolUseId: "A", taskId: "tA", description: "Outer" },
+      { type: "agent.started", toolUseId: "B", taskId: "tB", description: "Inner", parentTaskId: "tA" },
+    ]);
+    assert.equal(items.length, 1);
+    assert.equal((items[0] as AgentItem).children[0]?.kind, "agent");
+  });
+
+  it("tracks progress while running, task state by task id, and keeps the final totals", () => {
+    const progress = (tokens: number): AgentEvent => ({
+      type: "agent.progress",
+      toolUseId: "A",
+      taskId: "tA",
+      totalTokens: tokens,
+      toolUses: 1,
+      durationMs: 900,
+      lastTool: "Bash",
+    });
+    const live = run([
+      { type: "agent.started", toolUseId: "A", taskId: "tA", description: "Job" },
+      progress(500),
+      { type: "agent.updated", taskId: "tA", status: "paused", pausedMs: 30 },
+    ])[0] as AgentItem;
+    assert.deepEqual([live.status, live.tokens, live.lastTool, live.pausedMs], ["paused", 500, "Bash", 30]);
+
+    const ended = run([
+      { type: "agent.started", toolUseId: "A", taskId: "tA", description: "Job" },
+      { type: "agent.updated", taskId: "tA", status: "killed", endTime: 5_000 },
+      { type: "agent.completed", toolUseId: "A", taskId: "tA", status: "stopped", summary: "", totalTokens: 800 },
+      progress(600),
+      { type: "agent.updated", taskId: "unknown-shell", status: "completed" },
+    ])[0] as AgentItem;
+    assert.deepEqual([ended.status, ended.tokens, ended.endedAt], ["stopped", 800, 5_000]);
+  });
+
+  it("leaves an untouched transcript's array as it was", () => {
+    const items = run([{ type: "text.delta", text: "Hi" }]);
+    assert.equal(applyEvent(items, { type: "agent.updated", taskId: "none", status: "running" }), items);
   });
 });
 

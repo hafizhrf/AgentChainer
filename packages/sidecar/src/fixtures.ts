@@ -47,9 +47,9 @@ export function sanitizeForFixture(message: unknown, id: Identity): Record<strin
 
   let json = JSON.stringify(m);
   const replacements: [string, string][] = [
-    [id.cwd, "/workspace"],
+    [jsonText(id.cwd), "/workspace"],
     [encodePath(id.cwd), "-workspace"],
-    [id.home, "/home/user"],
+    [jsonText(id.home), "/home/user"],
     [encodePath(id.home), "-home-user"],
     [id.username, "user"],
     [encodePath(id.username), "user"],
@@ -64,9 +64,12 @@ export function sanitizeForFixture(message: unknown, id: Identity): Record<strin
   return obj;
 }
 
-/** Returns the identity strings still present in `text`; a committed fixture must return []. */
+/** A string as it appears inside JSON text: a Windows path's backslashes are doubled there. */
+const jsonText = (s: string) => JSON.stringify(s).slice(1, -1);
+
+/** Returns the identity strings still present in `text` (JSON); a committed fixture must return []. */
 export function leaks(text: string, id: Identity): string[] {
-  return [id.home, encodePath(id.home), id.username, encodePath(id.username)].filter(
+  return [jsonText(id.cwd), jsonText(id.home), encodePath(id.home), id.username, encodePath(id.username)].filter(
     (s) => s.length > 2 && text.includes(s),
   );
 }

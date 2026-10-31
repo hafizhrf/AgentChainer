@@ -1,6 +1,6 @@
 # Design: agent observability (M4)
 
-- **Status:** Draft, waiting for the owner. Three decisions are already made (§17); the open ones are listed there.
+- **Status:** Approved (2026-10-31). The owner made three decisions and left the other four to the implementer (§17).
 - **Date:** 2026-10-31
 - **Covers:** M4-01…M4-08 and the exit criteria M4-E1/E2. Scope source: PRD [F4](../PRD.md#f4--agent-observability-p1).
 - **Builds on:**
@@ -71,9 +71,11 @@ sessions, background work, and a manager for the project's agent definitions.
 
 **Where it lives.**
 - The sidecar stays a pure mapper (`normalize.ts`).
-- The tree is a pure reducer in the UI (`apps/desktop/src/agents.ts`), next to `transcript.ts`, driven by the same
-  events. The chat cards and the graph read one model.
-- `transcript.ts` gets nested agents. A subagent's card goes under its parent's card.
+- The tree is the transcript itself: `transcript.ts` nests a subagent's `AgentItem` under its parent's card and keeps
+  the fields above on it, so the chat cards and the graph read one model. The graph and timeline get their nodes from
+  a pure selector over those items, added with step 2.
+- An agent whose spawning call wasn't seen goes under its parent task (`parentTaskId`), else at the top level.
+  `agent.updated` finds its agent by `taskId`; ids with no agent (shells, monitors) are ignored.
 
 **Tests:**
 - the reducer, replaying `subagents-parallel.jsonl`;
@@ -82,9 +84,8 @@ sessions, background work, and a manager for the project's agent definitions.
 ## 4. Graph (M4-02)
 
 - **Library:** `@xyflow/react` (MIT, already named in ADR-0001 and ADR-0006).
-- **Layout:** top-down. The proposal is `@dagrejs/dagre` (MIT). elkjs is the alternative, but it is EPL-2.0
-  **(verify)**, and ADR-0006 lists only permissive libraries (§17, still open). The layout is recomputed only when the
-  tree's structure changes, not on every progress event.
+- **Layout:** top-down, with `@dagrejs/dagre` (MIT; §17). The layout is recomputed only when the tree's structure
+  changes, not on every progress event.
 - **Nodes:**
   - one per agent;
   - for tools, only the key calls: a spawn, an edit or write, a failed call, and any call running longer than 10 s
@@ -222,7 +223,7 @@ One PR per step, each merged before the next starts:
 |---|---|
 | Graph as a right-panel tab | Too narrow for 200 nodes and for a timeline; the owner chose a session view (§17) |
 | Graph on its own page | Separates it from the chat it explains |
-| elkjs for layout | Better layouts, but EPL-2.0 **(verify)**; open in §17 |
+| elkjs for layout | Better layouts, but EPL-2.0 **(verify)**, while ADR-0006 lists only permissive libraries (§17) |
 | `SubagentStart`/`SubagentStop` hooks | `task_*` messages already carry everything, and S4 found the hooks add nothing |
 | Reading transcript JSONL files directly | ADR-0004: SDK session APIs only |
 | Tokens only, no ≈USD | Hides which agent is expensive; the owner chose an estimate (§17) |
@@ -236,9 +237,12 @@ One PR per step, each merged before the next starts:
    the SDK's.
 3. **Order:** tree store, then graph, drawer and stop, then timeline, replay, background tasks, and the library.
 
-**Still open:**
-1. **Layout library:** dagre (MIT) or elkjs (EPL-2.0 **(verify)**). Choosing elkjs needs an ADR or an ADR-0006
-   amendment.
-2. **Folding:** the 10 s rule for long tool calls and the 200-node fold threshold; to tune on real sessions.
-3. **Price table source:** where the per-model prices come from and how often they're refreshed.
-4. **Background timing:** whether M4-07 should move earlier, if the CLI leans further on background agents.
+**Decided** (by the implementer, as the owner asked, 2026-10-31):
+4. **Layout library:** dagre (MIT). It fits ADR-0006 as it stands; elkjs would need an ADR for its EPL-2.0 licence
+   **(verify)**, and a tree of agents doesn't need its layered routing.
+5. **Folding:** 10 s for a long tool call and 200 nodes before completed subtrees fold. Both are named constants, tuned
+   after the E1 run on real sessions.
+6. **Price table:** Anthropic's public model pricing page **(verify the URL when the table is added)**, copied into a
+   table in the repo with the date it was read. It is refreshed whenever a model is added to the app's model list.
+7. **Background timing:** M4-07 stays fifth. #43 keeps the CLI in the foreground until then, and the read-only views
+   come first so background work is visible when it lands.

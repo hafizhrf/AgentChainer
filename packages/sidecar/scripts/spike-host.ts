@@ -1,7 +1,7 @@
 // Drives the sidecar the way the Rust core will (spikes S2/S3) and checks real behaviour
 // against the user's own `claude` CLI.
 //
-// Usage: node scripts/spike-host.ts --cwd <empty scratch dir> [--model haiku] [--scenario basic|mode|interrupt|guard|auto|subagents|sessions|approvals|plan|fixtures|image|exit|all] [--record out.jsonl] [--sidecar <executable> --data-dir <dir>]
+// Usage: node scripts/spike-host.ts --cwd <empty scratch dir> [--model haiku] [--scenario basic|mode|interrupt|guard|auto|subagents|nested|sessions|approvals|plan|fixtures|image|exit|all] [--record out.jsonl] [--sidecar <executable> --data-dir <dir>]
 // Makes real model calls with the user's own login (haiku keeps a full run around a few cents).
 import { execFileSync, spawn, spawnSync } from "node:child_process";
 import { cpSync, existsSync, readdirSync, readFileSync, rmSync } from "node:fs";
@@ -333,6 +333,30 @@ async function subagents() {
     "subagent tool calls and text attach to their agent",
     nestedTools.length >= 2,
     `nested tool calls=${nestedTools.length} nested text messages=${nestedText.length} final reply=${JSON.stringify(t.reply.slice(0, 100))}`,
+  );
+}
+
+/** A subagent that spawns its own subagent (M4-01): record with `--record` for the subagents-nested fixture. */
+async function nested() {
+  const t = await turn(
+    "Use the Agent tool to launch one general-purpose subagent with this exact task: " +
+      "'Use the Agent tool to launch one general-purpose subagent that runs `date` with the Bash tool and reports the " +
+      "output. Then report what it returned.' Then tell me the date it found in one sentence.",
+  );
+  const started = t.events.filter((e) => e.type === "agent.started");
+  const inner = started.find((e) => e.type === "agent.started" && (e.depth ?? 1) > 1);
+  const progress = t.events.filter((e) => e.type === "agent.progress");
+  check(
+    "a subagent spawns its own subagent",
+    inner !== undefined,
+    `started=${started.length} depths=${started.map((e) => (e.type === "agent.started" ? (e.depth ?? "?") : "")).join(",")}`,
+  );
+  check(
+    "the nested subagent names its parent task",
+    inner?.type === "agent.started"
+      ? started.some((e) => e.type === "agent.started" && e.taskId === inner.parentTaskId)
+      : null,
+    `parentTaskId=${inner?.type === "agent.started" ? inner.parentTaskId : "-"} progress events=${progress.length}`,
   );
 }
 
@@ -734,6 +758,7 @@ const scenarios: Record<string, () => Promise<void>> = {
   guard,
   auto,
   subagents,
+  nested,
   sessions,
   approvals,
   plan,

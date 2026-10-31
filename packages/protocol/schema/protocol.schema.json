@@ -1113,6 +1113,15 @@
                     },
                     "background": {
                       "type": "boolean"
+                    },
+                    "parentTaskId": {
+                      "type": "string"
+                    },
+                    "runId": {
+                      "type": "string"
+                    },
+                    "prompt": {
+                      "type": "string"
                     }
                   },
                   "required": [
@@ -1120,6 +1129,91 @@
                     "toolUseId",
                     "taskId",
                     "description"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "const": "agent.progress"
+                    },
+                    "toolUseId": {
+                      "type": "string"
+                    },
+                    "taskId": {
+                      "type": "string"
+                    },
+                    "runId": {
+                      "type": "string"
+                    },
+                    "totalTokens": {
+                      "type": "number"
+                    },
+                    "toolUses": {
+                      "type": "number"
+                    },
+                    "durationMs": {
+                      "type": "number"
+                    },
+                    "lastTool": {
+                      "type": "string"
+                    },
+                    "summary": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "toolUseId",
+                    "taskId",
+                    "totalTokens",
+                    "toolUses",
+                    "durationMs"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "const": "agent.updated"
+                    },
+                    "taskId": {
+                      "type": "string"
+                    },
+                    "runId": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "pending",
+                        "running",
+                        "completed",
+                        "failed",
+                        "killed",
+                        "paused"
+                      ]
+                    },
+                    "endTime": {
+                      "type": "number"
+                    },
+                    "pausedMs": {
+                      "type": "number"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "background": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "taskId"
                   ],
                   "additionalProperties": false
                 },
@@ -1160,7 +1254,13 @@
                     "taskId": {
                       "type": "string"
                     },
+                    "runId": {
+                      "type": "string"
+                    },
                     "status": {
+                      "type": "string"
+                    },
+                    "reason": {
                       "type": "string"
                     },
                     "summary": {
@@ -14460,6 +14560,15 @@
                 },
                 "background": {
                   "type": "boolean"
+                },
+                "parentTaskId": {
+                  "type": "string"
+                },
+                "runId": {
+                  "type": "string"
+                },
+                "prompt": {
+                  "type": "string"
                 }
               },
               "required": [
@@ -14467,6 +14576,91 @@
                 "toolUseId",
                 "taskId",
                 "description"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "const": "agent.progress"
+                },
+                "toolUseId": {
+                  "type": "string"
+                },
+                "taskId": {
+                  "type": "string"
+                },
+                "runId": {
+                  "type": "string"
+                },
+                "totalTokens": {
+                  "type": "number"
+                },
+                "toolUses": {
+                  "type": "number"
+                },
+                "durationMs": {
+                  "type": "number"
+                },
+                "lastTool": {
+                  "type": "string"
+                },
+                "summary": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type",
+                "toolUseId",
+                "taskId",
+                "totalTokens",
+                "toolUses",
+                "durationMs"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "const": "agent.updated"
+                },
+                "taskId": {
+                  "type": "string"
+                },
+                "runId": {
+                  "type": "string"
+                },
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "pending",
+                    "running",
+                    "completed",
+                    "failed",
+                    "killed",
+                    "paused"
+                  ]
+                },
+                "endTime": {
+                  "type": "number"
+                },
+                "pausedMs": {
+                  "type": "number"
+                },
+                "error": {
+                  "type": "string"
+                },
+                "background": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "type",
+                "taskId"
               ],
               "additionalProperties": false
             },
@@ -14507,7 +14701,13 @@
                 "taskId": {
                   "type": "string"
                 },
+                "runId": {
+                  "type": "string"
+                },
                 "status": {
+                  "type": "string"
+                },
+                "reason": {
                   "type": "string"
                 },
                 "summary": {

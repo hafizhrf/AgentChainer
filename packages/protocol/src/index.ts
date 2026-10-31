@@ -629,7 +629,10 @@ export const AgentEventSchema = z.discriminatedUnion("type", [
     output: z.string(),
     parentToolUseId: z.string().nullable(),
   }),
-  /** A subagent was spawned by the Agent tool call `toolUseId` (spike S4). */
+  /**
+   * A subagent was spawned by the Agent tool call `toolUseId` (spike S4). `parentTaskId` is the `taskId` of the
+   * subagent that spawned it, absent for a spawn from the main agent (M4-01). `runId` changes when a task resumes.
+   */
   z.object({
     type: z.literal("agent.started"),
     toolUseId: z.string(),
@@ -637,6 +640,35 @@ export const AgentEventSchema = z.discriminatedUnion("type", [
     description: z.string(),
     agentType: z.string().optional(),
     depth: z.number().optional(),
+    background: z.boolean().optional(),
+    parentTaskId: z.string().optional(),
+    runId: z.string().optional(),
+    prompt: z.string().optional(),
+  }),
+  /** A running subagent's totals so far and the tool it used last (M4-01). */
+  z.object({
+    type: z.literal("agent.progress"),
+    toolUseId: z.string(),
+    taskId: z.string(),
+    runId: z.string().optional(),
+    totalTokens: z.number(),
+    toolUses: z.number(),
+    durationMs: z.number(),
+    lastTool: z.string().optional(),
+    summary: z.string().optional(),
+  }),
+  /**
+   * A change to a task's state, keyed by `taskId` only: the SDK's `task_updated` carries no tool call id (M4-01).
+   * `endTime` is epoch ms.
+   */
+  z.object({
+    type: z.literal("agent.updated"),
+    taskId: z.string(),
+    runId: z.string().optional(),
+    status: z.enum(["pending", "running", "completed", "failed", "killed", "paused"]).optional(),
+    endTime: z.number().optional(),
+    pausedMs: z.number().optional(),
+    error: z.string().optional(),
     background: z.boolean().optional(),
   }),
   z.object({
@@ -649,7 +681,11 @@ export const AgentEventSchema = z.discriminatedUnion("type", [
     type: z.literal("agent.completed"),
     toolUseId: z.string(),
     taskId: z.string(),
+    runId: z.string().optional(),
+    /** The SDK's: completed, failed or stopped. */
     status: z.string(),
+    /** Set only when the task didn't end the ordinary way, e.g. `worker_restart`. */
+    reason: z.string().optional(),
     summary: z.string(),
     totalTokens: z.number().optional(),
     toolUses: z.number().optional(),

@@ -21,10 +21,15 @@ function fakeSdk(results: Record<string, unknown>[]) {
           yield { type: "result", duration_ms: 5, num_turns: 1, is_error: false, ...r };
         }
       })();
-      return Object.assign(messages, { close: () => undefined, interrupt: async () => undefined });
+      return Object.assign(messages, {
+        close: () => undefined,
+        interrupt: async () => undefined,
+        stopTask: async (id: string) => void stopped.push(id),
+      });
     },
   } as unknown as AgentSdkModule;
-  return { sdk, options: () => options };
+  const stopped: string[] = [];
+  return { sdk, options: () => options, stopped };
 }
 
 const callbacks = (events: AgentEvent[] = []) => ({
@@ -47,6 +52,17 @@ describe("Session.turn", () => {
     assert.deepEqual(two.structured, { verdict: "approve" });
     assert.equal(Math.round(two.costUsd * 100), 15);
     assert.equal(events.filter((e) => e.type === "turn.completed").length, 2, "the UI still gets every event");
+    s.close();
+  });
+
+  it("stops one subagent only while a turn runs (M4-05)", async () => {
+    const { sdk, stopped } = fakeSdk([{ subtype: "success", result: "done", total_cost_usd: 0.1 }]);
+    const s = new Session(sdk, { cwd: "/w", claudePath: "claude" }, callbacks());
+    assert.equal(await s.stopAgent("t1"), false, "idle: nothing to stop");
+    const turn = s.turn("go");
+    assert.equal(await s.stopAgent("t2"), true);
+    await turn;
+    assert.deepEqual(stopped, ["t2"]);
     s.close();
   });
 

@@ -23,6 +23,7 @@ import { Markdown } from "./Markdown.tsx";
 import {
   type AgentItem,
   type AgentStatus,
+  agentDuration,
   groupItems,
   type Item,
   type ToolGroup,
@@ -259,10 +260,11 @@ const ToolView = memo(function ToolView({ tool, onOpenFile }: { tool: ToolItem; 
 
 const AgentView = memo(function AgentView({ agent, onOpenFile }: { agent: AgentItem; onOpenFile: OpenFile }) {
   const live = agent.status === "running" || agent.status === "paused";
+  const duration = agentDuration(agent);
   const meta = [
     agent.agentType,
     live && agent.lastTool ? `using ${agent.lastTool}` : null,
-    agent.durationMs !== undefined ? `${(agent.durationMs / 1000).toFixed(1)} s` : null,
+    duration !== undefined ? `${(duration / 1000).toFixed(1)} s` : null,
     agent.tokens !== undefined ? `${agent.tokens.toLocaleString()} tokens` : null,
   ].filter(Boolean);
   return (
@@ -275,17 +277,7 @@ const AgentView = memo(function AgentView({ agent, onOpenFile }: { agent: AgentI
         <StatusIcon status={agent.status} />
       </summary>
       <div className="agent-children">
-        {agent.children.map((c) =>
-          c.kind === "tool" ? (
-            <ToolView key={`tool-${c.id}`} tool={c} onOpenFile={onOpenFile} />
-          ) : c.kind === "agent" ? (
-            <AgentView key={`agent-${c.id}`} agent={c} onOpenFile={onOpenFile} />
-          ) : (
-            <div key={`text-${c.id}`} className="msg agent-text">
-              {c.text}
-            </div>
-          ),
-        )}
+        <AgentChildList agent={agent} onOpenFile={onOpenFile} />
         {live && agent.progress && <div className="agent-summary">{agent.progress}</div>}
         {agent.error && <div className="agent-error">{agent.error}</div>}
         {agent.summary && !repeatsLastText(agent) && <div className="agent-summary">{agent.summary}</div>}
@@ -293,6 +285,37 @@ const AgentView = memo(function AgentView({ agent, onOpenFile }: { agent: AgentI
     </details>
   );
 });
+
+function AgentChildList({ agent, onOpenFile }: { agent: AgentItem; onOpenFile: OpenFile }) {
+  return agent.children.map((c) =>
+    c.kind === "tool" ? (
+      <ToolView key={`tool-${c.id}`} tool={c} onOpenFile={onOpenFile} />
+    ) : c.kind === "agent" ? (
+      <AgentView key={`agent-${c.id}`} agent={c} onOpenFile={onOpenFile} />
+    ) : (
+      <div key={`text-${c.id}`} className="msg agent-text">
+        {c.text}
+      </div>
+    ),
+  );
+}
+
+/** A subagent's tool calls, text and own subagents as its card shows them, for the node drawer (M4-03). */
+export function AgentChildren({
+  cwd,
+  agent,
+  onOpenFile,
+}: {
+  cwd: string;
+  agent: AgentItem;
+  onOpenFile?: (file: string) => void;
+}) {
+  return (
+    <Workspace.Provider value={cwd}>
+      <AgentChildList agent={agent} onOpenFile={onOpenFile} />
+    </Workspace.Provider>
+  );
+}
 
 /** The SDK's summary is often the subagent's last message word for word; it's shown once then. */
 function repeatsLastText(agent: AgentItem): boolean {

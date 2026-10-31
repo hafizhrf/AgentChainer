@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import type { AgentEvent } from "@agentchainer/protocol";
-import { budgetWarning, folderName, isFresh, newTab, type Tab, tabEvent, updateTab } from "./tabs.ts";
+import { agentUsd, budgetWarning, folderName, isFresh, newTab, type Tab, tabEvent, updateTab } from "./tabs.ts";
 
 const done = (totalCostUsd: number): AgentEvent => ({
   type: "turn.completed",
@@ -97,5 +97,25 @@ describe("isFresh", () => {
     assert.equal(isFresh({ ...tab, items: [{ kind: "user", id: 1, text: "hi" }] }), false);
     assert.equal(isFresh({ ...tab, running: true }), false);
     assert.equal(isFresh({ ...tab, ended: true }), false);
+  });
+});
+
+describe("agentUsd (M4-03)", () => {
+  const cost = (totalUsd: number | null, input: number, output: number) => ({
+    totalUsd,
+    lastUsd: null,
+    lastMs: 0,
+    totalTokens: { input, output },
+    lastTokens: null,
+  });
+
+  it("prices an agent's tokens at the session's own cost per token", () => {
+    assert.equal(agentUsd(cost(1, 90_000, 10_000), 25_000), 0.25);
+  });
+
+  it("is unknown before the first totals, or without tokens", () => {
+    assert.equal(agentUsd(cost(0, 0, 0), 1000), null);
+    assert.equal(agentUsd(cost(null, 10, 10), 1000), null);
+    assert.equal(agentUsd(cost(1, 10, 10), undefined), null);
   });
 });

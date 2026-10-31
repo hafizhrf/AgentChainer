@@ -81,6 +81,9 @@ Nothing else. In particular, there is no file-system or shell plugin.
 
 Each takes a folder the user opened. Paths inside it go through `insideRoot`, and git paths are passed after `--`.
 
+`session.stopAgent` (M4-05) neither touches files nor runs anything. It stops one task of a session this sidecar
+started (`requireSession`), through the SDK's `stopTask`, and does nothing while no turn runs.
+
 ## Security review of 2026-10-29
 
 **What was checked:**

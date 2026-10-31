@@ -24,7 +24,7 @@
 | [UX](#ux--product-design--ui-polish-before-r1) | v0.1 | Product design & UI polish (after M1/M2 work functionally) | ◐ Design system done; desktop shell, panels and setup page in place |
 | [R1](#r1--v01-release) | v0.1 | Packaging & release | ◐ Pipeline, updater, security review and docs in place; publishing waits for M0-01 and M0-22 |
 | [M3](#m3--adaptive-planner--task-contracts-v02) | v0.2 | Adaptive planner, contracts, evidence | ◐ Every tier (S, M, L, XL) runs live on macOS and Windows, with gates, evidence and accepted risk (preview); left: the owner's click-through and the exit runs |
-| [M4](#m4--agent-observability-v02v03) | v0.2–0.3 | Agent observability graph | ◐ Design approved; the agent tree is in, the graph is next |
+| [M4](#m4--agent-observability-v02v03) | v0.2–0.3 | Agent observability graph | ◐ Agent tree, live graph, drawer and per-agent stop in; timeline next |
 | [M5](#m5--git-workflow-pr--quality-gates-v03) | v0.3 | Git workflow, PRs, gates | ☐ Not started |
 | [M6](#m6--deployment--workflow-canvas-v04) | v0.4 | Deploy adapters, workflow canvas | ☐ Not started |
 | [M7](#m7--evals--analytics-v05) | v0.5 | Evals & analytics | ☐ Not started |
@@ -1258,14 +1258,19 @@ Decisions: [ADR-0009](adr/0009-release-signing-and-updates.md). Maintainer steps
 → PRD [F4](PRD.md#f4--agent-observability-p1) · design: [observability.md](design/observability.md) (approved
 2026-10-31)
 
-- [ ] **M4-01** Agent tree store built from normalized events (main → subagents → nested). Tracks status, current tool,
+- [x] **M4-01** Agent tree store built from normalized events (main → subagents → nested). Tracks status, current tool,
       start/end and attributable tokens and cost.
-      Note: the tree, status, current tool, start/end and tokens are in (design step 1: `agent.progress`,
-      `agent.updated`, nested cards, the `subagents-nested` fixture); the ≈USD estimate comes with the drawer.
+      Evidence: [#54](https://github.com/hafizhrf/AgentChainer/pull/54) (tree, `agent.progress`/`agent.updated`, the
+      `subagents-nested` fixture) and the step-2 PR (≈USD from the session's cost per token, `agentUsd`).
 - [ ] **M4-02** Live graph with `@xyflow/react` and dagre auto-layout (design §17). Nodes are agents and key tool calls; edges are spawns and hand-offs.
+      Note: built (Chat | Graph in the session header, folding, keyboard), checked live on Windows with three
+      parallel subagents; ticked with E2's 200-node frame times.
 - [ ] **M4-03** Node drawer: subagent prompt, transcript (SDK `getSessionMessages` / `agent_transcript_path`), tool calls, cost.
+      Note: the live drawer is in (prompt, activity, tokens, ≈USD); stored transcripts come with replay (M4-08).
 - [ ] **M4-04** Timeline (Gantt) view that shows parallelism and waiting.
-- [ ] **M4-05** Controls: interrupt the session; stop a single subagent if the SDK supports it (verify).
+- [x] **M4-05** Controls: interrupt the session; stop a single subagent if the SDK supports it (verify).
+      Evidence: `session.stopAgent` → `Query.stopTask` (SDK 0.3.311); in the app on Windows, Stop this agent ended a
+      subagent mid-`sleep` as stopped while the rest of the turn finished (step-2 PR).
 - [ ] **M4-06** Agent library manager: list, create and edit `.claude/agents/*.md` and programmatic agents; mark each as manual or auto-spawned.
 - [ ] **M4-07** Background tasks and shells panel.
       Note: until then the sidecar runs every `query()` with `CLAUDE_CODE_DISABLE_BACKGROUND_TASKS=1`, because CLI

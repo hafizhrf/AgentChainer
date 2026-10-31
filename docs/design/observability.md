@@ -103,7 +103,8 @@ sessions, background work, and a manager for the project's agent definitions.
 - **Prompt:** `task_started.prompt`, when the CLI sends it.
 - **Transcript:**
   - live: the agent's text and tool calls from the events the app already receives (`forwardSubagentText`);
-  - after the fact: `getSubagentMessages(sessionId, agentId)` through a new request `session.subagentMessages`;
+  - after the fact: `getSubagentMessages(sessionId, agentId)` through a new request `session.subagentMessages`,
+    which comes with replay (§9; step 2 shipped the live drawer only);
   - both through SDK APIs only (ADR-0004).
 - **Tool calls:** with their results, the same views as in the chat.
 - **Tokens and ≈USD:** §11.
@@ -167,17 +168,20 @@ This is the largest runtime change in M4, so it ships after the read-only views:
 ## 11. Cost per agent
 
 - **Tokens are the SDK's own:** `usage.total_tokens` on `task_progress` and `task_notification`.
-- **≈USD is the app's estimate:** tokens × the model's price, from a price table pinned in the repo with its date and
-  source **(verify the source)**.
-  - The input/output split isn't reported per task, so the estimate uses a blended rate and is always labelled
-    "≈ estimate".
+- **≈USD is the app's estimate:** the agent's tokens × the session's own cost per token so far (`total_cost_usd`
+  divided by every token the session reported, cache reads and writes included; `tabs.ts` `agentUsd`).
+  - The input/output split isn't reported per task, so a blended rate is the best available. Taking it from the
+    session's own totals builds in caching and the models actually used, and needs no price table to keep current.
+  - A subagent on a cheaper model than the main agent is overestimated, and the other way round; the label says
+    "estimate" and the drawer explains how it's made.
   - The session total stays the SDK's `total_cost_usd`. The agents' estimates don't have to add up to it (caching,
     the main agent's own turns), and the UI says so next to the total.
 
 ## 12. UI
 
 - **Chat | Graph | Timeline** is a segmented control in the session header. The choice is kept per session.
-- The drawer uses the right panel, as a tab that appears while a node is selected. Changes, Files and Git stay.
+- The drawer uses the right panel. Like a file's diff, it covers the tabs while a node is selected and closes with
+  its × or Esc, which closes the drawer before it would interrupt the turn. Changes, Files and Git stay.
 - **Light and dark:** status colours come from the existing tokens (`--ok`, `--warn`, `--err`, `--accent`).
 - **Keyboard** (X-12): arrows move between nodes, Enter opens the drawer, Esc closes it.
 - **Empty states:** "No subagents in this session yet" in the graph; replay explains when transcripts were cleaned up
@@ -233,8 +237,7 @@ One PR per step, each merged before the next starts:
 
 **Decided** (owner, 2026-10-31):
 1. **Where:** a session view, **Chat | Graph | Timeline**, with the node drawer in the right panel.
-2. **Cost per agent:** tokens plus ≈USD estimated from tokens × model price, always labelled; the session total stays
-   the SDK's.
+2. **Cost per agent:** tokens plus an ≈USD estimate, always labelled; the session total stays the SDK's.
 3. **Order:** tree store, then graph, drawer and stop, then timeline, replay, background tasks, and the library.
 
 **Decided** (by the implementer, as the owner asked, 2026-10-31):
@@ -242,7 +245,7 @@ One PR per step, each merged before the next starts:
    **(verify)**, and a tree of agents doesn't need its layered routing.
 5. **Folding:** 10 s for a long tool call and 200 nodes before completed subtrees fold. Both are named constants, tuned
    after the E1 run on real sessions.
-6. **Price table:** Anthropic's public model pricing page **(verify the URL when the table is added)**, copied into a
-   table in the repo with the date it was read. It is refreshed whenever a model is added to the app's model list.
+6. **Price source:** none. The estimate uses the session's own cost per token (§11) instead of a price table, so
+   there are no prices to copy, verify or keep current.
 7. **Background timing:** M4-07 stays fifth. #43 keeps the CLI in the foreground until then, and the read-only views
    come first so background work is visible when it lands.

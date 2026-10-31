@@ -1051,7 +1051,12 @@ for the desktop shell, start screen and session view to be cleaned up (UX-02, UX
     - Constraints, Out of scope and Risks stacked full width, and areas two per line;
     - one Contract card on a shared label column, with bullet lists, folding to its objective once the task has run;
     - triage signals stacked, in sentence case.
-  - Open: owner click-through in light and dark.
+  - Clicked through in light and dark on Windows (2026-10-31, `pnpm dev`, haiku, ≈$0.02): request, drafting, the
+    review with triage and a tier override, approve and run, the run's approvals, Done, gates, the evidence report,
+    the folded contract on reopening, and the task list. Fixed from it: the Add button under Affected areas sat in
+    the middle of the row; the evidence report scrolled inside the scrolling page, with a banner-sized title and
+    cramped sections; its gates table said "." for the root package (now "root").
+  - Open: the owner's own look in both themes.
 
 ### Exit criteria
 

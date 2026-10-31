@@ -258,7 +258,7 @@ const usd = (n: number) => `≈$${n.toFixed(n < 0.1 ? 4 : 2)}`;
 const seconds = (ms: number | null) => (ms === null ? "—" : `${(ms / 1000).toFixed(ms < 10_000 ? 1 : 0)} s`);
 
 function gateRow(g: GateRun, when: string): string {
-  return `| ${when} | ${g.kind} | \`${cell(g.command)}\` | ${cell(g.package)} | ${g.timedOut ? "timed out" : `exit ${g.exitCode ?? "none"}`} | ${seconds(g.durationMs)} |`;
+  return `| ${when} | ${g.kind} | \`${cell(g.command)}\` | ${g.package === "." ? "root" : cell(g.package)} | ${g.timedOut ? "timed out" : `exit ${g.exitCode ?? "none"}`} | ${seconds(g.durationMs)} |`;
 }
 
 /** The report as markdown: what's exported and shown on the task page. */

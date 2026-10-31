@@ -172,6 +172,11 @@ fieldset.task-field legend {
   grid-column: 1 / -1;
 }
 
+/* A grid item stretches across its cell; keep Add on the left, like every other list's. */
+.task-paths .editable-add {
+  justify-self: start;
+}
+
 /* Triage */
 
 .task-why {
@@ -490,13 +495,28 @@ fieldset.task-field legend {
   font-size: var(--text-sm);
 }
 
+/* The page scrolls the report: one scrollbar, not one inside another. Wide tables still scroll sideways. */
 .task-evidence-body {
-  max-height: 36rem;
-  overflow: auto;
+  overflow-x: auto;
   padding: var(--space-3) var(--space-4);
   border: 1px solid var(--border);
   border-radius: var(--radius);
   background: var(--bg);
+}
+
+/* The report's title repeats the objective, so it reads as a heading, not a banner; sections get room above. */
+.task-evidence-body h1 {
+  font-size: var(--text-lg);
+  line-height: 1.35;
+}
+
+.task-evidence-body h2 {
+  margin-top: var(--space-4);
+  font-size: var(--text-md);
+}
+
+.task-evidence-body p {
+  margin: var(--space-1) 0;
 }
 
 /* Fold toggles: the evidence report, and the contract once a task has run. */

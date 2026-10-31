@@ -1255,7 +1255,8 @@ Decisions: [ADR-0009](adr/0009-release-signing-and-updates.md). Maintainer steps
 
 ## M4 — Agent observability (v0.2–v0.3)
 
-→ PRD [F4](PRD.md#f4--agent-observability-p1)
+→ PRD [F4](PRD.md#f4--agent-observability-p1) · design: [observability.md](design/observability.md) (draft, waiting for
+the owner)
 
 - [ ] **M4-01** Agent tree store built from normalized events (main → subagents → nested). Tracks status, current tool,
       start/end and attributable tokens and cost.

@@ -214,27 +214,27 @@
       "source": {
         "type": "release-asset",
         "repo": "https://github.com/DeusData/codebase-memory-mcp",
-        "version": "0.11.0",
+        "version": "0.12.1",
         "assets": {
           "darwin-arm64": {
-            "url": "https://github.com/DeusData/codebase-memory-mcp/releases/download/v0.11.0/codebase-memory-mcp-darwin-arm64.tar.gz",
-            "sha256": "4dee7f38b63740e6751d7a7ed7eb10291c1f2a3ea2415f599dc68370ca0a2d18"
+            "url": "https://github.com/DeusData/codebase-memory-mcp/releases/download/v0.12.1/codebase-memory-mcp-darwin-arm64.tar.gz",
+            "sha256": "9bfcbe38414b47969a3e1d1c1999f5357409387c86fa3d24221b5458267660d2"
           },
           "darwin-x64": {
-            "url": "https://github.com/DeusData/codebase-memory-mcp/releases/download/v0.11.0/codebase-memory-mcp-darwin-amd64.tar.gz",
-            "sha256": "dbf1c73bfcbde64e7dde4cd1320da7afc02e2c972ee1789ae039521411f5132e"
+            "url": "https://github.com/DeusData/codebase-memory-mcp/releases/download/v0.12.1/codebase-memory-mcp-darwin-amd64.tar.gz",
+            "sha256": "ca6e64397a8ae80cec898a8205a6aa16750ac798acc05a0c3ed983837944a581"
           },
           "linux-x64": {
-            "url": "https://github.com/DeusData/codebase-memory-mcp/releases/download/v0.11.0/codebase-memory-mcp-linux-amd64-portable.tar.gz",
-            "sha256": "1f9e8293eb2bc5c05cfa27a7e8fc033da6d729ffad525ccfcdaa3fd606306683"
+            "url": "https://github.com/DeusData/codebase-memory-mcp/releases/download/v0.12.1/codebase-memory-mcp-linux-amd64-portable.tar.gz",
+            "sha256": "8c3d0341064301e78ecc84cf7348d4e2c6562a0f57448243ea560aaa34de36c1"
           },
           "linux-arm64": {
-            "url": "https://github.com/DeusData/codebase-memory-mcp/releases/download/v0.11.0/codebase-memory-mcp-linux-arm64-portable.tar.gz",
-            "sha256": "d62eeb224d5ee3eba3070938ec62cf1033f10b041ec1c4b2fb67f7aef390cc7b"
+            "url": "https://github.com/DeusData/codebase-memory-mcp/releases/download/v0.12.1/codebase-memory-mcp-linux-arm64-portable.tar.gz",
+            "sha256": "ed0f1f548cd79b121c401c2e9f7841c189a001af26d3768368088c24f6a53533"
           },
           "win32-x64": {
-            "url": "https://github.com/DeusData/codebase-memory-mcp/releases/download/v0.11.0/codebase-memory-mcp-windows-amd64.zip",
-            "sha256": "6eb6beaf261b19e419766e78baf93cbc3cf1c6338cff8fb7c0234859f96d1685"
+            "url": "https://github.com/DeusData/codebase-memory-mcp/releases/download/v0.12.1/codebase-memory-mcp-windows-amd64.zip",
+            "sha256": "4e4e0f16b45233af5c757a1fcbe3c3b16e9056375b1fbe2ce020b6de75dedcc0"
           }
         }
       },
@@ -247,9 +247,10 @@
       "risk": "medium",
       "permissions": [
         "Indexes code into a local database in ~/.cache/codebase-memory-mcp, shared by every project and agent on this account",
-        "Starts a per-account background process that watches the git projects of open sessions and re-indexes them",
+        "Starts a per-account background process that watches the git projects of open sessions and re-indexes them; it coordinates through a folder in /tmp (macOS, Linux) or %LOCALAPPDATA% (Windows), and an index it was asked to build keeps running after the request ends",
+        "Serves a web UI (CBM Lens) on 127.0.0.1:9749 by default, with no sign-in: any program on this machine can read the graph, browse folders, start an index or change its settings there. `codebase-memory-mcp --ui=false` turns it off for every agent on this account",
         "Claude can ask it to index any folder on this machine, delete an index, or save design notes in the index",
-        "Runs git; makes no network requests and collects no telemetry (checked in the 0.11.0 source and binary)"
+        "Runs git; the binary makes no network requests and collects no telemetry. The web UI's in-browser assistant downloads a model from Hugging Face only when you click Download (checked in the 0.12.1 source)"
       ],
       "secrets": [],
       "install": {
@@ -285,7 +286,7 @@
         ]
       },
       "reviews": [],
-      "notes": "AgentChainer never runs the project's install script: it edits the global config of every coding agent it finds and adds hooks, agents and skills. Only the binary is used, registered for this workspace. Not approved at 0.11.0 (docs/catalog-reviews/2026-10-30.md): 0.12.0 fixed a heap overflow reachable through query_graph and two symlink escapes. Re-pin to 0.12.1 and review again; as a community item it needs two reviews. Every cbm process on the machine must run the same version, so another installed version conflicts."
+      "notes": "AgentChainer never runs the project's install script: it edits the global config of every coding agent it finds and adds hooks, agents and skills. Only the binary is used, registered for this workspace. Re-pinned to 0.12.1, which has the security fixes 0.11.0 lacked (docs/catalog-reviews/2026-10-30.md); the draft review is in docs/catalog-reviews/2026-10-31-codebase-memory-mcp-0.12.1.md. As a community item it needs two signed reviews before it's offered. Its web UI is on by default and AgentChainer leaves that setting alone, because it is shared by every agent on the account. Every cbm process on the machine must run the same version, so another installed version conflicts."
     },
     {
       "id": "commit-commands",

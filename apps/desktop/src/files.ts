@@ -102,7 +102,7 @@ export function relativeTo(cwd: string, abs: string): string | null {
 }
 
 /** Tools that change files and say which one; Bash changes only show up in git status. */
-const EDIT_TOOLS = new Set(["Edit", "MultiEdit", "Write", "NotebookEdit"]);
+export const EDIT_TOOLS = new Set(["Edit", "MultiEdit", "Write", "NotebookEdit"]);
 
 export type TurnEdits = { prompt: string; files: string[] };
 

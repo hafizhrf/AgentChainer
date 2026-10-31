@@ -216,6 +216,11 @@ serve(
       interrupted: await requireSession(sessionId).interrupt(),
     }),
 
+    "session.stopAgent": async ({ sessionId, taskId }) => ({
+      ok: true,
+      stopped: await requireSession(sessionId).stopAgent(taskId),
+    }),
+
     "session.setMode": async ({ sessionId, mode }) => {
       await requireSession(sessionId).setMode(mode);
       return { ok: true };

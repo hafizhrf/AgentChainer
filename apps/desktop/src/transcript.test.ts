@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import type { AgentEvent } from "@agentchainer/protocol";
-import { type AgentItem, applyEvent, groupItems, type Item, type ToolItem } from "./transcript.ts";
+import { type AgentItem, agentDuration, applyEvent, groupItems, type Item, type ToolItem } from "./transcript.ts";
 
 const run = (events: AgentEvent[]) => events.reduce<Item[]>(applyEvent, []);
 
@@ -150,6 +150,13 @@ describe("transcript: the agent tree (M4-01)", () => {
       { type: "agent.updated", taskId: "unknown-shell", status: "completed" },
     ])[0] as AgentItem;
     assert.deepEqual([ended.status, ended.tokens, ended.endedAt], ["stopped", 800, 5_000]);
+  });
+
+  it("times a stopped agent by its own start and end, not its last progress frame", () => {
+    const base: AgentItem = { kind: "agent", id: "A", description: "d", status: "stopped", children: [] };
+    assert.equal(agentDuration({ ...base, durationMs: 1500, startedAt: 1_000, endedAt: 31_000 }), 30_000);
+    assert.equal(agentDuration({ ...base, durationMs: 1500 }), 1500, "history has no clock");
+    assert.equal(agentDuration({ ...base, durationMs: 9_000, startedAt: 1_000, endedAt: 2_000 }), 9_000);
   });
 
   it("leaves an untouched transcript's array as it was", () => {

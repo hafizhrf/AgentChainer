@@ -4,17 +4,21 @@ import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { Group, Panel, Separator, useDefaultLayout, usePanelRef } from "react-resizable-panels";
 import { type Attachment, Composer } from "./Composer.tsx";
 import type { Confirm } from "./Dialog.tsx";
+import { AgentDrawer } from "./graph/AgentDrawer.tsx";
 import { MODE_NAMES } from "./options.ts";
 import type { PanelTab } from "./panelTabs.ts";
-import { SessionHeader } from "./SessionHeader.tsx";
+import { SessionHeader, type SessionMode } from "./SessionHeader.tsx";
 import { TranscriptView } from "./TranscriptView.tsx";
 import { budgetWarning, type Cost, isFresh, type Tab } from "./tabs.ts";
+import { findAgent } from "./transcript.ts";
 import { layoutStorage } from "./ui/layoutStorage.ts";
 import { useWorkspace } from "./useWorkspace.ts";
 
 // Monaco and xterm are large; load them when first used.
 const DiffView = lazy(() => import("./DiffView.tsx"));
 const TerminalPanel = lazy(() => import("./TerminalPanel.tsx"));
+// React Flow and dagre load with the first graph.
+const SessionGraph = lazy(() => import("./graph/SessionGraph.tsx"));
 // The workspace panel carries the file-type icon set; it loads with the first session, not at app start.
 const WorkspacePanel = lazy(() => import("./WorkspacePanel.tsx").then((m) => ({ default: m.WorkspacePanel })));
 
@@ -36,6 +40,7 @@ export function SessionView({
   onToggleTerminal,
   onSend,
   onInterrupt,
+  onStopAgent,
   onModeChange,
   onModelChange,
   onEffortChange,
@@ -60,6 +65,8 @@ export function SessionView({
   onToggleTerminal: () => void;
   onSend: (text: string, images: Attachment[]) => void;
   onInterrupt: () => void;
+  /** Stops one subagent by its task id (M4-05). */
+  onStopAgent: (taskId: string) => Promise<void>;
   onModeChange: (mode: PermissionMode) => void;
   onModelChange: (alias: string) => void;
   onEffortChange: (effort: Effort | null) => void;
@@ -84,6 +91,11 @@ export function SessionView({
   /** The file shown in the diff, relative to the workspace. */
   const [selected, setSelected] = useState<string | null>(null);
   const [seed, setSeed] = useState<{ text: string } | null>(null);
+  const [view, setView] = useState<SessionMode>("chat");
+  /** The subagent shown in the right panel's drawer (M4-03). */
+  const [agentId, setAgentId] = useState<string | null>(null);
+  const agent = agentId ? findAgent(tab.items, (a) => a.id === agentId) : undefined;
+  const waiting = useMemo(() => new Set(tab.permissions.map((p) => p.toolUseId)), [tab.permissions]);
   const bottomRef = useRef<HTMLDivElement>(null);
   // Follow new output only while the reader is at the bottom; reading earlier output isn't interrupted (UX-04).
   const following = useRef(true);
@@ -147,15 +159,19 @@ export function SessionView({
     }
   }, [selected, rightOpen, right]);
 
-  // Esc stops the running turn (M1-14), unless a dialog or menu is open: there it closes that instead.
+  // Esc stops the running turn (M1-14), unless a dialog or menu is open: there it closes that instead. An open agent
+  // drawer closes first, so closing it never stops the whole turn.
+  const drawerOpen = agentId !== null;
   useEffect(() => {
-    if (hidden || !tab.running) return;
+    if (hidden || (!tab.running && !drawerOpen)) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && !e.defaultPrevented && !layerOpen()) onInterrupt();
+      if (e.key !== "Escape" || e.defaultPrevented || layerOpen()) return;
+      if (drawerOpen) setAgentId(null);
+      else onInterrupt();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [hidden, tab.running, onInterrupt]);
+  }, [hidden, tab.running, drawerOpen, onInterrupt]);
 
   return (
     <div className="session" hidden={hidden}>
@@ -169,6 +185,8 @@ export function SessionView({
           <div className="session-center">
             <SessionHeader
               tab={tab}
+              view={view}
+              onViewChange={setView}
               branch={workspace.files?.branch ?? null}
               terminalOpen={terminalOpen}
               rightOpen={rightOpen}
@@ -188,8 +206,23 @@ export function SessionView({
             >
               <Panel id="chat" minSize={200}>
                 <div className={`chat${fresh ? " fresh" : ""}`}>
+                  {view === "graph" && (
+                    <Suspense fallback={<div className="session-graph muted">Loading the graph…</div>}>
+                      <SessionGraph
+                        items={tab.items}
+                        running={tab.running}
+                        waiting={waiting}
+                        selected={agent ? agent.id : null}
+                        onSelect={(id) => {
+                          setAgentId(id);
+                          if (id && !rightOpen) onToggleRight();
+                        }}
+                      />
+                    </Suspense>
+                  )}
                   <div
                     className="transcript-scroll"
+                    hidden={view === "graph"}
                     onScroll={(e) => {
                       const el = e.currentTarget;
                       const near = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
@@ -271,7 +304,7 @@ export function SessionView({
             groupResizeBehavior="preserve-pixel-size"
           >
             <aside className="right-panel" aria-label="Workspace">
-              <div className="right-tabs" hidden={selected !== null}>
+              <div className="right-tabs" hidden={selected !== null || agent !== undefined}>
                 <Suspense fallback={<p className="muted panel-loading">Loading…</p>}>
                   <WorkspacePanel
                     key={panelTab}
@@ -292,6 +325,18 @@ export function SessionView({
                   />
                 </Suspense>
               </div>
+              {agent && !selected && (
+                <AgentDrawer
+                  cwd={tab.cwd}
+                  agent={agent}
+                  cost={tab.cost}
+                  canStop={tab.running}
+                  waiting={agent.children.some((c) => c.kind === "tool" && waiting.has(c.id))}
+                  onStop={onStopAgent}
+                  onClose={() => setAgentId(null)}
+                  onOpenFile={(file) => onOpenFile(file)}
+                />
+              )}
               {selected && (
                 <Suspense fallback={<p className="muted">Loading diff viewer…</p>}>
                   <DiffView

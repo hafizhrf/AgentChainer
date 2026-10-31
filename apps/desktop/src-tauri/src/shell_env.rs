@@ -7,6 +7,8 @@
 use std::collections::HashMap;
 use std::sync::OnceLock;
 
+// Used by the Unix resolver (and the tests on every OS); Windows has no login shell to ask.
+#[cfg_attr(windows, allow(dead_code))]
 const MARKER: &str = "__AGENTCHAINER_ENV__";
 
 /// The login-shell environment, resolved once per app run, for the integrated terminal and editor launches. Empty when
@@ -31,6 +33,7 @@ pub fn login_shell_env() -> Option<HashMap<String, String>> {
 
 /// Parses `printf MARKER; env -0` output. Anything an interactive shell prints before the marker (banners,
 /// prompts) is ignored.
+#[cfg_attr(windows, allow(dead_code))]
 pub fn parse_env_output(output: &[u8]) -> Option<HashMap<String, String>> {
     let text = String::from_utf8_lossy(output);
     let (_, after) = text.split_once(MARKER)?;

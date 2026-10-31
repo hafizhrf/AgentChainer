@@ -175,14 +175,16 @@ fn take_utf8(pending: &mut Vec<u8>) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::{PtyEvent, Ptys, take_utf8};
-    use std::sync::mpsc;
-    use std::time::{Duration, Instant};
+    use super::take_utf8;
 
     /// A real shell round trip: type a command, read its output, close.
     #[cfg(unix)]
     #[test]
     fn runs_a_shell_in_the_workspace() {
+        use super::{PtyEvent, Ptys};
+        use std::sync::mpsc;
+        use std::time::{Duration, Instant};
+
         let dir = std::env::temp_dir().canonicalize().unwrap();
         let ptys = Ptys::default();
         let (tx, rx) = mpsc::channel();

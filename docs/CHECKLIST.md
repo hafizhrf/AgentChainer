@@ -19,11 +19,11 @@
 | Milestone | Release | Theme | Status |
 |---|---|---|---|
 | [M0](#m0--foundations--spikes) | — | Foundations & spikes | ◐ Exit criteria met. Owner items left: M0-01, M0-05, M0-07, M0-13, M0-14, M0-22 |
-| [M1](#m1--agent-session-core-v01-a) | v0.1 | Agent session core | ◐ Built. Exit criteria wait for the UI click-through and the Windows/Ubuntu runs |
+| [M1](#m1--agent-session-core-v01-a) | v0.1 | Agent session core | ◐ Built. E1–E5 pass on macOS and Windows, and in the app on Windows; left: Ubuntu, E6 by hand, the click-through on macOS and Ubuntu |
 | [M2](#m2--workspace-bootstrap-v01-b) | v0.1 | Workspace bootstrap | ◐ Built. E1, E3, E4 pass; E2 (real repositories) deferred by the owner |
 | [UX](#ux--product-design--ui-polish-before-r1) | v0.1 | Product design & UI polish (after M1/M2 work functionally) | ◐ Design system done; desktop shell, panels and setup page in place |
 | [R1](#r1--v01-release) | v0.1 | Packaging & release | ◐ Pipeline, updater, security review and docs in place; publishing waits for M0-01 and M0-22 |
-| [M3](#m3--adaptive-planner--task-contracts-v02) | v0.2 | Adaptive planner, contracts, evidence | ◐ S, M and L run, with gates, evidence and accepted risk (preview); XL and the exit runs left |
+| [M3](#m3--adaptive-planner--task-contracts-v02) | v0.2 | Adaptive planner, contracts, evidence | ◐ Every tier (S, M, L, XL) runs live on macOS and Windows, with gates, evidence and accepted risk (preview); left: the owner's click-through and the exit runs |
 | [M4](#m4--agent-observability-v02v03) | v0.2–0.3 | Agent observability graph | ☐ Not started |
 | [M5](#m5--git-workflow-pr--quality-gates-v03) | v0.3 | Git workflow, PRs, gates | ☐ Not started |
 | [M6](#m6--deployment--workflow-canvas-v04) | v0.4 | Deploy adapters, workflow canvas | ☐ Not started |
@@ -493,8 +493,19 @@ All of these run on macOS, Windows and Ubuntu against a sample repo in `fixtures
   - After that change: E1 approvals for Bash, Edit, Bash and a commit; E3 back to the seeded bug; E4 stopped 18 ms
     after the interrupt; E2 named the fixed file after the restart; E5 ExitPlanMode approved, then a foreground
     subagent, tests pass. `--scenario subagents`: 2/2, no async launch.
-- Still to do: the same run on Ubuntu; E6 by hand on each OS (never automated: it would mean signing the user out);
-  and the UI click-through of the same flows.
+- **Windows 11: the UI click-through of E1–E5 passes** (2026-10-31, `pnpm dev`, haiku, ≈$0.03). Claude drove the app
+  through WebView2 remote debugging, clicking and reading the page as a user would:
+  - E1: in Safe, Bash, Edit and Bash each asked; the diff viewer showed one hunk; staged and committed from the Git
+    panel under the owner's identity.
+  - E3: Rewind files to the first message brought `src/cart.js` back to the seeded bug.
+  - E4: Stop during `sleep 60` ended the turn at 16 s; the next message got "alive".
+  - E2: the app was killed, relaunched, and the session resumed from Previous sessions; the agent named the file.
+  - E5: with Plan first picked in the mode menu, *Review the plan* appeared (Reject, Revise, Approve & run); the
+    subagent card showed during execution and the subagent asked for its own Edit; tests pass.
+  - Fixed from it: recent workspaces listed one folder twice (case), the rewind notice said 0 files, and Home claimed
+    the agent can't change anything outside the folder (#49); clippy failed on Windows only (#50).
+- Still to do: the same runs on Ubuntu; E6 by hand on each OS (never automated: it would mean signing the user out);
+  and the UI click-through on macOS and Ubuntu.
 
 - [ ] **M1-E1** Fix a seeded bug with tool approvals in the Safe profile, review the diff, commit.
 - [ ] **M1-E2** Quit the app mid-session, relaunch, resume, and continue the conversation.

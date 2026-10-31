@@ -36,6 +36,15 @@ Troubleshooting:
   PATH (rustup installed without changing your profile).
   - Fix it for every new terminal: `echo '. "$HOME/.cargo/env"' >> ~/.zshrc` (or `~/.bashrc`).
   - Fix it for the current one: `source "$HOME/.cargo/env"`.
+- **Windows** (checked on Windows 11, 2026-10-31):
+  - Use the MSVC Rust toolchain. With rustup's GNU default, the build fails with `dlltool.exe: program not found`:
+    `rustup set default-host x86_64-pc-windows-msvc`, then `rustup default stable-x86_64-pc-windows-msvc`. You also
+    need the Visual Studio Build Tools (C++ workload), as the Tauri prerequisites say.
+  - Turn off `core.autocrlf` (`git config --global core.autocrlf false`). Git for Windows turns it on, and the tests'
+    own temporary repos must keep LF text; CI does the same.
+  - Put `C:\Program Files\Git\bin` on your PATH, so `sh` is found by the tests and by `scripts/smoke.sh` gates.
+  - Turn on Developer Mode (`start ms-settings:developers`); one test creates a symlink, which Windows otherwise
+    refuses.
 
 ## Making a change
 

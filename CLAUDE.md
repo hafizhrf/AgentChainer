@@ -2,7 +2,7 @@
 
 Open-source desktop app (Tauri v2 + React/TS + Node sidecar on the Claude Agent SDK) that makes repos agent-ready and
 keeps agent work transparent and verified. **Current phase: R1 (v0.1 release prep; publishing waits for M0-01 and M0-22).
-M1 awaits its UI click-through and the Windows/Ubuntu exit runs; M2-E2 is deferred.**
+M1 awaits the Ubuntu exit runs, E6 by hand and the macOS/Ubuntu click-through (Windows passed); M2-E2 is deferred.**
 
 The app has a working M1/M2 UI in a three-column shell (UX-03):
 - a sidebar with sessions and workspaces, and a native menu with shortcuts;

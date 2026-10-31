@@ -167,8 +167,8 @@ describe("evidence", () => {
     assert.deepEqual(e.gates.preexisting, ["test"]);
     assert.deepEqual(e.gates.fixedByTask, ["test"], "failing before, passing now");
     const md = renderEvidence(e);
-    assert.match(md, /\| before the task \| test \| `npm run test` \| \. \| exit 1 \|/);
-    assert.match(md, /\| round 2 \| test \| `npm run test` \| \. \| exit 0 \|/);
+    assert.match(md, /\| before the task \| test \| `npm run test` \| root \| exit 1 \|/);
+    assert.match(md, /\| round 2 \| test \| `npm run test` \| root \| exit 0 \|/);
     assert.match(md, /Not run, no command detected: lint, format\. They don't count as passed\./);
     assert.match(md, /\n\nFailing before the task and passing now: test\./, "its own paragraph, not a table row");
     assert.match(md, /\*\*test log, before the task\*\* \(`npm run test`\):\n\n```\ntest broke\n```/);

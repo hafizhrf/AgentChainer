@@ -24,7 +24,7 @@
 | [UX](#ux--product-design--ui-polish-before-r1) | v0.1 | Product design & UI polish (after M1/M2 work functionally) | ◐ Design system done; desktop shell, panels and setup page in place |
 | [R1](#r1--v01-release) | v0.1 | Packaging & release | ◐ Pipeline, updater, security review and docs in place; publishing waits for M0-01 and M0-22 |
 | [M3](#m3--adaptive-planner--task-contracts-v02) | v0.2 | Adaptive planner, contracts, evidence | ◐ Every tier (S, M, L, XL) runs live on macOS and Windows, with gates, evidence and accepted risk (preview); left: the owner's click-through and the exit runs |
-| [M4](#m4--agent-observability-v02v03) | v0.2–0.3 | Agent observability graph | ☐ Not started |
+| [M4](#m4--agent-observability-v02v03) | v0.2–0.3 | Agent observability graph | ◐ Design approved; the agent tree is in, the graph is next |
 | [M5](#m5--git-workflow-pr--quality-gates-v03) | v0.3 | Git workflow, PRs, gates | ☐ Not started |
 | [M6](#m6--deployment--workflow-canvas-v04) | v0.4 | Deploy adapters, workflow canvas | ☐ Not started |
 | [M7](#m7--evals--analytics-v05) | v0.5 | Evals & analytics | ☐ Not started |
@@ -1255,12 +1255,14 @@ Decisions: [ADR-0009](adr/0009-release-signing-and-updates.md). Maintainer steps
 
 ## M4 — Agent observability (v0.2–v0.3)
 
-→ PRD [F4](PRD.md#f4--agent-observability-p1) · design: [observability.md](design/observability.md) (draft, waiting for
-the owner)
+→ PRD [F4](PRD.md#f4--agent-observability-p1) · design: [observability.md](design/observability.md) (approved
+2026-10-31)
 
 - [ ] **M4-01** Agent tree store built from normalized events (main → subagents → nested). Tracks status, current tool,
       start/end and attributable tokens and cost.
-- [ ] **M4-02** Live graph with `@xyflow/react` and elkjs auto-layout. Nodes are agents and key tool calls; edges are spawns and hand-offs.
+      Note: the tree, status, current tool, start/end and tokens are in (design step 1: `agent.progress`,
+      `agent.updated`, nested cards, the `subagents-nested` fixture); the ≈USD estimate comes with the drawer.
+- [ ] **M4-02** Live graph with `@xyflow/react` and dagre auto-layout (design §17). Nodes are agents and key tool calls; edges are spawns and hand-offs.
 - [ ] **M4-03** Node drawer: subagent prompt, transcript (SDK `getSessionMessages` / `agent_transcript_path`), tool calls, cost.
 - [ ] **M4-04** Timeline (Gantt) view that shows parallelism and waiting.
 - [ ] **M4-05** Controls: interrupt the session; stop a single subagent if the SDK supports it (verify).

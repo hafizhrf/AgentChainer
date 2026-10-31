@@ -9,8 +9,10 @@ import {
   ListTodo,
   Loader2,
   type LucideIcon,
+  Pause,
   RotateCcw,
   Search,
+  Square,
   SquareTerminal,
   Wrench,
   X,
@@ -18,7 +20,14 @@ import {
 import { createContext, memo, useCallback, useContext, useMemo, useRef, useState } from "react";
 import { diffStat, editDiffs, InlineDiff } from "./InlineDiff.tsx";
 import { Markdown } from "./Markdown.tsx";
-import { type AgentItem, groupItems, type Item, type ToolGroup, type ToolItem } from "./transcript.ts";
+import {
+  type AgentItem,
+  type AgentStatus,
+  groupItems,
+  type Item,
+  type ToolGroup,
+  type ToolItem,
+} from "./transcript.ts";
 import { CopyButton } from "./ui/CopyButton.tsx";
 
 /** The session's workspace, so tool rows can show paths inside it as relative ones. */
@@ -249,8 +258,10 @@ const ToolView = memo(function ToolView({ tool, onOpenFile }: { tool: ToolItem; 
 });
 
 const AgentView = memo(function AgentView({ agent, onOpenFile }: { agent: AgentItem; onOpenFile: OpenFile }) {
+  const live = agent.status === "running" || agent.status === "paused";
   const meta = [
     agent.agentType,
+    live && agent.lastTool ? `using ${agent.lastTool}` : null,
     agent.durationMs !== undefined ? `${(agent.durationMs / 1000).toFixed(1)} s` : null,
     agent.tokens !== undefined ? `${agent.tokens.toLocaleString()} tokens` : null,
   ].filter(Boolean);
@@ -267,21 +278,33 @@ const AgentView = memo(function AgentView({ agent, onOpenFile }: { agent: AgentI
         {agent.children.map((c) =>
           c.kind === "tool" ? (
             <ToolView key={`tool-${c.id}`} tool={c} onOpenFile={onOpenFile} />
+          ) : c.kind === "agent" ? (
+            <AgentView key={`agent-${c.id}`} agent={c} onOpenFile={onOpenFile} />
           ) : (
             <div key={`text-${c.id}`} className="msg agent-text">
               {c.text}
             </div>
           ),
         )}
-        {agent.summary && <div className="agent-summary">{agent.summary}</div>}
+        {live && agent.progress && <div className="agent-summary">{agent.progress}</div>}
+        {agent.error && <div className="agent-error">{agent.error}</div>}
+        {agent.summary && !repeatsLastText(agent) && <div className="agent-summary">{agent.summary}</div>}
       </div>
     </details>
   );
 });
 
-function StatusIcon({ status }: { status: "running" | "done" | "error" }) {
+/** The SDK's summary is often the subagent's last message word for word; it's shown once then. */
+function repeatsLastText(agent: AgentItem): boolean {
+  const last = agent.children.at(-1);
+  return last?.kind === "text" && last.text.trim() === agent.summary?.trim();
+}
+
+function StatusIcon({ status }: { status: AgentStatus }) {
   if (status === "running") return <Loader2 size={14} className="tool-status spin" aria-label="Running" />;
   if (status === "done") return <Check size={14} className="tool-status" aria-label="Done" />;
+  if (status === "stopped") return <Square size={14} className="tool-status" aria-label="Stopped" />;
+  if (status === "paused") return <Pause size={14} className="tool-status" aria-label="Paused" />;
   return <X size={14} className="tool-status" aria-label="Failed" />;
 }
 

@@ -131,6 +131,22 @@ describe("UI over a fake transport: subagents-parallel fixture", () => {
   });
 });
 
+describe("UI over a fake transport: subagents-nested fixture", () => {
+  it("shows the inner subagent inside the outer one's card, with its Bash call", async () => {
+    const tab = await runTurn(fixture("subagents-nested"));
+    const agents = tab.items.filter((i) => i.kind === "agent");
+    assert.equal(agents.length, 1, "one top-level card");
+    const outer = agents[0];
+    assert.ok(outer?.kind === "agent" && outer.status === "done");
+    const inner = outer.children.find((c) => c.kind === "agent");
+    assert.ok(inner?.kind === "agent", "the nested card");
+    assert.equal(inner.depth, 2);
+    assert.equal(inner.status, "done");
+    assert.ok(inner.prompt && inner.endedAt && inner.tokens);
+    assert.ok(inner.children.some((c) => c.kind === "tool" && c.name === "Bash"));
+  });
+});
+
 describe("client validation over the fake transport", () => {
   it("rejects results that break the protocol, and maps error codes", async () => {
     const bad = createClient(fakeSidecar([], { "system.ping": { ok: false } }).transport);

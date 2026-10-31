@@ -44,11 +44,57 @@ describe("normalize: subagents-parallel fixture", () => {
     for (const t of of("agent.text")) assert.ok(agents.has(t.parentToolUseId));
   });
 
+  it("reports progress and state changes by task, with the prompt and run id (M4-01)", () => {
+    const started = of("agent.started");
+    for (const e of started) {
+      assert.ok(e.prompt, "the prompt the subagent got");
+      assert.ok(e.runId);
+      assert.equal(e.parentTaskId, undefined, "spawned by the main agent");
+    }
+    const tasks = new Set(started.map((e) => e.taskId));
+    const progress = of("agent.progress");
+    assert.ok(progress.length >= 2);
+    for (const e of progress) {
+      assert.ok(tasks.has(e.taskId));
+      assert.ok(e.totalTokens > 0);
+      assert.equal(e.lastTool, "Bash");
+    }
+    const updated = of("agent.updated");
+    assert.deepEqual(new Set(updated.map((e) => e.taskId)), tasks);
+    for (const e of updated) {
+      assert.equal(e.status, "completed");
+      assert.ok(e.endTime && e.endTime > 0);
+    }
+  });
+
   it("streams main-agent text and ends with one successful turn", () => {
     assert.ok(of("text.delta").length > 0);
     const turns = of("turn.completed");
     assert.equal(turns.length, 1);
     assert.equal(turns[0]?.subtype, "success");
+  });
+});
+
+describe("normalize: subagents-nested fixture (CLI 2.1.314)", () => {
+  const events = replay("subagents-nested.jsonl");
+  const started = events.filter((e) => e.type === "agent.started");
+
+  it("names the parent task of a subagent spawned by a subagent (M4-01)", () => {
+    assert.equal(started.length, 2);
+    const [outer, inner] = started;
+    assert.equal(outer?.depth, 1);
+    assert.equal(outer?.parentTaskId, undefined);
+    assert.equal(inner?.depth, 2);
+    assert.equal(inner?.parentTaskId, outer?.taskId);
+  });
+
+  it("attributes the inner Agent call to the outer subagent and the Bash call to the inner one", () => {
+    const [outer, inner] = started;
+    const calls = events.filter((e) => e.type === "tool.started");
+    const spawn = calls.find((e) => e.toolUseId === inner?.toolUseId);
+    assert.equal(spawn?.parentToolUseId, outer?.toolUseId);
+    const bash = calls.find((e) => e.name === "Bash");
+    assert.equal(bash?.parentToolUseId, inner?.toolUseId);
   });
 });
 
@@ -119,6 +165,8 @@ describe("normalize: turn-basics fixture", () => {
       "tool.started",
       "tool.completed",
       "agent.started",
+      "agent.progress",
+      "agent.updated",
       "agent.text",
       "agent.completed",
       "turn.completed",
@@ -132,7 +180,7 @@ describe("normalize: turn-basics fixture", () => {
 
 describe("event snapshots for UI tests (M1-34)", () => {
   // apps/desktop replays these through a fake transport. Regenerate with UPDATE_FIXTURES=1 after re-recording.
-  for (const name of ["turn-basics", "subagents-parallel"]) {
+  for (const name of ["turn-basics", "subagents-parallel", "subagents-nested"]) {
     it(`${name}.events.json is up to date`, () => {
       const file = new URL(`../test/fixtures/${name}.events.json`, import.meta.url);
       const text = `${JSON.stringify(replay(`${name}.jsonl`), null, 1)}\n`;

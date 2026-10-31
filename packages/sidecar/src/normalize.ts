@@ -32,6 +32,40 @@ export function normalize(m: SDKMessage): AgentEvent[] {
             ...(m.subagent_type ? { agentType: m.subagent_type } : {}),
             ...(m.spawn_depth !== undefined ? { depth: m.spawn_depth } : {}),
             ...(m.is_backgrounded !== undefined ? { background: m.is_backgrounded } : {}),
+            ...(m.parent_task_id ? { parentTaskId: m.parent_task_id } : {}),
+            ...(m.run_id ? { runId: m.run_id } : {}),
+            ...(m.prompt ? { prompt: m.prompt } : {}),
+          },
+        ];
+      }
+      if (m.subtype === "task_progress" && m.tool_use_id) {
+        return [
+          {
+            type: "agent.progress",
+            toolUseId: m.tool_use_id,
+            taskId: m.task_id,
+            ...(m.run_id ? { runId: m.run_id } : {}),
+            totalTokens: m.usage.total_tokens,
+            toolUses: m.usage.tool_uses,
+            durationMs: m.usage.duration_ms,
+            ...(m.last_tool_name ? { lastTool: m.last_tool_name } : {}),
+            ...(m.summary ? { summary: m.summary } : {}),
+          },
+        ];
+      }
+      // task_updated names the task only; the UI ignores task ids it has no agent for (shells, monitors).
+      if (m.subtype === "task_updated") {
+        const p = m.patch;
+        return [
+          {
+            type: "agent.updated",
+            taskId: m.task_id,
+            ...(m.run_id ? { runId: m.run_id } : {}),
+            ...(p.status ? { status: p.status } : {}),
+            ...(p.end_time !== undefined ? { endTime: p.end_time } : {}),
+            ...(p.total_paused_ms !== undefined ? { pausedMs: p.total_paused_ms } : {}),
+            ...(p.error ? { error: p.error } : {}),
+            ...(p.is_backgrounded !== undefined ? { background: p.is_backgrounded } : {}),
           },
         ];
       }
@@ -41,7 +75,9 @@ export function normalize(m: SDKMessage): AgentEvent[] {
             type: "agent.completed",
             toolUseId: m.tool_use_id,
             taskId: m.task_id,
+            ...(m.run_id ? { runId: m.run_id } : {}),
             status: m.status,
+            ...(m.reason ? { reason: m.reason } : {}),
             summary: m.summary,
             ...(m.usage
               ? { totalTokens: m.usage.total_tokens, toolUses: m.usage.tool_uses, durationMs: m.usage.duration_ms }

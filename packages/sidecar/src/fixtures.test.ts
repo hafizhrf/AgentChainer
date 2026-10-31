@@ -20,6 +20,16 @@ describe("sanitizeForFixture", () => {
     assert.match(String(out.note), /\/workspace/);
   });
 
+  it("replaces Windows paths, whose backslashes JSON doubles", () => {
+    const win: Identity = { cwd: "C:\\Temp\\scratch\\ws", home: "C:\\Users\\jdoe", username: "jdoe" };
+    const raw = { type: "system", subtype: "init", cwd: win.cwd, note: `${win.home}\\AppData\\x` };
+    assert.notDeepEqual(leaks(JSON.stringify(raw), win), [], "the raw message leaks");
+    const out = sanitizeForFixture(raw, win);
+    assert.equal(out?.cwd, "/workspace");
+    assert.equal(out?.note, "/home/user\\AppData\\x");
+    assert.deepEqual(leaks(JSON.stringify(out), win), []);
+  });
+
   it("drops hook output, rate limits and status messages", () => {
     assert.equal(sanitizeForFixture({ type: "system", subtype: "hook_response", output: "secret" }, id), null);
     assert.equal(sanitizeForFixture({ type: "rate_limit_event" }, id), null);

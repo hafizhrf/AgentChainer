@@ -46,16 +46,27 @@ impl Settings {
         self.default_effort = clean(self.default_effort);
         self.theme = clean(self.theme).filter(|t| t == "light" || t == "dark");
         self.budget_usd = self.budget_usd.filter(|b| b.is_finite() && *b > 0.0);
-        let mut seen = Vec::new();
+        let mut seen: Vec<String> = Vec::new();
         for dir in self.recent_workspaces {
             let dir = dir.trim().to_string();
-            if !dir.is_empty() && !seen.contains(&dir) {
+            let key = dir_key(&dir, cfg!(windows));
+            if !dir.is_empty() && !seen.iter().any(|s| dir_key(s, cfg!(windows)) == key) {
                 seen.push(dir);
             }
         }
         seen.truncate(MAX_RECENT_WORKSPACES);
         self.recent_workspaces = seen;
         self
+    }
+}
+
+/// What makes two folder paths the same: on Windows case and separators don't matter, so `D:\a` and `d:/A/` are one
+/// recent workspace (the first, most recent spelling is kept).
+fn dir_key(dir: &str, windows: bool) -> String {
+    if windows {
+        dir.replace('/', "\\").trim_end_matches('\\').to_lowercase()
+    } else {
+        dir.trim_end_matches('/').to_string()
     }
 }
 
@@ -121,6 +132,22 @@ mod tests {
         assert_eq!(s.theme.as_deref(), Some("dark"));
         assert_eq!(s.recent_workspaces.len(), MAX_RECENT_WORKSPACES);
         assert_eq!(s.recent_workspaces[0], "/p/0");
+    }
+
+    #[test]
+    fn recent_workspaces_ignore_case_and_separators_on_windows() {
+        assert_eq!(
+            dir_key(r"C:\Temp\D--App\", true),
+            dir_key("c:/temp/d--app", true)
+        );
+        assert_ne!(
+            dir_key("/home/me/App", false),
+            dir_key("/home/me/app", false)
+        );
+        assert_eq!(
+            dir_key("/home/me/app/", false),
+            dir_key("/home/me/app", false)
+        );
     }
 
     #[test]

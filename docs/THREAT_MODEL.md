@@ -82,7 +82,17 @@ Nothing else. In particular, there is no file-system or shell plugin.
 Each takes a folder the user opened. Paths inside it go through `insideRoot`, and git paths are passed after `--`.
 
 `session.stopAgent` (M4-05) neither touches files nor runs anything. It stops one task of a session this sidecar
-started (`requireSession`), through the SDK's `stopTask`, and does nothing while no turn runs.
+started (`requireSession`), through the SDK's `stopTask`. It does nothing while no turn runs, unless the task is one of
+the session's live background tasks (M4-07).
+
+**Background work (M4-07):**
+- Interactive sessions let the CLI run subagents and shells in the background. They outlive the turn that started
+  them, and the CLI starts a turn of its own when they end.
+- They are bounded the same way as the turn:
+  - they run under the same session, with its permission mode, approvals, guard hook and spend cap;
+  - each one is listed above the composer with its own Stop;
+  - closing the session or quitting the app ends them with the CLI process.
+- Task steps, generators and triage keep background work off, so nothing they start outlives their turn.
 
 ## Security review of 2026-10-29
 

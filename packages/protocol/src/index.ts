@@ -671,6 +671,29 @@ export const AgentEventSchema = z.discriminatedUnion("type", [
     error: z.string().optional(),
     background: z.boolean().optional(),
   }),
+  /**
+   * Every live background task of the session after a change (M4-07): replace the set, don't merge. Ambient tasks
+   * (watchers the CLI starts itself) are left out.
+   */
+  z.object({
+    type: z.literal("background.changed"),
+    tasks: z.array(
+      z.object({
+        taskId: z.string(),
+        runId: z.string().optional(),
+        /** `local_agent`, `local_bash`, `monitor`, … */
+        kind: z.string(),
+        description: z.string(),
+        agentType: z.string().optional(),
+        parentTaskId: z.string().optional(),
+      }),
+    ),
+  }),
+  /**
+   * A turn the CLI started without a user message: background work finished and the main agent goes on (M4-07).
+   * It ends with `turn.completed` like any turn.
+   */
+  z.object({ type: z.literal("turn.started"), reason: z.literal("background") }),
   z.object({
     type: z.literal("agent.text"),
     parentToolUseId: z.string(),

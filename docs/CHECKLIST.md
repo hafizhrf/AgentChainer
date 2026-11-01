@@ -24,7 +24,7 @@
 | [UX](#ux--product-design--ui-polish-before-r1) | v0.1 | Product design & UI polish (after M1/M2 work functionally) | ◐ Design system done; desktop shell, panels and setup page in place |
 | [R1](#r1--v01-release) | v0.1 | Packaging & release | ◐ Pipeline, updater, security review and docs in place; publishing waits for M0-01 and M0-22 |
 | [M3](#m3--adaptive-planner--task-contracts-v02) | v0.2 | Adaptive planner, contracts, evidence | ◐ Every tier (S, M, L, XL) runs live on macOS and Windows, with gates, evidence and accepted risk (preview); left: the owner's click-through and the exit runs |
-| [M4](#m4--agent-observability-v02v03) | v0.2–0.3 | Agent observability graph | ◐ Agent tree, graph, drawer, per-agent stop, timeline and replay in; background tasks next |
+| [M4](#m4--agent-observability-v02v03) | v0.2–0.3 | Agent observability graph | ◐ Agent tree, graph, drawer, stop, timeline, replay and background tasks in; agent library next |
 | [M5](#m5--git-workflow-pr--quality-gates-v03) | v0.3 | Git workflow, PRs, gates | ☐ Not started |
 | [M6](#m6--deployment--workflow-canvas-v04) | v0.4 | Deploy adapters, workflow canvas | ☐ Not started |
 | [M7](#m7--evals--analytics-v05) | v0.5 | Evals & analytics | ☐ Not started |
@@ -1278,11 +1278,18 @@ Decisions: [ADR-0009](adr/0009-release-signing-and-updates.md). Maintainer steps
       Evidence: `session.stopAgent` → `Query.stopTask` (SDK 0.3.311); in the app on Windows, Stop this agent ended a
       subagent mid-`sleep` as stopped while the rest of the turn finished (step-2 PR).
 - [ ] **M4-06** Agent library manager: list, create and edit `.claude/agents/*.md` and programmatic agents; mark each as manual or auto-spawned.
-- [ ] **M4-07** Background tasks and shells panel.
-      Note: until then the sidecar runs every `query()` with `CLAUDE_CODE_DISABLE_BACKGROUND_TASKS=1`, because CLI
-      2.1.314 backgrounds subagents by default ([S4 update](spikes/S4-S5-S6.md)). This item lifts it: the session
-      stays busy while background tasks live (`background_tasks_changed`), each one can be stopped, and a task step
-      waits for them before its gates.
+- [x] **M4-07** Background tasks and shells panel.
+      Evidence: the step-5 PR ([design §8](design/observability.md)).
+      - Interactive sessions run background work: `background.changed`, `turn.started` for the CLI's own turn, Stop per
+        task, and `perTaskStopAffordance`. Task steps, generators and triage stay in the foreground.
+      - Tests: the recorded `subagents-background` fixture (CLI 2.1.314), and Session tests for the CLI's own turn.
+      - The M1 exit run on Windows passed 8/8 with background on.
+      - In the app on Windows:
+        - a background subagent outlived its turn and showed in the strip and the sidebar;
+        - Esc stopped the turn but not the background tasks;
+        - Stop ended a background shell;
+        - the CLI's own turn reported back.
+      - Not in: a shell's output tail; the SDK has no public method for it yet.
 - [x] **M4-08** Replay a finished session as a graph.
       Evidence: the step-4 PR. `session.history` adds each subagent's stored transcript (`listSubagents`,
       `getSubagentMessages`) under its spawn call, plus the stored times; `replayEvents` tests cover nesting, order,

@@ -193,6 +193,8 @@ serve(
           ...(maxBudgetUsd ? { maxBudgetUsd } : {}),
           ...(showThinking ? { showThinking } : {}),
           ...(resume ? { resume } : {}),
+          // Interactive sessions show their background tasks and stop them one by one (M4-07).
+          background: true,
         },
         {
           emit: (event) => notify("agent.event", { sessionId: session.id, event }),

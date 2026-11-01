@@ -151,8 +151,11 @@ export function applyEvent(items: Item[], e: AgentEvent, now?: number): Item[] {
       const finishIn = <T extends Item | AgentChild>(list: T[]): T[] =>
         list.map((it) => {
           if (it.kind === "tool" && it.id === e.toolUseId) return finish(it) as T;
-          // The Agent call's own result is the subagent's hand-back; agent.completed carries the summary.
-          if (it.kind === "agent" && it.id === e.toolUseId && it.status === "running") return { ...it, status } as T;
+          // The Agent call's own result is the subagent's hand-back; agent.completed carries the summary. A background
+          // subagent's call returns at once, while it goes on working (M4-07).
+          if (it.kind === "agent" && it.id === e.toolUseId && it.status === "running" && !it.background) {
+            return { ...it, status } as T;
+          }
           return it;
         });
       if (e.parentToolUseId !== null && findAgent(items, byId(e.parentToolUseId))) {
@@ -243,6 +246,17 @@ export function applyEvent(items: Item[], e: AgentEvent, now?: number): Item[] {
 
     case "turn.completed":
       return closeAssistant(items);
+
+    case "turn.started":
+      return [
+        ...closeAssistant(items),
+        {
+          kind: "notice",
+          id: nextId(),
+          text: "A background task ended. Claude picks it up.",
+          ...(now !== undefined ? { at: now } : {}),
+        },
+      ];
 
     case "error":
       return [

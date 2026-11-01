@@ -5,6 +5,7 @@ import { Group, Panel, Separator, useDefaultLayout, usePanelRef } from "react-re
 import { type Attachment, Composer } from "./Composer.tsx";
 import type { Confirm } from "./Dialog.tsx";
 import { AgentDrawer } from "./graph/AgentDrawer.tsx";
+import { BackgroundTasks } from "./graph/BackgroundTasks.tsx";
 import { SessionTimeline } from "./graph/SessionTimeline.tsx";
 import { MODE_NAMES } from "./options.ts";
 import type { PanelTab } from "./panelTabs.ts";
@@ -269,6 +270,16 @@ export function SessionView({
                       <p className="muted">Describe a task, or start from one of these.</p>
                     </div>
                   ) : null}
+                  {tab.background.length > 0 && (
+                    <BackgroundTasks
+                      tasks={tab.background}
+                      onStop={onStopAgent}
+                      onOpen={(taskId) => {
+                        const a = findAgent(tab.items, (x) => x.taskId === taskId);
+                        if (a) selectAgent(a.id);
+                      }}
+                    />
+                  )}
                   <Composer
                     tab={tab}
                     files={paths}
@@ -341,7 +352,7 @@ export function SessionView({
                   cwd={tab.cwd}
                   agent={agent}
                   cost={tab.cost}
-                  canStop={tab.running}
+                  canStop={tab.running || tab.background.some((b) => b.taskId === agent.taskId)}
                   waiting={agent.children.some((c) => c.kind === "tool" && waiting.has(c.id))}
                   onStop={onStopAgent}
                   onClose={() => setAgentId(null)}

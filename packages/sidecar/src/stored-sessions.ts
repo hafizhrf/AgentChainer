@@ -168,7 +168,10 @@ export function replayEvents(
         status: result?.status ?? "stopped",
         summary: last?.type === "agent.text" ? last.text : "",
       });
-      times.push(result?.at ?? timeOf(t.messages[t.messages.length - 1] as SessionMessage));
+      // It ended when its call returned, or with its last message if later: a background subagent's call returns at
+      // once (M4-07).
+      const ends = [result?.at, ...t.messages.map(timeOf)].filter((v): v is number => typeof v === "number");
+      times.push(ends.length ? Math.max(...ends) : null);
     }
   }
   return { events, times };

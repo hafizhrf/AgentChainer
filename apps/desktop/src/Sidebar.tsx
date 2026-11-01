@@ -136,6 +136,8 @@ function SessionStatus({ tab }: { tab: Tab }) {
       />
     );
   if (tab.running) return <Loader2 className="nav-status spin" size={14} aria-label="Working" />;
+  if (tab.background.length > 0)
+    return <Loader2 className="nav-status spin" size={14} aria-label="Working in the background" />;
   if (tab.ended)
     return (
       <span className="nav-status ended" title="Ended: open it to resume">

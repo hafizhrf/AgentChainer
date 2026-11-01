@@ -687,7 +687,7 @@ export const MergeMethodSchema = z.enum(["merge", "squash", "rebase"]);
 
 /** A provider a workspace can deploy to (M6-01): its config file, and whether its CLI is installed and signed in. */
 export const DeployTargetSchema = z.object({
-  adapter: z.enum(["vercel"]),
+  adapter: z.enum(["vercel", "cloudflare"]),
   label: z.string(),
   /** The file that marks the project for this provider, e.g. `.vercel/project.json`. */
   config: z.string(),
@@ -701,7 +701,7 @@ export type DeployTarget = z.infer<typeof DeployTargetSchema>;
 /** One deploy the app ran, always from a person's click (M6, design §7). Kept in `.agentchainer/deploys/`. */
 export const DeployRecordSchema = z.object({
   id: z.string(),
-  adapter: z.enum(["vercel"]),
+  adapter: z.enum(["vercel", "cloudflare"]),
   env: z.enum(["preview", "production"]),
   taskId: z.string().optional(),
   branch: z.string().optional(),
@@ -1359,7 +1359,10 @@ export const methodSchemas = {
    * Deploys a task's worktree as a preview with the provider's own CLI, then runs the smoke test on its URL (M6-01,
    * M6-03). Always from a person's click; never production.
    */
-  "deploy.preview": { params: TaskRef.extend({ adapter: z.enum(["vercel"]) }), result: DeployRecordSchema },
+  "deploy.preview": {
+    params: TaskRef.extend({ adapter: z.enum(["vercel", "cloudflare"]) }),
+    result: DeployRecordSchema,
+  },
   /** The workspace's deploys, newest first; a task's only, with `taskId`. */
   "deploy.list": {
     params: WorkspaceRef.extend({ taskId: TaskIdSchema.optional() }),

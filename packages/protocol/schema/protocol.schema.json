@@ -19519,7 +19519,8 @@
                 "adapter": {
                   "type": "string",
                   "enum": [
-                    "vercel"
+                    "vercel",
+                    "cloudflare"
                   ]
                 },
                 "label": {
@@ -19573,7 +19574,8 @@
           "adapter": {
             "type": "string",
             "enum": [
-              "vercel"
+              "vercel",
+              "cloudflare"
             ]
           }
         },
@@ -19594,7 +19596,8 @@
           "adapter": {
             "type": "string",
             "enum": [
-              "vercel"
+              "vercel",
+              "cloudflare"
             ]
           },
           "env": {
@@ -19710,7 +19713,8 @@
                 "adapter": {
                   "type": "string",
                   "enum": [
-                    "vercel"
+                    "vercel",
+                    "cloudflare"
                   ]
                 },
                 "env": {

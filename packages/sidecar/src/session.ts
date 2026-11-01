@@ -247,6 +247,13 @@ export class Session {
     return true;
   }
 
+  /** Stops one subagent (M4-05). Idle sessions have no running task, so nothing is sent then, as for interrupt. */
+  async stopAgent(taskId: string): Promise<boolean> {
+    if (this.openTurns === 0) return false;
+    await this.q.stopTask(taskId);
+    return true;
+  }
+
   /** Takes effect for the next tool call (streaming-input mode only). */
   async setMode(mode: PermissionMode): Promise<void> {
     await this.q.setPermissionMode(mode);

@@ -779,6 +779,14 @@ export const methodSchemas = {
     params: SessionRef,
     result: z.object({ ok: z.literal(true), interrupted: z.boolean() }),
   },
+  /**
+   * Stops one subagent (M4-05); the turn goes on. The SDK then sends its `agent.completed` with status `stopped`.
+   * `stopped: false` means no turn was running. `taskId` is the SDK's task id from `agent.started`.
+   */
+  "session.stopAgent": {
+    params: SessionRef.extend({ taskId: z.string().min(1).max(200) }),
+    result: z.object({ ok: z.literal(true), stopped: z.boolean() }),
+  },
   "session.setMode": { params: z.object({ sessionId: SessionIdSchema, mode: PermissionModeSchema }), result: Ok },
   /** Switches the model for the next turn (M1-15); an empty string goes back to the default model. */
   "session.setModel": { params: z.object({ sessionId: SessionIdSchema, model: z.string() }), result: Ok },

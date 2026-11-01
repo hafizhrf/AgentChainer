@@ -1,0 +1,267 @@
+/* Agent observability (M4): the Chat | Graph switch, the session graph and the agent drawer. */
+
+.segmented {
+  display: inline-flex;
+  min-inline-size: 0;
+  margin: 0 var(--space-2) 0 0;
+  padding: 2px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface-2);
+}
+
+.segmented > button {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-height: 24px;
+  padding: 0 var(--space-2);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--muted);
+  font-size: var(--text-sm);
+}
+
+.segmented > button[aria-pressed="true"] {
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+  color: var(--fg);
+}
+
+/* ---------- Graph ---------- */
+
+.session-graph {
+  position: relative;
+  flex: 1 1 0;
+  min-height: 0;
+  outline: none;
+}
+
+.session-graph:focus-visible {
+  box-shadow: inset 0 0 0 2px var(--focus);
+}
+
+.session-graph .react-flow {
+  --xy-background-color: var(--bg);
+  --xy-background-pattern-color: var(--border);
+  --xy-edge-stroke: var(--border-strong);
+  --xy-edge-stroke-width: 1.5;
+}
+
+.session-graph .graph-edge.live path {
+  stroke: var(--accent);
+}
+
+.session-graph .react-flow__controls {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  box-shadow: var(--shadow-sm);
+}
+
+.session-graph .react-flow__controls-button {
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--fg);
+}
+
+.react-flow__controls-button > svg {
+  fill: currentColor;
+}
+
+.session-graph .react-flow__handle {
+  opacity: 0;
+}
+
+.graph-empty {
+  position: absolute;
+  top: var(--space-6);
+  left: 0;
+  right: 0;
+  text-align: center;
+  pointer-events: none;
+}
+
+.graph-node {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 2px;
+  width: 100%;
+  height: 100%;
+  padding: var(--space-1) var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--fg);
+  font-size: var(--text-sm);
+  cursor: default;
+}
+
+.graph-node.agent {
+  border-left: 3px solid var(--accent);
+  cursor: pointer;
+}
+
+.graph-node.main {
+  background: var(--surface-2);
+}
+
+.graph-node.tool {
+  font-size: var(--text-xs);
+}
+
+.graph-node.selected {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-soft);
+}
+
+.graph-node.focused {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.graph-node-title {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.graph-node-title > strong,
+.graph-node-title > span {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.graph-node-title > svg {
+  flex-shrink: 0;
+  color: var(--muted);
+}
+
+.graph-node-meta {
+  display: flex;
+  gap: var(--space-2);
+  min-width: 0;
+  overflow: hidden;
+  color: var(--muted);
+  font-size: var(--text-xs);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.graph-node.done .graph-node-title > svg:last-child {
+  color: var(--ok);
+}
+
+.graph-node.error {
+  border-color: var(--err);
+}
+
+.graph-node.error .graph-node-title > svg:last-child {
+  color: var(--err);
+}
+
+.graph-node.stopped .graph-node-title > svg:last-child,
+.graph-node.paused .graph-node-title > svg:last-child {
+  color: var(--warn);
+}
+
+.graph-node.waiting {
+  border-color: var(--warn);
+  background: var(--warn-bg);
+}
+
+.graph-fold {
+  font-size: var(--text-xs);
+}
+
+/* ---------- Agent drawer (right panel) ---------- */
+
+.agent-drawer {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.agent-drawer-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 52px;
+  padding: 0 var(--space-3) 0 var(--space-4);
+  border-bottom: 1px solid var(--border);
+}
+
+.agent-drawer-head > svg {
+  flex-shrink: 0;
+  color: var(--accent);
+}
+
+.agent-drawer-head h2 {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  font-size: var(--text-md);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.agent-drawer-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4) var(--space-6);
+  overflow-y: auto;
+}
+
+.agent-drawer-body h3 {
+  margin: var(--space-2) 0 0;
+  color: var(--muted);
+  font-size: var(--text-xs);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.agent-facts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-2) var(--space-4);
+  margin: 0;
+}
+
+.agent-facts dt {
+  color: var(--muted);
+  font-size: var(--text-xs);
+}
+
+.agent-facts dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.agent-drawer-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  font-size: var(--text-sm);
+}
+
+.agent-prompt {
+  max-height: 14rem;
+  margin: 0;
+  font-size: var(--text-xs);
+  white-space: pre-wrap;
+}
+
+.agent-drawer .agent-children {
+  padding: 0;
+}

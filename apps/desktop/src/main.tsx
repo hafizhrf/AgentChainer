@@ -10,6 +10,7 @@ import "./styles/tree.css";
 import "./styles/setup.css";
 import "./styles/features.css";
 import "./styles/tasks.css";
+import "./styles/graph.css";
 
 createRoot(document.getElementById("root") as HTMLElement).render(
   <StrictMode>

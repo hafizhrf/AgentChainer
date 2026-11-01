@@ -877,6 +877,9 @@ export function App() {
                     onToggleTerminal={() => toggleTerminal(t.sessionId)}
                     onSend={(text, images) => void sendText(t.sessionId, text, images)}
                     onInterrupt={() => void request("session.interrupt", { sessionId: t.sessionId })}
+                    onStopAgent={async (taskId) => {
+                      await request("session.stopAgent", { sessionId: t.sessionId, taskId });
+                    }}
                     onModeChange={(m) => void changeMode(t.sessionId, m)}
                     onModelChange={(alias) => void changeModel(t.sessionId, alias)}
                     onEffortChange={(effort) => void changeEffort(t.sessionId, effort)}

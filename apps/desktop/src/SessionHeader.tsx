@@ -1,4 +1,4 @@
-import { Folder, GitBranch, PanelRight, SquareTerminal } from "lucide-react";
+import { Folder, GitBranch, MessageSquare, Network, PanelRight, SquareTerminal } from "lucide-react";
 import { useState } from "react";
 
 import { folderName, type Tab } from "./tabs.ts";
@@ -6,9 +6,17 @@ import { ActionMenu } from "./ui/ActionMenu.tsx";
 import { IconButton } from "./ui/IconButton.tsx";
 import { menuShortcut } from "./useMenuCommands.ts";
 
-/** The top of a session: title (rename in place), workspace and branch, panel toggles and session actions. */
+/** The centre of a session: the chat, or the agent graph (M4-02). */
+export type SessionMode = "chat" | "graph";
+
+/**
+ * The top of a session: title (rename in place), workspace and branch, the Chat | Graph switch, panel toggles and
+ * session actions.
+ */
 export function SessionHeader({
   tab,
+  view,
+  onViewChange,
   branch,
   terminalOpen,
   rightOpen,
@@ -20,6 +28,8 @@ export function SessionHeader({
   onOpenSetup,
 }: {
   tab: Tab;
+  view: SessionMode;
+  onViewChange: (view: SessionMode) => void;
   branch: string | null;
   terminalOpen: boolean;
   rightOpen: boolean;
@@ -75,6 +85,16 @@ export function SessionHeader({
         </span>
       </div>
       <div className="session-tools">
+        <fieldset className="segmented" aria-label="Session view">
+          <button type="button" aria-pressed={view === "chat"} onClick={() => onViewChange("chat")}>
+            <MessageSquare size={13} aria-hidden />
+            Chat
+          </button>
+          <button type="button" aria-pressed={view === "graph"} onClick={() => onViewChange("graph")}>
+            <Network size={13} aria-hidden />
+            Graph
+          </button>
+        </fieldset>
         <IconButton
           label="Terminal"
           shortcut={menuShortcut("toggle-terminal")}

@@ -260,6 +260,16 @@ export function setMessageId(items: Item[], id: number, messageId: string): Item
   return items.map((it) => (it.kind === "user" && it.id === id ? { ...it, messageId } : it));
 }
 
+/**
+ * How long a subagent ran. The SDK's totals stop at its last progress frame, which for a stopped agent can be long
+ * before the end, so a live session's own start and end win when they say it ran longer.
+ */
+export function agentDuration(a: AgentItem): number | undefined {
+  const measured = a.startedAt !== undefined && a.endedAt !== undefined ? a.endedAt - a.startedAt : undefined;
+  if (measured === undefined) return a.durationMs;
+  return a.durationMs === undefined ? measured : Math.max(measured, a.durationMs);
+}
+
 /** The SDK's task states (`task_updated`) as card states; pending changes nothing. */
 const TASK_STATUS: Record<string, AgentStatus | undefined> = {
   running: "running",

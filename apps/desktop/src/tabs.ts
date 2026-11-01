@@ -144,6 +144,17 @@ export function folderName(dir: string): string {
   return dir.split(/[\\/]/).filter(Boolean).at(-1) ?? dir;
 }
 
+/**
+ * ≈USD for a subagent's tokens (design §11): the session's cost per token so far, from the SDK's own totals, times the
+ * agent's tokens. Cache reads and the models used are in that rate, so no price table is needed; it's still an
+ * estimate, and the agents' figures needn't add up to the session's. `null` until a turn has reported its totals.
+ */
+export function agentUsd(cost: Cost, tokens: number | undefined): number | null {
+  const all = cost.totalTokens ? cost.totalTokens.input + cost.totalTokens.output : 0;
+  if (tokens === undefined || cost.totalUsd === null || all === 0) return null;
+  return (cost.totalUsd / all) * tokens;
+}
+
 /** The budget warning (M1-32): at 80% of the cap, for sessions whose whole spend is known. */
 export function budgetWarning(tab: Tab): string | null {
   if (tab.budgetUsd === null || tab.cost.totalUsd === null) return null;

@@ -312,6 +312,9 @@ describe("a branch for every task (M5-01)", () => {
     });
   /** An approved M task with its own worktree, ended Done. */
   const doneM = (root: string, request: string) => {
+    // The app commits as the user; CI machines have no global identity, so the repository gets one.
+    git(root, "config", "user.name", "t");
+    git(root, "config", "user.email", "t@example.invalid");
     const approved = approvedXl(newTask(root, request));
     if (!approved.triage) throw new Error("no triage");
     const { task } = taskBranch(root, { ...approved, triage: { ...approved.triage, chosen: "M" } });

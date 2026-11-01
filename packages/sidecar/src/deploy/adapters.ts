@@ -4,7 +4,7 @@ import type { DeployTarget } from "@agentchainer/protocol";
 import type { RunResult } from "../run-async.ts";
 import type { RunCli } from "./cli.ts";
 
-type Env = "preview" | "production";
+export type Env = "preview" | "production";
 /** What a deploy is for: a short alias (the task's) and a message (its objective). */
 export type DeployContext = { alias: string; message: string };
 
@@ -17,6 +17,8 @@ export type Adapter = {
   label: string;
   /** The CLI's name, as `resolveCli` finds it. */
   cli: string;
+  /** The environments it can deploy to: Fly.io has no previews. */
+  environments: readonly Env[];
   /** The file that marks the project for this provider, and what's missing before it can deploy; null when unused. */
   detect(root: string): { config: string; problem?: string } | null;
   /** The provider's project name, from its config (the name a person types to confirm production); null if unknown. */
@@ -26,16 +28,28 @@ export type Adapter = {
   /** Whether the CLI is signed in. Its output names the account, so only the exit code counts. */
   signedIn(run: RunCli, code: string): Promise<boolean>;
   deployArgs(env: Env, ctx: DeployContext): string[];
-  /** The deployment's URL and the provider's id for it, from the deploy command's output. */
-  parse(result: RunResult): { url: string; deploymentId: string } | null;
-  /** Rolls production back to `deploymentId`, or to the provider's own previous one without it. */
-  rollbackArgs(deploymentId?: string): string[];
+  /** The deployment's URL and the provider's id for it (what rollback goes back to), from the deploy's output. */
+  parse(result: RunResult): { url: string; deploymentId?: string } | null;
+  /**
+   * Rolls production back to `deploymentId`, or to the provider's own previous one without it; null when the provider
+   * needs the id (Fly.io and Firebase have no "previous" of their own).
+   */
+  rollbackArgs(deploymentId?: string): string[] | null;
 };
 
 const readJson = (file: string): Record<string, unknown> | null => {
   try {
     // JSONC: drop line comments that start a line (wrangler.jsonc); URLs inside strings are untouched.
     return JSON.parse(readFileSync(file, "utf8").replace(/^\s*\/\/.*$/gm, "")) as Record<string, unknown>;
+  } catch {
+    return null;
+  }
+};
+
+/** The JSON object a CLI printed with `--json`, ignoring anything around it. */
+const jsonOf = (text: string): Record<string, unknown> | null => {
+  try {
+    return JSON.parse(text.slice(text.indexOf("{"), text.lastIndexOf("}") + 1)) as Record<string, unknown>;
   } catch {
     return null;
   }
@@ -52,6 +66,7 @@ export const vercel: Adapter = {
   id: "vercel",
   label: "Vercel",
   cli: "vercel",
+  environments: ["preview", "production"],
   detect(root) {
     if (existsSync(path.join(root, ".vercel", "project.json"))) return { config: ".vercel/project.json" };
     if (existsSync(path.join(root, "vercel.json"))) {
@@ -97,6 +112,7 @@ export const cloudflare: Adapter = {
   id: "cloudflare",
   label: "Cloudflare Workers",
   cli: "wrangler",
+  environments: ["preview", "production"],
   detect(root) {
     const config = WRANGLER_CONFIGS.find((c) => existsSync(path.join(root, c)));
     if (!config) return null;
@@ -147,4 +163,117 @@ export const cloudflare: Adapter = {
   ],
 };
 
-export const ADAPTERS: readonly Adapter[] = [vercel, cloudflare];
+/** `.firebaserc`'s default project. */
+const firebaseProject = (root: string): string | null => {
+  const projects = readJson(path.join(root, ".firebaserc"))?.projects as Record<string, unknown> | undefined;
+  return typeof projects?.default === "string" && projects.default ? projects.default : null;
+};
+
+/**
+ * Firebase Hosting, through `firebase` (checked against firebase-tools 15.34.2's help and source). A preview is a
+ * Hosting channel (`hosting:channel:deploy <id>`, expiring after 7 days); production is `deploy --only hosting`. Both
+ * print JSON with `--json`: a channel's `url` and `version`, and the live release's `sites/<site>/versions/<id>`.
+ * Rollback clones the previous version back to the live channel (`hosting:clone <site>@<version> <site>:live`), so it
+ * needs the version the app recorded. One Hosting site per project for now.
+ */
+export const firebase: Adapter = {
+  id: "firebase",
+  label: "Firebase Hosting",
+  cli: "firebase",
+  environments: ["preview", "production"],
+  detect(root) {
+    const config = readJson(path.join(root, "firebase.json"));
+    if (!config || !("hosting" in config)) return null;
+    if (Array.isArray(config.hosting) && config.hosting.length > 1) {
+      return {
+        config: "firebase.json",
+        problem: "This project has several Hosting sites; one site is supported for now.",
+      };
+    }
+    if (!firebaseProject(root)) {
+      return {
+        config: "firebase.json",
+        problem: "The project has no default Firebase project: run `firebase use --add` in the workspace.",
+      };
+    }
+    return { config: "firebase.json" };
+  },
+  projectName: firebaseProject,
+  prepare(root, code) {
+    // `.firebaserc` is usually committed; when it's ignored, the worktree gets the workspace's.
+    const from = path.join(root, ".firebaserc");
+    const to = path.join(code, ".firebaserc");
+    if (code !== root && existsSync(from) && !existsSync(to)) copyFileSync(from, to);
+  },
+  async signedIn(run, code) {
+    // login:list exits 0 either way; signed out, it says so.
+    const r = await run(["login:list"], code, { timeoutMs: 30_000 });
+    return r.status === 0 && !/no authorized accounts/i.test(`${r.stdout}\n${r.stderr}`);
+  },
+  deployArgs: (env, ctx) =>
+    env === "production"
+      ? ["deploy", "--only", "hosting", "--message", ctx.message.slice(0, 100), "--non-interactive", "--json"]
+      : ["hosting:channel:deploy", ctx.alias, "--expires", "7d", "--non-interactive", "--json"],
+  parse(result) {
+    const out = jsonOf(result.stdout)?.result as Record<string, unknown> | undefined;
+    if (!out) return null;
+    // Production: the live release's version name.
+    if (typeof out.hosting === "string") {
+      const m = /sites\/([^/]+)\/versions\/([^/]+)$/.exec(out.hosting);
+      return m ? { url: `https://${m[1]}.web.app`, deploymentId: `${m[1]}@${m[2]}` } : null;
+    }
+    // A channel: one entry per site.
+    const site = Object.values(out).find(
+      (v): v is { site?: string; url: string; version?: string } =>
+        typeof v === "object" && v !== null && typeof (v as { url?: unknown }).url === "string",
+    );
+    if (!site?.url) return null;
+    return { url: site.url, ...(site.site && site.version ? { deploymentId: `${site.site}@${site.version}` } : {}) };
+  },
+  rollbackArgs: (version) =>
+    version ? ["hosting:clone", version, `${version.split("@")[0]}:live`, "--non-interactive"] : null,
+};
+
+/** fly.toml's `app`. */
+const flyApp = (root: string): string | null => {
+  const file = path.join(root, "fly.toml");
+  if (!existsSync(file)) return null;
+  return /^\s*app\s*=\s*["']([^"']+)["']/m.exec(readFileSync(file, "utf8"))?.[1] ?? null;
+};
+
+/**
+ * Fly.io, through `fly` (flags from fly.io's flyctl reference, **not checked against an installed flyctl**). Fly has
+ * no previews, so it deploys to production only: `fly deploy --remote-only --yes` builds on Fly's builder, not the
+ * local Docker. The image it deployed (`registry.fly.io/<app>:deployment-…`) is what rollback redeploys with
+ * `fly deploy --image`, so rollback needs the one the app recorded.
+ */
+export const fly: Adapter = {
+  id: "fly",
+  label: "Fly.io",
+  cli: "fly",
+  environments: ["production"],
+  detect(root) {
+    if (!existsSync(path.join(root, "fly.toml"))) return null;
+    if (!flyApp(root)) {
+      return { config: "fly.toml", problem: "fly.toml has no `app` name: run `fly launch` or set `app` in fly.toml." };
+    }
+    return { config: "fly.toml" };
+  },
+  projectName: flyApp,
+  prepare() {
+    // fly.toml is part of the repository.
+  },
+  async signedIn(run, code) {
+    return (await run(["auth", "whoami"], code, { timeoutMs: 30_000 })).status === 0;
+  },
+  deployArgs: () => ["deploy", "--remote-only", "--yes"],
+  parse(result) {
+    const text = `${result.stdout}\n${result.stderr}`;
+    const url = urls(text).find((u) => /\.fly\.dev\b/.test(u));
+    const image = /\b(registry\.fly\.io\/[^\s"']+)/.exec(text)?.[1];
+    return url ? { url: url.replace(/\/$/, ""), ...(image ? { deploymentId: image } : {}) } : null;
+  },
+  rollbackArgs: (image) => (image ? ["deploy", "--image", image, "--remote-only", "--yes"] : null),
+};
+
+export const ADAPTERS: readonly Adapter[] = [vercel, cloudflare, firebase, fly];

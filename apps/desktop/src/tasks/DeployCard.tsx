@@ -28,7 +28,8 @@ export function DeployCard({ task, cwd, onChanged }: { task: Task; cwd: string; 
         request("deploy.targets", { cwd }),
         request("deploy.list", { cwd, taskId: task.id }),
       ]);
-      setTargets(t.targets);
+      // Fly.io has no previews.
+      setTargets(t.targets.filter((x) => x.environments.includes("preview")));
       setDeploys(d.deploys);
       setError(null);
     } catch (err) {

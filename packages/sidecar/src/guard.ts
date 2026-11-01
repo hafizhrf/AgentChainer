@@ -76,6 +76,10 @@ export function checkBash(command: string, cwd: string, home = homedir()): strin
     /\b(vercel|netlify)\b[^;&|]*\s--prod\b/.test(command) ||
     /\b(firebase|fly|flyctl)\s+deploy\b/.test(command) ||
     /\bwrangler\s+deploy\b(?![^;&|]*--dry-run)/.test(command) ||
+    // Rollbacks and promotions change production too.
+    /\b(vercel|wrangler)\s+(rollback|promote)\b/.test(command) ||
+    /\bwrangler\s+versions\s+deploy\b/.test(command) ||
+    /\bfirebase\s+hosting:clone\b/.test(command) ||
     /\bterraform\s+(apply|destroy)\b/.test(command) ||
     /\bkubectl\s+delete\b/.test(command)
   ) {

@@ -25,6 +25,27 @@ describe("checkBash", () => {
     }
   });
 
+  it("leaves production deploys and rollbacks to a person (M6)", () => {
+    for (const cmd of [
+      "vercel --prod",
+      "vercel deploy --prod --yes",
+      "vercel rollback https://x.vercel.app --yes",
+      "vercel promote https://x.vercel.app",
+      "wrangler deploy",
+      "wrangler rollback 1a2b --yes",
+      "wrangler versions deploy --version-id 1a2b -y",
+      "firebase deploy --only hosting",
+      "firebase hosting:clone site@v1 site:live",
+      "fly deploy --image registry.fly.io/app:deployment-1",
+      "flyctl deploy",
+    ]) {
+      blocked(cmd);
+    }
+    for (const cmd of ["vercel whoami", "wrangler versions list", "fly releases --json", "firebase login:list"]) {
+      allowed(cmd);
+    }
+  });
+
   it("blocks sudo anywhere in a command chain", () => {
     blocked("sudo rm file");
     blocked("cd x && sudo make install");

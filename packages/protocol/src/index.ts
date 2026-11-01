@@ -686,7 +686,7 @@ export type MergeGate = z.infer<typeof MergeGateSchema>;
 export const MergeMethodSchema = z.enum(["merge", "squash", "rebase"]);
 
 /** The deploy providers (M6-01). */
-export const DeployAdapterSchema = z.enum(["vercel", "cloudflare"]);
+export const DeployAdapterSchema = z.enum(["vercel", "cloudflare", "firebase", "fly"]);
 
 /** A provider a workspace can deploy to (M6-01): its config file, and whether its CLI is installed and signed in. */
 export const DeployTargetSchema = z.object({
@@ -698,6 +698,10 @@ export const DeployTargetSchema = z.object({
   state: z.enum(["missing", "not-linked", "signed-out", "ready"]),
   /** What to do when it isn't ready. */
   hint: z.string().optional(),
+  /** Where it can deploy: Fly.io has no previews. */
+  environments: z.array(z.enum(["preview", "production"])),
+  /** Whether it can roll back without a recorded previous deploy (the provider knows its own previous one). */
+  rollbackWithoutRecord: z.boolean(),
 });
 export type DeployTarget = z.infer<typeof DeployTargetSchema>;
 
@@ -715,7 +719,7 @@ export const DeployRecordSchema = z.object({
   endedAt: z.string(),
   status: z.enum(["done", "failed"]),
   url: z.string().optional(),
-  /** The provider's id for the deployment (Vercel: its URL), which rollback goes back to. */
+  /** The provider's id for the deployment (Vercel: its URL; Cloudflare: a version; Firebase: site@version; Fly: an image), which rollback goes back to. */
   deploymentId: z.string().optional(),
   error: z.string().optional(),
   smoke: z.object({ ok: z.boolean(), how: z.enum(["script", "http"]), detail: z.string() }).optional(),

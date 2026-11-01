@@ -361,6 +361,55 @@ button.timeline-row:hover {
   border-radius: 3px;
 }
 
+/* ---------- Background tasks (above the composer) ---------- */
+
+/* As wide as the composer's box below it. */
+.background-tasks {
+  width: calc(100% - 2 * var(--space-6));
+  max-width: calc(848px - 2 * var(--space-6));
+  margin: 0 auto var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface-2);
+  font-size: var(--text-sm);
+}
+
+.background-tasks header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--muted);
+}
+
+.background-tasks ul {
+  margin: var(--space-1) 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.background-tasks li {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 30px;
+}
+
+.background-tasks > ul > li > .lucide {
+  flex-shrink: 0;
+  color: var(--muted);
+}
+
+.background-name {
+  display: block;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 /* ---------- Agent drawer (right panel) ---------- */
 
 .agent-drawer {

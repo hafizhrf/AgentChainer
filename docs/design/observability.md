@@ -136,20 +136,39 @@ sessions, background work, and a manager for the project's agent definitions.
 
 ## 8. Background tasks (M4-07)
 
-This is the largest runtime change in M4, so it ships after the read-only views:
+This was the largest runtime change in M4, so it shipped after the read-only views. A spike on CLI 2.1.314 settled
+how background work behaves:
+- The Agent call returns "Async agent launched" at once, and the turn ends with its `result`.
+- The subagent keeps sending `task_*` messages. `background_tasks_changed` lists the live tasks after every change.
+- When the last task ends, **the CLI starts a turn of its own**: an `init`, the main agent's reply, and a second
+  `result`, with no user message.
+- A subagent's own Bash call is a task too (`local_bash`).
 
-- Remove `CLAUDE_CODE_DISABLE_BACKGROUND_TASKS=1` from `foregroundOnly()`.
-- Map `background_tasks_changed` (a level signal: replace the set on every message) to `session.background`. The
-  session shows as **busy** while that set isn't empty, even between turns.
-- **Each background task** gets a Stop button (`stopTask`). Shells and Monitor tasks also get their output tail
-  (`getTaskOutput`).
-- `perTaskStopAffordance: true`, because the app now offers a per-task Stop.
-- **M3 task steps** wait for the step's background tasks to settle before the gates run, so gates never test
-  half-done work.
-- **Tests:** a recorded CLI 2.1.314 fixture with a backgrounded subagent and shell; the M1 exit run (E5) passes with
-  background on.
-- **THREAT_MODEL:** background work outlives a turn. It is bounded by the session's budget, and the app stops it when
-  the session closes.
+What shipped:
+- **Interactive sessions only.** `session.start` opts in (`ALLOW_BACKGROUND` in `sdk-loader.ts`). Every other
+  `query()` keeps `CLAUDE_CODE_DISABLE_BACKGROUND_TASKS=1`: a task's steps (so the step's work is done when its turn
+  ends, and the gates never test half-done work), the generators, triage and the commit message. That replaces the
+  plan to make task steps wait for their background tasks.
+- **`background.changed`** carries the set (replace, don't merge), leaving out ambient tasks. The tab keeps it, and the
+  sidebar shows the session as working while it isn't empty.
+- **The CLI's own turn:**
+  - The sidecar recognises it as an `init` with no user turn open, and emits `turn.started {reason: "background"}`.
+  - The UI then marks the session busy and notes it in the transcript, so messages typed meanwhile are queued.
+  - The session counts that turn's `result` apart, so a task step's `turn()` and the idle checks for interrupt and
+    stop stay right.
+- **Above the composer**, each background task has a row with a Stop button (`stopTask`, which also works between
+  turns for a live background task). A subagent's row opens its drawer.
+- **`perTaskStopAffordance: true`:** Esc stops the turn only. Background tasks keep running until stopped one by one.
+- **The tree:** a background subagent stays running after its Agent call returns, until `agent.completed`. A shell
+  task is not an agent: only `local_agent` tasks (or tasks without a type, from older CLIs) become agent cards.
+- **Replay:** a background subagent ends with its last stored message, since its call returned at once.
+- **Not shipped: a shell's output tail.** SDK 0.3.311 has the `get_task_output` control request in its types, but no
+  `Query` method for it **(verify on SDK updates)**.
+- **Tests:**
+  - the `subagents-background` fixture, recorded with `spike-host.ts --scenario background`;
+  - Session tests for the CLI's own turn and for stopping while idle.
+- **M1 exit run:** E1–E5 passed 8/8 with background on. The harness's `turn()` now waits until the background work
+  and the CLI's own turn have ended.
 
 ## 9. Replay (M4-08)
 
@@ -236,7 +255,7 @@ One PR per step, each merged before the next starts:
    question is decided.
 3. **Timeline** (shipped as described in §6).
 4. **Replay** (shipped as described in §9; it also fills the drawer's stored transcripts).
-5. **Background tasks** (M4-07), with the THREAT_MODEL update.
+5. **Background tasks** (M4-07), with the THREAT_MODEL update (shipped as described in §8).
 6. **Agent library** (M4-06).
 
 ## 16. Alternatives considered
@@ -267,3 +286,5 @@ One PR per step, each merged before the next starts:
    there are no prices to copy, verify or keep current.
 7. **Background timing:** M4-07 stays fifth. #43 keeps the CLI in the foreground until then, and the read-only views
    come first so background work is visible when it lands.
+8. **Background scope** (2026-11-01): interactive sessions only. A task's steps, the generators and triage stay in
+   the foreground instead of waiting for background tasks (§8).

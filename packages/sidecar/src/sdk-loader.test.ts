@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { after, describe, it } from "node:test";
 import { pathToFileURL } from "node:url";
-import { type AgentSdkModule, ensureSdk, foregroundOnly, sriOf } from "./sdk-loader.ts";
+import { type AgentSdkModule, ALLOW_BACKGROUND, ensureSdk, foregroundOnly, sriOf } from "./sdk-loader.ts";
 import type { SdkPin } from "./sdk-pin.ts";
 
 // A tiny stand-in for the npm tarball: package/sdk.mjs, packed with the system tar like npm does.
@@ -91,5 +91,24 @@ describe("foregroundOnly", () => {
 
     sdk.query({ prompt: "no options" });
     assert.equal(calls[1]?.options?.env?.CLAUDE_CODE_DISABLE_BACKGROUND_TASKS, "1");
+  });
+
+  it("lets a query opt in to background tasks (M4-07), and never passes the marker on", () => {
+    const calls: Parameters<AgentSdkModule["query"]>[0][] = [];
+    const sdk = foregroundOnly({
+      query: (args: Parameters<AgentSdkModule["query"]>[0]) => {
+        calls.push(args);
+        return undefined as unknown as ReturnType<AgentSdkModule["query"]>;
+      },
+    } as unknown as AgentSdkModule);
+    process.env.CLAUDE_CODE_DISABLE_BACKGROUND_TASKS = "1";
+    try {
+      sdk.query({ prompt: "hi", options: { env: { [ALLOW_BACKGROUND]: "1" } } });
+    } finally {
+      delete process.env.CLAUDE_CODE_DISABLE_BACKGROUND_TASKS;
+    }
+    const env = calls[0]?.options?.env ?? {};
+    assert.equal("CLAUDE_CODE_DISABLE_BACKGROUND_TASKS" in env, false, "not even from the inherited env");
+    assert.equal(ALLOW_BACKGROUND in env, false);
   });
 });

@@ -23,7 +23,7 @@ import { checkToolCall, READ_TOOLS, readOnlyHook } from "./guard.ts";
 import { normalize } from "./normalize.ts";
 import { alwaysUpdates, describeUpdates, retarget } from "./permissions.ts";
 import { log } from "./rpc.ts";
-import type { AgentSdkModule } from "./sdk-loader.ts";
+import { type AgentSdkModule, ALLOW_BACKGROUND } from "./sdk-loader.ts";
 
 /**
  * Dev-only: when set, every raw SDK message is appended to this local JSONL file. Raw recordings contain local
@@ -51,6 +51,11 @@ export type SessionOptions = {
   maxTurns?: number;
   /** Structured output for the session's answers, e.g. the reviewer's findings. */
   outputFormat?: { type: "json_schema"; schema: Record<string, unknown> };
+  /**
+   * Lets the CLI run subagents and shells in the background (M4-07): interactive sessions only, which show and stop
+   * them one by one. A task's steps leave it off, so their work is done when the turn ends.
+   */
+  background?: boolean;
 };
 
 /** How a turn ended, for code that drives a session itself (a task's steps). */
@@ -117,6 +122,10 @@ export class Session {
   private readonly q: Query;
   /** User messages sent but not yet answered by a `result`. */
   private openTurns = 0;
+  /** Turns the CLI started on its own when background work ended (M4-07), not yet answered by a `result`. */
+  private autoTurns = 0;
+  /** The session's live background tasks, from `background_tasks_changed`. */
+  private background = new Set<string>();
   /** `turn()` callers, in order, waiting for their turn's `result`. */
   private readonly waiters: { resolve: (r: TurnResult) => void; reject: (e: Error) => void }[] = [];
   /** The session's running cost, to give each turn its own. */
@@ -156,6 +165,8 @@ export class Session {
         // Backs up files before Edit/Write so they can be rewound (M1-23).
         enableFileCheckpointing: true,
         ...(options.model ? { model: options.model } : {}),
+        // The app shows a Stop per background task, so an interrupt stops the turn only (sdk.d.ts).
+        ...(options.background ? { env: { [ALLOW_BACKGROUND]: "1" }, perTaskStopAffordance: true } : {}),
         pathToClaudeCodeExecutable: options.claudePath,
         // Spawned here, as the SDK would, only to keep the process: see close().
         spawnClaudeCodeProcess: ({ command, args, cwd, env, signal }) => {
@@ -242,14 +253,17 @@ export class Session {
    * between turns aborts the *next* turn, e.g. a Stop click racing the end of a reply.
    */
   async interrupt(): Promise<boolean> {
-    if (this.openTurns === 0) return false;
+    if (!this.busy) return false;
     await this.q.interrupt();
     return true;
   }
 
-  /** Stops one subagent (M4-05). Idle sessions have no running task, so nothing is sent then, as for interrupt. */
+  /**
+   * Stops one subagent (M4-05) or background task (M4-07). Nothing is sent when the session is idle and the task isn't
+   * a live background task, as for interrupt.
+   */
   async stopAgent(taskId: string): Promise<boolean> {
-    if (this.openTurns === 0) return false;
+    if (!this.busy && !this.background.has(taskId)) return false;
     await this.q.stopTask(taskId);
     return true;
   }
@@ -295,11 +309,28 @@ export class Session {
     return exited;
   }
 
+  /** A turn runs: one the user started, or one the CLI started after background work. */
+  private get busy(): boolean {
+    return this.openTurns + this.autoTurns > 0;
+  }
+
   private async pump(): Promise<void> {
     try {
       for await (const message of this.q) {
         if (RECORD_PATH) appendFileSync(RECORD_PATH, `${JSON.stringify(message)}\n`);
-        if (message.type === "result") {
+        // Every turn starts with init (spike S2). One that no user message opened is the CLI going on after background
+        // work (M4-07). The CLI runs turns one at a time, so the next result is that turn's.
+        if (message.type === "system" && message.subtype === "init" && !this.busy) {
+          this.autoTurns++;
+          this.callbacks.emit({ type: "turn.started", reason: "background" });
+        }
+        if (message.type === "system" && message.subtype === "background_tasks_changed") {
+          this.background = new Set(message.tasks.map((t) => t.task_id));
+        }
+        if (message.type === "result" && this.autoTurns > 0) {
+          this.autoTurns--;
+          this.totalCostUsd = message.total_cost_usd;
+        } else if (message.type === "result") {
           this.openTurns = Math.max(0, this.openTurns - 1);
           const costUsd = Math.max(0, message.total_cost_usd - this.totalCostUsd);
           this.totalCostUsd = message.total_cost_usd;

@@ -14,6 +14,7 @@ const KEEP_SYSTEM = new Set([
   "task_progress",
   "task_updated",
   "task_notification",
+  "background_tasks_changed",
   "compact_boundary",
 ]);
 

@@ -37,22 +37,25 @@ export function loadSdk(): Promise<LoadedSdk> {
   return loading;
 }
 
+/** Set in a `query()`'s `options.env` to let its CLI run background tasks; the marker itself never reaches the CLI. */
+export const ALLOW_BACKGROUND = "AGENTCHAINER_ALLOW_BACKGROUND";
+
 /**
- * Every `query()` runs with background tasks off. From CLI 2.1.314 the Agent tool backgrounds subagents by default:
- * the turn ends before they work, and they die with the session, while the app's turns, gates and evidence expect
- * them to finish inside the turn (spike S4). Background work gets its own panel in M4-07.
+ * Every `query()` runs with background tasks off unless it opts in with `ALLOW_BACKGROUND`. From CLI 2.1.314 the
+ * Agent tool backgrounds subagents by default: the turn ends before they work (spike S4), while a task's steps, gates
+ * and evidence, the generators and triage expect the work done inside the turn. Interactive sessions opt in and show
+ * their background tasks (M4-07).
  */
 export function foregroundOnly(sdk: AgentSdkModule): AgentSdkModule {
   return {
     ...sdk,
-    query: ({ prompt, options }) =>
-      sdk.query({
-        prompt,
-        options: {
-          ...options,
-          env: { ...process.env, ...options?.env, CLAUDE_CODE_DISABLE_BACKGROUND_TASKS: "1" },
-        },
-      }),
+    query: ({ prompt, options }) => {
+      const { [ALLOW_BACKGROUND]: allow, ...rest } = options?.env ?? {};
+      const env: Record<string, string | undefined> = { ...process.env, ...rest };
+      if (allow === "1") delete env.CLAUDE_CODE_DISABLE_BACKGROUND_TASKS;
+      else env.CLAUDE_CODE_DISABLE_BACKGROUND_TASKS = "1";
+      return sdk.query({ prompt, options: { ...options, env } });
+    },
   };
 }
 

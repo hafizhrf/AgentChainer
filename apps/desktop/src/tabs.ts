@@ -30,8 +30,12 @@ export type Tab = {
   permissions: PermissionRequest[];
   /** How long each tool call waited for an approval, for the timeline (M4-04). Live sessions only. */
   waits: Wait[];
+  /** Subagents and shells still working in the background (M4-07); the session is busy while there are any. */
+  background: BackgroundTask[];
   cost: Cost;
 };
+
+export type BackgroundTask = Extract<AgentEvent, { type: "background.changed" }>["tasks"][number];
 
 /** A tool call's wait for an approval, from the request to its answer (epoch ms); `end` is unset while it waits. */
 export type Wait = { toolUseId: string; requestId: string; start: number; end?: number };
@@ -84,6 +88,7 @@ export function newTab(
     mode: options.mode,
     permissions: [],
     waits: [],
+    background: [],
     cost: {
       totalUsd: options.resumed ? null : 0,
       lastUsd: null,
@@ -135,6 +140,10 @@ export function tabEvent(tab: Tab, e: AgentEvent, now?: number): Tab {
         },
       };
     }
+    case "background.changed":
+      return { ...tab, background: e.tasks };
+    case "turn.started":
+      return { ...tab, running: true, items: applyEvent(tab.items, e, now) };
     case "error":
       return {
         ...tab,

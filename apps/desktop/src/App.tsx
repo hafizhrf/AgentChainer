@@ -195,6 +195,7 @@ export function App() {
                 running: false,
                 permissions: [],
                 waits: closeWaits(t.waits, Date.now()),
+                background: [],
                 items: [...closeAssistant(t.items), notice("The agent runtime stopped.")],
               },
         ),

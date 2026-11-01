@@ -98,6 +98,32 @@ describe("normalize: subagents-nested fixture (CLI 2.1.314)", () => {
   });
 });
 
+describe("normalize: subagents-background fixture (CLI 2.1.314, M4-07)", () => {
+  const events = replay("subagents-background.jsonl");
+  const sets = events.filter((e) => e.type === "background.changed");
+
+  it("lists the background subagent while it works, then an empty set", () => {
+    assert.ok(sets.length >= 2);
+    const [first] = sets;
+    assert.deepEqual(first?.type === "background.changed" && first.tasks.map((t) => [t.kind, t.agentType]), [
+      ["local_agent", "general-purpose"],
+    ]);
+    const last = sets[sets.length - 1];
+    assert.deepEqual(last?.type === "background.changed" && last.tasks, []);
+  });
+
+  it("marks the subagent as backgrounded before its call returns, and completes it after the first turn", () => {
+    const started = events.findIndex((e) => e.type === "agent.started" && e.background === true);
+    const returned = events.findIndex((e) => e.type === "tool.completed" && e.parentToolUseId === null);
+    const firstTurn = events.findIndex((e) => e.type === "turn.completed");
+    const completed = events.findIndex((e) => e.type === "agent.completed");
+    assert.ok(started >= 0 && started < returned, "the reducer must know before the call returns");
+    assert.ok(firstTurn < completed, "the turn ended while the subagent worked");
+    assert.equal(events.filter((e) => e.type === "turn.completed").length, 2, "the CLI's own turn follows");
+    assert.equal(events.filter((e) => e.type === "agent.started").length, 1, "the subagent's shell task is no agent");
+  });
+});
+
 describe("normalize: streamed thinking, slash commands and usage", () => {
   const msg = (m: unknown) => normalize(m as SDKMessage);
 
@@ -180,7 +206,7 @@ describe("normalize: turn-basics fixture", () => {
 
 describe("event snapshots for UI tests (M1-34)", () => {
   // apps/desktop replays these through a fake transport. Regenerate with UPDATE_FIXTURES=1 after re-recording.
-  for (const name of ["turn-basics", "subagents-parallel", "subagents-nested"]) {
+  for (const name of ["turn-basics", "subagents-parallel", "subagents-nested", "subagents-background"]) {
     it(`${name}.events.json is up to date`, () => {
       const file = new URL(`../test/fixtures/${name}.events.json`, import.meta.url);
       const text = `${JSON.stringify(replay(`${name}.jsonl`), null, 1)}\n`;

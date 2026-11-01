@@ -119,3 +119,16 @@ describe("agentUsd (M4-03)", () => {
     assert.equal(agentUsd(cost(1, 10, 10), undefined), null);
   });
 });
+
+describe("background tasks (M4-07)", () => {
+  it("replaces the set on each change, and a CLI-started turn makes the tab busy", () => {
+    let tab = newTab("s", "/w", { title: "t", mode: "default" });
+    const task = { taskId: "t1", kind: "local_agent", description: "Sleep" };
+    tab = tabEvent(tab, { type: "background.changed", tasks: [task] });
+    assert.deepEqual(tab.background, [task]);
+    tab = tabEvent(tab, { type: "turn.started", reason: "background" }, 5);
+    assert.equal(tab.running, true);
+    tab = tabEvent(tab, { type: "background.changed", tasks: [] });
+    assert.deepEqual(tab.background, []);
+  });
+});

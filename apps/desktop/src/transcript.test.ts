@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
 import type { AgentEvent } from "@agentchainer/protocol";
 import { type AgentItem, agentDuration, applyEvent, groupItems, type Item, type ToolItem } from "./transcript.ts";
@@ -232,5 +233,60 @@ describe("transcript: timestamps and tool groups (UX-04)", () => {
       groupItems([tool("a"), thought(5, true)]).map((r) => r.kind),
       ["tool", "thinking"],
     );
+  });
+});
+
+describe("transcript: background work (M4-07)", () => {
+  const run = (events: AgentEvent[]) => events.reduce<Item[]>((items, e) => applyEvent(items, e, 1000), []);
+
+  it("keeps a background subagent running after its call returns, until it completes", () => {
+    const launched = run([
+      { type: "tool.started", toolUseId: "sp", name: "Agent", input: { description: "Sleep" }, parentToolUseId: null },
+      { type: "agent.started", toolUseId: "sp", taskId: "t1", description: "Sleep", background: true },
+      {
+        type: "tool.completed",
+        toolUseId: "sp",
+        isError: false,
+        output: "Async agent launched",
+        parentToolUseId: null,
+      },
+    ]);
+    const agent = launched[0] as AgentItem;
+    assert.equal(agent.status, "running");
+    const done = applyEvent(launched, {
+      type: "agent.completed",
+      toolUseId: "sp",
+      taskId: "t1",
+      status: "completed",
+      summary: "finished",
+    });
+    assert.equal((done[0] as AgentItem).status, "done");
+  });
+
+  it("replays the recorded background run: running after the first turn, done after the CLI's own turn", () => {
+    const events = JSON.parse(
+      readFileSync(
+        new URL("../../../packages/sidecar/test/fixtures/subagents-background.events.json", import.meta.url),
+        "utf8",
+      ),
+    ) as AgentEvent[];
+    const firstTurn = events.findIndex((e) => e.type === "turn.completed");
+    const agents = (items: Item[]) => items.filter((i): i is AgentItem => i.kind === "agent");
+    const mid = agents(run(events.slice(0, firstTurn + 1)));
+    assert.deepEqual(
+      mid.map((a) => a.status),
+      ["running"],
+    );
+    const end = agents(run(events));
+    assert.deepEqual(
+      end.map((a) => [a.status, a.children.filter((c) => c.kind === "agent").length]),
+      [["done", 0]],
+      "its shell stays a tool call",
+    );
+  });
+
+  it("notes a turn the CLI started on its own", () => {
+    const items = run([{ type: "turn.started", reason: "background" }]);
+    assert.equal(items[0]?.kind, "notice");
   });
 });

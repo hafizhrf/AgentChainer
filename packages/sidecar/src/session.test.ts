@@ -32,6 +32,91 @@ function fakeSdk(results: Record<string, unknown>[]) {
   return { sdk, options: () => options, stopped };
 }
 
+/**
+ * A stand-in SDK that answers each user message with a scripted list of raw messages: a turn, and whatever the CLI
+ * sends after it, like a turn of its own once background work ends (spike, CLI 2.1.314).
+ */
+function scriptedSdk(script: Record<string, unknown>[][]) {
+  let options: Record<string, unknown> = {};
+  const stopped: string[] = [];
+  const sdk = {
+    query: ({ prompt, options: o }: { prompt: AsyncIterable<unknown>; options: Record<string, unknown> }) => {
+      options = o;
+      const messages = (async function* () {
+        let i = 0;
+        for await (const _ of prompt) {
+          const turn = script[i++];
+          if (!turn) return;
+          yield* turn;
+        }
+      })();
+      return Object.assign(messages, {
+        close: () => undefined,
+        interrupt: async () => undefined,
+        stopTask: async (id: string) => void stopped.push(id),
+      });
+    },
+  } as unknown as AgentSdkModule;
+  return { sdk, options: () => options, stopped };
+}
+
+const init = { type: "system", subtype: "init", session_id: "s", model: "m", cwd: "/w", permissionMode: "default" };
+const result = (text: string, cost: number) => ({
+  type: "result",
+  subtype: "success",
+  is_error: false,
+  result: text,
+  total_cost_usd: cost,
+  duration_ms: 5,
+  num_turns: 1,
+});
+const tasks = (...ids: string[]) => ({
+  type: "system",
+  subtype: "background_tasks_changed",
+  tasks: ids.map((id) => ({ task_id: id, task_type: "local_agent", description: id })),
+});
+const settle = () => new Promise((resolve) => setTimeout(resolve, 10));
+
+describe("background work (M4-07)", () => {
+  it("tells a turn the CLI starts on its own from the user's next turn", async () => {
+    const { sdk } = scriptedSdk([
+      [init, tasks("bg1"), result("launched", 0.1), tasks(), init, result("it finished", 0.2)],
+      [init, result("second", 0.3)],
+    ]);
+    const events: AgentEvent[] = [];
+    const s = new Session(sdk, { cwd: "/w", claudePath: "claude", background: true }, callbacks(events));
+    assert.equal((await s.turn("go")).text, "launched");
+    await settle();
+    assert.equal(events.filter((e) => e.type === "turn.started").length, 1, "only the CLI's own turn is announced");
+    const second = await s.turn("again");
+    assert.deepEqual([second.text, Math.round(second.costUsd * 100)], ["second", 10]);
+    assert.equal(events.filter((e) => e.type === "turn.started").length, 1);
+    s.close();
+  });
+
+  it("stops a background task while idle, and only a live one", async () => {
+    const { sdk, stopped } = scriptedSdk([[init, tasks("bg1"), result("launched", 0.1)]]);
+    const s = new Session(sdk, { cwd: "/w", claudePath: "claude", background: true }, callbacks());
+    await s.turn("go");
+    await settle();
+    assert.equal(await s.stopAgent("bg1"), true);
+    assert.equal(await s.stopAgent("gone"), false);
+    assert.deepEqual(stopped, ["bg1"]);
+    s.close();
+  });
+
+  it("lets only interactive sessions run background work, with a Stop per task", () => {
+    const on = scriptedSdk([]);
+    new Session(on.sdk, { cwd: "/w", claudePath: "claude", background: true }, callbacks()).close();
+    assert.deepEqual(on.options().env, { AGENTCHAINER_ALLOW_BACKGROUND: "1" });
+    assert.equal(on.options().perTaskStopAffordance, true);
+    const off = scriptedSdk([]);
+    new Session(off.sdk, { cwd: "/w", claudePath: "claude" }, callbacks()).close();
+    assert.equal(off.options().env, undefined);
+    assert.equal(off.options().perTaskStopAffordance, undefined);
+  });
+});
+
 const callbacks = (events: AgentEvent[] = []) => ({
   emit: (e: AgentEvent) => events.push(e),
   askPermission: () => undefined,

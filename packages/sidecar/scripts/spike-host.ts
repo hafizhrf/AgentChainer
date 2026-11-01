@@ -1,7 +1,7 @@
 // Drives the sidecar the way the Rust core will (spikes S2/S3) and checks real behaviour
 // against the user's own `claude` CLI.
 //
-// Usage: node scripts/spike-host.ts --cwd <empty scratch dir> [--model haiku] [--scenario basic|mode|interrupt|guard|auto|subagents|nested|sessions|approvals|plan|fixtures|image|exit|all] [--record out.jsonl] [--sidecar <executable> --data-dir <dir>]
+// Usage: node scripts/spike-host.ts --cwd <empty scratch dir> [--model haiku] [--scenario basic|mode|interrupt|guard|auto|subagents|nested|background|sessions|approvals|plan|fixtures|image|exit|all] [--record out.jsonl] [--sidecar <executable> --data-dir <dir>]
 // Makes real model calls with the user's own login (haiku keeps a full run around a few cents).
 import { execFileSync, spawn, spawnSync } from "node:child_process";
 import { cpSync, existsSync, readdirSync, readFileSync, rmSync } from "node:fs";
@@ -133,10 +133,22 @@ type Turn = {
   totalMs: number;
 };
 
-async function turn(text: string, onEvent?: (event: AgentEvent) => void): Promise<Turn> {
+/**
+ * Sends a message and waits for its turn to end. Interactive sessions run background work (M4-07), so by default it
+ * also waits until no background task is left and the turn the CLI then starts on its own has ended: the work the
+ * message asked for is done. `settle: false` returns at the first turn's end.
+ */
+async function turn(
+  text: string,
+  onEvent?: (event: AgentEvent) => void,
+  { settle = true }: { settle?: boolean } = {},
+): Promise<Turn> {
   console.log(`  ▶ ${JSON.stringify(text)}`);
   const t0 = performance.now();
   const acc = { reply: "", firstDeltaMs: null as number | null, events: [] as AgentEvent[] };
+  let background = 0;
+  let firstDone = false;
+  let awaitingOwnTurn = false;
   const end = new Promise<AgentEvent>((resolve) => {
     state.onEvent = (event) => {
       acc.events.push(event);
@@ -145,11 +157,21 @@ async function turn(text: string, onEvent?: (event: AgentEvent) => void): Promis
         acc.reply += event.text;
         acc.firstDeltaMs ??= performance.now() - t0;
       }
-      if (event.type === "turn.completed" || event.type === "error") resolve(event);
+      if (event.type === "background.changed") {
+        // Work that ends inside the first turn reports back in it; after it, the CLI starts a turn of its own.
+        if (background > 0 && event.tasks.length === 0) awaitingOwnTurn = firstDone;
+        background = event.tasks.length;
+      }
+      if (event.type === "error") resolve(event);
+      if (event.type !== "turn.completed") return;
+      firstDone = true;
+      if (!settle || (background === 0 && !awaitingOwnTurn)) resolve(event);
+      // The CLI's own turn after the last background task ended.
+      if (awaitingOwnTurn && background === 0 && acc.events.some((e) => e.type === "turn.started")) resolve(event);
     };
   });
   const { messageId } = await request("session.send", { sessionId: state.sessionId, text });
-  const timeout = sleep(90_000).then((): AgentEvent => ({ type: "error", message: "turn timed out after 90 s" }));
+  const timeout = sleep(180_000).then((): AgentEvent => ({ type: "error", message: "turn timed out after 180 s" }));
   const last = await Promise.race([end, timeout]);
   const endedAt = performance.now();
   return {
@@ -357,6 +379,40 @@ async function nested() {
       ? started.some((e) => e.type === "agent.started" && e.taskId === inner.parentTaskId)
       : null,
     `parentTaskId=${inner?.type === "agent.started" ? inner.parentTaskId : "-"} progress events=${progress.length}`,
+  );
+}
+
+/**
+ * A background subagent (M4-07): the turn ends at once, the agent works on, and the CLI starts a turn of its own when
+ * it finishes. Record with `--record` for the subagents-background fixture.
+ */
+async function background() {
+  const t = await turn(
+    "Use the Agent tool to start ONE general-purpose subagent in the background (run_in_background: true). " +
+      "Its job: run the Bash command `sleep 8 && echo finished` and report the output. " +
+      "Right after launching it, reply with the single word: launched",
+    undefined,
+    { settle: false },
+  );
+  const listed = t.events.find((e) => e.type === "background.changed" && e.tasks.length > 0);
+  check(
+    "the turn ends while the subagent works in the background",
+    listed !== undefined && !t.events.some((e) => e.type === "agent.completed"),
+    `background tasks=${listed?.type === "background.changed" ? listed.tasks.map((x) => x.kind).join(",") : "none"} reply=${JSON.stringify(t.reply.slice(0, 60))}`,
+  );
+  const later: AgentEvent[] = [];
+  const second = new Promise<boolean>((resolve) => {
+    state.onEvent = (event) => {
+      later.push(event);
+      if (event.type === "turn.completed") resolve(true);
+    };
+  });
+  const finished = await Promise.race([second, sleep(90_000).then(() => false)]);
+  const cleared = later.some((e) => e.type === "background.changed" && e.tasks.length === 0);
+  check(
+    "the CLI starts a turn of its own when the subagent finishes",
+    finished && later[0] !== undefined && later.some((e) => e.type === "turn.started"),
+    `agent.completed=${later.some((e) => e.type === "agent.completed")} cleared=${cleared} turn.started=${later.some((e) => e.type === "turn.started")}`,
   );
 }
 
@@ -759,6 +815,7 @@ const scenarios: Record<string, () => Promise<void>> = {
   auto,
   subagents,
   nested,
+  background,
   sessions,
   approvals,
   plan,

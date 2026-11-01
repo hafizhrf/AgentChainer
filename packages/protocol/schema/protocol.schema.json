@@ -1263,6 +1263,70 @@
                   "properties": {
                     "type": {
                       "type": "string",
+                      "const": "background.changed"
+                    },
+                    "tasks": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "taskId": {
+                            "type": "string"
+                          },
+                          "runId": {
+                            "type": "string"
+                          },
+                          "kind": {
+                            "type": "string"
+                          },
+                          "description": {
+                            "type": "string"
+                          },
+                          "agentType": {
+                            "type": "string"
+                          },
+                          "parentTaskId": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "taskId",
+                          "kind",
+                          "description"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "tasks"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "const": "turn.started"
+                    },
+                    "reason": {
+                      "type": "string",
+                      "const": "background"
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "reason"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string",
                       "const": "agent.text"
                     },
                     "parentToolUseId": {
@@ -14711,6 +14775,70 @@
               "required": [
                 "type",
                 "taskId"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "const": "background.changed"
+                },
+                "tasks": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "taskId": {
+                        "type": "string"
+                      },
+                      "runId": {
+                        "type": "string"
+                      },
+                      "kind": {
+                        "type": "string"
+                      },
+                      "description": {
+                        "type": "string"
+                      },
+                      "agentType": {
+                        "type": "string"
+                      },
+                      "parentTaskId": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "taskId",
+                      "kind",
+                      "description"
+                    ],
+                    "additionalProperties": false
+                  }
+                }
+              },
+              "required": [
+                "type",
+                "tasks"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "const": "turn.started"
+                },
+                "reason": {
+                  "type": "string",
+                  "const": "background"
+                }
+              },
+              "required": [
+                "type",
+                "reason"
               ],
               "additionalProperties": false
             },

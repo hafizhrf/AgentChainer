@@ -166,7 +166,8 @@ enables follow-ups, `interrupt()` and `setPermissionMode()`. Key options:
 | `includePartialMessages` | `true` | Token streaming |
 | `forwardSubagentText` | `true` | Subagent text and thinking for observability |
 | `enableFileCheckpointing` | `true` | Rewind (M1-23) |
-| `env` | inherited, plus `CLAUDE_CODE_DISABLE_BACKGROUND_TASKS=1` (every `query()`, in `sdk-loader.ts`) | Subagents and Bash finish inside the turn: from CLI 2.1.314 the Agent tool backgrounds subagents by default ([S4](spikes/S4-S5-S6.md)); a background panel is M4-07 |
+| `env` | inherited, plus `CLAUDE_CODE_DISABLE_BACKGROUND_TASKS=1` for every `query()` except interactive sessions (`foregroundOnly()` and `ALLOW_BACKGROUND` in `sdk-loader.ts`) | From CLI 2.1.314 the Agent tool backgrounds subagents by default ([S4](spikes/S4-S5-S6.md)). Task steps, generators and triage need the work done inside the turn; interactive sessions show and stop background tasks (M4-07) |
+| `perTaskStopAffordance` | `true` for interactive sessions | The app stops background tasks one by one, so an interrupt stops the turn only (M4-07) |
 | `canUseTool` | broker → UI | Approvals (§6) |
 | `hooks` | `PreToolUse` guard; `PostToolUse` (file change tracking, M1) | Safety and observability |
 | `permissionMode` | from profile | §6 |
@@ -185,6 +186,8 @@ mapped into a stable internal `AgentEvent` union so the UI never depends on raw 
 | `tool.started {toolUseId, name, input, agentId}` / `tool.completed {toolUseId, ok, output, durationMs}` | `assistant` tool_use / `user` tool_result |
 | `agent.started {toolUseId, taskId, description, agentType, depth, parentTaskId, runId, prompt}` / `agent.text` / `agent.completed {status, reason, summary, tokens, durationMs}` | `system/task_started` / subagent `assistant` messages / `system/task_notification` (spike S4) |
 | `agent.progress {toolUseId, taskId, totalTokens, toolUses, durationMs, lastTool, summary}` / `agent.updated {taskId, status, endTime, pausedMs, error, background}` | `system/task_progress` / `system/task_updated`, which names the task only (M4-01) |
+| `background.changed {tasks: [{taskId, kind, description, agentType, parentTaskId}]}` | `system/background_tasks_changed`, the full set each time; ambient tasks left out (M4-07) |
+| `turn.started {reason: "background"}` | `system/init` with no user turn open: the CLI's own turn after background work (the Session, M4-07) |
 | `permission.requested` / `permission.resolved` | `canUseTool` broker |
 | `turn.completed {costUsd, modelUsage, durationMs, numTurns, stopReason, denials}` | `result` |
 | `context.compacted` | `system/compact_boundary` |

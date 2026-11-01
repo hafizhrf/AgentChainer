@@ -22,7 +22,8 @@ export function normalize(m: SDKMessage): AgentEvent[] {
         ];
       }
       // Subagents (spike S4): the Agent tool call's id ties task messages, subagent messages and tool calls together.
-      if (m.subtype === "task_started" && m.tool_use_id) {
+      // With background work on, a subagent's shell is a task too (`local_bash`); it stays a tool call (M4-07).
+      if (m.subtype === "task_started" && m.tool_use_id && (m.task_type ?? "local_agent") === "local_agent") {
         return [
           {
             type: "agent.started",
@@ -66,6 +67,24 @@ export function normalize(m: SDKMessage): AgentEvent[] {
             ...(p.total_paused_ms !== undefined ? { pausedMs: p.total_paused_ms } : {}),
             ...(p.error ? { error: p.error } : {}),
             ...(p.is_backgrounded !== undefined ? { background: p.is_backgrounded } : {}),
+          },
+        ];
+      }
+      // A level signal: the full set of live background tasks after each change (M4-07).
+      if (m.subtype === "background_tasks_changed") {
+        return [
+          {
+            type: "background.changed",
+            tasks: m.tasks
+              .filter((t) => !t.ambient)
+              .map((t) => ({
+                taskId: t.task_id,
+                ...(t.run_id ? { runId: t.run_id } : {}),
+                kind: t.task_type,
+                description: t.description,
+                ...(t.subagent_type ? { agentType: t.subagent_type } : {}),
+                ...(t.parent_task_id ? { parentTaskId: t.parent_task_id } : {}),
+              })),
           },
         ];
       }

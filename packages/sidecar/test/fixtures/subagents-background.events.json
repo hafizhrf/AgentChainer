@@ -1,0 +1,178 @@
+[
+ {
+  "type": "session.started",
+  "sessionId": "7890f953-c1a8-4d89-832d-a55ade6a7af6",
+  "model": "claude-haiku-5-5",
+  "cwd": "/home/user\\AppData\\Local\\Temp\\claude\\d--PersonalProjects-AgentChainer\\7b405934-88e2-4952-b74f-d21eab07e53e\\scratchpad\\bg-rec",
+  "claudeCodeVersion": "2.1.314",
+  "permissionMode": "default",
+  "slashCommands": []
+ },
+ {
+  "type": "tool.started",
+  "toolUseId": "toolu_019AKc9fm3GAi5nSe8xqrLpD",
+  "name": "Agent",
+  "input": {
+   "description": "Run sleep and echo command",
+   "prompt": "Run the Bash command `sleep 8 && echo finished` and report the output. Do nothing else.",
+   "subagent_type": "general-purpose",
+   "run_in_background": true
+  },
+  "parentToolUseId": null
+ },
+ {
+  "type": "background.changed",
+  "tasks": [
+   {
+    "taskId": "a2df20d2a2c34bcd5",
+    "runId": "0mvxm1g1h-09f11375",
+    "kind": "local_agent",
+    "description": "Run sleep and echo command",
+    "agentType": "general-purpose"
+   }
+  ]
+ },
+ {
+  "type": "agent.started",
+  "toolUseId": "toolu_019AKc9fm3GAi5nSe8xqrLpD",
+  "taskId": "a2df20d2a2c34bcd5",
+  "description": "Run sleep and echo command",
+  "agentType": "general-purpose",
+  "depth": 1,
+  "background": true,
+  "runId": "0mvxm1g1h-09f11375",
+  "prompt": "Run the Bash command `sleep 8 && echo finished` and report the output. Do nothing else."
+ },
+ {
+  "type": "tool.completed",
+  "toolUseId": "toolu_019AKc9fm3GAi5nSe8xqrLpD",
+  "isError": false,
+  "output": "Async agent launched successfully. (This tool result is internal metadata — never quote or paste any part of it, including the agentId below, into a user-facing reply.)\nagentId: a2df20d2a2c34bcd5 (internal ID - do not mention to user. Use SendMessage with to: 'a2df20d2a2c34bcd5', summary: '<5-10 word recap>' to continue this agent.)\nThe agent is working in the background. You will be notified automatically when it completes. You know nothing about its results until that notification arrives — do not report, assume, or predict them; continue other work or respond to the user in the meantime.\nDo not duplicate this agent's work — avoid working with the same files or topics it is using.\noutput_file: /home/user\\AppData\\Local\\Temp\\claude\\-workspace\\7890f953-c1a8-4d89-832d-a55ade6a7af6\\tasks\\a2df20d2a2c34bcd5.output\nDo NOT Read or tail this file via the shell tool — it is the full subagent JSONL transcript and reading it will overflow your context. If the user asks for progress, say the agent is still running; you'll get a completion notification.",
+  "parentToolUseId": null
+ },
+ {
+  "type": "text.delta",
+  "text": "launched"
+ },
+ {
+  "type": "turn.completed",
+  "subtype": "success",
+  "isError": false,
+  "totalCostUsd": 0.009040470000000002,
+  "durationMs": 2681,
+  "numTurns": 2,
+  "usage": {
+   "inputTokens": 1245,
+   "outputTokens": 185,
+   "cacheReadTokens": 39327,
+   "cacheCreationTokens": 42151
+  }
+ },
+ {
+  "type": "tool.started",
+  "toolUseId": "toolu_01Rd2svvSybk8XmkbKsUtgcZ",
+  "name": "Bash",
+  "input": {
+   "command": "sleep 8 && echo finished",
+   "description": "Sleep 8 seconds then echo finished"
+  },
+  "parentToolUseId": "toolu_019AKc9fm3GAi5nSe8xqrLpD",
+  "agentId": "a2df20d2a2c34bcd5"
+ },
+ {
+  "type": "agent.progress",
+  "toolUseId": "toolu_019AKc9fm3GAi5nSe8xqrLpD",
+  "taskId": "a2df20d2a2c34bcd5",
+  "runId": "0mvxm1g1h-09f11375",
+  "totalTokens": 32192,
+  "toolUses": 1,
+  "durationMs": 1381,
+  "lastTool": "Bash"
+ },
+ {
+  "type": "agent.completed",
+  "toolUseId": "toolu_01Rd2svvSybk8XmkbKsUtgcZ",
+  "taskId": "bqnw25nqm",
+  "runId": "0mvxm1li2-cbaba24c",
+  "status": "completed",
+  "summary": "Sleep 8 seconds then echo finished"
+ },
+ {
+  "type": "tool.completed",
+  "toolUseId": "toolu_01Rd2svvSybk8XmkbKsUtgcZ",
+  "isError": false,
+  "output": "finished",
+  "parentToolUseId": "toolu_019AKc9fm3GAi5nSe8xqrLpD"
+ },
+ {
+  "type": "agent.text",
+  "parentToolUseId": "toolu_019AKc9fm3GAi5nSe8xqrLpD",
+  "agentId": "a2df20d2a2c34bcd5",
+  "text": "The command `sleep 8 && echo finished` ran and printed:\n\n```\nfinished\n```"
+ },
+ {
+  "type": "agent.updated",
+  "taskId": "a2df20d2a2c34bcd5",
+  "runId": "0mvxm1g1h-09f11375",
+  "status": "completed",
+  "endTime": 1793524278502
+ },
+ {
+  "type": "agent.completed",
+  "toolUseId": "toolu_019AKc9fm3GAi5nSe8xqrLpD",
+  "taskId": "a2df20d2a2c34bcd5",
+  "runId": "0mvxm1g1h-09f11375",
+  "status": "completed",
+  "summary": "The command `sleep 8 && echo finished` ran and printed:\n\n```\nfinished\n```",
+  "totalTokens": 36330,
+  "toolUses": 1,
+  "durationMs": 13173
+ },
+ {
+  "type": "background.changed",
+  "tasks": []
+ },
+ {
+  "type": "session.started",
+  "sessionId": "7890f953-c1a8-4d89-832d-a55ade6a7af6",
+  "model": "claude-haiku-5-5",
+  "cwd": "/home/user\\AppData\\Local\\Temp\\claude\\d--PersonalProjects-AgentChainer\\7b405934-88e2-4952-b74f-d21eab07e53e\\scratchpad\\bg-rec",
+  "claudeCodeVersion": "2.1.314",
+  "permissionMode": "default",
+  "slashCommands": []
+ },
+ {
+  "type": "text.delta",
+  "text": "The background ag"
+ },
+ {
+  "type": "text.delta",
+  "text": "ent finished."
+ },
+ {
+  "type": "text.delta",
+  "text": " Its `sleep 8 "
+ },
+ {
+  "type": "text.delta",
+  "text": "&& echo finished` print"
+ },
+ {
+  "type": "text.delta",
+  "text": "ed `finished`."
+ },
+ {
+  "type": "turn.completed",
+  "subtype": "success",
+  "isError": false,
+  "totalCostUsd": 0.015028345000000002,
+  "durationMs": 1435,
+  "numTurns": 1,
+  "usage": {
+   "inputTokens": 1251,
+   "outputTokens": 420,
+   "cacheReadTokens": 113647,
+   "cacheCreationTokens": 81393
+  }
+ }
+]

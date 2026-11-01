@@ -58,6 +58,8 @@ import {
   draftTask,
   fixCiTask,
   listTasksLive,
+  mergeGates,
+  mergePrTask,
   mergeResult,
   newTask,
   overlapsOf,
@@ -66,6 +68,7 @@ import {
   prStatus,
   resumeTask,
   retriageTask,
+  reviewPrTask,
   reviseTask,
   settleRun,
   shutdownRuns,
@@ -609,6 +612,24 @@ serve(
       requireFolder(cwd);
       await settleRun(id);
       return fixCiTask(cwd, id, link, sessionHost(await claude()), systemGh(), taskUpdated(cwd));
+    },
+
+    "task.mergeGates": async ({ cwd, id }) => {
+      requireFolder(cwd);
+      await settleRun(id);
+      return mergeGates(cwd, id, systemGh());
+    },
+
+    "task.reviewPr": async ({ cwd, id }) => {
+      requireFolder(cwd);
+      await settleRun(id);
+      return reviewPrTask(cwd, id, sessionHost(await claude()), systemGh(), taskUpdated(cwd));
+    },
+
+    "task.mergePr": async ({ cwd, id, method, headSha, acceptReason }) => {
+      requireFolder(cwd);
+      await settleRun(id);
+      return mergePrTask(cwd, id, { method, headSha, ...(acceptReason ? { acceptReason } : {}) }, systemGh());
     },
 
     "task.overlaps": ({ cwd, id }) => {

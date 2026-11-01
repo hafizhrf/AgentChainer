@@ -47,6 +47,7 @@ import { IconButton } from "../ui/IconButton.tsx";
 import { EmptyState } from "../ui/Section.tsx";
 import { Select } from "../ui/Select.tsx";
 import { CreatePrDialog } from "./CreatePr.tsx";
+import { MergeGates } from "./MergeGates.tsx";
 import { PrChecks } from "./PrChecks.tsx";
 import {
   canAcceptRisk,
@@ -1685,6 +1686,7 @@ function ResultCard({
         </dd>
       </dl>
       {task.pr && <PrChecks task={task} cwd={cwd} onChanged={onChanged} />}
+      {task.pr && <MergeGates task={task} cwd={cwd} onChanged={onChanged} />}
       {conflicts.length > 0 && (
         <p className="callout">
           The merge stopped on conflicts in {conflicts.join(", ")}. Resolve and commit them, or abort the merge, in the
@@ -1692,7 +1694,7 @@ function ResultCard({
         </p>
       )}
       <div className="card-footer">
-        {mergeBlock && !task.mergedInto && <span className="muted">{mergeBlock}</span>}
+        {mergeBlock && !task.mergedInto && !task.pr && <span className="muted">{mergeBlock}</span>}
         <span className="grow" />
         {!wt.removed && !task.pr && finished && !task.mergedInto && (
           <button type="button" className="secondary" disabled={busy !== null} onClick={() => setCreatingPr(true)}>
@@ -1706,7 +1708,7 @@ function ResultCard({
             Clean up
           </button>
         )}
-        {!task.mergedInto && (
+        {!task.mergedInto && !task.pr && (
           <button
             type="button"
             disabled={busy !== null || mergeBlock !== null}

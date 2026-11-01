@@ -50,6 +50,25 @@ export function checkBash(command: string, cwd: string, home = homedir()): strin
   if (/\bgit\s+push\b[^;&|]*(\s--force(-with-lease)?\b|\s-f\b|\s\+\S)/.test(command)) {
     return "Force-pushing rewrites remote history. Push without --force, or do it yourself.";
   }
+  // Human-only operations (M5-05): merging, releases and tags are a person's call, and so is writing through the API.
+  if (/\bgh\s+pr\s+merge\b/.test(command) || /\bgh\s+release\b/.test(command)) {
+    return "Merging pull requests and making releases are a person's decision. Use the task page's Merge, or do it yourself.";
+  }
+  if (
+    /\bgh\s+api\b/.test(command) &&
+    /\s(-X|--method)[=\s]*["']?(POST|PUT|PATCH|DELETE)\b|\s(-f|-F|--field|--raw-field|--input)[=\s]/i.test(command)
+  ) {
+    return "Changing things on GitHub through `gh api` is a person's decision. Reading with `gh api` is fine.";
+  }
+  if (
+    /\bgit\s+tag\b(?![^;&|]*\s(-l|--list|-v|--verify|-n\d*|--contains|--no-contains|--points-at|--merged|--no-merged)\b)[^;&|]*\s[^\s;&|-]/.test(
+      command,
+    ) ||
+    /\bgit\s+tag\s+(-a|-s|-d|-f|--delete|--force|--annotate|--sign)\b/.test(command) ||
+    /\bgit\s+push\b[^;&|]*(\s--tags\b|\s--follow-tags\b|\srefs\/tags\/|\s--delete\b|\s:\S)/.test(command)
+  ) {
+    return "Release tags, and pushes that delete refs, are a person's decision. Do it yourself if it's intended.";
+  }
   if (/\bmkfs(\.\w+)?\b/.test(command) || /\bdd\b[^;&|]*\bof=\/dev\//.test(command)) {
     return "Formatting or writing raw disks is never done by the agent.";
   }

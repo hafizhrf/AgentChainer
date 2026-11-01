@@ -647,10 +647,43 @@ export const TaskSchema = z.object({
       fixes: z
         .array(z.object({ check: z.string(), at: z.string(), state: z.enum(["done", "failed", "cancelled"]) }))
         .optional(),
+      /**
+       * The latest independent review that covers the PR (M5-04): the run's own review (M and L), or one run on the
+       * PR's diff. It counts for the merge gate only while the PR's head is still `headSha`.
+       */
+      review: z
+        .object({
+          headSha: z.string(),
+          verdict: z.enum(["approve", "changes-requested", "unreadable"]),
+          mustFix: z.number().int(),
+          at: z.string(),
+          source: z.enum(["run", "pr"]),
+        })
+        .optional(),
+      /** How a person merged it (M5-05): only from the Merge button, after a confirmation. */
+      merged: z
+        .object({
+          method: z.enum(["merge", "squash", "rebase"]),
+          sha: z.string(),
+          at: z.string(),
+          /** Why the person merged with gates that weren't green, when they did. */
+          accepted: z.string().optional(),
+        })
+        .optional(),
     })
     .optional(),
 });
 export type Task = z.infer<typeof TaskSchema>;
+
+/** One merge gate of a task's PR (M5-04): `fail`, `pending` and `missing` hold Merge back; `not-run` doesn't. */
+export const MergeGateSchema = z.object({
+  id: z.enum(["local", "review", "secrets", "semgrep", "trivy", "ci"]),
+  label: z.string(),
+  state: z.enum(["pass", "fail", "pending", "missing", "not-run"]),
+  detail: z.string(),
+});
+export type MergeGate = z.infer<typeof MergeGateSchema>;
+export const MergeMethodSchema = z.enum(["merge", "squash", "rebase"]);
 
 /** How many Fix CI rounds a PR gets (design §6). */
 export const MAX_CI_FIXES = 3;
@@ -1257,6 +1290,35 @@ export const methodSchemas = {
    * like a run; at most `MAX_CI_FIXES` rounds.
    */
   "task.fixCi": { params: TaskRef.extend({ link: z.string().min(1) }), result: TaskSchema },
+  /**
+   * The merge gates of the task's PR (M5-04), worked out now: the run, the review of the current head, gitleaks, semgrep
+   * and trivy when installed (offline only), and CI. Also the merge methods the repository allows.
+   */
+  "task.mergeGates": {
+    params: TaskRef,
+    result: z.object({
+      headSha: z.string(),
+      draft: z.boolean(),
+      gates: z.array(MergeGateSchema),
+      methods: z.array(MergeMethodSchema),
+      defaultMethod: MergeMethodSchema,
+    }),
+  },
+  /** Runs the independent reviewer on the PR's diff (M5-04), in the background like a run; the task records the verdict. */
+  "task.reviewPr": { params: TaskRef, result: TaskSchema },
+  /**
+   * Merges the task's PR on GitHub (M5-05): only from a person's click and confirmation, with the head the gates were
+   * worked out for (`--match-head-commit`). Gates that hold Merge back need `acceptReason`, which the task keeps. A
+   * draft is marked ready first. Never `--auto`.
+   */
+  "task.mergePr": {
+    params: TaskRef.extend({
+      method: MergeMethodSchema,
+      headSha: z.string().min(7),
+      acceptReason: z.string().trim().min(1).max(2000).optional(),
+    }),
+    result: TaskSchema,
+  },
   /** Other tasks whose live branches change the same files as this one's: merging both may conflict (M5-01). */
   "task.overlaps": {
     params: TaskRef,

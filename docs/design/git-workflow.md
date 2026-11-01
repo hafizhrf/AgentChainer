@@ -163,6 +163,18 @@ The Merge button is enabled when every gate below is green, or its risk was acce
 
 Each result is shown on the page with what it covers, and appended to the evidence.
 
+As built (decided by the implementer, 2026-11-01):
+- **Offline scanners.** semgrep runs only with the repository's own rules (`.semgrep.yml`, `.semgrep.yaml` or
+  `.semgrep/`), with `--metrics=off`. trivy runs with `--offline-scan --skip-db-update`, so it needs a database already on
+  the machine. Neither reaches the network from the app; registry rules and database downloads stay the user's own step.
+- **The gates are worked out when asked** (`task.mergeGates`), not polled. They are worked out again inside
+  `task.mergePr`, for the head the person saw.
+- **The review** counts for the head it covered. The run's own review (M and L) counts for the head Create PR pushed.
+  **Review the PR** runs the reviewer on the PR's diff for any tier (`Orchestrator.reviewPr`, ≈$0.07 with the shipped
+  role).
+- **The scanners** run on the task's worktree only while it is at the PR's head. Otherwise they say so, and don't hold
+  Merge back.
+
 ## 8. Human-only operations (M5-05, owner decision 2)
 
 - **Merge:** only a person, by clicking **Merge** and confirming.

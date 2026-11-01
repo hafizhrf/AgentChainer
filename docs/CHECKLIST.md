@@ -25,7 +25,7 @@
 | [R1](#r1--v01-release) | v0.1 | Packaging & release | ◐ Pipeline, updater, security review and docs in place; publishing waits for M0-01 and M0-22 |
 | [M3](#m3--adaptive-planner--task-contracts-v02) | v0.2 | Adaptive planner, contracts, evidence | ◐ Every tier (S, M, L, XL) runs live on macOS and Windows, with gates, evidence and accepted risk (preview); left: the owner's click-through and the exit runs |
 | [M4](#m4--agent-observability-v02v03) | v0.2–0.3 | Agent observability graph | ◐ Agent tree, graph, drawer, stop, timeline, replay, background tasks and agent library in; E2 frame times left |
-| [M5](#m5--git-workflow-pr--quality-gates-v03) | v0.3 | Git workflow, PRs, gates | ◐ Design approved ([git-workflow.md](design/git-workflow.md)); a worktree for every task, Create PR, CI status, Fix CI and merge gates in; E1 next (owner merges) |
+| [M5](#m5--git-workflow-pr--quality-gates-v03) | v0.3 | Git workflow, PRs, gates | ◐ Done for GitHub ([git-workflow.md](design/git-workflow.md)): worktrees, PRs, CI and Fix CI, merge gates, human merge; E1 passed on Windows. GitLab (M5-06, optional) left |
 | [M6](#m6--deployment--workflow-canvas-v04) | v0.4 | Deploy adapters, workflow canvas | ☐ Not started |
 | [M7](#m7--evals--analytics-v05) | v0.5 | Evals & analytics | ☐ Not started |
 | [M8](#m8--multi-folder-workspaces--agent-fleet-proposed) | later | Multi-folder workspaces, agent fleet | ☐ Proposed (owner, 2026-10-30) |
@@ -1376,18 +1376,32 @@ Decisions: [ADR-0009](adr/0009-release-signing-and-updates.md). Maintainer steps
         - **Review the PR** ran: approve, no must-fix findings, ≈$0.07;
         - after it, the review and CI gates passed;
         - the scanners showed "not installed".
-- [ ] **M5-05** Merge, force push and release tags always require a human.
-      Note: built in the step-4 PR.
-      - `task.mergePr` runs only from the Merge dialog. It uses `--match-head-commit`, never `--auto`, and needs a reason
-        when a gate isn't green.
-      - The guard denies agents `gh pr merge`, `gh release`, writes through `gh api`, tags, and pushes that delete refs.
-      - Tests: `guard.test.ts` and `service.test.ts`.
-      - The box is ticked when the owner merges a PR from the app (E1).
+- [x] **M5-05** Merge, force push and release tags always require a human.
+      Evidence:
+      - [#66](https://github.com/hafizhrf/AgentChainer/pull/66):
+        - `task.mergePr` runs only from the Merge dialog, with `--match-head-commit` and never `--auto`, and asks for a
+          reason when a gate isn't green;
+        - the guard denies agents `gh pr merge`, `gh release`, writes through `gh api`, tags, and pushes that delete
+          refs;
+        - tests: `guard.test.ts` and `service.test.ts`.
+      - Live (2026-11-01): the owner clicked **Merge** in the app on `hafizhrf/agentchainer-e2e` PR #3. It merged at the
+        reviewed head `504950c`, as merge commit `cfc5755`. The task recorded `pr.merged`, and its evidence says
+        "Merged by a person".
 - [ ] **M5-06** GitLab support (optional).
 
 ### Exit criteria
 
-- [ ] **M5-E1** End to end on a test repo: task → worktree → gates → PR → CI green → human merge.
+- [x] **M5-E1** End to end on a test repo: task → worktree → gates → PR → CI green → human merge.
+      Evidence (Windows, in the app, on the private test repository `hafizhrf/agentchainer-e2e`, haiku, ≈$0.09):
+      1. The task was drafted (the S triage) and approved.
+      2. It ran in `.agentchainer/worktrees/<id>` on `agentchainer/<id>`, with `npm install`, a red baseline and green
+         gates.
+      3. Create PR opened PR #3 (draft, with the contract and evidence), and its `test` check passed.
+      4. Review the PR approved it, with no must-fix findings, and the merge gates were green.
+      5. The owner merged it from the app; `main`'s CI passed after the merge.
+      - The run exposed two bugs, fixed in [#67](https://github.com/hafizhrf/AgentChainer/pull/67): a blocking push
+        restarted the sidecar, and the push depended on git's credential helper.
+      - Fix CI was checked live separately ([#65](https://github.com/hafizhrf/AgentChainer/pull/65), PR #2).
 
 ---
 

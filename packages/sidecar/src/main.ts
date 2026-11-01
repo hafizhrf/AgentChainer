@@ -12,6 +12,7 @@ import { proposals } from "./bootstrap/proposals.ts";
 import { toolsDir } from "./bootstrap/tools.ts";
 import { catalog } from "./catalog/index.ts";
 import { checkEnvironment, claudeVersion, findClaude } from "./claude.ts";
+import { deployPreview, deployTargets, listDeploys } from "./deploy/service.ts";
 import { auditWorkspace, saveProfile } from "./detect/audit.ts";
 import { detectWorkspace } from "./detect/detect.ts";
 import {
@@ -75,6 +76,7 @@ import {
   splitTask,
   startTask,
   taskEvidence,
+  writeEvidence,
 } from "./tasks/service.ts";
 import { loadTask } from "./tasks/store.ts";
 import { fileDiff, gitInit, listFiles, revert } from "./workspace.ts";
@@ -630,6 +632,27 @@ serve(
       requireFolder(cwd);
       await settleRun(id);
       return mergePrTask(cwd, id, { method, headSha, ...(acceptReason ? { acceptReason } : {}) }, systemGh());
+    },
+
+    "deploy.targets": async ({ cwd }) => {
+      requireFolder(cwd);
+      return { targets: await deployTargets(cwd) };
+    },
+
+    "deploy.preview": async ({ cwd, id, adapter }) => {
+      requireFolder(cwd);
+      const record = await deployPreview(cwd, id, adapter);
+      try {
+        writeEvidence(cwd, loadTask(cwd, id));
+      } catch {
+        // The report is built again on request.
+      }
+      return record;
+    },
+
+    "deploy.list": ({ cwd, taskId }) => {
+      requireFolder(cwd);
+      return { deploys: listDeploys(cwd, taskId) };
     },
 
     "task.overlaps": ({ cwd, id }) => {

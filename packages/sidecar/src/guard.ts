@@ -79,7 +79,7 @@ export function checkBash(command: string, cwd: string, home = homedir()): strin
     /\bterraform\s+(apply|destroy)\b/.test(command) ||
     /\bkubectl\s+delete\b/.test(command)
   ) {
-    return "Production deploys and infrastructure changes need an explicit human step (deploy flow arrives in M6).";
+    return "Production deploys and infrastructure changes are a person's decision. Deploy from the task page or the workspace's Deploy page.";
   }
   for (const target of recursiveRmTargets(command)) {
     const abs = resolve(cwd, expandHome(target, home));

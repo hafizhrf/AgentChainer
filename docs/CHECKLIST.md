@@ -26,7 +26,7 @@
 | [M3](#m3--adaptive-planner--task-contracts-v02) | v0.2 | Adaptive planner, contracts, evidence | ◐ Every tier (S, M, L, XL) runs live on macOS and Windows, with gates, evidence and accepted risk (preview); left: the owner's click-through and the exit runs |
 | [M4](#m4--agent-observability-v02v03) | v0.2–0.3 | Agent observability graph | ◐ Agent tree, graph, drawer, stop, timeline, replay, background tasks and agent library in; E2 frame times left |
 | [M5](#m5--git-workflow-pr--quality-gates-v03) | v0.3 | Git workflow, PRs, gates | ◐ Done for GitHub ([git-workflow.md](design/git-workflow.md)): worktrees, PRs, CI and Fix CI, merge gates, human merge; E1 passed on Windows. GitLab (M5-06, optional) left |
-| [M6](#m6--deployment--workflow-canvas-v04) | v0.4 | Deploy adapters, workflow canvas | ◐ Design draft ([deploy-and-canvas.md](design/deploy-and-canvas.md)), waiting for the owner |
+| [M6](#m6--deployment--workflow-canvas-v04) | v0.4 | Deploy adapters, workflow canvas | ◐ Design approved ([deploy-and-canvas.md](design/deploy-and-canvas.md)); Vercel preview + smoke built; Cloudflare next |
 | [M7](#m7--evals--analytics-v05) | v0.5 | Evals & analytics | ☐ Not started |
 | [M8](#m8--multi-folder-workspaces--agent-fleet-proposed) | later | Multi-folder workspaces, agent fleet | ☐ Proposed (owner, 2026-10-30) |
 | [X](#cross-cutting-tracks-ongoing) | all | Security, quality, compatibility, docs, a11y | ☐ Ongoing |
@@ -1407,13 +1407,18 @@ Decisions: [ADR-0009](adr/0009-release-signing-and-updates.md). Maintainer steps
 
 ## M6 — Deployment & workflow canvas (v0.4)
 
-→ PRD [F6, F7](PRD.md#f6f9-p2) · design: [deploy-and-canvas.md](design/deploy-and-canvas.md) (draft, 2026-11-01)
+→ PRD [F6, F7](PRD.md#f6f9-p2) · design: [deploy-and-canvas.md](design/deploy-and-canvas.md) (approved 2026-11-01)
 
 - [ ] **M6-01** Deploy adapter interface (detect, plan, deploy, smoke, rollback), with adapters for Vercel, Cloudflare (wrangler),
       Fly.io, Docker image → registry, and Firebase.
+      Note: step 1 is built: the interface, CLIs run without a shell (npm shims resolved; wrangler checked live), the
+      Vercel adapter, `deploy.targets`, `deploy.preview` and `deploy.list`, the task page's Deploy card, and records in
+      `.agentchainer/deploys/`. Tested with stand-in CLIs. A live Vercel deploy waits for the owner's `vercel login`.
 - [ ] **M6-02** Environments are labeled preview or production. Production deploys always need explicit human approval.
       Credentials stay in each provider's own CLI.
 - [ ] **M6-03** Post-deploy smoke test and one-click rollback.
+      Note: the smoke test is in the step-1 PR: `scripts/smoke.*` with `SMOKE_URL`, or a GET that must answer 2xx. The
+      Vercel adapter has its rollback command; the Roll back button arrives with production (step 3).
 - [ ] **M6-04** Editable workflow canvas: React Flow ⇄ workflow YAML round-trip, with validation, import/export and sharing.
 
 ### Exit criteria

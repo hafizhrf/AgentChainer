@@ -14,6 +14,7 @@ import {
 } from "@agentchainer/protocol";
 import { AC_DIR } from "../ac-dir.ts";
 import { findTool, toolsDir } from "../bootstrap/tools.ts";
+import { listDeploys } from "../deploy/service.ts";
 import { detectWorkspace } from "../detect/detect.ts";
 import { branches, merge, pushBranch } from "../git.ts";
 import {
@@ -1370,6 +1371,7 @@ export function writeEvidence(root: string, task: Task, now = new Date()): { mar
     summary: children.length ? subtaskSummaries(root, children) : readTaskFile(root, task.id, "summary.md"),
     review,
     secrets: scanSecrets(code, files),
+    deploys: listDeploys(root, task.id),
     subtasks: children.map((c) => ({
       number: (c.parent?.index ?? 0) + 1,
       title: c.title ?? c.request,

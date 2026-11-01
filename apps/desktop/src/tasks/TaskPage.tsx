@@ -47,6 +47,7 @@ import { IconButton } from "../ui/IconButton.tsx";
 import { EmptyState } from "../ui/Section.tsx";
 import { Select } from "../ui/Select.tsx";
 import { CreatePrDialog } from "./CreatePr.tsx";
+import { DeployCard } from "./DeployCard.tsx";
 import { MergeGates } from "./MergeGates.tsx";
 import { PrChecks } from "./PrChecks.tsx";
 import {
@@ -515,6 +516,13 @@ export function TaskPage({
         {task?.worktree && !task.parent && task.state !== "running" && (
           <ResultCard task={task} cwd={cwd} confirm={confirm} onChanged={(t) => show(t)} onError={setError} />
         )}
+
+        {task?.worktree &&
+          !task.worktree.removed &&
+          !task.parent &&
+          (task.state === "done" || task.state === "accepted") && (
+            <DeployCard task={task} cwd={cwd} onChanged={() => void open(task.id)} />
+          )}
 
         {task?.subtasks?.length ? (
           <SubtasksCard

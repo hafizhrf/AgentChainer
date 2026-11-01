@@ -685,6 +685,40 @@ export const MergeGateSchema = z.object({
 export type MergeGate = z.infer<typeof MergeGateSchema>;
 export const MergeMethodSchema = z.enum(["merge", "squash", "rebase"]);
 
+/** A provider a workspace can deploy to (M6-01): its config file, and whether its CLI is installed and signed in. */
+export const DeployTargetSchema = z.object({
+  adapter: z.enum(["vercel"]),
+  label: z.string(),
+  /** The file that marks the project for this provider, e.g. `.vercel/project.json`. */
+  config: z.string(),
+  /** missing: the CLI isn't installed; not-linked: the project isn't connected to the provider yet. */
+  state: z.enum(["missing", "not-linked", "signed-out", "ready"]),
+  /** What to do when it isn't ready. */
+  hint: z.string().optional(),
+});
+export type DeployTarget = z.infer<typeof DeployTargetSchema>;
+
+/** One deploy the app ran, always from a person's click (M6, design §7). Kept in `.agentchainer/deploys/`. */
+export const DeployRecordSchema = z.object({
+  id: z.string(),
+  adapter: z.enum(["vercel"]),
+  env: z.enum(["preview", "production"]),
+  taskId: z.string().optional(),
+  branch: z.string().optional(),
+  commit: z.string(),
+  /** The exact command, as the plan showed it. */
+  command: z.string(),
+  startedAt: z.string(),
+  endedAt: z.string(),
+  status: z.enum(["done", "failed"]),
+  url: z.string().optional(),
+  /** The provider's id for the deployment (Vercel: its URL), which rollback goes back to. */
+  deploymentId: z.string().optional(),
+  error: z.string().optional(),
+  smoke: z.object({ ok: z.boolean(), how: z.enum(["script", "http"]), detail: z.string() }).optional(),
+});
+export type DeployRecord = z.infer<typeof DeployRecordSchema>;
+
 /** How many Fix CI rounds a PR gets (design §6). */
 export const MAX_CI_FIXES = 3;
 
@@ -1318,6 +1352,18 @@ export const methodSchemas = {
       acceptReason: z.string().trim().min(1).max(2000).optional(),
     }),
     result: TaskSchema,
+  },
+  /** The providers this workspace can deploy to, with their CLI's state (M6-01). Runs only `whoami`-style checks. */
+  "deploy.targets": { params: WorkspaceRef, result: z.object({ targets: z.array(DeployTargetSchema) }) },
+  /**
+   * Deploys a task's worktree as a preview with the provider's own CLI, then runs the smoke test on its URL (M6-01,
+   * M6-03). Always from a person's click; never production.
+   */
+  "deploy.preview": { params: TaskRef.extend({ adapter: z.enum(["vercel"]) }), result: DeployRecordSchema },
+  /** The workspace's deploys, newest first; a task's only, with `taskId`. */
+  "deploy.list": {
+    params: WorkspaceRef.extend({ taskId: TaskIdSchema.optional() }),
+    result: z.object({ deploys: z.array(DeployRecordSchema) }),
   },
   /** Other tasks whose live branches change the same files as this one's: merging both may conflict (M5-01). */
   "task.overlaps": {

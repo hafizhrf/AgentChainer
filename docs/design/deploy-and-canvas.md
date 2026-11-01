@@ -1,6 +1,6 @@
 # Design: deploy adapters and the workflow canvas (M6)
 
-- **Status:** Draft, waiting for the owner. The owner made four decisions up front (§15).
+- **Status:** Approved (2026-11-01). The owner made four decisions up front (§15) and approved the draft (#69).
 - **Date:** 2026-11-01
 - **Covers:** M6-01…M6-04 and the exit criterion M6-E1. Scope source: PRD
   [F6 and F7](../PRD.md#f6f9-p2).
@@ -50,17 +50,23 @@ Each provider is an adapter with the same five steps:
   shim is read and resolved to `node <script>`, as `exeFromNpmShim` does for `claude` (`claude.ts`); the app never
   runs them through `cmd /c`. Checked: wrangler's shim ends with `"%dp0%\node_modules\wrangler\bin\wrangler.js" %*`.
 - Every call sets the provider's no-prompt flag (`--yes` or `CI=1`), has a timeout, and has its output capped.
-- The flags below were checked against **wrangler 4.58.0**. The Vercel CLI wasn't installed here, so its flags are
-  **(verify)** until step 1 checks them, as was done for `gh`.
+- The flags below were checked against **wrangler 4.58.0**, and the Vercel ones against **Vercel CLI 65.9.0** (through
+  `npx`, without installing or signing in).
+- As built (step 1): the CLIs run with `CI=1`, `NO_COLOR` and the providers' telemetry off
+  (`VERCEL_TELEMETRY_DISABLED`, `WRANGLER_SEND_METRICS=false`), and `node` for a shim is the one on PATH (the sidecar's
+  own executable isn't a Node a CLI can run on). Checked live: `wrangler`'s shim ran as
+  `node …\wrangler.js --version`.
 
 ## 4. The first adapters (owner decision 1)
 
 **Vercel:**
-- detect: `vercel.json` or `.vercel/project.json`; `vercel whoami` exits 0 **(verify)**;
-- preview: `vercel deploy --yes` prints the deployment URL **(verify)**;
-- production: `vercel deploy --prod --yes` **(verify)**;
-- rollback: `vercel rollback <previous deployment url>` **(verify)**;
-- status: `vercel inspect <url>` **(verify)**.
+- detect: `.vercel/project.json` (linked) or `vercel.json` (asks for `vercel link` first); `vercel whoami` exits 0;
+- **a task's worktree gets the workspace's `.vercel/project.json`**: `.vercel/` is usually ignored by git, and without
+  it `vercel deploy --yes` would make a new project named after the worktree's folder;
+- preview: `vercel deploy --yes` prints the deployment URL on stdout **(verify the output on a live deploy)**;
+- production: `vercel deploy --prod --yes`;
+- rollback: `vercel rollback <deployment> --yes` (an id or a URL);
+- status: `vercel inspect <url> --json --wait`.
 
 **Cloudflare (Workers and Pages), through wrangler:**
 - detect: `wrangler.toml`, `wrangler.json` or `wrangler.jsonc`; `wrangler whoami`.

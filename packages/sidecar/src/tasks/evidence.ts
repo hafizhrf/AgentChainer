@@ -1,4 +1,4 @@
-import type { ApprovalRecord, GateKind, GateRun, GuardBlock, Task } from "@agentchainer/protocol";
+import type { ApprovalRecord, DeployRecord, GateKind, GateRun, GuardBlock, Task } from "@agentchainer/protocol";
 import type { Review } from "./orchestrator.ts";
 
 /**
@@ -38,6 +38,8 @@ export type EvidenceInput = {
   secrets: SecretsScan;
   /** An XL task's sub-tasks; none for other tiers. */
   subtasks?: SubtaskSummary[];
+  /** The task's deploys (M6), newest first. */
+  deploys?: DeployRecord[];
   now: Date;
 };
 
@@ -77,6 +79,8 @@ export type Evidence = {
   cost: { steps: { label: string; durationMs: number | null; costUsd: number }[]; runUsd: number; totalUsd: number };
   /** The task's pull request (M5): its review, its Fix CI rounds and how a person merged it. */
   pr?: Task["pr"];
+  /** The task's deploys (M6). */
+  deploys?: DeployRecord[];
 };
 
 const failed = (g: GateRun) => g.exitCode !== 0 || g.timedOut;
@@ -168,7 +172,16 @@ function criterion(
 
 const RISK_ORDER = { high: 0, medium: 1, low: 2 } as const;
 
-export function buildEvidence({ task, files, summary, review, secrets, subtasks = [], now }: EvidenceInput): Evidence {
+export function buildEvidence({
+  task,
+  files,
+  summary,
+  review,
+  secrets,
+  subtasks = [],
+  deploys,
+  now,
+}: EvidenceInput): Evidence {
   const noReview = review ? null : reviewAbsence(task);
   const run = task.run;
   const contract = task.contract;
@@ -233,6 +246,7 @@ export function buildEvidence({ task, files, summary, review, secrets, subtasks 
       totalUsd: task.costUsd,
     },
     ...(task.pr ? { pr: task.pr } : {}),
+    ...(deploys?.length ? { deploys } : {}),
   };
 }
 
@@ -379,6 +393,19 @@ export function renderEvidence(e: Evidence): string {
     if (pr.merged) {
       add(
         `- Merged by a person (${pr.merged.method}) at \`${pr.merged.sha.slice(0, 7)}\`, ${pr.merged.at}.${pr.merged.accepted ? ` Gates not green, accepted: ${pr.merged.accepted}` : ""}`,
+      );
+    }
+  }
+  if (e.deploys?.length) {
+    add("", "## Deploys", "");
+    for (const d of e.deploys) {
+      const smoke = d.smoke
+        ? ` Smoke test (${d.smoke.how}): ${d.smoke.ok ? "passed" : "failed"}. ${d.smoke.detail}`
+        : "";
+      add(
+        d.status === "done"
+          ? `- ${d.env} on ${d.adapter} at \`${d.commit.slice(0, 7)}\`: ${d.url}.${smoke}`
+          : `- ${d.env} on ${d.adapter} at \`${d.commit.slice(0, 7)}\` failed: ${d.error ?? "no detail"}`,
       );
     }
   }

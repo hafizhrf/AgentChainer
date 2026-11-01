@@ -59,6 +59,66 @@ export const RuleScopeSchema = z.enum(["workspace", "team"]);
 export type RuleScope = z.infer<typeof RuleScopeSchema>;
 const RulesSchema = z.object({ allow: z.array(z.string()), ask: z.array(z.string()), deny: z.array(z.string()) });
 
+/** An agent's name, which is also its file name in `.claude/agents/` (M4-06). */
+export const AgentNameSchema = z
+  .string()
+  .regex(/^[a-z0-9][a-z0-9-]{0,63}$/, "Use lowercase letters, digits and hyphens, up to 64 characters.");
+
+/** A subagent definition: `.claude/agents/<name>.md` in the project, or the user's `~/.claude/agents` (M4-06). */
+export const AgentDefinitionSchema = z.object({
+  name: z.string(),
+  /** The user's agents are listed read-only. */
+  scope: z.enum(["project", "user"]),
+  /** Where it lives, for display: `.claude/agents/x.md` or `~/.claude/agents/x.md`. */
+  file: z.string(),
+  description: z.string(),
+  tools: z.string().optional(),
+  model: z.string().optional(),
+  prompt: z.string(),
+  /** Its description asks Claude to use it on its own ("use proactively"); otherwise it runs when asked for. */
+  auto: z.boolean(),
+  /** One of AgentChainer's task roles (M3-05), which the setup plan installs. */
+  role: z.boolean(),
+  /** Why the file couldn't be read as an agent; the other fields are then empty. */
+  error: z.string().optional(),
+});
+export type AgentDefinition = z.infer<typeof AgentDefinitionSchema>;
+
+export const AgentInputSchema = z.object({
+  name: AgentNameSchema,
+  description: z.string().trim().min(1).max(2000),
+  /** Comma-separated tool names; omitted for all tools. */
+  tools: z.string().trim().max(1000).optional(),
+  /** `inherit`, an alias (`haiku`, `sonnet`, `opus`) or a model id; omitted for the default. */
+  model: z
+    .string()
+    .trim()
+    .regex(/^[\w.[\]-]{1,100}$/)
+    .optional(),
+  prompt: z.string().trim().min(1).max(100_000),
+  auto: z.boolean(),
+});
+export type AgentInput = z.infer<typeof AgentInputSchema>;
+
+/** Wording that asks Claude to start an agent on its own, as the CLI's docs suggest ("use proactively", M4-06). */
+const AUTO_AGENT = /\bproactively\b|\bMUST BE USED\b/i;
+export const isAutoAgent = (description: string) => AUTO_AGENT.test(description);
+
+/** Adds or removes the "use proactively" wording, so the description says whether Claude may start it on its own. */
+export function withAutoWording(description: string, auto: boolean): string {
+  const text = description.trim();
+  if (auto === isAutoAgent(text)) return text;
+  if (auto) return `${text}${/[.!?]$/.test(text) ? "" : "."} Use proactively.`;
+  const kept = text.split(/(?<=[.!?])\s+/).filter((s) => !isAutoAgent(s));
+  // A description that is one long sentence keeps its words, without the wording itself.
+  return kept.length
+    ? kept.join(" ")
+    : text
+        .replace(/[,;]?\s*\b(use|invoke)\b[^.,;]*\bproactively\b/gi, "")
+        .replace(AUTO_AGENT, "")
+        .trim();
+}
+
 /** How hard Claude thinks (the SDK's `effort`, M1-15). Unset means the CLI's default for the model. */
 export const EffortSchema = z.enum(["low", "medium", "high", "xhigh", "max"]);
 export const EFFORTS = EffortSchema.options;
@@ -856,6 +916,24 @@ export const methodSchemas = {
   "permissions.list": {
     params: z.object({ cwd: z.string().min(1) }),
     result: z.object({ workspace: RulesSchema, team: RulesSchema }),
+  },
+  /** The project's and the user's subagent definitions (M4-06). */
+  "agents.list": {
+    params: z.object({ cwd: z.string().min(1) }),
+    result: z.object({ agents: z.array(AgentDefinitionSchema) }),
+  },
+  /**
+   * Creates or edits a project agent, as a recorded run that History can roll back. `previousName` renames: the old
+   * file goes in the same run. Front matter fields the form doesn't show are kept.
+   */
+  "agents.save": {
+    params: z.object({ cwd: z.string().min(1), agent: AgentInputSchema, previousName: AgentNameSchema.optional() }),
+    result: z.object({ runId: z.string() }),
+  },
+  /** Deletes a project agent, as a recorded run that History can roll back. */
+  "agents.delete": {
+    params: z.object({ cwd: z.string().min(1), name: AgentNameSchema }),
+    result: z.object({ runId: z.string() }),
   },
   "permissions.remove": {
     params: z.object({

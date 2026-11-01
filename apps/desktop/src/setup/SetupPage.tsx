@@ -1,6 +1,7 @@
 import type { Methods } from "@agentchainer/protocol";
 import {
   ArrowLeft,
+  Bot,
   ClipboardList,
   History as HistoryIcon,
   ListChecks,
@@ -14,6 +15,7 @@ import type { Confirm } from "../Dialog.tsx";
 import { request } from "../sidecar.ts";
 import { folderName } from "../tabs.ts";
 import { IconButton } from "../ui/IconButton.tsx";
+import { Agents } from "./Agents.tsx";
 import { Commands } from "./Commands.tsx";
 import { History } from "./History.tsx";
 import { gapsOf, Overview } from "./Overview.tsx";
@@ -22,12 +24,12 @@ import { PlanView } from "./PlanView.tsx";
 import { useBootstrap } from "./useBootstrap.tsx";
 
 type Scan = Methods["workspace.scan"]["result"];
-export type SetupView = "overview" | "plan" | "commands" | "permissions" | "history";
+export type SetupView = "overview" | "plan" | "commands" | "agents" | "permissions" | "history";
 
 /**
  * Workspace settings as a full page (UX-06), laid out like an IDE's project settings: what the workspace is made of at
- * the top, sections on the left (readiness, the setup plan, detected commands, saved permission rules, past runs), and
- * the section's content on the right. Opens over the session or Home; Back returns there.
+ * the top, sections on the left (readiness, the setup plan, detected commands, agents, saved permission rules, past
+ * runs), and the section's content on the right. Opens over the session or Home; Back returns there.
  */
 export function SetupPage({
   cwd,
@@ -84,6 +86,7 @@ export function SetupPage({
       count: bootstrap.selected.size || null,
     },
     { id: "commands", label: "Commands", icon: <Terminal size={16} className="nav-icon" /> },
+    { id: "agents", label: "Agents", icon: <Bot size={16} className="nav-icon" /> },
     { id: "permissions", label: "Permissions", icon: <ShieldCheck size={16} className="nav-icon" /> },
     {
       id: "history",
@@ -174,6 +177,7 @@ export function SetupPage({
           )}
           {view === "plan" && <PlanView bootstrap={bootstrap} focus={focus} onFocus={setFocus} />}
           {scan && view === "commands" && <Commands profile={scan.profile} />}
+          {view === "agents" && <Agents cwd={cwd} confirm={confirm} onChanged={() => void bootstrap.load()} />}
           {view === "permissions" && <Permissions cwd={cwd} confirm={confirm} />}
           {view === "history" && <History bootstrap={bootstrap} />}
         </main>

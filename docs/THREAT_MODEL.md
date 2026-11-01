@@ -76,7 +76,7 @@ Nothing else. In particular, there is no file-system or shell plugin.
 | `update_prepare` | — | Stops the runtime and terminals before an update installs. |
 
 **Sidecar methods that touch the file system or run commands:**
-- the `workspace.*`, `git.*`, `bootstrap.*` and `task.*` families;
+- the `workspace.*`, `git.*`, `bootstrap.*`, `task.*` and `agents.*` families;
 - `session.start` and `session.rewind`.
 
 Each takes a folder the user opened. Paths inside it go through `insideRoot`, and git paths are passed after `--`.
@@ -84,6 +84,14 @@ Each takes a folder the user opened. Paths inside it go through `insideRoot`, an
 `session.stopAgent` (M4-05) neither touches files nor runs anything. It stops one task of a session this sidecar
 started (`requireSession`), through the SDK's `stopTask`. It does nothing while no turn runs, unless the task is one of
 the session's live background tasks (M4-07).
+
+**The agent library (M4-06):**
+- `agents.save` and `agents.delete` write only `.claude/agents/<name>.md`. The name is checked against
+  `[a-z0-9-]` before it becomes a path, and the write goes through `insideRoot`.
+- Each change is a recorded run, so it can be rolled back like a setup step.
+- `agents.list` also reads the user's `~/.claude/agents/*.md` (or `CLAUDE_CONFIG_DIR`). It reads them only, and shows
+  the agents' own text. The agents' prompts are instructions to Claude, which a malicious repository can supply (T-02);
+  listing them doesn't run them.
 
 **Background work (M4-07):**
 - Interactive sessions let the CLI run subagents and shells in the background. They outlive the turn that started

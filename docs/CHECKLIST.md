@@ -24,7 +24,7 @@
 | [UX](#ux--product-design--ui-polish-before-r1) | v0.1 | Product design & UI polish (after M1/M2 work functionally) | ◐ Design system done; desktop shell, panels and setup page in place |
 | [R1](#r1--v01-release) | v0.1 | Packaging & release | ◐ Pipeline, updater, security review and docs in place; publishing waits for M0-01 and M0-22 |
 | [M3](#m3--adaptive-planner--task-contracts-v02) | v0.2 | Adaptive planner, contracts, evidence | ◐ Every tier (S, M, L, XL) runs live on macOS and Windows, with gates, evidence and accepted risk (preview); left: the owner's click-through and the exit runs |
-| [M4](#m4--agent-observability-v02v03) | v0.2–0.3 | Agent observability graph | ◐ Agent tree, graph, drawer, stop, timeline, replay and background tasks in; agent library next |
+| [M4](#m4--agent-observability-v02v03) | v0.2–0.3 | Agent observability graph | ◐ Agent tree, graph, drawer, stop, timeline, replay, background tasks and agent library in; E2 frame times left |
 | [M5](#m5--git-workflow-pr--quality-gates-v03) | v0.3 | Git workflow, PRs, gates | ☐ Not started |
 | [M6](#m6--deployment--workflow-canvas-v04) | v0.4 | Deploy adapters, workflow canvas | ☐ Not started |
 | [M7](#m7--evals--analytics-v05) | v0.5 | Evals & analytics | ☐ Not started |
@@ -1277,7 +1277,21 @@ Decisions: [ADR-0009](adr/0009-release-signing-and-updates.md). Maintainer steps
 - [x] **M4-05** Controls: interrupt the session; stop a single subagent if the SDK supports it (verify).
       Evidence: `session.stopAgent` → `Query.stopTask` (SDK 0.3.311); in the app on Windows, Stop this agent ended a
       subagent mid-`sleep` as stopped while the rest of the turn finished (step-2 PR).
-- [ ] **M4-06** Agent library manager: list, create and edit `.claude/agents/*.md` and programmatic agents; mark each as manual or auto-spawned.
+- [x] **M4-06** Agent library manager: list, create and edit `.claude/agents/*.md` and programmatic agents; mark each as manual or auto-spawned.
+      Evidence: the step-6 PR ([design §10](design/observability.md)).
+      - What it does:
+        - `agents.list`, `agents.save` and `agents.delete`, behind Workspace settings → Agents;
+        - project agents can be created, edited, renamed and deleted, each change as a run History can roll back;
+        - the user's agents are listed read-only;
+        - Auto/Manual rewrites the "use proactively" wording.
+      - Tests: `agents.test.ts`, covering listing, the wording, the YAML, and create, rename and delete with rollback.
+      - In the app on Windows:
+        - edited an agent to manual, keeping its `color`;
+        - created one whose description has a colon;
+        - deleted it, then rolled the delete back from History;
+        - checked light and dark.
+      - The CLI listed both agents in `system/init`.
+      - Programmatic agents: the app defines none for its sessions, so there are none to list.
 - [x] **M4-07** Background tasks and shells panel.
       Evidence: the step-5 PR ([design §8](design/observability.md)).
       - Interactive sessions run background work: `background.changed`, `turn.started` for the CLI's own turn, Stop per

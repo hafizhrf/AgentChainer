@@ -1,7 +1,9 @@
 import { existsSync } from "node:fs";
 import { homedir } from "node:os";
+import { join } from "node:path";
 import { PROTOCOL_VERSION, RpcErrorCode, type Task } from "@agentchainer/protocol";
 import pkg from "../package.json" with { type: "json" };
+import { deleteAgent, listAgents, saveAgent } from "./agents.ts";
 import { applyActions, type Cli, listRuns, rollback } from "./bootstrap/apply.ts";
 import { autoApplicable } from "./bootstrap/auto-apply.ts";
 import { generate, resolveActionlint } from "./bootstrap/generate.ts";
@@ -302,6 +304,22 @@ serve(
     },
 
     "permissions.list": ({ cwd }) => ({ workspace: listRules(cwd, "workspace"), team: listRules(cwd, "team") }),
+
+    "agents.list": ({ cwd }) => {
+      requireFolder(cwd);
+      // The CLI's config folder, where the user's own agents live (read-only here).
+      return { agents: listAgents(cwd, process.env.CLAUDE_CONFIG_DIR || join(homedir(), ".claude")) };
+    },
+
+    "agents.save": ({ cwd, agent, previousName }) => {
+      requireFolder(cwd);
+      return { runId: saveAgent(cwd, agent, catalog.version, previousName) };
+    },
+
+    "agents.delete": ({ cwd, name }) => {
+      requireFolder(cwd);
+      return { runId: deleteAgent(cwd, name, catalog.version) };
+    },
 
     "permissions.remove": ({ cwd, behavior, rule, scope }) => {
       removeRule(cwd, behavior, rule, scope ?? "workspace");

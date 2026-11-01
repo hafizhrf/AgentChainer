@@ -97,6 +97,7 @@ Planned surface (v0.1):
 | request | `session.send` | Push a user message into the streaming input `{sessionId, text}` → `{messageId}`. Planned: @files, images |
 | request | `session.interrupt` | Interrupt the running turn |
 | request | `session.stopAgent` | Stop one subagent by its task id; the turn goes on (M4-05) |
+| request | `agents.list` / `agents.save` / `agents.delete` | The project's `.claude/agents/` (written as recorded runs History can roll back) and the user's agents, read-only (M4-06) |
 | request | `session.setMode` | `setPermissionMode()` mid-session |
 | request | `session.setModel` / `session.setEffort` | `setModel()` / `applyFlagSettings({effortLevel})` mid-session |
 | request | `session.close` | End a live session (tab closed); the transcript stays resumable |

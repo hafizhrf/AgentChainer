@@ -421,7 +421,7 @@ export function App() {
     const mode = asMode(settings?.defaultMode);
     try {
       const { effort, budgetUsd, showThinking } = sessionOptions(mode);
-      const { events } = await request("session.history", { cwd: dir, sessionId });
+      const { events, times } = await request("session.history", { cwd: dir, sessionId });
       await request("session.start", {
         cwd: dir,
         resume: sessionId,
@@ -432,7 +432,11 @@ export function App() {
         showThinking,
       });
       const items = closeAssistant(
-        events.reduce<Item[]>((acc, e) => applyEvent(acc, e), [notice(`Resumed “${title}” in ${folderName(dir)}`)]),
+        // Stored times rebuild the agents' timing for the graph and the timeline (M4-08).
+        events.reduce<Item[]>(
+          (acc, e, i) => applyEvent(acc, e, times?.[i] ?? undefined),
+          [notice(`Resumed “${title}” in ${folderName(dir)}`)],
+        ),
       );
       const tab = newTab(sessionId, dir, { title, mode, items, resumed: true, modelAlias, effort, budgetUsd });
       setTabs((ts) => (ts.some((t) => t.sessionId === sessionId) ? updateTab(ts, sessionId, () => tab) : [...ts, tab]));

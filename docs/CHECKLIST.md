@@ -24,7 +24,7 @@
 | [UX](#ux--product-design--ui-polish-before-r1) | v0.1 | Product design & UI polish (after M1/M2 work functionally) | ◐ Design system done; desktop shell, panels and setup page in place |
 | [R1](#r1--v01-release) | v0.1 | Packaging & release | ◐ Pipeline, updater, security review and docs in place; publishing waits for M0-01 and M0-22 |
 | [M3](#m3--adaptive-planner--task-contracts-v02) | v0.2 | Adaptive planner, contracts, evidence | ◐ Every tier (S, M, L, XL) runs live on macOS and Windows, with gates, evidence and accepted risk (preview); left: the owner's click-through and the exit runs |
-| [M4](#m4--agent-observability-v02v03) | v0.2–0.3 | Agent observability graph | ◐ Agent tree, live graph, drawer, per-agent stop and timeline in; replay next |
+| [M4](#m4--agent-observability-v02v03) | v0.2–0.3 | Agent observability graph | ◐ Agent tree, graph, drawer, per-agent stop, timeline and replay in; background tasks next |
 | [M5](#m5--git-workflow-pr--quality-gates-v03) | v0.3 | Git workflow, PRs, gates | ☐ Not started |
 | [M6](#m6--deployment--workflow-canvas-v04) | v0.4 | Deploy adapters, workflow canvas | ☐ Not started |
 | [M7](#m7--evals--analytics-v05) | v0.5 | Evals & analytics | ☐ Not started |
@@ -1265,8 +1265,10 @@ Decisions: [ADR-0009](adr/0009-release-signing-and-updates.md). Maintainer steps
 - [ ] **M4-02** Live graph with `@xyflow/react` and dagre auto-layout (design §17). Nodes are agents and key tool calls; edges are spawns and hand-offs.
       Note: built (Chat | Graph in the session header, folding, keyboard), checked live on Windows with three
       parallel subagents; ticked with E2's 200-node frame times.
-- [ ] **M4-03** Node drawer: subagent prompt, transcript (SDK `getSessionMessages` / `agent_transcript_path`), tool calls, cost.
-      Note: the live drawer is in (prompt, activity, tokens, ≈USD); stored transcripts come with replay (M4-08).
+- [x] **M4-03** Node drawer: subagent prompt, transcript (SDK `getSessionMessages` / `agent_transcript_path`), tool calls, cost.
+      Evidence: the live drawer (prompt, activity, tokens, ≈USD) in [#55](https://github.com/hafizhrf/AgentChainer/pull/55);
+      stored transcripts through `getSubagentMessages` in the step-4 PR (a reopened subagent has no stored tokens or
+      cost).
 - [x] **M4-04** Timeline (Gantt) view that shows parallelism and waiting.
       Evidence: the step-3 PR. Chat | Graph | Timeline, one turn at a time; approval waits recorded per tool call
       (`permissionAsked`/`permissionAnswered`) and drawn on the owning agent's row; tests on both subagent fixtures.
@@ -1281,11 +1283,18 @@ Decisions: [ADR-0009](adr/0009-release-signing-and-updates.md). Maintainer steps
       2.1.314 backgrounds subagents by default ([S4 update](spikes/S4-S5-S6.md)). This item lifts it: the session
       stays busy while background tasks live (`background_tasks_changed`), each one can be stopped, and a task step
       waits for them before its gates.
-- [ ] **M4-08** Replay a finished session as a graph.
+- [x] **M4-08** Replay a finished session as a graph.
+      Evidence: the step-4 PR. `session.history` adds each subagent's stored transcript (`listSubagents`,
+      `getSubagentMessages`) under its spawn call, plus the stored times; `replayEvents` tests cover nesting, order,
+      side agents, times and stopped/failed. In the app on Windows: a reopened session showed its five subagents in
+      the graph, with long Bash calls as nodes, the timeline matched the live run (9.2 s vs 9.1 s), and the drawer
+      showed a subagent's prompt and tool calls.
 
 ### Exit criteria
 
-- [ ] **M4-E1** A session with ≥ 3 parallel subagents renders correctly live and on replay.
+- [x] **M4-E1** A session with ≥ 3 parallel subagents renders correctly live and on replay.
+      Evidence (Windows, haiku): three parallel subagents live in the graph and timeline (#55, #56), then the same
+      session reopened with the same agents, nesting and times (step-4 PR).
 - [ ] **M4-E2** Pan and zoom hold 60 fps with 200 nodes on the slowest supported WebView.
 
 ---

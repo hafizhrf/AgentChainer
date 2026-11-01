@@ -15,7 +15,7 @@ const STATUS_LABEL: Record<AgentStatus, string> = {
 
 /**
  * One subagent in the right panel (M4-03): what it was asked, what it did so far, its tokens and ≈USD, and Stop this
- * agent (M4-05). Live only: a reopened session's subagent transcripts come with replay (M4-08).
+ * agent (M4-05). A reopened session's subagents come from their stored transcripts (M4-08), without tokens or cost.
  */
 export function AgentDrawer({
   cwd,

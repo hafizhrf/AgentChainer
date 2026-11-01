@@ -699,7 +699,9 @@ export function mergeResult(
 function commitResult(root: string, task: Task): void {
   const wt = task.worktree;
   if (!wt || wt.removed || !existsSync(wt.path)) return;
-  const message = `${task.contract?.objective || task.request}\n\nAgentChainer task ${task.id}`;
+  const objective = task.contract?.objective || task.request;
+  const subject = shortTitle(objective);
+  const message = `${subject}\n\n${subject === objective ? "" : `${objective}\n\n`}AgentChainer task ${task.id}`;
   try {
     commitAll(codeRootIn(root, wt.path), message, wt.untracked);
   } catch (err) {
@@ -767,6 +769,21 @@ function shippable(root: string, id: string): Task & { worktree: NonNullable<Tas
   return { ...task, worktree: wt };
 }
 
+/**
+ * A commit subject or PR title from the task's objective: its first sentence, at most 72 characters, cut at a word.
+ * The whole objective stays in the commit's body and the PR's contract.
+ */
+export function shortTitle(objective: string): string {
+  const first =
+    objective
+      .trim()
+      .split(/(?<=[.!?])\s/)[0]
+      ?.replace(/[.\s]+$/, "") ?? "";
+  if (first.length <= 72) return first;
+  const cut = first.slice(0, 71);
+  return `${cut.slice(0, Math.max(cut.lastIndexOf(" "), 40)).replace(/[\s,;:]+$/, "")}…`;
+}
+
 /** The branch a task's PR goes into: the one it started from, else the workspace's current branch. */
 function prBase(root: string, task: Task): string {
   const base = task.worktree?.from ?? (git(["symbolic-ref", "--short", "-q", "HEAD"], root).stdout.trim() || null);
@@ -810,7 +827,7 @@ export function prPreview(root: string, id: string, gh: Gh | null) {
     github: githubStatus(root, gh),
     base: prBase(root, task),
     head: task.worktree.branch,
-    title: task.contract?.objective || task.request,
+    title: shortTitle(task.contract?.objective || task.request),
     body: prBody(root, task),
   };
 }

@@ -52,6 +52,7 @@ set up.
 | First start, and after an update that changes the SDK version | `registry.npmjs.org` | Downloads the pinned Agent SDK and checks its integrity hash. |
 | Every session | Through your Claude CLI | Claude itself. See the provider note above. |
 | When you apply a setup that installs something | `github.com`, `codeload.github.com`, and `registry.npmjs.org` for MCP servers | Downloads exactly the pinned versions, checked against their hashes ([ADR-0005](adr/0005-catalog-trust-model.md)). The CLI fetches plugins from their marketplace repositories. |
+| When you click **Create PR…** on a task (M5) | Your repository's `origin` (through your git credentials) and the GitHub API (through your own `gh` login) | `gh` checks your sign-in for the remote's host when the dialog opens. **Push and create PR** pushes the task's branch and opens the pull request you previewed. |
 | When you click **Check for updates** | `github.com` (this project's releases) | Fetches `latest.json`. An update downloads only when you click **Install**, and it must carry the project's signature. |
 
 AgentChainer never checks for updates by itself, and sends nothing about you or your projects anywhere.

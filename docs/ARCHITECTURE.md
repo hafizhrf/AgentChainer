@@ -126,6 +126,8 @@ Planned surface (v0.1):
 | request | `task.continue` | Picks a stopped, failed or interrupted XL run up again: merged sub-tasks are skipped, the others run in their worktrees |
 | request | `task.mergeResult` / `task.cleanup` | Commits what a task's run left in its worktree, then merges its branch `agentchainer/<id>` into the current branch (clean tree only); removes its worktrees after the same commit, and its branches only when asked (M3-07, M5-01) |
 | request | `task.overlaps` | Other tasks whose live branches change the same files (M5-01) |
+| request | `github.status` | Whether the user's `gh` can make PRs for the workspace's `origin`: missing, no-remote, signed-out or ready; never the account (M5-02) |
+| request | `task.prPreview` / `task.createPr` | The PR's base, head, title and body from the contract and evidence; then commit, gitleaks, push (never forced) and `gh pr create` (M5-02) |
 | notification | `task.updated` | A run changed: a step started or ended, gates ran, or it ended |
 | notification | `task` tag on `agent.event` / `permission.request` | Marks a task step's session, which has no tab: the task page shows its transcript, and its approvals show over any page |
 | request | `workspace.scan` | Detect stack, commands, and audit the setup → `WorkspaceProfile` + findings (read-only) |

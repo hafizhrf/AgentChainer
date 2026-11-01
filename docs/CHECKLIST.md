@@ -25,7 +25,7 @@
 | [R1](#r1--v01-release) | v0.1 | Packaging & release | ◐ Pipeline, updater, security review and docs in place; publishing waits for M0-01 and M0-22 |
 | [M3](#m3--adaptive-planner--task-contracts-v02) | v0.2 | Adaptive planner, contracts, evidence | ◐ Every tier (S, M, L, XL) runs live on macOS and Windows, with gates, evidence and accepted risk (preview); left: the owner's click-through and the exit runs |
 | [M4](#m4--agent-observability-v02v03) | v0.2–0.3 | Agent observability graph | ◐ Agent tree, graph, drawer, stop, timeline, replay, background tasks and agent library in; E2 frame times left |
-| [M5](#m5--git-workflow-pr--quality-gates-v03) | v0.3 | Git workflow, PRs, gates | ◐ Design approved ([git-workflow.md](design/git-workflow.md)); a worktree for every task in; PRs next |
+| [M5](#m5--git-workflow-pr--quality-gates-v03) | v0.3 | Git workflow, PRs, gates | ◐ Design approved ([git-workflow.md](design/git-workflow.md)); a worktree for every task in; Create PR built, waiting on a live run |
 | [M6](#m6--deployment--workflow-canvas-v04) | v0.4 | Deploy adapters, workflow canvas | ☐ Not started |
 | [M7](#m7--evals--analytics-v05) | v0.5 | Evals & analytics | ☐ Not started |
 | [M8](#m8--multi-folder-workspaces--agent-fleet-proposed) | later | Multi-folder workspaces, agent fleet | ☐ Proposed (owner, 2026-10-30) |
@@ -1345,6 +1345,11 @@ Decisions: [ADR-0009](adr/0009-release-signing-and-updates.md). Maintainer steps
       - In the app: two M tasks touching `src/cart.js` showed the warning; Merge committed and merged the first; Clean
         up kept the second's work on its branch.
 - [ ] **M5-02** PR creation (gh CLI or GitHub API) with the contract and evidence report in the body.
+      Note: built in the step-2 PR.
+      - Done: `github.status`, `task.prPreview` and `task.createPr` through the user's `gh`; the GITHUB_SETUP guide.
+      - Tests: `github.test.ts`, plus `service.test.ts`, which pushes to a local bare remote with a `gh` stand-in.
+      - Checked in the app: the dialog's preview and its not-ready state.
+      - Left: a live PR on a real repository, before the box is ticked.
 - [ ] **M5-03** CI status polling, plus a "Fix CI" loop that reads failing logs. The loop is gated by approval and budget.
 - [ ] **M5-04** Merge gates: independent AI review of the diff, plus deterministic scanners (gitleaks; semgrep and trivy if installed).
 - [ ] **M5-05** Merge, force push and release tags always require a human.

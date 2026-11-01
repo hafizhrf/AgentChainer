@@ -656,3 +656,27 @@ fieldset.task-field legend {
 .callout.task-overlaps p {
   margin: 0;
 }
+
+/* ---------- Create PR (M5-02) ---------- */
+
+.pr-form,
+.pr-not-ready {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.pr-not-ready .row {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.pr-body {
+  max-height: 22rem;
+  padding: var(--space-3);
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface-2);
+  font-size: var(--text-sm);
+}

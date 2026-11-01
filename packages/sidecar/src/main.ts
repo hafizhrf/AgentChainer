@@ -29,6 +29,7 @@ import {
   switchBranch,
   unstage,
 } from "./git.ts";
+import { githubStatus, systemGh } from "./github.ts";
 import {
   addMcpServer,
   installPlugin,
@@ -51,6 +52,7 @@ import {
   cancelTask,
   cleanupTask,
   continueTask,
+  createTaskPr,
   deleteTaskSafe,
   draftTask,
   listTasksLive,
@@ -58,6 +60,7 @@ import {
   newTask,
   overlapsOf,
   present,
+  prPreview,
   resumeTask,
   retriageTask,
   reviseTask,
@@ -570,6 +573,23 @@ serve(
       await settleRun(id);
       cleanupTask(cwd, id, deleteBranches);
       return { ok: true };
+    },
+
+    "github.status": ({ cwd }) => {
+      requireFolder(cwd);
+      return githubStatus(cwd, systemGh());
+    },
+
+    "task.prPreview": async ({ cwd, id }) => {
+      requireFolder(cwd);
+      await settleRun(id);
+      return prPreview(cwd, id, systemGh());
+    },
+
+    "task.createPr": async ({ cwd, id, title, draft }) => {
+      requireFolder(cwd);
+      await settleRun(id);
+      return createTaskPr(cwd, id, { title, draft }, systemGh());
     },
 
     "task.overlaps": ({ cwd, id }) => {

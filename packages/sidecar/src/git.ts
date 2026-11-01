@@ -210,6 +210,13 @@ export function push(cwd: string): string {
   return (r.stderr || r.stdout).trim();
 }
 
+/** Pushes `branch` to `origin` and tracks it, from any checkout of the repository: a task's branch (M5-02). Never forced. */
+export function pushBranch(cwd: string, branch: string): string {
+  const r = git(["push", "-u", "origin", `refs/heads/${branch}:refs/heads/${branch}`], cwd, undefined, NETWORK);
+  if (r.status !== 0) throw new Error(`git push failed: ${r.stderr.trim() || `exit ${r.status}`}`);
+  return (r.stderr || r.stdout).trim();
+}
+
 /** Diff caps for the commit-message prompt: enough to describe the change, bounded in cost. */
 const MAX_DIFF_CHARS = 24_000;
 

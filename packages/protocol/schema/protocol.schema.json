@@ -19664,6 +19664,499 @@
               "detail"
             ],
             "additionalProperties": false
+          },
+          "previous": {
+            "type": "object",
+            "properties": {
+              "recordId": {
+                "type": "string"
+              },
+              "deploymentId": {
+                "type": "string"
+              },
+              "url": {
+                "type": "string"
+              },
+              "commit": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false
+          },
+          "rollbackOf": {
+            "type": "string"
+          },
+          "rolledBackBy": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "adapter",
+          "env",
+          "commit",
+          "command",
+          "startedAt",
+          "endedAt",
+          "status"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "deploy.plan": {
+      "params": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "cwd": {
+            "type": "string",
+            "minLength": 1
+          },
+          "adapter": {
+            "type": "string",
+            "enum": [
+              "vercel",
+              "cloudflare"
+            ]
+          }
+        },
+        "required": [
+          "cwd",
+          "adapter"
+        ],
+        "additionalProperties": false
+      },
+      "result": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "adapter": {
+            "type": "string",
+            "enum": [
+              "vercel",
+              "cloudflare"
+            ]
+          },
+          "label": {
+            "type": "string"
+          },
+          "project": {
+            "type": "string"
+          },
+          "command": {
+            "type": "string"
+          },
+          "branch": {
+            "type": "string"
+          },
+          "commit": {
+            "type": "string"
+          },
+          "problem": {
+            "type": "string"
+          },
+          "current": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "adapter": {
+                "type": "string",
+                "enum": [
+                  "vercel",
+                  "cloudflare"
+                ]
+              },
+              "env": {
+                "type": "string",
+                "enum": [
+                  "preview",
+                  "production"
+                ]
+              },
+              "taskId": {
+                "type": "string"
+              },
+              "branch": {
+                "type": "string"
+              },
+              "commit": {
+                "type": "string"
+              },
+              "command": {
+                "type": "string"
+              },
+              "startedAt": {
+                "type": "string"
+              },
+              "endedAt": {
+                "type": "string"
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "done",
+                  "failed"
+                ]
+              },
+              "url": {
+                "type": "string"
+              },
+              "deploymentId": {
+                "type": "string"
+              },
+              "error": {
+                "type": "string"
+              },
+              "smoke": {
+                "type": "object",
+                "properties": {
+                  "ok": {
+                    "type": "boolean"
+                  },
+                  "how": {
+                    "type": "string",
+                    "enum": [
+                      "script",
+                      "http"
+                    ]
+                  },
+                  "detail": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "ok",
+                  "how",
+                  "detail"
+                ],
+                "additionalProperties": false
+              },
+              "previous": {
+                "type": "object",
+                "properties": {
+                  "recordId": {
+                    "type": "string"
+                  },
+                  "deploymentId": {
+                    "type": "string"
+                  },
+                  "url": {
+                    "type": "string"
+                  },
+                  "commit": {
+                    "type": "string"
+                  }
+                },
+                "additionalProperties": false
+              },
+              "rollbackOf": {
+                "type": "string"
+              },
+              "rolledBackBy": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "adapter",
+              "env",
+              "commit",
+              "command",
+              "startedAt",
+              "endedAt",
+              "status"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "adapter",
+          "label",
+          "project",
+          "command",
+          "branch",
+          "commit"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "deploy.production": {
+      "params": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "cwd": {
+            "type": "string",
+            "minLength": 1
+          },
+          "adapter": {
+            "type": "string",
+            "enum": [
+              "vercel",
+              "cloudflare"
+            ]
+          },
+          "confirm": {
+            "type": "string"
+          },
+          "commit": {
+            "type": "string",
+            "minLength": 7
+          }
+        },
+        "required": [
+          "cwd",
+          "adapter",
+          "confirm",
+          "commit"
+        ],
+        "additionalProperties": false
+      },
+      "result": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "adapter": {
+            "type": "string",
+            "enum": [
+              "vercel",
+              "cloudflare"
+            ]
+          },
+          "env": {
+            "type": "string",
+            "enum": [
+              "preview",
+              "production"
+            ]
+          },
+          "taskId": {
+            "type": "string"
+          },
+          "branch": {
+            "type": "string"
+          },
+          "commit": {
+            "type": "string"
+          },
+          "command": {
+            "type": "string"
+          },
+          "startedAt": {
+            "type": "string"
+          },
+          "endedAt": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "done",
+              "failed"
+            ]
+          },
+          "url": {
+            "type": "string"
+          },
+          "deploymentId": {
+            "type": "string"
+          },
+          "error": {
+            "type": "string"
+          },
+          "smoke": {
+            "type": "object",
+            "properties": {
+              "ok": {
+                "type": "boolean"
+              },
+              "how": {
+                "type": "string",
+                "enum": [
+                  "script",
+                  "http"
+                ]
+              },
+              "detail": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "ok",
+              "how",
+              "detail"
+            ],
+            "additionalProperties": false
+          },
+          "previous": {
+            "type": "object",
+            "properties": {
+              "recordId": {
+                "type": "string"
+              },
+              "deploymentId": {
+                "type": "string"
+              },
+              "url": {
+                "type": "string"
+              },
+              "commit": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false
+          },
+          "rollbackOf": {
+            "type": "string"
+          },
+          "rolledBackBy": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "adapter",
+          "env",
+          "commit",
+          "command",
+          "startedAt",
+          "endedAt",
+          "status"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "deploy.rollback": {
+      "params": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "cwd": {
+            "type": "string",
+            "minLength": 1
+          },
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "confirm": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "cwd",
+          "id",
+          "confirm"
+        ],
+        "additionalProperties": false
+      },
+      "result": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "adapter": {
+            "type": "string",
+            "enum": [
+              "vercel",
+              "cloudflare"
+            ]
+          },
+          "env": {
+            "type": "string",
+            "enum": [
+              "preview",
+              "production"
+            ]
+          },
+          "taskId": {
+            "type": "string"
+          },
+          "branch": {
+            "type": "string"
+          },
+          "commit": {
+            "type": "string"
+          },
+          "command": {
+            "type": "string"
+          },
+          "startedAt": {
+            "type": "string"
+          },
+          "endedAt": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "done",
+              "failed"
+            ]
+          },
+          "url": {
+            "type": "string"
+          },
+          "deploymentId": {
+            "type": "string"
+          },
+          "error": {
+            "type": "string"
+          },
+          "smoke": {
+            "type": "object",
+            "properties": {
+              "ok": {
+                "type": "boolean"
+              },
+              "how": {
+                "type": "string",
+                "enum": [
+                  "script",
+                  "http"
+                ]
+              },
+              "detail": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "ok",
+              "how",
+              "detail"
+            ],
+            "additionalProperties": false
+          },
+          "previous": {
+            "type": "object",
+            "properties": {
+              "recordId": {
+                "type": "string"
+              },
+              "deploymentId": {
+                "type": "string"
+              },
+              "url": {
+                "type": "string"
+              },
+              "commit": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false
+          },
+          "rollbackOf": {
+            "type": "string"
+          },
+          "rolledBackBy": {
+            "type": "string"
           }
         },
         "required": [
@@ -19781,6 +20274,30 @@
                     "detail"
                   ],
                   "additionalProperties": false
+                },
+                "previous": {
+                  "type": "object",
+                  "properties": {
+                    "recordId": {
+                      "type": "string"
+                    },
+                    "deploymentId": {
+                      "type": "string"
+                    },
+                    "url": {
+                      "type": "string"
+                    },
+                    "commit": {
+                      "type": "string"
+                    }
+                  },
+                  "additionalProperties": false
+                },
+                "rollbackOf": {
+                  "type": "string"
+                },
+                "rolledBackBy": {
+                  "type": "string"
                 }
               },
               "required": [

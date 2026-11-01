@@ -6,6 +6,7 @@ import {
   History as HistoryIcon,
   ListChecks,
   RefreshCw,
+  Rocket,
   Save,
   ShieldCheck,
   Terminal,
@@ -17,6 +18,7 @@ import { folderName } from "../tabs.ts";
 import { IconButton } from "../ui/IconButton.tsx";
 import { Agents } from "./Agents.tsx";
 import { Commands } from "./Commands.tsx";
+import { Deploys } from "./Deploys.tsx";
 import { History } from "./History.tsx";
 import { gapsOf, Overview } from "./Overview.tsx";
 import { Permissions } from "./Permissions.tsx";
@@ -24,12 +26,12 @@ import { PlanView } from "./PlanView.tsx";
 import { useBootstrap } from "./useBootstrap.tsx";
 
 type Scan = Methods["workspace.scan"]["result"];
-export type SetupView = "overview" | "plan" | "commands" | "agents" | "permissions" | "history";
+export type SetupView = "overview" | "plan" | "commands" | "agents" | "permissions" | "deploy" | "history";
 
 /**
  * Workspace settings as a full page (UX-06), laid out like an IDE's project settings: what the workspace is made of at
- * the top, sections on the left (readiness, the setup plan, detected commands, agents, saved permission rules, past
- * runs), and the section's content on the right. Opens over the session or Home; Back returns there.
+ * the top, sections on the left (readiness, the setup plan, detected commands, agents, saved permission rules,
+ * deploys, past runs), and the section's content on the right. Opens over the session or Home; Back returns there.
  */
 export function SetupPage({
   cwd,
@@ -88,6 +90,7 @@ export function SetupPage({
     { id: "commands", label: "Commands", icon: <Terminal size={16} className="nav-icon" /> },
     { id: "agents", label: "Agents", icon: <Bot size={16} className="nav-icon" /> },
     { id: "permissions", label: "Permissions", icon: <ShieldCheck size={16} className="nav-icon" /> },
+    { id: "deploy", label: "Deploy", icon: <Rocket size={16} className="nav-icon" /> },
     {
       id: "history",
       label: "History",
@@ -179,6 +182,7 @@ export function SetupPage({
           {scan && view === "commands" && <Commands profile={scan.profile} />}
           {view === "agents" && <Agents cwd={cwd} confirm={confirm} onChanged={() => void bootstrap.load()} />}
           {view === "permissions" && <Permissions cwd={cwd} confirm={confirm} />}
+          {view === "deploy" && <Deploys cwd={cwd} />}
           {view === "history" && <History bootstrap={bootstrap} />}
         </main>
       </div>

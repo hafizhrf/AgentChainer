@@ -685,9 +685,12 @@ export const MergeGateSchema = z.object({
 export type MergeGate = z.infer<typeof MergeGateSchema>;
 export const MergeMethodSchema = z.enum(["merge", "squash", "rebase"]);
 
+/** The deploy providers (M6-01). */
+export const DeployAdapterSchema = z.enum(["vercel", "cloudflare"]);
+
 /** A provider a workspace can deploy to (M6-01): its config file, and whether its CLI is installed and signed in. */
 export const DeployTargetSchema = z.object({
-  adapter: z.enum(["vercel", "cloudflare"]),
+  adapter: DeployAdapterSchema,
   label: z.string(),
   /** The file that marks the project for this provider, e.g. `.vercel/project.json`. */
   config: z.string(),
@@ -701,7 +704,7 @@ export type DeployTarget = z.infer<typeof DeployTargetSchema>;
 /** One deploy the app ran, always from a person's click (M6, design §7). Kept in `.agentchainer/deploys/`. */
 export const DeployRecordSchema = z.object({
   id: z.string(),
-  adapter: z.enum(["vercel", "cloudflare"]),
+  adapter: DeployAdapterSchema,
   env: z.enum(["preview", "production"]),
   taskId: z.string().optional(),
   branch: z.string().optional(),
@@ -716,8 +719,38 @@ export const DeployRecordSchema = z.object({
   deploymentId: z.string().optional(),
   error: z.string().optional(),
   smoke: z.object({ ok: z.boolean(), how: z.enum(["script", "http"]), detail: z.string() }).optional(),
+  /** Production: what was live before this one, which Roll back goes back to (design §6). */
+  previous: z
+    .object({
+      recordId: z.string().optional(),
+      deploymentId: z.string().optional(),
+      url: z.string().optional(),
+      commit: z.string().optional(),
+    })
+    .optional(),
+  /** A rollback: the record it rolled back. */
+  rollbackOf: z.string().optional(),
+  /** The rollback that undid this deploy. */
+  rolledBackBy: z.string().optional(),
 });
 export type DeployRecord = z.infer<typeof DeployRecordSchema>;
+
+/**
+ * What a production deploy will do, shown before it runs (M6-02, design §5): the command, the provider's project (the
+ * name the person types to confirm), and the branch and commit. `problem` says why it can't run yet.
+ */
+export const DeployPlanSchema = z.object({
+  adapter: DeployAdapterSchema,
+  label: z.string(),
+  project: z.string(),
+  command: z.string(),
+  branch: z.string(),
+  commit: z.string(),
+  problem: z.string().optional(),
+  /** The production deploy that is live now, as far as the app knows. */
+  current: DeployRecordSchema.optional(),
+});
+export type DeployPlan = z.infer<typeof DeployPlanSchema>;
 
 /** How many Fix CI rounds a PR gets (design §6). */
 export const MAX_CI_FIXES = 3;
@@ -1360,7 +1393,29 @@ export const methodSchemas = {
    * M6-03). Always from a person's click; never production.
    */
   "deploy.preview": {
-    params: TaskRef.extend({ adapter: z.enum(["vercel", "cloudflare"]) }),
+    params: TaskRef.extend({ adapter: DeployAdapterSchema }),
+    result: DeployRecordSchema,
+  },
+  /** What a production deploy of the workspace's current branch would run (M6-02). Runs only `whoami`-style checks. */
+  "deploy.plan": {
+    params: WorkspaceRef.extend({ adapter: DeployAdapterSchema }),
+    result: DeployPlanSchema,
+  },
+  /**
+   * Deploys the workspace's current branch to production, then runs the smoke test (M6-02, M6-03). Only from a
+   * person's click: `confirm` is the project's name as they typed it, and `commit` the one the plan showed.
+   */
+  "deploy.production": {
+    params: WorkspaceRef.extend({
+      adapter: DeployAdapterSchema,
+      confirm: z.string(),
+      commit: z.string().min(7),
+    }),
+    result: DeployRecordSchema,
+  },
+  /** Rolls the live production deploy back to the one before it, with the provider's own rollback (M6-03). */
+  "deploy.rollback": {
+    params: WorkspaceRef.extend({ id: z.string().min(1), confirm: z.string() }),
     result: DeployRecordSchema,
   },
   /** The workspace's deploys, newest first; a task's only, with `taskId`. */

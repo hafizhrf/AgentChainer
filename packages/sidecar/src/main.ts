@@ -12,7 +12,14 @@ import { proposals } from "./bootstrap/proposals.ts";
 import { toolsDir } from "./bootstrap/tools.ts";
 import { catalog } from "./catalog/index.ts";
 import { checkEnvironment, claudeVersion, findClaude } from "./claude.ts";
-import { deployPreview, deployTargets, listDeploys } from "./deploy/service.ts";
+import {
+  deployPreview,
+  deployProduction,
+  deployTargets,
+  listDeploys,
+  productionPlan,
+  rollbackDeploy,
+} from "./deploy/service.ts";
 import { auditWorkspace, saveProfile } from "./detect/audit.ts";
 import { detectWorkspace } from "./detect/detect.ts";
 import {
@@ -648,6 +655,21 @@ serve(
         // The report is built again on request.
       }
       return record;
+    },
+
+    "deploy.plan": async ({ cwd, adapter }) => {
+      requireFolder(cwd);
+      return productionPlan(cwd, adapter);
+    },
+
+    "deploy.production": async ({ cwd, adapter, confirm, commit }) => {
+      requireFolder(cwd);
+      return deployProduction(cwd, adapter, { typed: confirm, commit });
+    },
+
+    "deploy.rollback": async ({ cwd, id, confirm }) => {
+      requireFolder(cwd);
+      return rollbackDeploy(cwd, id, confirm);
     },
 
     "deploy.list": ({ cwd, taskId }) => {

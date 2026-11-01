@@ -828,6 +828,25 @@ fieldset.task-field legend {
   color: var(--err);
 }
 
+/* The production dialog's plan: what runs, where and from which commit. */
+.deploy-plan {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: var(--space-1) var(--space-3);
+  margin: 0 0 var(--space-3);
+  font-size: var(--text-sm);
+}
+
+.deploy-plan dt {
+  color: var(--muted);
+}
+
+.deploy-plan dd {
+  margin: 0;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
 .deploy-detail {
   min-width: 0;
   overflow: hidden;

@@ -105,6 +105,11 @@ Each provider is an adapter with the same five steps:
 - A production deploy starts from a clean tree, on the branch the dialog shows, at its current commit.
 - **Credentials stay in the provider's CLI** (ADR-0002). The app only runs `whoami`-style checks, and drops their
   output beyond the exit code.
+- **As built (step 3):** Workspace settings → Deploy. The project's name is `projectName` in `.vercel/project.json` or
+  `name` in the wrangler config, else the workspace folder's name. Production runs in the workspace folder, not a
+  task's worktree, and needs a branch (not a detached HEAD) and a clean tree; the app's own `.agentchainer/` doesn't
+  count. Cloudflare production is `wrangler deploy`, which works whether or not a preview was made. The sidecar checks
+  the typed name and that `HEAD` is still the plan's commit.
 
 ## 6. Smoke test and rollback (M6-03)
 
@@ -117,6 +122,10 @@ Each provider is an adapter with the same five steps:
   - one click, with a confirmation (and the typed name for production);
   - it calls the adapter's rollback to the previous deployment, which was recorded when this one was made;
   - the rollback is recorded too, and the smoke test runs again on the restored deployment.
+- **As built (step 3):** only the live production deploy (the newest one that worked) has Roll back; a preview has
+  none, since it takes no traffic. It goes back to the recorded previous deploy, or, without one, to the provider's own
+  previous (`vercel rollback --yes`, `wrangler rollback --yes`). The rollback record becomes the live one, so rolling
+  it back goes forward again. The smoke test runs on the Worker's URL, or on the previous Vercel deployment's URL.
 
 ## 7. Records
 

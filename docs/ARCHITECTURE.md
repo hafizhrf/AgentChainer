@@ -128,6 +128,7 @@ Planned surface (v0.1):
 | request | `task.overlaps` | Other tasks whose live branches change the same files (M5-01) |
 | request | `github.status` | Whether the user's `gh` can make PRs for the workspace's `origin`: missing, no-remote, signed-out or ready; never the account (M5-02) |
 | request | `deploy.targets` / `deploy.preview` / `deploy.list` | The providers a workspace uses and their CLI's state; a task's preview deploy with the smoke test; the deploy records (M6) |
+| request | `deploy.plan` / `deploy.production` / `deploy.rollback` | What a production deploy of the current branch would run; the production deploy itself, given the project's name as typed and the plan's commit; rolling the live production deploy back to the one before it (M6-02, M6-03) |
 | request | `task.mergeGates` / `task.reviewPr` / `task.mergePr` | The PR's merge gates worked out now (run, review of the head, gitleaks, offline semgrep and trivy, CI); the reviewer on the PR's diff; a person's merge with `--match-head-commit` (M5-04, M5-05) |
 | request | `task.prStatus` / `task.ciLog` / `task.fixCi` | The PR's state and checks through `gh`; a failing GitHub Actions job's log, cut and redacted; one Fix CI round (the write step's role with the log as data, then the gates, then commit and push), at most 3 per PR (M5-03) |
 | request | `task.prPreview` / `task.createPr` | The PR's base, head, title and body from the contract and evidence; then commit, gitleaks, push (never forced) and `gh pr create` (M5-02) |

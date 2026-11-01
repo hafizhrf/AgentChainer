@@ -9,7 +9,15 @@ import { newTask, taskBranch } from "../tasks/service.ts";
 import { saveTask } from "../tasks/store.ts";
 import { cloudflare, vercel } from "./adapters.ts";
 import { resolveCli, scriptFromNpmShim } from "./cli.ts";
-import { type Clis, deployPreview, deployTargets, listDeploys } from "./service.ts";
+import {
+  type Clis,
+  deployPreview,
+  deployProduction,
+  deployTargets,
+  listDeploys,
+  productionPlan,
+  rollbackDeploy,
+} from "./service.ts";
 import { runSmoke } from "./smoke.ts";
 
 const dirs: string[] = [];
@@ -270,6 +278,108 @@ describe("the Cloudflare Workers adapter (M6-01)", () => {
       }),
     );
     assert.match(never.error ?? "", /hasn't been deployed yet[\s\S]*wrangler deploy/);
+  });
+
+  it("names the Worker from its config, and reads what `wrangler deploy` prints", () => {
+    const toml = tmp();
+    put(toml, "wrangler.toml", 'name = "shop"\nmain = "src/index.js"\n');
+    assert.equal(cloudflare.projectName(toml), "shop");
+    const jsonc = tmp();
+    put(jsonc, "wrangler.jsonc", '// the shop\n{ "name": "shop-api", "main": "src/index.ts" }\n');
+    assert.equal(cloudflare.projectName(jsonc), "shop-api");
+    assert.deepEqual(
+      cloudflare.parse(
+        result(
+          0,
+          "Uploaded shop (1.1 sec)\nDeployed shop triggers (0.3 sec)\n  https://shop.team.workers.dev\nCurrent Version ID: 9a8b7c6d-1111-2222-3333-444455556666\n",
+        ),
+      ),
+      { url: "https://shop.team.workers.dev", deploymentId: "9a8b7c6d-1111-2222-3333-444455556666" },
+    );
+    assert.deepEqual(cloudflare.rollbackArgs(), ["rollback", "--message", "Rolled back from AgentChainer", "--yes"]);
+  });
+});
+
+describe("production deploys and rollback (M6-02, M6-03)", () => {
+  const vercelAt = (url: string) => fakeClis({ whoami: result(0), deploy: result(0, `${url}\n`) });
+
+  /** A Vercel workspace whose project.json names the project, on a clean `main`. */
+  const named = () => {
+    const w = linkedWorkspace();
+    put(w.root, ".vercel/project.json", '{"projectId":"prj_1","orgId":"team_1","projectName":"shop"}\n');
+    return w;
+  };
+
+  it("plans the workspace's branch and commit, and needs a clean tree", async () => {
+    const { root } = named();
+    const plan = await productionPlan(root, "vercel", vercelAt("https://x"));
+    assert.deepEqual(
+      [plan.project, plan.command, plan.branch, plan.problem],
+      ["shop", "vercel deploy --prod --yes", "main", undefined],
+    );
+    assert.equal(plan.commit.length, 40);
+    put(root, "draft.txt", "not committed\n");
+    assert.match((await productionPlan(root, "vercel", vercelAt("https://x"))).problem ?? "", /uncommitted/);
+  });
+
+  it("deploys only with the project's name typed and the commit the plan showed", async () => {
+    const { root } = named();
+    const clis = vercelAt("https://shop-a1.vercel.app");
+    const { commit } = await productionPlan(root, "vercel", clis);
+    await assert.rejects(
+      deployProduction(root, "vercel", { typed: "shp", commit }, clis),
+      /Type the project's name, shop/,
+    );
+    await assert.rejects(deployProduction(root, "vercel", { typed: "shop", commit: "0".repeat(40) }, clis), /moved/);
+    assert.equal(clis.calls.filter((c) => c.args[0] === "deploy").length, 0);
+    const r = await deployProduction(root, "vercel", { typed: " shop ", commit }, clis);
+    assert.deepEqual(
+      [r.env, r.status, r.url, r.branch, r.smoke?.ok, r.previous],
+      ["production", "done", "https://shop-a1.vercel.app", "main", true, undefined],
+    );
+    assert.deepEqual(clis.calls.at(-1), { args: ["deploy", "--prod", "--yes"], cwd: root });
+  });
+
+  it("rolls the live production deploy back to the one before it, and records both ways", async () => {
+    const { root } = named();
+    const { commit } = await productionPlan(root, "vercel", vercelAt("https://x"));
+    const first = await deployProduction(
+      root,
+      "vercel",
+      { typed: "shop", commit },
+      vercelAt("https://shop-a1.vercel.app"),
+    );
+    const second = await deployProduction(
+      root,
+      "vercel",
+      { typed: "shop", commit },
+      vercelAt("https://shop-b2.vercel.app"),
+    );
+    assert.equal(second.previous?.deploymentId, "https://shop-a1.vercel.app");
+
+    const clis = fakeClis({ whoami: result(0), rollback: result(0, "Success") });
+    await assert.rejects(rollbackDeploy(root, first.id, "shop", clis), /newer production deploy is live/);
+    await assert.rejects(rollbackDeploy(root, second.id, "nope", clis), /Type the project's name/);
+    const back = await rollbackDeploy(root, second.id, "shop", clis);
+    assert.deepEqual(clis.calls.at(-1), { args: ["rollback", "https://shop-a1.vercel.app", "--yes"], cwd: root });
+    assert.deepEqual(
+      [back.status, back.rollbackOf, back.url, back.commit, back.smoke?.ok],
+      ["done", second.id, "https://shop-a1.vercel.app", commit, true],
+    );
+    const records = listDeploys(root);
+    assert.equal(records.find((r) => r.id === second.id)?.rolledBackBy, back.id);
+    // The rollback is what is live now, so it's the one to roll back next (forward again).
+    await assert.rejects(rollbackDeploy(root, second.id, "shop", clis), /newer production deploy is live/);
+    assert.equal((await productionPlan(root, "vercel", clis)).current?.id, back.id);
+  });
+
+  it("refuses to roll back a preview", async () => {
+    const { root, task } = named();
+    const preview = await deployPreview(root, task.id, "vercel", vercelAt("https://shop-git-task.vercel.app"));
+    await assert.rejects(
+      rollbackDeploy(root, preview.id, "shop", vercelAt("https://x")),
+      /previews don't take traffic/,
+    );
   });
 });
 

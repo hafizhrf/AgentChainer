@@ -771,6 +771,7 @@ export function App() {
         ["commands", "Commands"],
         ["agents", "Agents"],
         ["permissions", "Permissions"],
+        ["deploy", "Deploy"],
         ["history", "History"],
       ];
       for (const [view, label] of views)

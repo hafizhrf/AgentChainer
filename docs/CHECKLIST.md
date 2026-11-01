@@ -1418,9 +1418,15 @@ Decisions: [ADR-0009](adr/0009-release-signing-and-updates.md). Maintainer steps
       version; Pages configs are detected and deferred. Tested with stand-in CLIs and wrangler's output shape.
 - [ ] **M6-02** Environments are labeled preview or production. Production deploys always need explicit human approval.
       Credentials stay in each provider's own CLI.
+      Note: step 3 is built: Workspace settings → Deploy plans a production deploy of the current branch (command,
+      project, branch and commit), refuses a dirty tree or a detached HEAD, and runs only after the project's name is
+      typed; the sidecar checks the name and the commit again. Checked in the app with a seeded workspace (the dialog
+      only, no live deploy) and with stand-in CLIs.
 - [ ] **M6-03** Post-deploy smoke test and one-click rollback.
       Note: the smoke test is in the step-1 PR: `scripts/smoke.*` with `SMOKE_URL`, or a GET that must answer 2xx. The
       Vercel adapter has its rollback command; the Roll back button arrives with production (step 3).
+      Step 3 adds Roll back on the live production deploy: back to the recorded previous one (or the provider's own
+      previous), typed-name confirmation, the smoke test again, and both records linked.
 - [ ] **M6-04** Editable workflow canvas: React Flow ⇄ workflow YAML round-trip, with validation, import/export and sharing.
 
 ### Exit criteria

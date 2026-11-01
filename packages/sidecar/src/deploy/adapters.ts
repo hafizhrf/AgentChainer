@@ -19,6 +19,8 @@ export type Adapter = {
   cli: string;
   /** The file that marks the project for this provider, and what's missing before it can deploy; null when unused. */
   detect(root: string): { config: string; problem?: string } | null;
+  /** The provider's project name, from its config (the name a person types to confirm production); null if unknown. */
+  projectName(root: string): string | null;
   /** Readies `code` (a task's worktree) to deploy as the workspace's project. */
   prepare(root: string, code: string): void;
   /** Whether the CLI is signed in. Its output names the account, so only the exit code counts. */
@@ -26,7 +28,17 @@ export type Adapter = {
   deployArgs(env: Env, ctx: DeployContext): string[];
   /** The deployment's URL and the provider's id for it, from the deploy command's output. */
   parse(result: RunResult): { url: string; deploymentId: string } | null;
-  rollbackArgs(deploymentId: string): string[];
+  /** Rolls production back to `deploymentId`, or to the provider's own previous one without it. */
+  rollbackArgs(deploymentId?: string): string[];
+};
+
+const readJson = (file: string): Record<string, unknown> | null => {
+  try {
+    // JSONC: drop line comments that start a line (wrangler.jsonc); URLs inside strings are untouched.
+    return JSON.parse(readFileSync(file, "utf8").replace(/^\s*\/\/.*$/gm, "")) as Record<string, unknown>;
+  } catch {
+    return null;
+  }
 };
 
 const urls = (text: string) => [...text.matchAll(/https:\/\/[^\s"'<>]+/g)].map((m) => m[0].replace(/[.,)]+$/, ""));
@@ -50,6 +62,10 @@ export const vercel: Adapter = {
     }
     return null;
   },
+  projectName(root) {
+    const name = readJson(path.join(root, ".vercel", "project.json"))?.projectName;
+    return typeof name === "string" && name ? name : null;
+  },
   prepare(root, code) {
     const from = path.join(root, ".vercel", "project.json");
     const to = path.join(code, ".vercel", "project.json");
@@ -66,7 +82,7 @@ export const vercel: Adapter = {
     const url = urls(result.stdout).at(-1);
     return url ? { url, deploymentId: url } : null;
   },
-  rollbackArgs: (deploymentId) => ["rollback", deploymentId, "--yes"],
+  rollbackArgs: (deploymentId) => ["rollback", ...(deploymentId ? [deploymentId] : []), "--yes"],
 };
 
 const WRANGLER_CONFIGS = ["wrangler.toml", "wrangler.json", "wrangler.jsonc"];
@@ -92,6 +108,15 @@ export const cloudflare: Adapter = {
     }
     return { config };
   },
+  projectName(root) {
+    const config = WRANGLER_CONFIGS.find((c) => existsSync(path.join(root, c)));
+    if (!config) return null;
+    const file = path.join(root, config);
+    const name = config.endsWith(".toml")
+      ? /^\s*name\s*=\s*["']([^"']+)["']/m.exec(readFileSync(file, "utf8"))?.[1]
+      : readJson(file)?.name;
+    return typeof name === "string" && name ? name : null;
+  },
   prepare() {
     // The config is part of the repository, so the worktree has it.
   },
@@ -100,19 +125,26 @@ export const cloudflare: Adapter = {
     const r = await run(["whoami"], code, { timeoutMs: 30_000 });
     return r.status === 0 && !/not authenticated|wrangler login/i.test(`${r.stdout}\n${r.stderr}`);
   },
+  // Production deploys the workspace as it is (`wrangler deploy` prints the URL and the "Current Version ID").
   deployArgs: (env, ctx) =>
     env === "production"
       ? ["deploy"]
       : ["versions", "upload", "--preview-alias", ctx.alias, "--message", ctx.message.slice(0, 100)],
   parse(result) {
     const text = `${result.stdout}\n${result.stderr}`;
-    const version = /Worker Version ID:\s*([0-9a-f-]{8,})/i.exec(text)?.[1];
+    const version = /(?:Worker|Current) Version ID:\s*([0-9a-f-]{8,})/i.exec(text)?.[1];
     const alias = /Version Preview Alias URL:\s*(https:\/\/\S+)/i.exec(text)?.[1];
     const preview = /Version Preview URL:\s*(https:\/\/\S+)/i.exec(text)?.[1];
     const url = alias ?? preview ?? urls(result.stdout).at(-1);
     return url && version ? { url, deploymentId: version } : null;
   },
-  rollbackArgs: (version) => ["rollback", version, "--message", "Rolled back from AgentChainer", "--yes"],
+  rollbackArgs: (version) => [
+    "rollback",
+    ...(version ? [version] : []),
+    "--message",
+    "Rolled back from AgentChainer",
+    "--yes",
+  ],
 };
 
 export const ADAPTERS: readonly Adapter[] = [vercel, cloudflare];

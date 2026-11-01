@@ -80,6 +80,10 @@ export function checkBash(command: string, cwd: string, home = homedir()): strin
     /\b(vercel|wrangler)\s+(rollback|promote)\b/.test(command) ||
     /\bwrangler\s+versions\s+deploy\b/.test(command) ||
     /\bfirebase\s+hosting:clone\b/.test(command) ||
+    // Pushing an image publishes it to a registry, where deploys pull it from.
+    /\bdocker\s+(image\s+)?push\b/.test(command) ||
+    /\bdocker\s+buildx\s+build\b[^;&|]*\s--push\b/.test(command) ||
+    /\bdocker\s+buildx\s+imagetools\s+create\b/.test(command) ||
     /\bterraform\s+(apply|destroy)\b/.test(command) ||
     /\bkubectl\s+delete\b/.test(command)
   ) {

@@ -1,12 +1,16 @@
-import { copyFileSync, existsSync, mkdirSync, readFileSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
-import type { DeployTarget } from "@agentchainer/protocol";
+import { type DeployTarget, DockerImageSchema } from "@agentchainer/protocol";
+import { AC_DIR } from "../ac-dir.ts";
 import type { RunResult } from "../run-async.ts";
 import type { RunCli } from "./cli.ts";
 
 export type Env = "preview" | "production";
-/** What a deploy is for: a short alias (the task's) and a message (its objective). */
-export type DeployContext = { alias: string; message: string };
+/**
+ * What a deploy is for: a short alias (the task's), a message (the objective, or the commit's subject), the workspace
+ * and the commit being deployed.
+ */
+export type DeployContext = { alias: string; message: string; root: string; commit: string };
 
 /**
  * A deploy provider (M6-01, design §3): how to tell a project uses it, how to ready a task's worktree for it, the
@@ -28,8 +32,11 @@ export type Adapter = {
   /** Whether the CLI is signed in. Its output names the account, so only the exit code counts. */
   signedIn(run: RunCli, code: string): Promise<boolean>;
   deployArgs(env: Env, ctx: DeployContext): string[];
-  /** The deployment's URL and the provider's id for it (what rollback goes back to), from the deploy's output. */
-  parse(result: RunResult): { url: string; deploymentId?: string } | null;
+  /**
+   * The deployment's URL and the provider's id for it (what rollback goes back to), from the deploy's output. A
+   * Docker image has no URL, so nothing to smoke-test.
+   */
+  parse(result: RunResult, ctx: DeployContext): { url?: string; deploymentId?: string } | null;
   /**
    * Rolls production back to `deploymentId`, or to the provider's own previous one without it; null when the provider
    * needs the id (Fly.io and Firebase have no "previous" of their own).
@@ -276,4 +283,72 @@ export const fly: Adapter = {
   rollbackArgs: (image) => (image ? ["deploy", "--image", image, "--remote-only", "--yes"] : null),
 };
 
-export const ADAPTERS: readonly Adapter[] = [vercel, cloudflare, firebase, fly];
+/* ---------- Docker → registry ---------- */
+
+const DOCKER_FILE = "docker.json";
+/** The image the workspace pushes to, from `.agentchainer/docker.json`; null when it isn't named yet. */
+export function dockerImage(root: string): string | null {
+  const image = readJson(path.join(root, AC_DIR, DOCKER_FILE))?.image;
+  return typeof image === "string" && DockerImageSchema.safeParse(image).success ? image : null;
+}
+
+/** Names the image (or clears it with null). The file isn't ignored, so a team can commit it. */
+export function setDockerImage(root: string, image: string | null): void {
+  const file = path.join(root, AC_DIR, DOCKER_FILE);
+  mkdirSync(path.dirname(file), { recursive: true });
+  writeFileSync(file, `${JSON.stringify(image ? { image } : {}, null, 2)}\n`);
+}
+
+const dockerTag = (commit: string) => commit.slice(0, 12);
+
+/**
+ * A Docker image pushed to a registry the user names (flags checked against docker buildx 0.30.1). Production only:
+ * `docker buildx build --push` builds the workspace's Dockerfile and pushes `<image>:<commit>` and `<image>:latest`.
+ * There's no URL, so no smoke test. Rollback points `latest` back at the previous commit's tag in the registry
+ * (`buildx imagetools create`), without building. The registry login stays with `docker login`; the app never reads
+ * Docker's config. Whether the daemon runs is the only check.
+ */
+export const docker: Adapter = {
+  id: "docker",
+  label: "Docker image",
+  cli: "docker",
+  environments: ["production"],
+  detect(root) {
+    if (!existsSync(path.join(root, "Dockerfile"))) return null;
+    if (!dockerImage(root)) {
+      return { config: "Dockerfile", problem: "Name the image to push to, e.g. `ghcr.io/you/app`." };
+    }
+    return { config: "Dockerfile" };
+  },
+  projectName: dockerImage,
+  prepare() {
+    // The Dockerfile is part of the repository.
+  },
+  async signedIn(run, code) {
+    // Whether the daemon answers; the registry login is checked by the push itself.
+    return (await run(["info", "--format", "{{.ServerVersion}}"], code, { timeoutMs: 30_000 })).status === 0;
+  },
+  deployArgs(_env, ctx) {
+    const image = dockerImage(ctx.root) ?? "<image>";
+    return [
+      "buildx",
+      "build",
+      "--push",
+      "--tag",
+      `${image}:${dockerTag(ctx.commit)}`,
+      "--tag",
+      `${image}:latest`,
+      "--label",
+      `org.opencontainers.image.revision=${ctx.commit}`,
+      ".",
+    ];
+  },
+  parse(_result, ctx) {
+    const image = dockerImage(ctx.root);
+    return image ? { deploymentId: `${image}:${dockerTag(ctx.commit)}` } : null;
+  },
+  rollbackArgs: (tagged) =>
+    tagged ? ["buildx", "imagetools", "create", "--tag", `${tagged.replace(/:[^:/]+$/, "")}:latest`, tagged] : null,
+};
+
+export const ADAPTERS: readonly Adapter[] = [vercel, cloudflare, firebase, fly, docker];

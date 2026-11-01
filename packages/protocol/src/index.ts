@@ -685,8 +685,17 @@ export const MergeGateSchema = z.object({
 export type MergeGate = z.infer<typeof MergeGateSchema>;
 export const MergeMethodSchema = z.enum(["merge", "squash", "rebase"]);
 
+/** A Docker repository to push to: lowercase, with its registry or namespace, and no tag (`ghcr.io/you/app`). */
+export const DockerImageSchema = z
+  .string()
+  .trim()
+  .regex(
+    /^[a-z0-9]+(?:[._-][a-z0-9]+)*(?:\.[a-z0-9-]+)*(?::\d+)?(?:\/[a-z0-9]+(?:[._-][a-z0-9]+)*)+$/,
+    "An image like ghcr.io/you/app: lowercase, with the registry or namespace, and no tag.",
+  );
+
 /** The deploy providers (M6-01). */
-export const DeployAdapterSchema = z.enum(["vercel", "cloudflare", "firebase", "fly"]);
+export const DeployAdapterSchema = z.enum(["vercel", "cloudflare", "firebase", "fly", "docker"]);
 
 /** A provider a workspace can deploy to (M6-01): its config file, and whether its CLI is installed and signed in. */
 export const DeployTargetSchema = z.object({
@@ -702,6 +711,8 @@ export const DeployTargetSchema = z.object({
   environments: z.array(z.enum(["preview", "production"])),
   /** Whether it can roll back without a recorded previous deploy (the provider knows its own previous one). */
   rollbackWithoutRecord: z.boolean(),
+  /** The provider's project, the name typed to confirm production (Docker: the image), when the config names it. */
+  project: z.string().optional(),
 });
 export type DeployTarget = z.infer<typeof DeployTargetSchema>;
 
@@ -1423,6 +1434,13 @@ export const methodSchemas = {
     result: DeployRecordSchema,
   },
   /** The workspace's deploys, newest first; a task's only, with `taskId`. */
+  /** Names the image a Docker deploy pushes to (`.agentchainer/docker.json`), or clears it with null (M6-01). */
+  "deploy.setDockerImage": {
+    params: WorkspaceRef.extend({
+      image: DockerImageSchema.nullable(),
+    }),
+    result: z.object({ ok: z.literal(true) }),
+  },
   "deploy.list": {
     params: WorkspaceRef.extend({ taskId: TaskIdSchema.optional() }),
     result: z.object({ deploys: z.array(DeployRecordSchema) }),

@@ -116,6 +116,19 @@ Each provider is an adapter with the same five steps:
   the Deploy page doesn't offer it.
 - Docker → registry is its own step: it has no URL to smoke-test and needs the registry the user names.
 
+**As built (step 4b), Docker → registry** (flags checked against docker buildx 0.30.1):
+- detect: a `Dockerfile`, and the image named on the Deploy page (`ghcr.io/you/app`: lowercase, with its registry or
+  namespace, no tag), saved in `.agentchainer/docker.json`. That file isn't ignored, so a team can commit it. The
+  image is the name typed to confirm a deploy;
+- ready: `docker info` answers (the daemon runs). The registry login stays with `docker login`; the app never reads
+  Docker's config, and the push itself says when the login is missing;
+- **production only**: `docker buildx build --push --tag <image>:<12 characters of the commit> --tag <image>:latest
+  --label org.opencontainers.image.revision=<commit> .`. There's no URL, so no smoke test; the record keeps the
+  pushed tag;
+- rollback: `docker buildx imagetools create --tag <image>:latest <image>:<previous tag>`, which moves `latest` in
+  the registry without building. It needs the tag the app recorded;
+- a production deploy's message is now the commit's subject (Firebase's `--message`).
+
 ## 5. Environments (M6-02, owner decision 2)
 
 - **Preview and production** are labelled by the adapter, never guessed from a branch name.

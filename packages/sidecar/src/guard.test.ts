@@ -38,10 +38,21 @@ describe("checkBash", () => {
       "firebase hosting:clone site@v1 site:live",
       "fly deploy --image registry.fly.io/app:deployment-1",
       "flyctl deploy",
+      "docker push ghcr.io/you/app:1",
+      "docker image push ghcr.io/you/app",
+      "docker buildx build --tag ghcr.io/you/app:1 --push .",
+      "docker buildx imagetools create --tag ghcr.io/you/app:latest ghcr.io/you/app:1",
     ]) {
       blocked(cmd);
     }
-    for (const cmd of ["vercel whoami", "wrangler versions list", "fly releases --json", "firebase login:list"]) {
+    for (const cmd of [
+      "vercel whoami",
+      "wrangler versions list",
+      "fly releases --json",
+      "firebase login:list",
+      "docker build -t app .",
+      "docker buildx build --load -t app .",
+    ]) {
       allowed(cmd);
     }
   });

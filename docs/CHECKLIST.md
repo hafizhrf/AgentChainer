@@ -1419,6 +1419,9 @@ Decisions: [ADR-0009](adr/0009-release-signing-and-updates.md). Maintainer steps
       Step 4 adds Firebase Hosting (channels for previews, `hosting:clone` to roll back) and Fly.io (production only,
       rollback by redeploying the recorded image). Tested with stand-in CLIs; firebase-tools checked against its 15.34.2
       source, flyctl only against its docs. Docker → registry follows in its own PR.
+      Step 4b adds Docker → registry: the image is named on the Deploy page, `buildx build --push` pushes the
+      commit's tag and `latest`, and rollback moves `latest` back with `buildx imagetools create`. Tested with
+      stand-in CLIs; the image form and the "Docker isn't running" state checked in the app.
 - [ ] **M6-02** Environments are labeled preview or production. Production deploys always need explicit human approval.
       Credentials stay in each provider's own CLI.
       Note: step 3 is built: Workspace settings → Deploy plans a production deploy of the current branch (command,

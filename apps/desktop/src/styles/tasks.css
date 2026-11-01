@@ -828,6 +828,35 @@ fieldset.task-field legend {
   color: var(--err);
 }
 
+/* The Deploy page's providers: a row each, and Docker's image form under its row. */
+.deploy-card > ul > li.deploy-target {
+  display: block;
+}
+
+.deploy-target-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 32px;
+}
+
+.deploy-image {
+  display: flex;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin: var(--space-1) 0 var(--space-2);
+}
+
+.deploy-image .field {
+  flex: 1 1 280px;
+}
+
+.deploy-image > .warn {
+  flex-basis: 100%;
+  margin: 0;
+}
+
 /* The production dialog's plan: what runs, where and from which commit. */
 .deploy-plan {
   display: grid;

@@ -112,10 +112,17 @@ sessions, background work, and a manager for the project's agent definitions.
 
 ## 6. Timeline (M4-04)
 
-- One row per agent, ordered by start, indented by depth.
-- Each bar is drawn from start to end. Paused spans and **waiting for an approval** are drawn differently; the waits
-  come from `permission.request` up to its answer, per `agentId`.
-- Live: the right edge follows the clock. Done: the axis fits the session.
+- One row per agent, ordered by start, indented by depth, under a **Main agent** row that spans the turn.
+- **One turn at a time**, the latest by default, with ‹ › to step through earlier turns. The time between turns is
+  the user's own, and on one session-wide axis it squeezed each turn's bars to slivers.
+- Each bar is drawn from start to end. **Waiting for an approval** is drawn over it: the UI records each
+  `permission.request` up to its answer (or the turn's end) and puts the wait on the row of the agent that owns the
+  tool call. That needs no `agentId` from the CLI.
+- **Paused:** the SDK reports only a total (`total_paused_ms`), not when, so a paused or stopped bar is hatched and
+  the total is in the row's tooltip.
+- Live: the right edge follows the clock. Done: the axis fits the turn.
+- It is a plain HTML view (no chart library); rows are buttons, the arrow keys move between them, and Enter opens
+  the drawer.
 - **Replay has no timeline durations.** Stored `SessionMessage`s carry no timestamps (`sdk.d.ts`
   `SessionMessage`), so a reopened session shows order, not time. The timeline says so instead of guessing.
 
@@ -216,7 +223,7 @@ One PR per step, each merged before the next starts:
 1. **Tree store and protocol:** the new events, the reducer, nested cards in the chat, and the fixtures.
 2. **Graph, drawer and Stop this agent:** the session view switch, plus the layout dependency once §17's licence
    question is decided.
-3. **Timeline.**
+3. **Timeline** (shipped as described in §6).
 4. **Replay.**
 5. **Background tasks** (M4-07), with the THREAT_MODEL update.
 6. **Agent library** (M4-06).

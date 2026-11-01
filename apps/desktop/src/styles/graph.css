@@ -1,4 +1,4 @@
-/* Agent observability (M4): the Chat | Graph switch, the session graph and the agent drawer. */
+/* Agent observability (M4): the Chat | Graph | Timeline switch, the session graph, the timeline and the agent drawer. */
 
 .segmented {
   display: inline-flex;
@@ -178,6 +178,187 @@
 
 .graph-fold {
   font-size: var(--text-xs);
+}
+
+/* ---------- Timeline ---------- */
+
+.session-timeline {
+  --timeline-label: 220px;
+  flex: 1 1 0;
+  min-height: 0;
+  padding: var(--space-3) var(--space-4) var(--space-6);
+  overflow: auto;
+}
+
+.timeline-nav {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  margin-bottom: var(--space-2);
+  font-size: var(--text-sm);
+}
+
+.timeline-turn {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.timeline-empty {
+  max-width: 480px;
+  margin: var(--space-6) auto;
+  text-align: center;
+}
+
+.timeline-axis,
+.timeline-row {
+  display: grid;
+  grid-template-columns: var(--timeline-label) minmax(0, 1fr);
+  gap: var(--space-3);
+  align-items: center;
+}
+
+.timeline-axis {
+  position: sticky;
+  top: calc(-1 * var(--space-3));
+  z-index: 1;
+  height: 28px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg);
+}
+
+.timeline-track {
+  position: relative;
+  height: 100%;
+  min-height: 20px;
+}
+
+.timeline-tick {
+  position: absolute;
+  bottom: var(--space-1);
+  padding-left: 3px;
+  border-left: 1px solid var(--border-strong);
+  color: var(--muted);
+  font-size: var(--text-xs);
+  white-space: nowrap;
+}
+
+.timeline-rows {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.timeline-row {
+  width: 100%;
+  min-height: 32px;
+  padding: 0;
+  border: 0;
+  border-bottom: 1px solid var(--border);
+  border-radius: 0;
+  background: transparent;
+  color: var(--fg);
+  font: inherit;
+  font-size: var(--text-sm);
+  text-align: left;
+}
+
+button.timeline-row:hover {
+  background: var(--surface-2);
+}
+
+.timeline-row.selected {
+  background: var(--accent-soft);
+}
+
+.timeline-label {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.timeline-label > svg {
+  flex-shrink: 0;
+  color: var(--muted);
+}
+
+.timeline-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.timeline-row.main .timeline-name {
+  font-weight: 600;
+}
+
+.timeline-bar,
+.timeline-wait {
+  position: absolute;
+  top: 50%;
+  min-width: 2px;
+  height: 12px;
+  border-radius: 3px;
+  transform: translateY(-50%);
+}
+
+.timeline-bar {
+  background: var(--accent);
+}
+
+.timeline-bar.main {
+  background: var(--border-strong);
+}
+
+.timeline-bar.done {
+  background: var(--ok);
+}
+
+.timeline-bar.error {
+  background: var(--err);
+}
+
+.timeline-bar.stopped,
+.timeline-bar.paused {
+  background: repeating-linear-gradient(-45deg, var(--warn) 0 4px, transparent 4px 7px);
+  box-shadow: inset 0 0 0 1px var(--warn);
+}
+
+.timeline-bar.live {
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+  opacity: 0.85;
+}
+
+.timeline-wait,
+.timeline-wait-swatch {
+  background: var(--warn);
+  box-shadow: 0 0 0 2px var(--bg);
+}
+
+.timeline-wait {
+  height: 6px;
+}
+
+.timeline-legend {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+  font-size: var(--text-xs);
+}
+
+.timeline-wait-swatch {
+  display: inline-block;
+  width: 16px;
+  height: 6px;
+  border-radius: 3px;
 }
 
 /* ---------- Agent drawer (right panel) ---------- */

@@ -34,7 +34,17 @@ import { quitApp, readSelftestConfig, runSelftest } from "./selftest.ts";
 import { loadSettings, type Settings, saveSettings, withRecent } from "./settings.ts";
 import type { SetupView } from "./setup/SetupPage.tsx";
 import { connect, isRpcError, onExit, onReady, request, requestWithTimeout, subscribe } from "./sidecar.ts";
-import { asMode, folderName, newTab, type Tab, tabEvent, updateTab } from "./tabs.ts";
+import {
+  asMode,
+  closeWaits,
+  folderName,
+  newTab,
+  permissionAnswered,
+  permissionAsked,
+  type Tab,
+  tabEvent,
+  updateTab,
+} from "./tabs.ts";
 import { WorkspaceStep } from "./tasks/WorkspaceStep.tsx";
 import { asTheme } from "./theme.ts";
 import { applyEvent, closeAssistant, type Item, nextId, setMessageId } from "./transcript.ts";
@@ -184,6 +194,7 @@ export function App() {
                 ended: true,
                 running: false,
                 permissions: [],
+                waits: closeWaits(t.waits, Date.now()),
                 items: [...closeAssistant(t.items), notice("The agent runtime stopped.")],
               },
         ),
@@ -207,7 +218,7 @@ export function App() {
           setTaskApprovals((q) => [...q, n.params]);
           return;
         }
-        patchTab(n.params.sessionId, (t) => ({ ...t, permissions: [...t.permissions, n.params] }));
+        patchTab(n.params.sessionId, (t) => permissionAsked(t, n.params, Date.now()));
         return;
       }
       if (n.method === "task.updated") {
@@ -506,8 +517,7 @@ export function App() {
 
   async function answer(req: PermissionRequest, reply: PermissionAnswer) {
     patchTab(req.sessionId, (t) => ({
-      ...t,
-      permissions: t.permissions.filter((p) => p.requestId !== req.requestId),
+      ...permissionAnswered(t, req.requestId, Date.now()),
       // An approved plan runs in the mode the user picked (M1-16).
       ...(reply.allow && reply.mode && req.toolName === "ExitPlanMode" ? { mode: reply.mode } : {}),
     }));

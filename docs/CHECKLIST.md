@@ -24,7 +24,7 @@
 | [UX](#ux--product-design--ui-polish-before-r1) | v0.1 | Product design & UI polish (after M1/M2 work functionally) | ◐ Design system done; desktop shell, panels and setup page in place |
 | [R1](#r1--v01-release) | v0.1 | Packaging & release | ◐ Pipeline, updater, security review and docs in place; publishing waits for M0-01 and M0-22 |
 | [M3](#m3--adaptive-planner--task-contracts-v02) | v0.2 | Adaptive planner, contracts, evidence | ◐ Every tier (S, M, L, XL) runs live on macOS and Windows, with gates, evidence and accepted risk (preview); left: the owner's click-through and the exit runs |
-| [M4](#m4--agent-observability-v02v03) | v0.2–0.3 | Agent observability graph | ◐ Agent tree, live graph, drawer and per-agent stop in; timeline next |
+| [M4](#m4--agent-observability-v02v03) | v0.2–0.3 | Agent observability graph | ◐ Agent tree, live graph, drawer, per-agent stop and timeline in; replay next |
 | [M5](#m5--git-workflow-pr--quality-gates-v03) | v0.3 | Git workflow, PRs, gates | ☐ Not started |
 | [M6](#m6--deployment--workflow-canvas-v04) | v0.4 | Deploy adapters, workflow canvas | ☐ Not started |
 | [M7](#m7--evals--analytics-v05) | v0.5 | Evals & analytics | ☐ Not started |
@@ -1267,7 +1267,11 @@ Decisions: [ADR-0009](adr/0009-release-signing-and-updates.md). Maintainer steps
       parallel subagents; ticked with E2's 200-node frame times.
 - [ ] **M4-03** Node drawer: subagent prompt, transcript (SDK `getSessionMessages` / `agent_transcript_path`), tool calls, cost.
       Note: the live drawer is in (prompt, activity, tokens, ≈USD); stored transcripts come with replay (M4-08).
-- [ ] **M4-04** Timeline (Gantt) view that shows parallelism and waiting.
+- [x] **M4-04** Timeline (Gantt) view that shows parallelism and waiting.
+      Evidence: the step-3 PR. Chat | Graph | Timeline, one turn at a time; approval waits recorded per tool call
+      (`permissionAsked`/`permissionAnswered`) and drawn on the owning agent's row; tests on both subagent fixtures.
+      In the app on Windows with haiku: three parallel subagents as overlapping bars, and a subagent's Bash approval
+      as a 21 s wait on its row; light and dark checked.
 - [x] **M4-05** Controls: interrupt the session; stop a single subagent if the SDK supports it (verify).
       Evidence: `session.stopAgent` → `Query.stopTask` (SDK 0.3.311); in the app on Windows, Stop this agent ended a
       subagent mid-`sleep` as stopped while the rest of the turn finished (step-2 PR).

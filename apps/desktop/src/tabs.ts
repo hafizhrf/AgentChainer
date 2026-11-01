@@ -28,8 +28,13 @@ export type Tab = {
   mode: PermissionMode;
   /** Pending tool approvals, oldest first. */
   permissions: PermissionRequest[];
+  /** How long each tool call waited for an approval, for the timeline (M4-04). Live sessions only. */
+  waits: Wait[];
   cost: Cost;
 };
+
+/** A tool call's wait for an approval, from the request to its answer (epoch ms); `end` is unset while it waits. */
+export type Wait = { toolUseId: string; requestId: string; start: number; end?: number };
 
 type Tokens = { input: number; output: number };
 
@@ -78,6 +83,7 @@ export function newTab(
     ended: false,
     mode: options.mode,
     permissions: [],
+    waits: [],
     cost: {
       totalUsd: options.resumed ? null : 0,
       lastUsd: null,
@@ -113,6 +119,7 @@ export function tabEvent(tab: Tab, e: AgentEvent, now?: number): Tab {
         running: false,
         lastSubtype: e.subtype,
         items: applyEvent(tab.items, e, now),
+        waits: closeWaits(tab.waits, now),
         cost: {
           totalUsd: e.totalCostUsd,
           lastUsd: tab.cost.totalUsd === null ? null : Math.max(0, e.totalCostUsd - tab.cost.totalUsd),
@@ -129,10 +136,40 @@ export function tabEvent(tab: Tab, e: AgentEvent, now?: number): Tab {
       };
     }
     case "error":
-      return { ...tab, running: false, lastSubtype: "error", items: applyEvent(tab.items, e, now) };
+      return {
+        ...tab,
+        running: false,
+        lastSubtype: "error",
+        items: applyEvent(tab.items, e, now),
+        waits: closeWaits(tab.waits, now),
+      };
     default:
       return { ...tab, items: applyEvent(tab.items, e, now) };
   }
+}
+
+/** A tool call asks for an approval: queue it, and start its wait. */
+export function permissionAsked(tab: Tab, req: PermissionRequest, now: number): Tab {
+  return {
+    ...tab,
+    permissions: [...tab.permissions, req],
+    waits: [...tab.waits, { toolUseId: req.toolUseId, requestId: req.requestId, start: now }],
+  };
+}
+
+/** An approval was answered: drop it from the queue, and end its wait. */
+export function permissionAnswered(tab: Tab, requestId: string, now: number): Tab {
+  return {
+    ...tab,
+    permissions: tab.permissions.filter((p) => p.requestId !== requestId),
+    waits: tab.waits.map((w) => (w.requestId === requestId && w.end === undefined ? { ...w, end: now } : w)),
+  };
+}
+
+/** A turn that ends, or a session that dies, ends every wait still open. */
+export function closeWaits(waits: Wait[], now: number | undefined): Wait[] {
+  if (now === undefined || waits.every((w) => w.end !== undefined)) return waits;
+  return waits.map((w) => (w.end === undefined ? { ...w, end: now } : w));
 }
 
 export function updateTab(tabs: Tab[], sessionId: string, fn: (tab: Tab) => Tab): Tab[] {

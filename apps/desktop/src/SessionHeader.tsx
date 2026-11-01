@@ -1,4 +1,4 @@
-import { Folder, GitBranch, MessageSquare, Network, PanelRight, SquareTerminal } from "lucide-react";
+import { ChartGantt, Folder, GitBranch, MessageSquare, Network, PanelRight, SquareTerminal } from "lucide-react";
 import { useState } from "react";
 
 import { folderName, type Tab } from "./tabs.ts";
@@ -7,7 +7,7 @@ import { IconButton } from "./ui/IconButton.tsx";
 import { menuShortcut } from "./useMenuCommands.ts";
 
 /** The centre of a session: the chat, or the agent graph (M4-02). */
-export type SessionMode = "chat" | "graph";
+export type SessionMode = "chat" | "graph" | "timeline";
 
 /**
  * The top of a session: title (rename in place), workspace and branch, the Chat | Graph switch, panel toggles and
@@ -93,6 +93,10 @@ export function SessionHeader({
           <button type="button" aria-pressed={view === "graph"} onClick={() => onViewChange("graph")}>
             <Network size={13} aria-hidden />
             Graph
+          </button>
+          <button type="button" aria-pressed={view === "timeline"} onClick={() => onViewChange("timeline")}>
+            <ChartGantt size={13} aria-hidden />
+            Timeline
           </button>
         </fieldset>
         <IconButton

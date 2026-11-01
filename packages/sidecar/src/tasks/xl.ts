@@ -424,6 +424,6 @@ export class XlOrchestrator {
 /** A sub-task's run that ended; `note` says why when it never got to run (its setup failed). */
 type Ended = { id: string; entry: string; child: Task; note?: string };
 
-function setupNote(s: SetupRun): string {
+export function setupNote(s: SetupRun): string {
   return `\`${s.command}\` ${s.timedOut ? "timed out" : `exited ${s.exitCode}`} in ${(s.durationMs / 1000).toFixed(1)} s`;
 }

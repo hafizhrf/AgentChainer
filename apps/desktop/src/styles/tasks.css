@@ -639,3 +639,20 @@ fieldset.task-field legend {
   align-items: center;
   gap: var(--space-2);
 }
+
+/* Another task changes the same files (M5-01). */
+.task-overlaps {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+}
+
+.callout.task-overlaps > svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+  color: var(--warn);
+}
+
+.callout.task-overlaps p {
+  margin: 0;
+}

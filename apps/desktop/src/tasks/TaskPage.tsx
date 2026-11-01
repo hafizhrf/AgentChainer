@@ -11,6 +11,7 @@ import {
   type Triage,
 } from "@agentchainer/protocol";
 import {
+  AlertTriangle,
   ArrowLeft,
   ChevronRight,
   CircleCheck,
@@ -504,7 +505,9 @@ export function TaskPage({
           />
         )}
 
-        {task && isXl(task) && task.worktree && task.state !== "running" && (
+        {task && <Overlaps task={task} cwd={cwd} onOpenTask={(id) => void open(id)} />}
+
+        {task?.worktree && !task.parent && task.state !== "running" && (
           <ResultCard task={task} cwd={cwd} confirm={confirm} onChanged={(t) => show(t)} onError={setError} />
         )}
 
@@ -1535,8 +1538,46 @@ function SubtasksCard({
 }
 
 /**
- * An XL run's result (M3-07): its branch, which changes the user's branch only when they merge it, and its worktrees,
- * which Clean up removes (the branches stay).
+ * Other tasks whose live branches change the same files as this one (M5-01). Nothing is blocked; merging both may
+ * conflict. Read again whenever the task changes.
+ */
+function Overlaps({ task, cwd, onOpenTask }: { task: Task; cwd: string; onOpenTask: (id: string) => void }) {
+  const [overlaps, setOverlaps] = useState<{ taskId: string; title: string; files: string[] }[]>([]);
+  const live = !!task.worktree && !task.worktree.removed && !task.mergedInto && !task.parent;
+  // biome-ignore lint/correctness/useExhaustiveDependencies: read again whenever the task changes.
+  useEffect(() => {
+    if (!live) return setOverlaps([]);
+    let current = true;
+    request("task.overlaps", { cwd, id: task.id }).then(
+      (r) => current && setOverlaps(r.overlaps),
+      () => undefined,
+    );
+    return () => {
+      current = false;
+    };
+  }, [cwd, task.id, task.updatedAt, live]);
+  if (!overlaps.length) return null;
+  return (
+    <div className="callout task-overlaps" role="status">
+      <AlertTriangle size={15} aria-hidden />
+      <div>
+        {overlaps.map((o) => (
+          <p key={o.taskId}>
+            <button type="button" className="link" onClick={() => onOpenTask(o.taskId)}>
+              {o.title}
+            </button>{" "}
+            also changes {o.files.join(", ")}. Merging both may conflict.
+          </p>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * A run's result on its own branch (M5-01; XL since M3-07): the user's branch changes only when they merge it. What
+ * the run left uncommitted is committed on the task's branch first. Clean up removes the worktrees (the branches
+ * stay).
  */
 function ResultCard({
   task,
@@ -1590,14 +1631,15 @@ function ResultCard({
 
   async function cleanUp() {
     const ok = await confirm({
-      title: "Remove the task's worktrees?",
+      title: isXl(task) ? "Remove the task's worktrees?" : "Remove the task's worktree?",
       body: (
         <p>
-          The worktrees in <code>.agentchainer/worktrees/</code> are removed, with whatever was installed in them. The
-          branches stay, so nothing committed is lost; delete them with git when you no longer need them.
+          The task's folders in <code>.agentchainer/worktrees/</code> are removed, with whatever was installed in them.
+          What the run left uncommitted is committed on its branch first, and the branches stay, so no work is lost;
+          delete them with git when you no longer need them.
         </p>
       ),
-      confirmLabel: "Remove worktrees",
+      confirmLabel: isXl(task) ? "Remove worktrees" : "Remove worktree",
     });
     if (ok)
       await act("cleanup", () =>
@@ -1610,7 +1652,7 @@ function ResultCard({
       <div className="card-title">
         <GitMerge size={16} aria-hidden />
         <h2>Result</h2>
-        <span className="muted">On its own branch: yours changes only when you merge it.</span>
+        <span className="muted">On its own branch: your branch changes only when you merge it.</span>
       </div>
       <dl className="task-facts">
         <dt>Branch</dt>
@@ -1623,7 +1665,7 @@ function ResultCard({
             ? `Into ${task.mergedInto.branch}, ${new Date(task.mergedInto.at).toLocaleString()}`
             : "Not yet"}
         </dd>
-        <dt>Worktrees</dt>
+        <dt>{isXl(task) ? "Worktrees" : "Worktree"}</dt>
         <dd>{wt.removed ? "Removed" : <code>.agentchainer/worktrees/</code>}</dd>
       </dl>
       {conflicts.length > 0 && (

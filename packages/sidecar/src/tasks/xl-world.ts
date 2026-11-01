@@ -16,10 +16,21 @@ import {
   tipOf,
   worktreePath,
 } from "./worktree.ts";
-import type { ChildRun, XlWorld } from "./xl.ts";
+import type { ChildRun, SetupRun, XlWorld } from "./xl.ts";
 
 /** A dependency install can take a while on a cold cache. */
 const SETUP_TIMEOUT_MS = 900_000;
+
+/**
+ * Runs the project's install command in a new worktree's code folder, under the workspace guard so a lockfile it
+ * rewrites is put back. Null when the project has no install command.
+ */
+export async function setupWorktree(code: string, signal: AbortSignal): Promise<SetupRun | null> {
+  const command = installCommand(detectWorkspace(code));
+  if (!command) return null;
+  const r = await runGuarded(code, command, code, SETUP_TIMEOUT_MS, {}, signal);
+  return { command, exitCode: r.exitCode, timedOut: r.timedOut, durationMs: r.ms, tail: r.tail };
+}
 
 /**
  * The real world of an XL run (M3-07): worktrees under the workspace's `.agentchainer/worktrees/`, the project's install
@@ -46,12 +57,7 @@ export function gitWorld(
     removeWorktree: (path) => removeWorktree(root, path),
     head: () => headOf(root),
     tip: (branch) => tipOf(root, branch),
-    async setup(code, signal) {
-      const command = installCommand(detectWorkspace(code));
-      if (!command) return null;
-      const r = await runGuarded(code, command, code, SETUP_TIMEOUT_MS, {}, signal);
-      return { command, exitCode: r.exitCode, timedOut: r.timedOut, durationMs: r.ms, tail: r.tail };
-    },
+    setup: setupWorktree,
     untracked: (code) => untracked(code),
     async gates(code, kinds, round, signal) {
       const commands = resolveGates(code, detectWorkspace(code), kinds);

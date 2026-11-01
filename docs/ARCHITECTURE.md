@@ -124,7 +124,8 @@ Planned surface (v0.1):
 | request | `task.evidence` | The evidence report (M3-09) as markdown and its path in the task folder; built from the run's records when a run ends, and again when it's older than the task ([planner.md](design/planner.md) §9) |
 | request | `task.split` / `task.approveSubtasks` | XL (M3-07): a read-only session splits the approved contract into sub-tasks, created as draft child tasks with their own contracts and triage (signals plus the split's tier, capped at L); approve them all as drafted ([planner.md](design/planner.md) §8) |
 | request | `task.continue` | Picks a stopped, failed or interrupted XL run up again: merged sub-tasks are skipped, the others run in their worktrees |
-| request | `task.mergeResult` / `task.cleanup` | Merges an XL task's branch `agentchainer/<id>` into the current branch (clean tree only); removes its worktrees, and its branches only when asked |
+| request | `task.mergeResult` / `task.cleanup` | Commits what a task's run left in its worktree, then merges its branch `agentchainer/<id>` into the current branch (clean tree only); removes its worktrees after the same commit, and its branches only when asked (M3-07, M5-01) |
+| request | `task.overlaps` | Other tasks whose live branches change the same files (M5-01) |
 | notification | `task.updated` | A run changed: a step started or ended, gates ran, or it ended |
 | notification | `task` tag on `agent.event` / `permission.request` | Marks a task step's session, which has no tab: the task page shows its transcript, and its approvals show over any page |
 | request | `workspace.scan` | Detect stack, commands, and audit the setup → `WorkspaceProfile` + findings (read-only) |

@@ -25,7 +25,7 @@
 | [R1](#r1--v01-release) | v0.1 | Packaging & release | ◐ Pipeline, updater, security review and docs in place; publishing waits for M0-01 and M0-22 |
 | [M3](#m3--adaptive-planner--task-contracts-v02) | v0.2 | Adaptive planner, contracts, evidence | ◐ Every tier (S, M, L, XL) runs live on macOS and Windows, with gates, evidence and accepted risk (preview); left: the owner's click-through and the exit runs |
 | [M4](#m4--agent-observability-v02v03) | v0.2–0.3 | Agent observability graph | ◐ Agent tree, graph, drawer, stop, timeline, replay, background tasks and agent library in; E2 frame times left |
-| [M5](#m5--git-workflow-pr--quality-gates-v03) | v0.3 | Git workflow, PRs, gates | ◐ Design draft ([git-workflow.md](design/git-workflow.md)), waiting for the owner |
+| [M5](#m5--git-workflow-pr--quality-gates-v03) | v0.3 | Git workflow, PRs, gates | ◐ Design approved ([git-workflow.md](design/git-workflow.md)); a worktree for every task in; PRs next |
 | [M6](#m6--deployment--workflow-canvas-v04) | v0.4 | Deploy adapters, workflow canvas | ☐ Not started |
 | [M7](#m7--evals--analytics-v05) | v0.5 | Evals & analytics | ☐ Not started |
 | [M8](#m8--multi-folder-workspaces--agent-fleet-proposed) | later | Multi-folder workspaces, agent fleet | ☐ Proposed (owner, 2026-10-30) |
@@ -1330,12 +1330,20 @@ Decisions: [ADR-0009](adr/0009-release-signing-and-updates.md). Maintainer steps
 ## M5 — Git workflow, PR & quality gates (v0.3)
 
 → PRD [F5](PRD.md#f5--git-workflow-prs-and-quality-gates-p1) · design: [git-workflow.md](design/git-workflow.md)
-(draft, 2026-11-01)
+(approved 2026-11-01)
 
-- [ ] **M5-01** Each task runs in an isolated worktree and branch. Parallel tasks are supported, with a warning when two touch
+- [x] **M5-01** Each task runs in an isolated worktree and branch. Parallel tasks are supported, with a warning when two touch
       the same files. Worktrees are cleaned up afterward.
-      Note (2026-10-30): XL tasks already run in worktrees (`tasks/worktree.ts`, M3-07); M5-01 extends them to every
-      tier.
+      Evidence: the step-1 PR ([design §3](design/git-workflow.md)).
+      - Every tier runs in `.agentchainer/worktrees/<id>` on `agentchainer/<id>`, behind a "Task branch" setup step
+        that installs dependencies.
+      - Merge and Clean up work for every tier; each commits what the run left on the task's branch first.
+      - `task.overlaps` drives a warning on the task page.
+      - Tests: `service.test.ts` (branch, no git, merge, keep work on Clean up, overlaps) and `orchestrator.test.ts`
+        (setup step).
+      - Live on Windows (haiku): an S task ran in its worktree, `npm install` 1.1 s, then the gates; Clean up worked.
+      - In the app: two M tasks touching `src/cart.js` showed the warning; Merge committed and merged the first; Clean
+        up kept the second's work on its branch.
 - [ ] **M5-02** PR creation (gh CLI or GitHub API) with the contract and evidence report in the body.
 - [ ] **M5-03** CI status polling, plus a "Fix CI" loop that reads failing logs. The loop is gated by approval and budget.
 - [ ] **M5-04** Merge gates: independent AI review of the diff, plus deterministic scanners (gitleaks; semgrep and trivy if installed).

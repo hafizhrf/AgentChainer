@@ -22,13 +22,23 @@ import { buildEvidence, type FileChange, renderEvidence, type SecretsScan, secti
 import shipped from "./library.json" with { type: "json" };
 import { LibrarySchema } from "./library.ts";
 import { newRun, Orchestrator, parseReview } from "./orchestrator.ts";
-import { fileStats, type SessionHost, sessionRunner, startBase } from "./runner.ts";
+import { changedPaths, fileStats, type SessionHost, sessionRunner, startBase, untracked } from "./runner.ts";
 import { proposeSplit } from "./split.ts";
 import { createTask, deleteTask, listTasks, loadTask, readTaskFile, saveTask, writeTaskFile } from "./store.ts";
 import { classify, classifyPrompt, DEFAULT_BUDGET_USD, signals, triageRecord } from "./triage.ts";
-import { codeRootIn, deleteBranch, hasTrackedChanges, headOf, removeWorktree } from "./worktree.ts";
-import { XlOrchestrator } from "./xl.ts";
-import { gitWorld } from "./xl-world.ts";
+import {
+  addWorktree,
+  branchOf,
+  codeRootIn,
+  commitAll,
+  deleteBranch,
+  hasTrackedChanges,
+  headOf,
+  removeWorktree,
+  worktreePath,
+} from "./worktree.ts";
+import { setupNote, XlOrchestrator } from "./xl.ts";
+import { gitWorld, setupWorktree } from "./xl-world.ts";
 
 /**
  * The task operations behind `task.*` (M3-02, M3-03). A task is drafted (contract, then triage on the draft), edited
@@ -216,6 +226,19 @@ const library = LibrarySchema.parse(shipped);
 
 /** Runs in progress in this sidecar, by task id: a tier's workflow, or an XL run. */
 const runs = new Map<string, { cancel: () => void; readonly current: Task }>();
+/** Each run's promise, until it has fully ended: its sessions closed after its end was saved. */
+const endings = new Map<string, Promise<unknown>>();
+
+/**
+ * Waits for a run whose end is already saved, while it closes its sessions, so Merge or Clean up clicked right away
+ * finds it ended and its worktree free (Windows won't remove a folder a process runs in). A run still working isn't
+ * waited for: the caller says it's running.
+ */
+export async function settleRun(id: string): Promise<void> {
+  const run = runs.get(id);
+  const ending = endings.get(id);
+  if (run && ending && run.current.state !== "running") await ending.catch(() => undefined);
+}
 /** Set while the sidecar shuts down: a run cut off then is left `running`, so it reads back as interrupted. */
 let shuttingDown = false;
 
@@ -245,7 +268,7 @@ export function deleteTaskSafe(root: string, id: string): void {
   deleteTask(root, id);
 }
 
-/** Where a task's code is: its worktree for XL tasks and sub-tasks while it exists, otherwise the workspace. */
+/** Where a task's code is: its worktree while it exists, otherwise the workspace (one without git). */
 function codeRootOf(root: string, task: Task): string {
   const wt = task.worktree;
   return wt && !wt.removed && existsSync(wt.path) ? codeRootIn(root, wt.path) : root;
@@ -264,6 +287,7 @@ function launch(
   host: SessionHost,
   notify: (task: Task) => void,
   resume: boolean,
+  setup = false,
 ): Promise<Task> {
   const workflow = Object.values(library.workflows).find((w) => w.id === task.run?.workflow.id);
   if (!workflow) throw invalid(`The workflow ${task.run?.workflow.id} isn't in this version of the app.`);
@@ -286,8 +310,42 @@ function launch(
       notify(present(t));
     },
     resume,
+    ...(setup ? { setup: (signal: AbortSignal) => readyBranch(root, task, signal) } : {}),
   });
   return track(root, task.id, orchestrator, notify);
+}
+
+/**
+ * The task's branch, ready to work in: the project's install command in its new worktree (M5-01). The note says which
+ * branch, and that the workspace's uncommitted changes aren't on it.
+ */
+async function readyBranch(root: string, task: Task, signal: AbortSignal): Promise<{ ok: boolean; note: string }> {
+  const wt = task.worktree;
+  if (!wt) return { ok: true, note: "" };
+  const run = await setupWorktree(codeRootIn(root, wt.path), signal);
+  const notes = [
+    wt.branch,
+    ...(run ? [setupNote(run)] : []),
+    ...(hasTrackedChanges(root) ? ["your uncommitted changes in the workspace aren't on this branch"] : []),
+  ];
+  return { ok: !run || (run.exitCode === 0 && !run.timedOut), note: notes.join("; ") };
+}
+
+/**
+ * Gives a task its own worktree and branch, `agentchainer/<id>` from HEAD (M5-01), or keeps the one it has. Returns
+ * the task with it and whether it is new, so the run sets it up. A workspace without git, or without a commit to branch
+ * from, has no branch: the task runs in the workspace, as before M5.
+ */
+export function taskBranch(root: string, task: Task): { task: Task; fresh: boolean } {
+  const wt = task.worktree;
+  if (wt && !wt.removed && existsSync(wt.path)) return { task, fresh: false };
+  const head = repoOf(root) ? headOf(root) : null;
+  if (!head) return { task, fresh: false };
+  const base = wt?.base ?? head;
+  const dir = worktreePath(root, task.id);
+  addWorktree(root, dir, branchOf(task.id), base);
+  const worktree = { path: dir, branch: branchOf(task.id), base, untracked: untracked(codeRootIn(root, dir)) };
+  return { task: { ...task, worktree }, fresh: true };
 }
 
 /** Keeps a run in `runs` while it goes; when it ends, writes its evidence and tells the UI. */
@@ -298,10 +356,11 @@ function track(
   notify: (task: Task) => void,
 ): Promise<Task> {
   runs.set(id, running);
-  return running
+  const ending = running
     .run()
     .finally(() => {
       runs.delete(id);
+      endings.delete(id);
       if (shuttingDown) return;
       const ended = present(running.current);
       try {
@@ -312,9 +371,14 @@ function track(
       notify(ended);
     })
     .then(() => present(running.current));
+  endings.set(id, ending);
+  return ending;
 }
 
-/** Starts a run of an approved task (S, M or L; XL comes later). It continues in the background and reports through `notify`. */
+/**
+ * Starts a run of an approved task, in its own worktree and branch (M5-01). It continues in the background and reports
+ * through `notify`.
+ */
 export function startTask(
   root: string,
   id: string,
@@ -332,19 +396,20 @@ export function startTask(
   if (task.parent) requireOwnRun(task);
   const workflow = library.workflows[task.triage.chosen];
   if (!workflow) throw invalid(`${task.triage.chosen} tasks have no workflow in this version of the app.`);
-  // A sub-task's changes count from where its worktree branched, whichever run of it this is.
-  const base = task.worktree
-    ? { base: task.worktree.base, untrackedAtStart: task.worktree.untracked }
-    : startBase(root);
+  // A sub-task runs in the worktree its XL task made; any other task gets its own.
+  const branched = task.parent ? { task, fresh: false } : taskBranch(root, task);
+  const wt = branched.task.worktree;
+  // Changes count from where the worktree branched, whichever run this is.
+  const base = wt ? { base: wt.base, untrackedAtStart: wt.untracked } : startBase(root);
   const started: Task = {
-    ...task,
+    ...branched.task,
     state: "running",
     run: newRun(workflow, { ...opts, ...base }, now),
     updatedAt: now.toISOString(),
   };
   saveTask(root, started);
   notify(started);
-  void launch(root, started, host, notify, false);
+  void launch(root, started, host, notify, false, branched.fresh);
   return started;
 }
 
@@ -363,7 +428,10 @@ export function resumeTask(root: string, id: string, host: SessionHost, notify: 
   if (task.triage?.chosen === "XL") return continueTask(root, id, host, notify);
   if (task.parent) requireOwnRun(task);
   const running: Task = { ...task, state: "running" };
-  void launch(root, running, host, notify, true);
+  // A run cut off while its branch was being set up sets it up again.
+  const unready =
+    !!task.worktree && !task.parent && task.run.steps.some((s) => s.kind === "setup" && s.status !== "done");
+  void launch(root, running, host, notify, true, unready);
   notify(running);
   return running;
 }
@@ -590,19 +658,24 @@ function launchXl(
   return track(root, task.id, orchestrator, notify);
 }
 
-/** Merges a finished XL task's branch into the workspace's current branch; conflicts leave the merge in progress. */
+/**
+ * Merges a finished task's branch into the workspace's current branch (M5-01; XL since M3-07). What the run left
+ * uncommitted in its worktree is committed first, with the contract's objective as the message. Conflicts leave the
+ * merge in progress.
+ */
 export function mergeResult(
   root: string,
   id: string,
   now = new Date(),
 ): { merged: boolean; conflicts: string[]; into: string } {
   const task = present(loadTask(root, id));
-  if (!task.worktree || task.triage?.chosen !== "XL") throw invalid("Only an XL task has a branch to merge.");
+  if (!task.worktree || task.parent) throw invalid("This task has no branch of its own to merge.");
   if (runs.has(id)) throw invalid("The task is running. Stop it first.");
   if (task.state !== "done" && task.state !== "accepted") {
     throw invalid("Merge once the run is Done, or accept its risk first.");
   }
   if (hasTrackedChanges(root)) throw invalid("Commit or stash your changes first: the merge would mix with them.");
+  commitResult(root, task);
   const into = branches(root).current ?? "HEAD";
   const r = merge(root, task.worktree.branch);
   if (r.merged)
@@ -610,14 +683,57 @@ export function mergeResult(
   return { ...r, into };
 }
 
-/** Removes an XL task's worktrees, and its branches when asked (they may hold work that was never merged). */
+/**
+ * Commits what a task's run left in its worktree, as one commit on its branch; nothing when it's all committed (an XL
+ * task's branch holds merges). The user's commit hooks run, and one that fails stops the merge with its message.
+ */
+function commitResult(root: string, task: Task): void {
+  const wt = task.worktree;
+  if (!wt || wt.removed || !existsSync(wt.path)) return;
+  const message = `${task.contract?.objective || task.request}\n\nAgentChainer task ${task.id}`;
+  try {
+    commitAll(codeRootIn(root, wt.path), message, wt.untracked);
+  } catch (err) {
+    throw invalid(`Committing the task's changes failed: ${err instanceof Error ? err.message : String(err)}`);
+  }
+}
+
+/**
+ * Other tasks whose live branches change the same files as this one's (M5-01): merging both may conflict. Paths are
+ * relative to the code folder.
+ */
+export function overlapsOf(root: string, id: string): { taskId: string; title: string; files: string[] }[] {
+  const changed = (t: Task) => {
+    const wt = t.worktree;
+    if (!wt || wt.removed || t.mergedInto || !existsSync(wt.path)) return null;
+    return new Set(changedPaths(codeRootIn(root, wt.path), wt.base, wt.untracked));
+  };
+  const task = loadTask(root, id);
+  const mine = changed(task);
+  if (!mine?.size) return [];
+  return listTasks(root)
+    .filter((s) => s.id !== id)
+    .flatMap((s) => {
+      const other = loadTask(root, s.id);
+      if (other.parent) return [];
+      const files = [...(changed(other) ?? [])].filter((f) => mine.has(f)).sort();
+      return files.length ? [{ taskId: other.id, title: other.contract?.objective || other.request, files }] : [];
+    });
+}
+
+/**
+ * Removes a task's worktrees (an XL task's sub-tasks' too). What a run left uncommitted is committed on its branch
+ * first, and the branches stay unless asked: they may hold unmerged work.
+ */
 export function cleanupTask(root: string, id: string, deleteBranches: boolean): void {
   const task = loadTask(root, id);
-  if (task.triage?.chosen !== "XL") throw invalid("Only an XL task has worktrees.");
+  if (task.parent) throw invalid("A sub-task's worktree goes with its XL task.");
   if (runs.has(id)) throw invalid("The task is running. Stop it first.");
   for (const t of [...subtasksOf(root, task), task]) {
     const wt = t.worktree;
     if (!wt) continue;
+    // What the run left uncommitted goes on its branch first, so removing the folder loses nothing.
+    if (!deleteBranches) commitResult(root, t);
     if (!wt.removed) removeWorktree(root, wt.path);
     if (deleteBranches) deleteBranch(root, wt.branch);
     saveTask(root, { ...loadTask(root, t.id), worktree: { ...wt, removed: true } });

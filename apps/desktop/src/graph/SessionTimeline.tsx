@@ -61,7 +61,7 @@ export function SessionTimeline({
         {nav}
         <p className="timeline-empty muted">
           {turn.some((i) => i.kind === "agent" || i.kind === "tool")
-            ? "This session was reopened. Stored messages carry no times, so there is no timeline to draw; the graph shows the same agents in order."
+            ? "This session's stored messages carry no times, so there is no timeline to draw; the graph shows the same agents in order."
             : "Nothing has run in this session yet."}
         </p>
       </div>

@@ -103,8 +103,8 @@ sessions, background work, and a manager for the project's agent definitions.
 - **Prompt:** `task_started.prompt`, when the CLI sends it.
 - **Transcript:**
   - live: the agent's text and tool calls from the events the app already receives (`forwardSubagentText`);
-  - after the fact: `getSubagentMessages(sessionId, agentId)` through a new request `session.subagentMessages`,
-    which comes with replay (§9; step 2 shipped the live drawer only);
+  - after the fact: the subagent's stored transcript, which `session.history` now includes (§9), so no separate
+    request was needed;
   - both through SDK APIs only (ADR-0004).
 - **Tool calls:** with their results, the same views as in the chat.
 - **Tokens and ≈USD:** §11.
@@ -123,8 +123,8 @@ sessions, background work, and a manager for the project's agent definitions.
 - Live: the right edge follows the clock. Done: the axis fits the turn.
 - It is a plain HTML view (no chart library); rows are buttons, the arrow keys move between them, and Enter opens
   the drawer.
-- **Replay has no timeline durations.** Stored `SessionMessage`s carry no timestamps (`sdk.d.ts`
-  `SessionMessage`), so a reopened session shows order, not time. The timeline says so instead of guessing.
+- **Replay** draws from the stored messages' times (§9). Approval waits aren't stored, so a reopened session shows
+  none. When the times are missing, the timeline says so instead of guessing.
 
 ## 7. Controls (M4-05)
 
@@ -158,10 +158,21 @@ This is the largest runtime change in M4, so it ships after the read-only views:
   2. `listSubagents(sessionId)` lists the subagent transcripts;
   3. `getSubagentMessages` reads each one;
   4. `parent_agent_id` and `parent_tool_use_id` on `SessionMessage` place each subagent under its parent.
-- A new mapper turns these into the same events the live path emits, so one reducer serves both. It sits next to
-  `historyEvents`, which stays for the chat.
-- No timing or token totals are stored with the messages **(verify: whether tool results carry usage)**. Replay shows
-  structure, status, tools and text.
+- **Placing a subagent:** every message of its transcript carries the spawning Agent call's id in
+  `parent_tool_use_id`, so the transcript goes under that call, with nested agents under their parents' calls.
+  `parent_agent_id` isn't needed. A transcript whose spawn call isn't in the session, such as the CLI's own side
+  agents, is left out.
+- **One reducer:** `replayEvents` (in `stored-sessions.ts`, next to `historyEvents`) turns the main chain and the
+  subagent transcripts into the same events the live path emits, parents before children. `session.history` returns
+  them, so a reopened session in the chat, the graph, the timeline, the drawer and a task step's page all show the
+  subagents' work.
+- **Times:** the SDK returns a `timestamp` on each stored message, although `sdk.d.ts` doesn't declare it **(verify on
+  SDK updates)**. `session.history` passes them as `times`, and the UI replays each event at its time, so durations,
+  long tool calls and the timeline come back. When a timestamp is missing or unreadable, the event has no time.
+- **Status:** a subagent ends when its spawn call's result was stored. A result of
+  `[Request interrupted by user…]` means it was stopped; other errors mean it failed; no result means the session
+  ended while it ran, so it is shown as stopped.
+- **Not stored:** tokens, cost and approval waits, so the drawer of a reopened subagent shows neither.
 
 ## 10. Agent library (M4-06)
 
@@ -224,7 +235,7 @@ One PR per step, each merged before the next starts:
 2. **Graph, drawer and Stop this agent:** the session view switch, plus the layout dependency once §17's licence
    question is decided.
 3. **Timeline** (shipped as described in §6).
-4. **Replay.**
+4. **Replay** (shipped as described in §9; it also fills the drawer's stored transcripts).
 5. **Background tasks** (M4-07), with the THREAT_MODEL update.
 6. **Agent library** (M4-06).
 

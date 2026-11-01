@@ -101,7 +101,7 @@ Planned surface (v0.1):
 | request | `session.setModel` / `session.setEffort` | `setModel()` / `applyFlagSettings({effortLevel})` mid-session |
 | request | `session.close` | End a live session (tab closed); the transcript stays resumable |
 | request | `session.rewind` | `rewindFiles(messageId, {dryRun})` |
-| request | `session.list` / `session.history` / `session.rename` / `session.tag` / `session.delete` / `session.fork` | SDK session APIs on stored sessions `{cwd, sessionId}` |
+| request | `session.list` / `session.history` / `session.rename` / `session.tag` / `session.delete` / `session.fork` | SDK session APIs on stored sessions `{cwd, sessionId}`; `session.history` includes the subagents' transcripts and the stored times (M4-08) |
 | request | `session.retention` | `cleanupPeriodDays` only, from the user's effective settings |
 | request | `permission.respond` | Answer a pending permission request `{allow, always?, updatedInput?, message?, mode?}` |
 | request | `permissions.list` / `permissions.remove` | The `permissions` lists of `.claude/settings.local.json`; nothing else in that file leaves the sidecar |

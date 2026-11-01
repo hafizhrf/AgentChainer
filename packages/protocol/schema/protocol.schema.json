@@ -1402,6 +1402,15 @@
                 }
               ]
             }
+          },
+          "times": {
+            "type": "array",
+            "items": {
+              "type": [
+                "number",
+                "null"
+              ]
+            }
           }
         },
         "required": [

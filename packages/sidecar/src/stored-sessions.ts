@@ -44,53 +44,134 @@ function blocksOf(message: unknown): Block[] | string | null {
 /**
  * Turns a stored conversation into the same events a live session emits, so the UI renders both the same way.
  * Assistant text arrives as one `text.delta` per block. Thinking is skipped. Subagent transcripts aren't part of the
- * main chain, so a subagent shows as its Agent tool call.
+ * main chain, so here a subagent shows as its Agent tool call; `replayEvents` adds what it did.
  */
 export function historyEvents(messages: SessionMessage[]): AgentEvent[] {
+  return messages.flatMap((m) => messageEvents(m, null));
+}
+
+/**
+ * The events of one stored message. `agent` is the Agent tool call whose subagent wrote it, or `null` for the main
+ * chain. A subagent's own prompt is skipped: its spawn call already carries it.
+ */
+function messageEvents(m: SessionMessage, agent: string | null): AgentEvent[] {
   const events: AgentEvent[] = [];
-  for (const m of messages) {
-    const blocks = blocksOf(m.message);
-    if (blocks === null) continue;
-    if (m.type === "user") {
-      if (typeof blocks === "string") {
-        if (!META_TEXT.test(blocks)) events.push({ type: "user.message", messageId: m.uuid, text: blocks });
-        continue;
+  const blocks = blocksOf(m.message);
+  if (blocks === null) return events;
+  if (m.type === "user") {
+    if (typeof blocks === "string") {
+      if (agent === null && !META_TEXT.test(blocks)) {
+        events.push({ type: "user.message", messageId: m.uuid, text: blocks });
       }
-      const text = blocks
-        .filter((b) => b.type === "text" && typeof b.text === "string" && !META_TEXT.test(b.text))
-        .map((b) => b.text as string)
-        .join("\n");
-      const imageCount = blocks.filter((b) => b.type === "image").length;
-      if (text.trim() || imageCount) {
-        events.push({ type: "user.message", messageId: m.uuid, text, ...(imageCount ? { imageCount } : {}) });
-      }
-      for (const b of blocks) {
-        if (b.type !== "tool_result" || typeof b.tool_use_id !== "string") continue;
+      return events;
+    }
+    const text = blocks
+      .filter((b) => b.type === "text" && typeof b.text === "string" && !META_TEXT.test(b.text))
+      .map((b) => b.text as string)
+      .join("\n");
+    const imageCount = blocks.filter((b) => b.type === "image").length;
+    if (agent === null && (text.trim() || imageCount)) {
+      events.push({ type: "user.message", messageId: m.uuid, text, ...(imageCount ? { imageCount } : {}) });
+    }
+    for (const b of blocks) {
+      if (b.type !== "tool_result" || typeof b.tool_use_id !== "string") continue;
+      events.push({
+        type: "tool.completed",
+        toolUseId: b.tool_use_id,
+        isError: b.is_error === true,
+        output: summarize(b.content),
+        parentToolUseId: agent ?? m.parent_tool_use_id,
+      });
+    }
+  } else if (m.type === "assistant" && typeof blocks !== "string") {
+    for (const b of blocks) {
+      if (b.type === "text" && typeof b.text === "string" && b.text.trim()) {
+        if (agent !== null) events.push({ type: "agent.text", parentToolUseId: agent, text: b.text });
+        else if (m.parent_tool_use_id === null) events.push({ type: "text.delta", text: b.text });
+      } else if (b.type === "tool_use" && typeof b.id === "string" && typeof b.name === "string") {
         events.push({
-          type: "tool.completed",
-          toolUseId: b.tool_use_id,
-          isError: b.is_error === true,
-          output: summarize(b.content),
-          parentToolUseId: m.parent_tool_use_id,
+          type: "tool.started",
+          toolUseId: b.id,
+          name: b.name,
+          input: b.input,
+          parentToolUseId: agent ?? m.parent_tool_use_id,
         });
-      }
-    } else if (m.type === "assistant" && typeof blocks !== "string") {
-      for (const b of blocks) {
-        if (b.type === "text" && typeof b.text === "string" && b.text.trim() && m.parent_tool_use_id === null) {
-          events.push({ type: "text.delta", text: b.text });
-        } else if (b.type === "tool_use" && typeof b.id === "string" && typeof b.name === "string") {
-          events.push({
-            type: "tool.started",
-            toolUseId: b.id,
-            name: b.name,
-            input: b.input,
-            parentToolUseId: m.parent_tool_use_id,
-          });
-        }
       }
     }
   }
   return events;
+}
+
+/** The result the CLI stores for a tool call that a stop or interrupt cut short. */
+const INTERRUPTED = /^\[Request interrupted by user/;
+
+/** The tools that spawn a subagent, as in the UI's transcript. */
+const SPAWN_TOOLS = new Set(["Agent", "Task"]);
+
+/**
+ * When the CLI stored a message, in epoch ms. The SDK returns each message's `timestamp` although its types don't
+ * declare it **(verify on SDK updates)**, so it is read defensively; `null` when it is missing or unreadable.
+ */
+function timeOf(m: SessionMessage): number | null {
+  const t = (m as { timestamp?: unknown }).timestamp;
+  const ms = typeof t === "string" ? Date.parse(t) : Number.NaN;
+  return Number.isFinite(ms) ? ms : null;
+}
+
+/**
+ * A stored session as live events, subagents included (M4-08, design §9), with the time of each event (`null` when
+ * unknown) so the UI's reducer can rebuild timing too. Each subagent transcript (`getSubagentMessages`) is placed
+ * under the Agent call that spawned it: its messages carry that call's id in `parent_tool_use_id`. A transcript whose
+ * spawn call isn't in the session, such as the CLI's own side agents, is left out. A parent's events come before its
+ * children's, so the reducer always finds the parent.
+ */
+export function replayEvents(
+  main: SessionMessage[],
+  subagents: ReadonlyMap<string, SessionMessage[]>,
+): { events: AgentEvent[]; times: (number | null)[] } {
+  const events: AgentEvent[] = [];
+  const times: (number | null)[] = [];
+  const spawns = new Set<string>();
+  /** The spawn calls' results: when each subagent handed back, and whether it failed. */
+  const results = new Map<string, { at: number | null; status: "completed" | "failed" | "stopped" }>();
+  const add = (m: SessionMessage, agent: string | null) => {
+    const at = timeOf(m);
+    for (const e of messageEvents(m, agent)) {
+      if (e.type === "tool.started" && SPAWN_TOOLS.has(e.name)) spawns.add(e.toolUseId);
+      if (e.type === "tool.completed") {
+        const status = !e.isError ? "completed" : INTERRUPTED.test(e.output) ? "stopped" : "failed";
+        results.set(e.toolUseId, { at, status });
+      }
+      events.push(e);
+      times.push(at);
+    }
+  };
+  for (const m of main) add(m, null);
+
+  let pending = [...subagents].flatMap(([agentId, messages]) => {
+    const spawn = messages.find((m) => m.parent_tool_use_id)?.parent_tool_use_id;
+    return spawn ? [{ agentId, spawn, messages }] : [];
+  });
+  while (pending.length) {
+    const ready = pending.filter((t) => spawns.has(t.spawn));
+    if (!ready.length) break;
+    pending = pending.filter((t) => !ready.includes(t));
+    for (const t of ready) {
+      for (const m of t.messages) add(m, t.spawn);
+      const result = results.get(t.spawn);
+      const last = [...events].reverse().find((e) => e.type === "agent.text" && e.parentToolUseId === t.spawn);
+      events.push({
+        type: "agent.completed",
+        toolUseId: t.spawn,
+        taskId: t.agentId,
+        // No result stored: the session ended while the subagent ran.
+        status: result?.status ?? "stopped",
+        summary: last?.type === "agent.text" ? last.text : "",
+      });
+      times.push(result?.at ?? timeOf(t.messages[t.messages.length - 1] as SessionMessage));
+    }
+  }
+  return { events, times };
 }
 
 /**

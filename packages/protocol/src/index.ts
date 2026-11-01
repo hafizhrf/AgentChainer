@@ -850,9 +850,13 @@ export const methodSchemas = {
     result: z.object({ sessions: z.array(SessionInfoSchema) }),
   },
   /** The main conversation of a stored session as events, to render before resuming it. */
+  /**
+   * A stored session as live events, its subagents' transcripts included (M4-08). `times[i]` is when `events[i]`
+   * happened (epoch ms), `null` when unknown.
+   */
   "session.history": {
     params: StoredSessionRef,
-    result: z.object({ events: z.array(AgentEventSchema) }),
+    result: z.object({ events: z.array(AgentEventSchema), times: z.array(z.number().nullable()).optional() }),
   },
   "session.rename": { params: StoredSessionRef.extend({ title: z.string().trim().min(1).max(200) }), result: Ok },
   /** `tag: null` clears the tag. */

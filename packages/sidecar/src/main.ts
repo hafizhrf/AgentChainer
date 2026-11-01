@@ -39,7 +39,7 @@ import { listRules, removeRule } from "./permissions.ts";
 import { log, notify, RpcFailure, serve } from "./rpc.ts";
 import { loadSdk } from "./sdk-loader.ts";
 import { Session } from "./session.ts";
-import { historyEvents, retention, toSessionInfo } from "./stored-sessions.ts";
+import { replayEvents, retention, toSessionInfo } from "./stored-sessions.ts";
 import type { SessionHost } from "./tasks/runner.ts";
 import {
   acceptRisk,
@@ -260,7 +260,14 @@ serve(
 
     "session.history": async ({ cwd, sessionId }) => {
       const { sdk } = await prepareSdk();
-      return { events: historyEvents(await sdk.getSessionMessages(sessionId, { dir: cwd })) };
+      const main = await sdk.getSessionMessages(sessionId, { dir: cwd });
+      const ids = await sdk.listSubagents(sessionId, { dir: cwd });
+      const subagents = new Map(
+        await Promise.all(
+          ids.map(async (id) => [id, await sdk.getSubagentMessages(sessionId, id, { dir: cwd })] as const),
+        ),
+      );
+      return replayEvents(main, subagents);
     },
 
     "session.rename": async ({ cwd, sessionId, title }) => {

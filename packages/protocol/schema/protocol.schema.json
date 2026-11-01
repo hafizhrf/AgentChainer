@@ -19492,6 +19492,313 @@
         "additionalProperties": false
       }
     },
+    "deploy.targets": {
+      "params": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "cwd": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "cwd"
+        ],
+        "additionalProperties": false
+      },
+      "result": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "targets": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "adapter": {
+                  "type": "string",
+                  "enum": [
+                    "vercel"
+                  ]
+                },
+                "label": {
+                  "type": "string"
+                },
+                "config": {
+                  "type": "string"
+                },
+                "state": {
+                  "type": "string",
+                  "enum": [
+                    "missing",
+                    "not-linked",
+                    "signed-out",
+                    "ready"
+                  ]
+                },
+                "hint": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "adapter",
+                "label",
+                "config",
+                "state"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "targets"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "deploy.preview": {
+      "params": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "cwd": {
+            "type": "string",
+            "minLength": 1
+          },
+          "id": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}-[0-9a-f]{8}$"
+          },
+          "adapter": {
+            "type": "string",
+            "enum": [
+              "vercel"
+            ]
+          }
+        },
+        "required": [
+          "cwd",
+          "id",
+          "adapter"
+        ],
+        "additionalProperties": false
+      },
+      "result": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "adapter": {
+            "type": "string",
+            "enum": [
+              "vercel"
+            ]
+          },
+          "env": {
+            "type": "string",
+            "enum": [
+              "preview",
+              "production"
+            ]
+          },
+          "taskId": {
+            "type": "string"
+          },
+          "branch": {
+            "type": "string"
+          },
+          "commit": {
+            "type": "string"
+          },
+          "command": {
+            "type": "string"
+          },
+          "startedAt": {
+            "type": "string"
+          },
+          "endedAt": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "done",
+              "failed"
+            ]
+          },
+          "url": {
+            "type": "string"
+          },
+          "deploymentId": {
+            "type": "string"
+          },
+          "error": {
+            "type": "string"
+          },
+          "smoke": {
+            "type": "object",
+            "properties": {
+              "ok": {
+                "type": "boolean"
+              },
+              "how": {
+                "type": "string",
+                "enum": [
+                  "script",
+                  "http"
+                ]
+              },
+              "detail": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "ok",
+              "how",
+              "detail"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "id",
+          "adapter",
+          "env",
+          "commit",
+          "command",
+          "startedAt",
+          "endedAt",
+          "status"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "deploy.list": {
+      "params": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "cwd": {
+            "type": "string",
+            "minLength": 1
+          },
+          "taskId": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}-[0-9a-f]{8}$"
+          }
+        },
+        "required": [
+          "cwd"
+        ],
+        "additionalProperties": false
+      },
+      "result": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "deploys": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "adapter": {
+                  "type": "string",
+                  "enum": [
+                    "vercel"
+                  ]
+                },
+                "env": {
+                  "type": "string",
+                  "enum": [
+                    "preview",
+                    "production"
+                  ]
+                },
+                "taskId": {
+                  "type": "string"
+                },
+                "branch": {
+                  "type": "string"
+                },
+                "commit": {
+                  "type": "string"
+                },
+                "command": {
+                  "type": "string"
+                },
+                "startedAt": {
+                  "type": "string"
+                },
+                "endedAt": {
+                  "type": "string"
+                },
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "done",
+                    "failed"
+                  ]
+                },
+                "url": {
+                  "type": "string"
+                },
+                "deploymentId": {
+                  "type": "string"
+                },
+                "error": {
+                  "type": "string"
+                },
+                "smoke": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    },
+                    "how": {
+                      "type": "string",
+                      "enum": [
+                        "script",
+                        "http"
+                      ]
+                    },
+                    "detail": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "ok",
+                    "how",
+                    "detail"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "required": [
+                "id",
+                "adapter",
+                "env",
+                "commit",
+                "command",
+                "startedAt",
+                "endedAt",
+                "status"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "deploys"
+        ],
+        "additionalProperties": false
+      }
+    },
     "task.overlaps": {
       "params": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",

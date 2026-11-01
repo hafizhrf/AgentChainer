@@ -80,7 +80,13 @@ export function renderAgent(agent: AgentInput, keep: Record<string, unknown> = {
 const fileOf = (name: string) => `${PROJECT_DIR}/${name}.md`;
 
 /** Creates or edits (and with `previousName`, renames) a project agent. Returns the run id. */
-export function saveAgent(root: string, agent: AgentInput, catalogVersion: string, previousName?: string): string {
+export function saveAgent(
+  root: string,
+  agent: AgentInput,
+  catalogVersion: string,
+  previousName?: string,
+  now = new Date(),
+): string {
   const from = previousName ?? agent.name;
   const target = path.join(root, ...fileOf(agent.name).split("/"));
   const source = path.join(root, ...fileOf(from).split("/"));
@@ -105,10 +111,11 @@ export function saveAgent(root: string, agent: AgentInput, catalogVersion: strin
     { id: `agent:${agent.name}`, title: `${verb} agent ${agent.name}` },
     edits,
     catalogVersion,
+    now,
   );
 }
 
-export function deleteAgent(root: string, name: string, catalogVersion: string): string {
+export function deleteAgent(root: string, name: string, catalogVersion: string, now = new Date()): string {
   if (!existsSync(path.join(root, ...fileOf(name).split("/"))))
     throw new Error(`There is no project agent named ${name}.`);
   return applyFileEdits(
@@ -116,5 +123,6 @@ export function deleteAgent(root: string, name: string, catalogVersion: string):
     { id: `agent:${name}`, title: `Delete agent ${name}` },
     [{ path: fileOf(name), content: null }],
     catalogVersion,
+    now,
   );
 }

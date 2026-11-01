@@ -27,6 +27,7 @@ import {
   prPreview,
   retriageTask,
   reviseTask,
+  shortTitle,
   splitTask,
   startTask,
   taskBranch,
@@ -367,7 +368,7 @@ describe("a branch for every task (M5-01)", () => {
     const merged = mergeResult(root, id);
     assert.deepEqual(merged, { merged: true, conflicts: [], into: "main" });
     assert.equal(readFileSync(join(root, "coupon.js"), "utf8"), "export const coupon = 1;\n");
-    assert.match(git(root, "log", "-2", "--format=%s", branchOf(id)), /^Totals count quantity\.$/m);
+    assert.match(git(root, "log", "-2", "--format=%s", branchOf(id)), /^Totals count quantity$/m);
     cleanupTask(root, id, false);
     assert.equal(existsSync(wt), false);
     assert.equal(loadTask(root, id).worktree?.removed, true);
@@ -479,7 +480,7 @@ describe("pull requests (M5-02)", () => {
     const { root, gh, calls } = world();
     const { id, wt } = doneWithChange(root);
     const p = prPreview(root, id, gh);
-    assert.deepEqual([p.github.state, p.base, p.head, p.title], ["ready", "main", wt.branch, "Totals count quantity."]);
+    assert.deepEqual([p.github.state, p.base, p.head, p.title], ["ready", "main", wt.branch, "Totals count quantity"]);
     assert.match(p.body, /## Contract[\s\S]*\*\*Objective:\*\* Totals count quantity\.[\s\S]*## Evidence/);
     assert.match(p.body, /Opened from AgentChainer task `[^`]+`\.$/);
     assert.ok(!calls.some((c) => c[0] === "pr" && c[1] === "create"), "nothing was created");
@@ -503,6 +504,16 @@ describe("pull requests (M5-02)", () => {
     const again = createTaskPr(root, id, { title: "Add coupons", draft: true }, gh);
     assert.equal(again.pr?.number, 7);
     assert.equal(prs.size, 1);
+  });
+
+  it("titles a PR and its commit with the objective's first sentence, at most 72 characters", () => {
+    assert.equal(shortTitle("Totals count quantity."), "Totals count quantity");
+    assert.equal(shortTitle("Fix totals. Then also do more."), "Fix totals");
+    const long = shortTitle(
+      "Fix total() in src/cart.js so each item contributes price times quantity (in cents) instead of price alone",
+    );
+    assert.ok(long.length <= 72 && long.endsWith("…"), long);
+    assert.equal(long, "Fix total() in src/cart.js so each item contributes price times…");
   });
 
   it("refuses without gh, without changes, or before the run is Done", () => {

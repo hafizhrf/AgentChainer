@@ -9,6 +9,9 @@
 //   [--print-evidence]: prints the evidence report (M3-09)
 //   --tier XL: splits the task, approves every sub-task as drafted, runs it, prints the task branch's log, then cleans
 //   the worktrees up (M3-07)
+//   [--cwd <checkout>]: runs in an existing checkout instead of a fixture copy (left in place); for M5's live checks
+//   [--pr]: after a Done (or accepted) run, opens a draft PR through the user's own `gh` (task.createPr, M5-02). Only
+//   with --cwd on a throwaway repository you own: it pushes a branch and opens a real pull request
 //   cost: a few cents with haiku for an S task; an M or L task's review runs on Opus (≈$0.2–3).
 
 import { execSync, spawn } from "node:child_process";
@@ -29,10 +32,13 @@ const { values } = parseArgs({
     "stop-after": { type: "string" },
     accept: { type: "string" },
     "print-evidence": { type: "boolean", default: false },
+    cwd: { type: "string" },
+    pr: { type: "boolean", default: false },
   },
 });
+if (values.pr && !values.cwd) throw new Error("--pr needs --cwd: a checkout of a throwaway repository you own.");
 
-const cwd = copyFixture(values.fixture);
+const cwd = values.cwd ?? copyFixture(values.fixture);
 console.log(`workspace: ${cwd}`);
 const child = spawn(process.execPath, [fileURLToPath(new URL("../src/main.ts", import.meta.url))], {
   stdio: ["pipe", "pipe", "inherit"],
@@ -155,6 +161,15 @@ try {
   console.log(`  gate runs in the report ${same ? "✓ match the recorded runs" : "✗ differ from the recorded runs"}`);
   console.log(`  sections: ${[...evidence.markdown.matchAll(/^## (.+)$/gm)].map((m) => m[1]).join(" · ")}`);
   if (values["print-evidence"]) console.log(`\n${evidence.markdown}`);
+  // M5-02: the PR through the user's own gh, after the same preview the dialog shows.
+  if (values.pr && (final.state === "done" || final.state === "accepted")) {
+    const preview = await request("task.prPreview", { cwd, id: created.id });
+    console.log(`\nPR: ${preview.head} → ${preview.base} (gh ${preview.github.state}, ${preview.github.repo ?? "-"})`);
+    const shipped = await request("task.createPr", { cwd, id: created.id, title: preview.title, draft: true });
+    console.log(
+      `  ${shipped.pr?.url} (#${shipped.pr?.number}, draft ${shipped.pr?.draft}, head ${shipped.pr?.headSha.slice(0, 7)})`,
+    );
+  }
   if (end.worktree) {
     console.log(
       `\n${end.worktree.branch}:\n${execSync(`git log --oneline --graph -12 ${end.worktree.branch}`, { cwd, encoding: "utf8" })}`,
@@ -177,5 +192,5 @@ try {
   const timer = setTimeout(() => child.kill(), 10_000);
   await exited;
   clearTimeout(timer);
-  if (!values.keep) removeFixtureCopies();
+  if (!values.keep && !values.cwd) removeFixtureCopies();
 }

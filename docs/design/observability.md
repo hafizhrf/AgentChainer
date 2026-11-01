@@ -202,6 +202,24 @@ What shipped:
 - **Manual or auto-spawned:** an agent whose description invites automatic use ("use proactively") is marked
   auto-spawned, and the others manual. The user can change it, which rewrites that wording.
 
+What shipped:
+- **Agents** is a section of Workspace settings.
+  - It lists the project's agents, which can be created, edited, renamed and deleted.
+  - The user's own agents are listed read-only. Their folder is the CLI's config folder (`CLAUDE_CONFIG_DIR`, or
+    `~/.claude`).
+  - AgentChainer's task roles are marked **Task role**.
+  - A file that can't be read is listed with the reason, and can be deleted.
+- **Writing a file:**
+  - The front matter is YAML, written with the `yaml` library, so a description with a colon stays valid.
+  - Fields the form doesn't show (`color`, `mcpServers`, …) are kept.
+  - The CLI loaded agents written this way (`system/init` lists them).
+- **History:** every change is one recorded run (`applyFileEdits` in `bootstrap/apply.ts`). History lists it, and
+  Roll back restores the files, as for a setup step.
+- **Auto:** the checkbox adds "Use proactively." to the description, or removes that sentence. The form shows the new
+  wording at once. `isAutoAgent` and `withAutoWording` live in the protocol package, so the UI and the sidecar agree.
+- **Programmatic agents:** the app defines none for its sessions (the task roles are files), so there are none to
+  list.
+
 ## 11. Cost per agent
 
 - **Tokens are the SDK's own:** `usage.total_tokens` on `task_progress` and `task_notification`.
@@ -256,7 +274,7 @@ One PR per step, each merged before the next starts:
 3. **Timeline** (shipped as described in §6).
 4. **Replay** (shipped as described in §9; it also fills the drawer's stored transcripts).
 5. **Background tasks** (M4-07), with the THREAT_MODEL update (shipped as described in §8).
-6. **Agent library** (M4-06).
+6. **Agent library** (M4-06) (shipped as described in §10).
 
 ## 16. Alternatives considered
 

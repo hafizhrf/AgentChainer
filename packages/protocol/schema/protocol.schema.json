@@ -821,6 +821,189 @@
         "additionalProperties": false
       }
     },
+    "agents.list": {
+      "params": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "cwd": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "cwd"
+        ],
+        "additionalProperties": false
+      },
+      "result": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "agents": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "scope": {
+                  "type": "string",
+                  "enum": [
+                    "project",
+                    "user"
+                  ]
+                },
+                "file": {
+                  "type": "string"
+                },
+                "description": {
+                  "type": "string"
+                },
+                "tools": {
+                  "type": "string"
+                },
+                "model": {
+                  "type": "string"
+                },
+                "prompt": {
+                  "type": "string"
+                },
+                "auto": {
+                  "type": "boolean"
+                },
+                "role": {
+                  "type": "boolean"
+                },
+                "error": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "name",
+                "scope",
+                "file",
+                "description",
+                "prompt",
+                "auto",
+                "role"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "agents"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "agents.save": {
+      "params": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "cwd": {
+            "type": "string",
+            "minLength": 1
+          },
+          "agent": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "pattern": "^[a-z0-9][a-z0-9-]{0,63}$"
+              },
+              "description": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 2000
+              },
+              "tools": {
+                "type": "string",
+                "maxLength": 1000
+              },
+              "model": {
+                "type": "string",
+                "pattern": "^[\\w.[\\]-]{1,100}$"
+              },
+              "prompt": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 100000
+              },
+              "auto": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "name",
+              "description",
+              "prompt",
+              "auto"
+            ],
+            "additionalProperties": false
+          },
+          "previousName": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9-]{0,63}$"
+          }
+        },
+        "required": [
+          "cwd",
+          "agent"
+        ],
+        "additionalProperties": false
+      },
+      "result": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "runId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "runId"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "agents.delete": {
+      "params": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "cwd": {
+            "type": "string",
+            "minLength": 1
+          },
+          "name": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9-]{0,63}$"
+          }
+        },
+        "required": [
+          "cwd",
+          "name"
+        ],
+        "additionalProperties": false
+      },
+      "result": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "runId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "runId"
+        ],
+        "additionalProperties": false
+      }
+    },
     "permissions.remove": {
       "params": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",

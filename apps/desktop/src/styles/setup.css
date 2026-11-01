@@ -724,3 +724,51 @@ button.chip:hover {
 .install-consent .field-help {
   display: block;
 }
+
+/* ---------- Agents (M4-06) ---------- */
+
+.agents-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.agent-row {
+  padding: var(--space-2) 0;
+  border-top: 1px solid var(--border);
+}
+
+.agent-row-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.agent-row-head > svg {
+  flex-shrink: 0;
+  color: var(--accent);
+}
+
+.agent-row-desc {
+  margin: var(--space-1) 0 0;
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+}
+
+.agent-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface-2);
+}
+
+.agent-form-actions {
+  display: flex;
+  gap: var(--space-2);
+}

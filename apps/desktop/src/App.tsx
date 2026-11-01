@@ -764,6 +764,7 @@ export function App() {
         ["overview", "Overview"],
         ["plan", "Setup plan"],
         ["commands", "Commands"],
+        ["agents", "Agents"],
         ["permissions", "Permissions"],
         ["history", "History"],
       ];

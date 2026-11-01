@@ -214,6 +214,54 @@ function hasMarketplace(json: unknown, name: string): boolean {
   return JSON.stringify(json ?? null).includes(`"${name}"`);
 }
 
+/** Keeps the backups and the local-only files out of git, as part of the run so a full rollback restores it too. */
+function ignoreOwnFiles(root: string, tracker: Tracker, meta: FileRecord[]): void {
+  const ignore = existsSync(abs(root, AC_IGNORE)) ? readFileSync(abs(root, AC_IGNORE), "utf8") : "";
+  const lines = ignore.split("\n");
+  const missing = ["backups/", "profile.json", "local.json"].filter((l) => !lines.includes(l));
+  if (missing.length) {
+    tracker.write(meta, AC_IGNORE, `${ignore}${ignore && !ignore.endsWith("\n") ? "\n" : ""}${missing.join("\n")}\n`);
+  }
+}
+
+/**
+ * Writes or deletes workspace files as one recorded run with a single action, so History lists it and Roll back
+ * restores the files, like an applied setup step: the agent library's edits (M4-06). `content: null` deletes the file.
+ */
+export function applyFileEdits(
+  root: string,
+  action: { id: string; title: string },
+  edits: { path: string; content: string | null }[],
+  catalogVersion: string,
+  now = new Date(),
+): string {
+  const runId = `${now.toISOString().replace(/[:.]/g, "-")}-${randomBytes(3).toString("hex")}`;
+  const runDir = abs(root, `${BACKUPS}/${runId}`);
+  mkdirSync(runDir, { recursive: true });
+  const tracker = new Tracker(root, runDir);
+  const rec: ActionRecord = { ...action, status: "applied", warnings: [], files: [], undo: [] };
+  const run: RunRecord = { runId, startedAt: now.toISOString(), catalogVersion, actions: [rec], meta: [] };
+  try {
+    for (const e of edits) {
+      if (e.content !== null) tracker.write(rec.files, e.path, e.content);
+      else {
+        tracker.watch(rec.files, e.path);
+        rmSync(insideRoot(root, e.path), { force: true });
+      }
+    }
+    tracker.settle(rec.files);
+  } catch (err) {
+    // Leave nothing half-written.
+    restoreFiles(root, runDir, rec.files, true);
+    rmSync(runDir, { recursive: true, force: true });
+    removeIfEmpty(root);
+    throw err;
+  }
+  ignoreOwnFiles(root, tracker, run.meta);
+  writeFileSync(path.join(runDir, "run.json"), `${JSON.stringify(run, null, 2)}\n`);
+  return runId;
+}
+
 export async function applyActions(
   root: string,
   ids: string[],
@@ -314,16 +362,7 @@ export async function applyActions(
     // A run of local-only items leaves the committed lockfile alone.
     if (lockChanged) tracker.write(run.meta, LOCK, lockText(lock));
     if (localChanged) tracker.write(run.meta, LOCAL, lockText(local));
-    const ignore = existsSync(abs(root, AC_IGNORE)) ? readFileSync(abs(root, AC_IGNORE), "utf8") : "";
-    const lines = ignore.split("\n");
-    const missing = ["backups/", "profile.json", "local.json"].filter((l) => !lines.includes(l));
-    if (missing.length) {
-      tracker.write(
-        run.meta,
-        AC_IGNORE,
-        `${ignore}${ignore && !ignore.endsWith("\n") ? "\n" : ""}${missing.join("\n")}\n`,
-      );
-    }
+    ignoreOwnFiles(root, tracker, run.meta);
     writeFileSync(path.join(runDir, "run.json"), `${JSON.stringify(run, null, 2)}\n`);
   } else {
     rmSync(runDir, { recursive: true, force: true });

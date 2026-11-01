@@ -25,6 +25,7 @@ const realClis: Clis = { resolve: (n) => resolveCli(n), runner: cliRunner };
 
 const HINTS: Record<string, string> = {
   vercel: "Install it with `npm i -g vercel`, then sign in with `vercel login` in a terminal.",
+  cloudflare: "Install it with `npm i -g wrangler`, then sign in with `wrangler login` in a terminal.",
 };
 
 async function targetOf(a: Adapter, root: string, clis: Clis): Promise<DeployTarget | null> {
@@ -102,7 +103,11 @@ export async function deployPreview(
     adapter.prepare(root, code);
     const cli = clis.resolve(adapter.cli);
     if (!cli) throw invalid(`The ${adapter.cli} CLI isn't installed.`);
-    const args = adapter.deployArgs("preview");
+    // Preview aliases are lowercase letters, digits and dashes; the task id's random part keeps it short and unique.
+    const args = adapter.deployArgs("preview", {
+      alias: `task-${taskId.slice(-8)}`,
+      message: task.contract?.objective || task.request,
+    });
     const started = now();
     const base = {
       id: `${started.toISOString().replace(/[:.]/g, "-")}-${randomBytes(3).toString("hex")}`,
@@ -127,7 +132,9 @@ export async function deployPreview(
         error:
           r.status === 0
             ? "The deploy finished, but its URL couldn't be read from the output."
-            : tail || `exit ${r.status}`,
+            : adapter.id === "cloudflare" && /does not exist|not found|deploy.*first/i.test(tail)
+              ? `The Worker hasn't been deployed yet, so it has no versions to preview. Deploy it once yourself (\`wrangler deploy\`), then preview from here. (${tail})`
+              : tail || `exit ${r.status}`,
       };
     } else {
       const smoke = await runSmoke(code, out.url, clis.fetch);

@@ -7,7 +7,7 @@ import { after, describe, it } from "node:test";
 import type { RunResult } from "../run-async.ts";
 import { newTask, taskBranch } from "../tasks/service.ts";
 import { saveTask } from "../tasks/store.ts";
-import { vercel } from "./adapters.ts";
+import { cloudflare, vercel } from "./adapters.ts";
 import { resolveCli, scriptFromNpmShim } from "./cli.ts";
 import { type Clis, deployPreview, deployTargets, listDeploys } from "./service.ts";
 import { runSmoke } from "./smoke.ts";
@@ -26,6 +26,7 @@ const put = (root: string, rel: string, text: string) => {
   writeFileSync(path.join(root, rel), text);
 };
 const result = (status: number, stdout = "", stderr = ""): RunResult => ({ status, stdout, stderr });
+const CTX = { alias: "task-1a2b3c4d", message: "Ship the page" };
 
 /** A git workspace linked to Vercel, with a task that has its own worktree. */
 const linkedWorkspace = () => {
@@ -122,8 +123,8 @@ describe("the Vercel adapter (M6-01)", () => {
       deploymentId: "https://app-abc123-team.vercel.app",
     });
     assert.equal(vercel.parse(result(0, "", "Error: something")), null);
-    assert.deepEqual(vercel.deployArgs("preview"), ["deploy", "--yes"]);
-    assert.deepEqual(vercel.deployArgs("production"), ["deploy", "--prod", "--yes"]);
+    assert.deepEqual(vercel.deployArgs("preview", CTX), ["deploy", "--yes"]);
+    assert.deepEqual(vercel.deployArgs("production", CTX), ["deploy", "--prod", "--yes"]);
     assert.deepEqual(vercel.rollbackArgs("https://a.vercel.app"), ["rollback", "https://a.vercel.app", "--yes"]);
   });
 });
@@ -187,6 +188,88 @@ describe("deploy targets and a task's preview (M6-01, M6-03)", () => {
   it("refuses when the provider isn't ready", async () => {
     const { root, task } = linkedWorkspace();
     await assert.rejects(deployPreview(root, task.id, "vercel", fakeClis({ whoami: result(1) })), /vercel login/);
+  });
+});
+
+/** What `wrangler versions upload` prints (the shape of wrangler 4.x). */
+const UPLOADED = [
+  "Total Upload: 0.19 KiB / gzip: 0.16 KiB",
+  "Uploaded shop (1.20 sec)",
+  "Worker Startup Time: 2 ms",
+  "Worker Version ID: 0f3c6c1a-9b7d-4b8e-8a8e-2b1c3d4e5f60",
+  "Version Preview URL: https://0f3c6c1a-shop.team.workers.dev",
+  "Version Preview Alias URL: https://task-1a2b3c4d-shop.team.workers.dev",
+].join("\n");
+
+describe("the Cloudflare Workers adapter (M6-01)", () => {
+  it("finds wrangler's config, and leaves Pages projects for later", () => {
+    const root = tmp();
+    assert.equal(cloudflare.detect(root), null);
+    put(root, "wrangler.toml", 'name = "shop"\nmain = "src/index.js"\n');
+    assert.deepEqual(cloudflare.detect(root), { config: "wrangler.toml" });
+    const pages = tmp();
+    put(pages, "wrangler.json", '{"name":"site","pages_build_output_dir":"dist"}');
+    assert.match(cloudflare.detect(pages)?.problem ?? "", /Pages/);
+  });
+
+  it("is signed in only when whoami doesn't say otherwise (it exits 0 either way)", async () => {
+    const run = (r: RunResult) => async () => r;
+    assert.equal(await cloudflare.signedIn(run(result(0, "You are logged in with an OAuth Token")), "."), true);
+    assert.equal(
+      await cloudflare.signedIn(run(result(0, "You are not authenticated. Please run `wrangler login`.")), "."),
+      false,
+    );
+  });
+
+  it("uploads a preview version with the task's alias, reads its URL and version, and rolls back to a version", () => {
+    assert.deepEqual(cloudflare.deployArgs("preview", CTX), [
+      "versions",
+      "upload",
+      "--preview-alias",
+      "task-1a2b3c4d",
+      "--message",
+      "Ship the page",
+    ]);
+    assert.deepEqual(cloudflare.parse(result(0, UPLOADED)), {
+      url: "https://task-1a2b3c4d-shop.team.workers.dev",
+      deploymentId: "0f3c6c1a-9b7d-4b8e-8a8e-2b1c3d4e5f60",
+    });
+    assert.equal(cloudflare.parse(result(0, "Uploaded shop")), null);
+    assert.deepEqual(cloudflare.rollbackArgs("0f3c6c1a"), [
+      "rollback",
+      "0f3c6c1a",
+      "--message",
+      "Rolled back from AgentChainer",
+      "--yes",
+    ]);
+  });
+
+  it("previews a task through the service, and explains a Worker that was never deployed", async () => {
+    const { root, task } = linkedWorkspace();
+    put(root, "wrangler.toml", 'name = "shop"\nmain = "src/index.js"\n');
+    const clis = fakeClis({ whoami: result(0, "logged in"), versions: result(0, UPLOADED) });
+    const r = await deployPreview(root, task.id, "cloudflare", clis);
+    assert.deepEqual(
+      [r.status, r.adapter, r.url, r.deploymentId, r.smoke?.ok],
+      [
+        "done",
+        "cloudflare",
+        "https://task-1a2b3c4d-shop.team.workers.dev",
+        "0f3c6c1a-9b7d-4b8e-8a8e-2b1c3d4e5f60",
+        true,
+      ],
+    );
+    assert.ok(r.command.startsWith(`wrangler versions upload --preview-alias task-${task.id.slice(-8)}`));
+    const never = await deployPreview(
+      root,
+      task.id,
+      "cloudflare",
+      fakeClis({
+        whoami: result(0, "logged in"),
+        versions: result(1, "", "✘ [ERROR] This Worker does not exist on your account."),
+      }),
+    );
+    assert.match(never.error ?? "", /hasn't been deployed yet[\s\S]*wrangler deploy/);
   });
 });
 

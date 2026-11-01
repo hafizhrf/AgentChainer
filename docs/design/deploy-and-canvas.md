@@ -80,6 +80,14 @@ Each provider is an adapter with the same five steps:
   Workers come first.
 - Which of the two applies is read from the config: Workers have `main`, Pages have `pages_build_output_dir`
   **(verify)** (§15).
+- **As built (step 2):** Workers only. A config with `pages_build_output_dir` is shown with "Pages deploys come
+  later". The preview alias is `task-<last 8 characters of the task id>` (aliases are lowercase letters, digits and
+  dashes), and the message is the objective, cut to 100 characters. The URL and the version id are read from the
+  `Version Preview Alias URL:` and `Worker Version ID:` lines. `wrangler whoami` exits 0 even when signed out, so its
+  text is checked for "not authenticated" too (only the result is kept). A Worker that was never deployed has no
+  versions to preview: the card says to run `wrangler deploy` once by hand, and the app never does a first deploy
+  on its own. Whether production promotes the previewed version (`versions deploy`) or runs `wrangler deploy` is
+  settled in step 3.
 
 **Later in M6:**
 - Fly.io: `fly deploy`, `fly releases`, rollback by redeploying the previous image;

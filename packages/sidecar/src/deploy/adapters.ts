@@ -1,10 +1,12 @@
-import { copyFileSync, existsSync, mkdirSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 import type { DeployTarget } from "@agentchainer/protocol";
 import type { RunResult } from "../run-async.ts";
 import type { RunCli } from "./cli.ts";
 
 type Env = "preview" | "production";
+/** What a deploy is for: a short alias (the task's) and a message (its objective). */
+export type DeployContext = { alias: string; message: string };
 
 /**
  * A deploy provider (M6-01, design §3): how to tell a project uses it, how to ready a task's worktree for it, the
@@ -21,7 +23,7 @@ export type Adapter = {
   prepare(root: string, code: string): void;
   /** Whether the CLI is signed in. Its output names the account, so only the exit code counts. */
   signedIn(run: RunCli, code: string): Promise<boolean>;
-  deployArgs(env: Env): string[];
+  deployArgs(env: Env, ctx: DeployContext): string[];
   /** The deployment's URL and the provider's id for it, from the deploy command's output. */
   parse(result: RunResult): { url: string; deploymentId: string } | null;
   rollbackArgs(deploymentId: string): string[];
@@ -67,4 +69,50 @@ export const vercel: Adapter = {
   rollbackArgs: (deploymentId) => ["rollback", deploymentId, "--yes"],
 };
 
-export const ADAPTERS: readonly Adapter[] = [vercel];
+const WRANGLER_CONFIGS = ["wrangler.toml", "wrangler.json", "wrangler.jsonc"];
+
+/**
+ * Cloudflare Workers, through `wrangler` (flags checked against wrangler 4.58.0). A preview uploads a new version
+ * without sending traffic to it (`versions upload --preview-alias`), so production keeps serving the deployed one;
+ * rollback goes back to a version. A Worker must exist (deployed once) before versions can be uploaded. Pages
+ * projects (`pages_build_output_dir`) come later in M6.
+ */
+export const cloudflare: Adapter = {
+  id: "cloudflare",
+  label: "Cloudflare Workers",
+  cli: "wrangler",
+  detect(root) {
+    const config = WRANGLER_CONFIGS.find((c) => existsSync(path.join(root, c)));
+    if (!config) return null;
+    if (/pages_build_output_dir/.test(readFileSync(path.join(root, config), "utf8"))) {
+      return {
+        config,
+        problem: "This is a Cloudflare Pages project; Pages deploys come later. Workers are supported.",
+      };
+    }
+    return { config };
+  },
+  prepare() {
+    // The config is part of the repository, so the worktree has it.
+  },
+  async signedIn(run, code) {
+    // whoami exits 0 either way; signed out, it says so.
+    const r = await run(["whoami"], code, { timeoutMs: 30_000 });
+    return r.status === 0 && !/not authenticated|wrangler login/i.test(`${r.stdout}\n${r.stderr}`);
+  },
+  deployArgs: (env, ctx) =>
+    env === "production"
+      ? ["deploy"]
+      : ["versions", "upload", "--preview-alias", ctx.alias, "--message", ctx.message.slice(0, 100)],
+  parse(result) {
+    const text = `${result.stdout}\n${result.stderr}`;
+    const version = /Worker Version ID:\s*([0-9a-f-]{8,})/i.exec(text)?.[1];
+    const alias = /Version Preview Alias URL:\s*(https:\/\/\S+)/i.exec(text)?.[1];
+    const preview = /Version Preview URL:\s*(https:\/\/\S+)/i.exec(text)?.[1];
+    const url = alias ?? preview ?? urls(result.stdout).at(-1);
+    return url && version ? { url, deploymentId: version } : null;
+  },
+  rollbackArgs: (version) => ["rollback", version, "--message", "Rolled back from AgentChainer", "--yes"],
+};
+
+export const ADAPTERS: readonly Adapter[] = [vercel, cloudflare];

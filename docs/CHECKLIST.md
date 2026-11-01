@@ -1414,6 +1414,8 @@ Decisions: [ADR-0009](adr/0009-release-signing-and-updates.md). Maintainer steps
       Note: step 1 is built: the interface, CLIs run without a shell (npm shims resolved; wrangler checked live), the
       Vercel adapter, `deploy.targets`, `deploy.preview` and `deploy.list`, the task page's Deploy card, and records in
       `.agentchainer/deploys/`. Tested with stand-in CLIs. A live Vercel deploy waits for the owner's `vercel login`.
+      Step 2 adds Cloudflare Workers: preview through `wrangler versions upload --preview-alias`, rollback to a
+      version; Pages configs are detected and deferred. Tested with stand-in CLIs and wrangler's output shape.
 - [ ] **M6-02** Environments are labeled preview or production. Production deploys always need explicit human approval.
       Credentials stay in each provider's own CLI.
 - [ ] **M6-03** Post-deploy smoke test and one-click rollback.

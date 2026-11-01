@@ -80,6 +80,7 @@ Prerequisites:
 | Release asset script tests (collect, SHA256SUMS, latest.json) | `node --test scripts/release-assets.test.mjs` |
 | Launch smoke test (after a debug build) | `node scripts/smoke-launch.mjs target/debug/agentchainer [--seconds N]` |
 | Streaming latency + CPU self-test (after a debug build; one real haiku turn, opens a window briefly) | `node scripts/selftest-latency.mjs --cwd <empty scratch dir> [--resume]` |
+| Graph frame-time bench, exit criterion M4-E2 (after a debug build; 200 synthetic nodes, no model calls, opens a window for ~10 s) | `node scripts/graph-bench.mjs` |
 
 CI (`.github/workflows/ci.yml`) runs on every PR and on pushes to `main`. Actions are pinned by commit SHA, so keep the
 `# vX.Y.Z` comment next to each SHA when bumping.

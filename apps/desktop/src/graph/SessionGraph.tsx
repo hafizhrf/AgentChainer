@@ -25,7 +25,7 @@ type NodeData = {
   expanded: boolean;
   onToggle: (id: string) => void;
 };
-type FlowNode = Node<NodeData>;
+export type FlowNode = Node<NodeData>;
 
 /**
  * The live agent graph of a session (M4-02): the main agent, its subagents under their parents, and the key tool
@@ -38,6 +38,7 @@ export default function SessionGraph({
   waiting,
   selected,
   onSelect,
+  onFlow,
 }: {
   items: Item[];
   running: boolean;
@@ -45,6 +46,8 @@ export default function SessionGraph({
   waiting: ReadonlySet<string>;
   selected: string | null;
   onSelect: (agentId: string | null) => void;
+  /** The React Flow instance once it's ready: the M4-E2 bench drives the viewport through it. */
+  onFlow?: (flow: ReactFlowInstance<FlowNode>) => void;
 }) {
   // Every 2 s, so a tool call that turns long gets its node (design §4).
   const now = useNow(running, 2000);
@@ -129,6 +132,7 @@ export default function SessionGraph({
         nodeTypes={NODE_TYPES}
         onInit={(instance) => {
           flow.current = instance;
+          onFlow?.(instance);
         }}
         onNodeClick={(_, n) => {
           setFocused(n.id);

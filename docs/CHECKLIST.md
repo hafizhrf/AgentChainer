@@ -1317,6 +1317,13 @@ Decisions: [ADR-0009](adr/0009-release-signing-and-updates.md). Maintainer steps
       Evidence (Windows, haiku): three parallel subagents live in the graph and timeline (#55, #56), then the same
       session reopened with the same agents, nesting and times (step-4 PR).
 - [ ] **M4-E2** Pan and zoom hold 60 fps with 200 nodes on the slowest supported WebView.
+      How to run, after a debug build: `node scripts/graph-bench.mjs`. It pans, then zooms, a synthetic 200-node
+      session graph for 4 s each, with no model calls.
+      - Windows (2026-11-01): passed. WebView2 (Edge 156), 144 Hz display, 1280×780:
+        - pan: 143 fps, p95 7.1 ms, 0.3% dropped;
+        - zoom: 144 fps, p95 7.2 ms, 0% dropped.
+      - Still to run, by the owner: macOS (WKWebView) and Ubuntu (WebKitGTK, likely the slowest). The box is ticked
+        once both pass, and M4-02 with it.
 
 ---
 

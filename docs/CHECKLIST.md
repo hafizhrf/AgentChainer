@@ -25,7 +25,7 @@
 | [R1](#r1--v01-release) | v0.1 | Packaging & release | ◐ Pipeline, updater, security review and docs in place; publishing waits for M0-01 and M0-22 |
 | [M3](#m3--adaptive-planner--task-contracts-v02) | v0.2 | Adaptive planner, contracts, evidence | ◐ Every tier (S, M, L, XL) runs live on macOS and Windows, with gates, evidence and accepted risk (preview); left: the owner's click-through and the exit runs |
 | [M4](#m4--agent-observability-v02v03) | v0.2–0.3 | Agent observability graph | ◐ Agent tree, graph, drawer, stop, timeline, replay, background tasks and agent library in; E2 frame times left |
-| [M5](#m5--git-workflow-pr--quality-gates-v03) | v0.3 | Git workflow, PRs, gates | ☐ Not started |
+| [M5](#m5--git-workflow-pr--quality-gates-v03) | v0.3 | Git workflow, PRs, gates | ◐ Design draft ([git-workflow.md](design/git-workflow.md)), waiting for the owner |
 | [M6](#m6--deployment--workflow-canvas-v04) | v0.4 | Deploy adapters, workflow canvas | ☐ Not started |
 | [M7](#m7--evals--analytics-v05) | v0.5 | Evals & analytics | ☐ Not started |
 | [M8](#m8--multi-folder-workspaces--agent-fleet-proposed) | later | Multi-folder workspaces, agent fleet | ☐ Proposed (owner, 2026-10-30) |
@@ -1329,7 +1329,8 @@ Decisions: [ADR-0009](adr/0009-release-signing-and-updates.md). Maintainer steps
 
 ## M5 — Git workflow, PR & quality gates (v0.3)
 
-→ PRD [F5](PRD.md#f5--git-workflow-prs-and-quality-gates-p1)
+→ PRD [F5](PRD.md#f5--git-workflow-prs-and-quality-gates-p1) · design: [git-workflow.md](design/git-workflow.md)
+(draft, 2026-11-01)
 
 - [ ] **M5-01** Each task runs in an isolated worktree and branch. Parallel tasks are supported, with a warning when two touch
       the same files. Worktrees are cleaned up afterward.

@@ -22,10 +22,11 @@ Report vulnerabilities privately: see [SECURITY.md](../SECURITY.md).
  ┌────────────┐  IPC   ┌───────────┐ stdio ┌──────────────┐ spawn ┌────────────┐
  │  Webview   │◄──────►│ Rust core │◄─────►│ Node sidecar │──────►│ claude CLI │
  │ (React UI) │ invoke │  (Tauri)  │ JSON- │ (Agent SDK)  │       │  + tools   │
- └────────────┘        └─────┬─────┘  RPC  └──────┬───────┘       └────────────┘
-                             │ updates            │ catalog downloads (pinned, hashed)
-                             ▼                    ▼
-                     GitHub Releases       GitHub, npm
+ └────────────┘        └─────┬─────┘  RPC  └──┬───────┬───┘       └────────────┘
+                             │ updates        │       │ spawn: git push, gh (user's own logins, M5)
+                             ▼                ▼       ▼
+                     GitHub Releases    GitHub, npm   The task's GitHub repository
+                                        (catalog)
 ```
 
 **The webview is trusted to act for the user, so script in it is code execution.** It can:
@@ -50,6 +51,7 @@ as data, never run as markup or script. That is threat T-01.
 | T-08 | **Secrets leak** through logs, diagnostics or the UI (X-03). | Diagnostics are redacted: home folder, API keys, tokens, passwords and emails. The app never reads or stores credentials. Raw SDK recordings are never committed (`make-fixture.ts`). A task's evidence report scans the files the task changed with gitleaks when it's installed (`gitleaks dir <file> --redact`, local, no network) and names the flagged files, never the secret. | Medium. Redaction is pattern-based. The UI shows tool output as the agent saw it, including secrets the agent read. |
 | T-09 | **Credential handling** by the app (R-01). | None by design: the user signs in to their own CLI in their own terminal ([ADR-0002](adr/0002-auth-and-branding.md)). | None known. |
 | T-10 | **Build-time downloads outside our pinning.** | The Rust and npm dependencies are locked. CI actions are pinned by SHA. Release builds don't use the Rust cache. | Tauri's bundlers download linuxdeploy (AppImage), WiX and NSIS at build time. Their integrity depends on Tauri's own checks. |
+| T-12 | **Pull requests (M5-02):** a push or a PR body leaks secrets, or the app acts on GitHub beyond what the user asked. | Create PR runs only from the user's click, after a preview of the title, branches and body. Before anything leaves the machine, gitleaks scans the branch's changed files (when installed) and blocks on a finding. The push is `git push -u origin <task branch>`, never forced, with the user's own git credentials and no prompts. `gh` runs with an argument array, never a shell, with `GH_PROMPT_DISABLED`; the app never passes `--show-token` or reads `gh`'s config. The body is built in the sidecar from the contract and the evidence, not taken from the UI. The app never merges. | Medium. `gh` acts with the user's full GitHub rights, so the app's fixed commands are the boundary. The report can quote tool output the agent saw. |
 | T-11 | **Runaway cost** (R-10). | A spend cap per session, visible running cost, and caps on generator turns and budget. Task runs (M3) have a total cap from the triage card, per-step turn caps, capped fix rounds, and Stop. | Low to medium. |
 
 ## Tauri capabilities and IPC surface (R1-06)
@@ -77,6 +79,7 @@ Nothing else. In particular, there is no file-system or shell plugin.
 
 **Sidecar methods that touch the file system or run commands:**
 - the `workspace.*`, `git.*`, `bootstrap.*`, `task.*` and `agents.*` families;
+- `github.status`, and `task.createPr`, which pushes and runs `gh` (T-12);
 - `session.start` and `session.rewind`.
 
 Each takes a folder the user opened. Paths inside it go through `insideRoot`, and git paths are passed after `--`.

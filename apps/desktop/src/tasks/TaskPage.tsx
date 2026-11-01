@@ -10,6 +10,7 @@ import {
   type Tier,
   type Triage,
 } from "@agentchainer/protocol";
+import { openUrl } from "@tauri-apps/plugin-opener";
 import {
   AlertTriangle,
   ArrowLeft,
@@ -21,6 +22,7 @@ import {
   ExternalLink,
   FileText,
   GitMerge,
+  GitPullRequest,
   ListTree,
   Loader2,
   MinusCircle,
@@ -44,6 +46,7 @@ import { Field } from "../ui/Field.tsx";
 import { IconButton } from "../ui/IconButton.tsx";
 import { EmptyState } from "../ui/Section.tsx";
 import { Select } from "../ui/Select.tsx";
+import { CreatePrDialog } from "./CreatePr.tsx";
 import {
   canAcceptRisk,
   canContinue,
@@ -1596,6 +1599,7 @@ function ResultCard({
   const [status, setStatus] = useState<{ branch: string | null; dirty: boolean } | null>(null);
   const [busy, setBusy] = useState<"merge" | "cleanup" | null>(null);
   const [conflicts, setConflicts] = useState<string[]>([]);
+  const [creatingPr, setCreatingPr] = useState(false);
   // biome-ignore lint/correctness/useExhaustiveDependencies: read again whenever the task changes.
   useEffect(() => {
     let live = true;
@@ -1667,6 +1671,17 @@ function ResultCard({
         </dd>
         <dt>{isXl(task) ? "Worktrees" : "Worktree"}</dt>
         <dd>{wt.removed ? "Removed" : <code>.agentchainer/worktrees/</code>}</dd>
+        <dt>Pull request</dt>
+        <dd>
+          {task.pr ? (
+            <button type="button" className="link" onClick={() => void openUrl(task.pr?.url ?? "")}>
+              #{task.pr.number} into {task.pr.base}
+              {task.pr.draft ? " (draft)" : ""}
+            </button>
+          ) : (
+            "None"
+          )}
+        </dd>
       </dl>
       {conflicts.length > 0 && (
         <p className="callout">
@@ -1677,6 +1692,12 @@ function ResultCard({
       <div className="card-footer">
         {mergeBlock && !task.mergedInto && <span className="muted">{mergeBlock}</span>}
         <span className="grow" />
+        {!wt.removed && !task.pr && finished && !task.mergedInto && (
+          <button type="button" className="secondary" disabled={busy !== null} onClick={() => setCreatingPr(true)}>
+            <GitPullRequest size={14} />
+            Create PR…
+          </button>
+        )}
         {!wt.removed && (
           <button type="button" className="secondary" disabled={busy !== null} onClick={() => void cleanUp()}>
             {busy === "cleanup" && <Loader2 size={14} className="spin" />}
@@ -1699,6 +1720,13 @@ function ResultCard({
           </button>
         )}
       </div>
+      <CreatePrDialog
+        open={creatingPr}
+        task={task}
+        cwd={cwd}
+        onOpenChange={setCreatingPr}
+        onCreated={(t) => onChanged(t)}
+      />
     </section>
   );
 }

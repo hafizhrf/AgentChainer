@@ -139,8 +139,8 @@ export function listTasks(root: string): TaskSummary[] {
   return tasks.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 }
 
-/** Files steps hand to each other (planner.md §6), kept in the task's folder. */
-const HAND_OFF_FILES = new Set(["plan.md", "review.json", "summary.md", "evidence.json", "evidence.md"]);
+/** Files steps hand to each other (planner.md §6), and the body of the task's PR (M5-02), kept in the task's folder. */
+const HAND_OFF_FILES = new Set(["plan.md", "review.json", "summary.md", "evidence.json", "evidence.md", "pr-body.md"]);
 
 export function readTaskFile(root: string, id: string, name: string): string | null {
   if (!HAND_OFF_FILES.has(name)) throw new Error(`Not a task file: ${name}`);

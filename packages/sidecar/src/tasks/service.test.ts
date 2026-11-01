@@ -6,6 +6,7 @@ import { join } from "node:path";
 import { after, describe, it } from "node:test";
 import { RpcErrorCode } from "@agentchainer/protocol";
 import { copyFixture, removeFixtureCopies } from "../detect/fixture-copy.ts";
+import type { Gh, GhResult } from "../github.ts";
 import type { AgentSdkModule } from "../sdk-loader.ts";
 import { normalizeContract } from "./contract.ts";
 import shipped from "./library.json" with { type: "json" };
@@ -17,11 +18,13 @@ import {
   approveTask,
   cancelTask,
   cleanupTask,
+  createTaskPr,
   deleteTaskSafe,
   draftTask,
   mergeResult,
   newTask,
   overlapsOf,
+  prPreview,
   retriageTask,
   reviseTask,
   splitTask,
@@ -390,6 +393,127 @@ describe("a branch for every task (M5-01)", () => {
     writeFileSync(join(c.wt, "other.md"), "c\n");
     assert.deepEqual(overlapsOf(root, a.id), [{ taskId: b.id, title: "Totals count quantity.", files: ["README.md"] }]);
     assert.deepEqual(overlapsOf(root, c.id), []);
+  });
+});
+
+describe("pull requests (M5-02)", () => {
+  const git = (cwd: string, ...args: string[]) =>
+    execFileSync("git", ["-c", "user.name=t", "-c", "user.email=t@example.invalid", ...args], {
+      cwd,
+      encoding: "utf8",
+    });
+  const URL = "https://github.com/acme/app.git";
+
+  /**
+   * A workspace whose origin is on GitHub for `gh`, while pushes go to a local bare repository, and a `gh` stand-in
+   * that knows the PRs it made.
+   */
+  const world = () => {
+    const root = copyFixture("sample-app");
+    git(root, "config", "user.name", "t");
+    git(root, "config", "user.email", "t@example.invalid");
+    const bare = mkdtempSync(join(tmpdir(), "ac-origin-"));
+    git(bare, "init", "-q", "--bare");
+    git(root, "remote", "add", "origin", URL);
+    git(root, "config", `url.${bare}.pushInsteadOf`, URL);
+    const prs = new Map<string, { number: number; base: string; title: string; body: string; draft: boolean }>();
+    const calls: string[][] = [];
+    const out = (stdout: string, status = 0): GhResult => ({ status, stdout, stderr: "" });
+    const gh: Gh = (args) => {
+      calls.push(args);
+      if (args[0] === "--version") return out("gh version 2.103.3 (2026-10-26)\n");
+      if (args[0] === "auth") return out("");
+      const [cmd, sub] = args;
+      if (cmd === "pr" && sub === "view") {
+        const head = args[2] ?? "";
+        const pr = prs.get(head);
+        if (!pr) return out("", 1);
+        const sha = git(bare, "rev-parse", head).trim();
+        return out(
+          JSON.stringify({
+            number: pr.number,
+            url: `https://github.com/acme/app/pull/${pr.number}`,
+            isDraft: pr.draft,
+            headRefOid: sha,
+            baseRefName: pr.base,
+            headRefName: head,
+            state: "OPEN",
+          }),
+        );
+      }
+      if (cmd === "pr" && sub === "create") {
+        const flag = (name: string) => args[args.indexOf(name) + 1] ?? "";
+        prs.set(flag("--head"), {
+          number: prs.size + 7,
+          base: flag("--base"),
+          title: flag("--title"),
+          body: readFileSync(flag("--body-file"), "utf8"),
+          draft: args.includes("--draft"),
+        });
+        return out("https://github.com/acme/app/pull/7\n");
+      }
+      return out("", 1);
+    };
+    return { root, bare, gh, prs, calls };
+  };
+
+  /** A done M task with a change in its worktree. */
+  const doneWithChange = (root: string) => {
+    const approved = approvedXl(newTask(root, "Coupons"));
+    if (!approved.triage) throw new Error("no triage");
+    const { task } = taskBranch(root, { ...approved, triage: { ...approved.triage, chosen: "M" } });
+    const wt = task.worktree;
+    if (!wt) throw new Error("no worktree");
+    const workflow = LibrarySchema.parse(shipped).workflows.M;
+    if (!workflow) throw new Error("no M workflow");
+    saveTask(root, {
+      ...task,
+      state: "done",
+      run: newRun(workflow, { permissionMode: "default", base: wt.base, untrackedAtStart: wt.untracked }, new Date()),
+    });
+    writeFileSync(join(wt.path, "coupon.js"), "export const coupon = 1;\n");
+    return { id: task.id, wt };
+  };
+
+  it("previews the PR without sending anything: base, head, title, and a body from the contract and the evidence", () => {
+    const { root, gh, calls } = world();
+    const { id, wt } = doneWithChange(root);
+    const p = prPreview(root, id, gh);
+    assert.deepEqual([p.github.state, p.base, p.head, p.title], ["ready", "main", wt.branch, "Totals count quantity."]);
+    assert.match(p.body, /## Contract[\s\S]*\*\*Objective:\*\* Totals count quantity\.[\s\S]*## Evidence/);
+    assert.match(p.body, /Opened from AgentChainer task `[^`]+`\.$/);
+    assert.ok(!calls.some((c) => c[0] === "pr" && c[1] === "create"), "nothing was created");
+  });
+
+  it("commits, pushes the task's branch without force, opens a draft PR, and records it", () => {
+    const { root, bare, gh, prs, calls } = world();
+    const { id, wt } = doneWithChange(root);
+    const t = createTaskPr(root, id, { title: "Add coupons", draft: true }, gh, new Date("2026-11-01T12:00:00Z"));
+    assert.equal(git(bare, "show", `${wt.branch}:coupon.js`), "export const coupon = 1;\n", "pushed with the work");
+    const made = prs.get(wt.branch);
+    assert.deepEqual([made?.base, made?.title, made?.draft], ["main", "Add coupons", true]);
+    assert.match(made?.body ?? "", /## Contract/);
+    assert.deepEqual(
+      [t.pr?.number, t.pr?.base, t.pr?.head, t.pr?.draft, t.pr?.headSha],
+      [7, "main", wt.branch, true, git(bare, "rev-parse", wt.branch).trim()],
+    );
+    assert.ok(!calls.flat().some((a) => /force|--show-token/.test(a)));
+
+    // Again: the open PR is picked up, not made twice.
+    const again = createTaskPr(root, id, { title: "Add coupons", draft: true }, gh);
+    assert.equal(again.pr?.number, 7);
+    assert.equal(prs.size, 1);
+  });
+
+  it("refuses without gh, without changes, or before the run is Done", () => {
+    const { root, gh } = world();
+    const { id } = doneWithChange(root);
+    assert.throws(() => createTaskPr(root, id, { title: "x", draft: true }, null), /GitHub CLI \(gh\) isn't installed/);
+    const empty = doneWithChange(root);
+    rmSync(join(empty.wt.path, "coupon.js"));
+    assert.throws(() => createTaskPr(root, empty.id, { title: "x", draft: true }, gh), /nothing to propose/);
+    saveTask(root, { ...loadTask(root, id), state: "failed" });
+    assert.throws(() => createTaskPr(root, id, { title: "x", draft: true }, gh), /once the run is Done/);
   });
 });
 

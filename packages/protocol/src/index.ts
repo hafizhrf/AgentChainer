@@ -613,25 +613,54 @@ export const TaskSchema = z.object({
   /** The sub-tasks this one runs after. */
   dependsOn: z.array(TaskIdSchema).optional(),
   /**
-   * The git worktree an XL task or sub-task works in, on its own branch: `base` is the commit it started from, and
-   * `untracked` the files already untracked after its setup (installed dependencies), which aren't its changes.
-   * `removed` once the worktree is gone (merged, or cleaned up); the branch can outlive it.
+   * The git worktree a task works in, on its own branch (every tier since M5-01): `base` is the commit it started
+   * from, `from` the branch that was checked out then (a PR's base), and `untracked` the files already untracked after
+   * its setup (installed dependencies), which aren't its changes. `removed` once the worktree is gone (merged, or
+   * cleaned up); the branch can outlive it.
    */
   worktree: z
     .object({
       path: z.string(),
       branch: z.string(),
       base: z.string(),
+      from: z.string().optional(),
       untracked: z.array(z.string()),
       removed: z.boolean().optional(),
     })
     .optional(),
   /** An XL task's sub-tasks, in the split's order. */
   subtasks: z.array(TaskIdSchema).optional(),
-  /** Where the user merged an XL task's branch. */
+  /** Where the user merged the task's branch. */
   mergedInto: z.object({ branch: z.string(), at: z.string() }).optional(),
+  /** The pull request made from the task's branch (M5-02). */
+  pr: z
+    .object({
+      number: z.number().int(),
+      url: z.string(),
+      base: z.string(),
+      head: z.string(),
+      /** The commit the PR's branch pointed at when it was pushed. */
+      headSha: z.string(),
+      draft: z.boolean(),
+      createdAt: z.string(),
+    })
+    .optional(),
 });
 export type Task = z.infer<typeof TaskSchema>;
+
+/**
+ * Whether the app can make pull requests for a workspace through the user's own `gh` (M5-02, ADR-0002): `missing` when
+ * `gh` isn't installed, `signed-out` when it has no login for the remote's host, `no-remote` when the repository has
+ * no `origin` on a GitHub host, `ready` otherwise. Never carries the account or a token.
+ */
+export const GitHubStatusSchema = z.object({
+  state: z.enum(["missing", "no-remote", "signed-out", "ready"]),
+  version: z.string().optional(),
+  host: z.string().optional(),
+  /** `owner/name` of the origin remote, when it's on a GitHub host. */
+  repo: z.string().optional(),
+});
+export type GitHubStatus = z.infer<typeof GitHubStatusSchema>;
 
 export const TaskSummarySchema = TaskSchema.pick({
   id: true,
@@ -1162,6 +1191,31 @@ export const methodSchemas = {
   },
   /** Removes a task's worktrees (an XL task's sub-tasks' too), and its branches when asked. */
   "task.cleanup": { params: TaskRef.extend({ deleteBranches: z.boolean() }), result: Ok },
+  /** Whether pull requests can be made here through the user's `gh` (M5-02). */
+  "github.status": { params: WorkspaceRef, result: GitHubStatusSchema },
+  /**
+   * What Create PR would send (M5-02): the `gh` status, the base branch, the title and the body built from the contract
+   * and the evidence, and the task's PR when it has one already. Nothing is pushed or sent.
+   */
+  "task.prPreview": {
+    params: TaskRef,
+    result: z.object({
+      github: GitHubStatusSchema,
+      base: z.string(),
+      head: z.string(),
+      title: z.string(),
+      body: z.string(),
+    }),
+  },
+  /**
+   * Commits what the run left, scans the changed files for secrets, pushes the task's branch (never forced) and opens
+   * a pull request through `gh` (M5-02). The body is built here, not taken from the UI. A branch that has a PR already
+   * gets that one recorded instead of a second.
+   */
+  "task.createPr": {
+    params: TaskRef.extend({ title: z.string().trim().min(1).max(256), draft: z.boolean() }),
+    result: TaskSchema,
+  },
   /** Other tasks whose live branches change the same files as this one's: merging both may conflict (M5-01). */
   "task.overlaps": {
     params: TaskRef,

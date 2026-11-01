@@ -13,10 +13,11 @@ import {
 import { AC_DIR } from "../ac-dir.ts";
 import { findTool, toolsDir } from "../bootstrap/tools.ts";
 import { detectWorkspace } from "../detect/detect.ts";
-import { branches, merge } from "../git.ts";
+import { branches, merge, pushBranch } from "../git.ts";
+import { createPr, findPr, type Gh, githubStatus } from "../github.ts";
 import { RpcFailure } from "../rpc.ts";
 import type { AgentSdkModule } from "../sdk-loader.ts";
-import { listFiles, repoOf } from "../workspace.ts";
+import { git, listFiles, repoOf } from "../workspace.ts";
 import { availableGates, draftContract, normalizeContract } from "./contract.ts";
 import { buildEvidence, type FileChange, renderEvidence, type SecretsScan, sectionLines } from "./evidence.ts";
 import shipped from "./library.json" with { type: "json" };
@@ -344,7 +345,15 @@ export function taskBranch(root: string, task: Task): { task: Task; fresh: boole
   const base = wt?.base ?? head;
   const dir = worktreePath(root, task.id);
   addWorktree(root, dir, branchOf(task.id), base);
-  const worktree = { path: dir, branch: branchOf(task.id), base, untracked: untracked(codeRootIn(root, dir)) };
+  // The branch checked out now is where the work goes back to: a PR's base (M5-02).
+  const from = wt?.from ?? (git(["symbolic-ref", "--short", "-q", "HEAD"], root).stdout.trim() || undefined);
+  const worktree = {
+    path: dir,
+    branch: branchOf(task.id),
+    base,
+    ...(from ? { from } : {}),
+    untracked: untracked(codeRootIn(root, dir)),
+  };
   return { task: { ...task, worktree }, fresh: true };
 }
 
@@ -738,6 +747,135 @@ export function cleanupTask(root: string, id: string, deleteBranches: boolean): 
     if (deleteBranches) deleteBranch(root, wt.branch);
     saveTask(root, { ...loadTask(root, t.id), worktree: { ...wt, removed: true } });
   }
+}
+
+/* ---------- Pull requests (M5-02) ---------- */
+
+/** GitHub allows 65,536 characters in a PR body; the report is cut before that, with a pointer to the full file. */
+const MAX_PR_BODY = 60_000;
+
+/** A task that can become a PR: ended Done or accepted, with its own branch and a worktree to commit from. */
+function shippable(root: string, id: string): Task & { worktree: NonNullable<Task["worktree"]> } {
+  const task = present(loadTask(root, id));
+  if (task.parent) throw invalid("A sub-task's work goes in with its XL task's branch.");
+  if (runs.has(id)) throw invalid("The task is running. Stop it first.");
+  if (task.state !== "done" && task.state !== "accepted") {
+    throw invalid("Create a PR once the run is Done, or accept its risk first.");
+  }
+  const wt = task.worktree;
+  if (!wt || wt.removed || !existsSync(wt.path)) throw invalid("The task has no worktree to push from.");
+  return { ...task, worktree: wt };
+}
+
+/** The branch a task's PR goes into: the one it started from, else the workspace's current branch. */
+function prBase(root: string, task: Task): string {
+  const base = task.worktree?.from ?? (git(["symbolic-ref", "--short", "-q", "HEAD"], root).stdout.trim() || null);
+  if (!base) throw invalid("The workspace isn't on a branch, so the PR has no base. Check one out first.");
+  return base;
+}
+
+/** The PR's body: the contract, then the evidence report, then where it came from. Built here, never by the UI. */
+export function prBody(root: string, task: Task): string {
+  const c = task.contract;
+  const list = (items: string[]) => (items.length ? items.map((i) => `- ${i}`) : ["- None"]);
+  const contract = c
+    ? [
+        "## Contract",
+        "",
+        `**Objective:** ${c.objective}`,
+        "",
+        "**Acceptance criteria**",
+        "",
+        ...c.acceptanceCriteria.map((a) => `- ${a.text} (${a.check})`),
+        "",
+        "**Out of scope**",
+        "",
+        ...list(c.outOfScope),
+        "",
+      ]
+    : [];
+  const evidence = taskEvidence(root, task.id).markdown.replace(/^# .*\n+/, "");
+  const footer = ["", "---", `Opened from AgentChainer task \`${task.id}\`.`];
+  let body = [...contract, "## Evidence", "", evidence.trim(), ...footer].join("\n");
+  if (body.length > MAX_PR_BODY) {
+    body = `${body.slice(0, MAX_PR_BODY)}\n\n…the report goes on in \`.agentchainer/tasks/${task.id}/evidence.md\`.${footer.join("\n")}`;
+  }
+  return body;
+}
+
+/** What Create PR would send, without sending anything. */
+export function prPreview(root: string, id: string, gh: Gh | null) {
+  const task = shippable(root, id);
+  return {
+    github: githubStatus(root, gh),
+    base: prBase(root, task),
+    head: task.worktree.branch,
+    title: task.contract?.objective || task.request,
+    body: prBody(root, task),
+  };
+}
+
+/**
+ * Creates the task's PR: commits what the run left, scans the branch's changed files with gitleaks, pushes the branch
+ * (never forced) and opens the PR through the user's `gh`. A branch with an open PR gets that one recorded.
+ */
+export function createTaskPr(
+  root: string,
+  id: string,
+  opts: { title: string; draft: boolean },
+  gh: Gh | null,
+  now = new Date(),
+): Task {
+  const task = shippable(root, id);
+  const status = githubStatus(root, gh);
+  if (!gh || status.state !== "ready") {
+    throw invalid(
+      status.state === "missing"
+        ? "The GitHub CLI (gh) isn't installed."
+        : status.state === "no-remote"
+          ? "The repository has no origin remote on GitHub."
+          : `gh isn't signed in to ${status.host}. Run \`gh auth login\` in a terminal.`,
+    );
+  }
+  const base = prBase(root, task);
+  const head = task.worktree.branch;
+  commitResult(root, task);
+  if (git(["rev-list", "--count", `${base}..${head}`], root).stdout.trim() === "0") {
+    throw invalid(`${head} has no commits that ${base} doesn't have: there is nothing to propose.`);
+  }
+  // Nothing leaves the machine before the changed files were scanned for secrets (T-08).
+  const code = codeRootIn(root, task.worktree.path);
+  const changed = git(["diff", "--name-only", "--no-renames", `${base}...${head}`, "--", "."], code)
+    .stdout.split("\n")
+    .filter((f) => f && existsSync(path.join(code, ...f.split("/"))))
+    .map((f): FileChange => ({ path: f, status: "modified", added: null, removed: null }));
+  const scan = scanSecrets(code, changed);
+  if (scan.ran && scan.flagged.length) {
+    throw invalid(`gitleaks flagged possible secrets in ${scan.flagged.join(", ")}. Remove them before pushing.`);
+  }
+  pushBranch(root, head);
+  const existing = findPr(gh, root, head);
+  let pr = existing;
+  if (!pr) {
+    writeTaskFile(root, id, "pr-body.md", prBody(root, task));
+    const bodyFile = path.join(root, AC_DIR, "tasks", id, "pr-body.md");
+    pr = createPr(gh, root, { base, head, title: opts.title, bodyFile, draft: opts.draft });
+  }
+  const next: Task = {
+    ...loadTask(root, id),
+    pr: {
+      number: pr.number,
+      url: pr.url,
+      base: pr.baseRefName,
+      head: pr.headRefName,
+      headSha: pr.headRefOid,
+      draft: pr.isDraft,
+      createdAt: now.toISOString(),
+    },
+    updatedAt: now.toISOString(),
+  };
+  saveTask(root, next);
+  return present(next);
 }
 
 /* ---------- Accepted risk (M3-10) and evidence (M3-09) ---------- */

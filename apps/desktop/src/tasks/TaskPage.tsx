@@ -47,6 +47,7 @@ import { IconButton } from "../ui/IconButton.tsx";
 import { EmptyState } from "../ui/Section.tsx";
 import { Select } from "../ui/Select.tsx";
 import { CreatePrDialog } from "./CreatePr.tsx";
+import { PrChecks } from "./PrChecks.tsx";
 import {
   canAcceptRisk,
   canContinue,
@@ -1683,6 +1684,7 @@ function ResultCard({
           )}
         </dd>
       </dl>
+      {task.pr && <PrChecks task={task} cwd={cwd} onChanged={onChanged} />}
       {conflicts.length > 0 && (
         <p className="callout">
           The merge stopped on conflicts in {conflicts.join(", ")}. Resolve and commit them, or abort the merge, in the

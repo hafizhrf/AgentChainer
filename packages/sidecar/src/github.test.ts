@@ -4,7 +4,18 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { after, describe, it } from "node:test";
-import { findGh, type Gh, type GhResult, githubStatus, parseRemote } from "./github.ts";
+import {
+  failedJobLog,
+  findGh,
+  type Gh,
+  type GhResult,
+  githubStatus,
+  jobOf,
+  MAX_LOG_CHARS,
+  parseRemote,
+  prChecks,
+  redact,
+} from "./github.ts";
 
 const dirs: string[] = [];
 after(() => {
@@ -72,5 +83,38 @@ describe("GitHub through the user's gh (M5-02)", () => {
     assert.equal(githubStatus(repoWithOrigin("https://gitlab.com/acme/app.git"), gh).state, "no-remote");
     assert.equal(githubStatus(repoWithOrigin("https://github.example.com/acme/app.git"), gh).state, "signed-out");
     assert.ok(gh.calls.every((c) => !c.includes("--show-token") && !c.includes("token")));
+  });
+});
+
+describe("CI status and logs (M5-03)", () => {
+  const answer =
+    (r: GhResult): Gh =>
+    () =>
+      r;
+
+  it("reads checks from the JSON even when gh exits non-zero for failing or pending checks", () => {
+    const checks = [{ name: "test", workflow: "test", state: "FAILURE", bucket: "fail", link: "https://x/1" }];
+    assert.deepEqual(prChecks(answer(done(JSON.stringify(checks), 1)), ".", 1), checks);
+    assert.deepEqual(
+      prChecks(answer({ status: 1, stdout: "", stderr: "no checks reported on the 'x' branch" }), ".", 1),
+      [],
+    );
+    assert.throws(() => prChecks(answer({ status: 4, stdout: "", stderr: "HTTP 401" }), ".", 1), /HTTP 401/);
+  });
+
+  it("knows a GitHub Actions job from its check link, and nothing else", () => {
+    assert.equal(jobOf("https://github.com/a/b/actions/runs/41297716998/job/124821994093"), "124821994093");
+    assert.equal(jobOf("https://github.com/a/b/actions/runs/1/job/2?pr=3"), "2");
+    assert.equal(jobOf("https://circleci.com/gh/a/b/123"), null);
+  });
+
+  it("keeps the log's end and masks secrets and emails, as diagnostics do", () => {
+    assert.equal(
+      redact("token=abc123def and ghp_0123456789abcdefghijABCD by dev@example.com in /home/u/app", "/home/u"),
+      "token=[redacted] and [redacted token] by [email] in ~/app",
+    );
+    const long = `${"x".repeat(MAX_LOG_CHARS)}FAILED here`;
+    const log = failedJobLog(answer(done(long)), ".", "2");
+    assert.ok(log.length <= MAX_LOG_CHARS + 2 && log.endsWith("FAILED here") && log.startsWith("…"));
   });
 });

@@ -10,12 +10,14 @@
 //   --tier XL: splits the task, approves every sub-task as drafted, runs it, prints the task branch's log, then cleans
 //   the worktrees up (M3-07)
 //   [--cwd <checkout>]: runs in an existing checkout instead of a fixture copy (left in place); for M5's live checks
+//   [--fix-ci]: with --pr, breaks a test on the PR's branch, waits for CI to fail, runs one Fix CI round and waits for
+//   CI on the fix (M5-03); the worktree is kept for the round
 //   [--pr]: after a Done (or accepted) run, opens a draft PR through the user's own `gh` (task.createPr, M5-02). Only
 //   with --cwd on a throwaway repository you own: it pushes a branch and opens a real pull request
 //   cost: a few cents with haiku for an S task; an M or L task's review runs on Opus (≈$0.2–3).
 
 import { execSync, spawn } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
 import { createInterface } from "node:readline";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
@@ -34,6 +36,7 @@ const { values } = parseArgs({
     "print-evidence": { type: "boolean", default: false },
     cwd: { type: "string" },
     pr: { type: "boolean", default: false },
+    "fix-ci": { type: "boolean", default: false },
   },
 });
 if (values.pr && !values.cwd) throw new Error("--pr needs --cwd: a checkout of a throwaway repository you own.");
@@ -72,6 +75,61 @@ createInterface({ input: child.stdout }).on("line", (line) => {
     if (t.id === topId && !["running", "ready"].includes(t.state)) finished(t);
   }
 });
+
+/** Polls the PR's checks until `done` says so, or gives up after 10 minutes. */
+async function waitForChecks(taskId: string, done: (checks: { bucket: string }[]) => boolean) {
+  const until = Date.now() + 600_000;
+  for (;;) {
+    const s = await request("task.prStatus", { cwd, id: taskId });
+    if (s.checks.length && done(s.checks)) return s;
+    if (Date.now() > until) throw new Error(`CI didn't settle: ${JSON.stringify(s.checks.map((c) => c.bucket))}`);
+    await new Promise((r) => setTimeout(r, 15_000));
+  }
+}
+
+/**
+ * M5-03 live: breaks a test on the PR's branch on purpose (applyDiscount rounds up), waits for CI to fail, shows the
+ * failing log, runs one Fix CI round, and waits for CI to pass on the pushed fix.
+ */
+async function fixCiRound(task: Task) {
+  const wt = task.worktree;
+  if (!wt) return;
+  const git = (...args: string[]) => execSync(`git ${args.join(" ")}`, { cwd: wt.path, encoding: "utf8" });
+  const file = `${wt.path}/src/cart.js`;
+  writeFileSync(file, readFileSync(file, "utf8").replace("Math.round(", "Math.ceil("));
+  git("commit", "-q", "-am", '"Round discounts up"');
+  execSync(`git push -q origin ${wt.branch}`, { cwd, encoding: "utf8" });
+  console.log("\nFix CI: pushed a commit that breaks applyDiscount; waiting for CI to fail…");
+  const failing = await waitForChecks(
+    task.id,
+    (c) => c.every((x) => x.bucket !== "pending") && c.some((x) => x.bucket === "fail"),
+  );
+  const check = failing.checks.find((c) => c.bucket === "fail");
+  if (!check) return;
+  const { log } = await request("task.ciLog", { cwd, id: task.id, link: check.link });
+  console.log(
+    `  ${check.name} failed; log (${log.length} chars), last lines:\n${log
+      .trim()
+      .split("\n")
+      .slice(-6)
+      .map((l) => `    ${l}`)
+      .join("\n")}`,
+  );
+  const ended = new Promise<Task>((resolve) => (finished = resolve));
+  await request("task.fixCi", { cwd, id: task.id, link: check.link });
+  const round = await ended;
+  // The push and the round's record come right after the run's end.
+  let after = round;
+  for (let i = 0; i < 20 && (after.pr?.fixes?.length ?? 0) < 1; i++) {
+    await new Promise((r) => setTimeout(r, 500));
+    after = await request("task.get", { cwd, id: task.id });
+  }
+  console.log(`  round: ${after.state} · ${after.run?.outcome} · fixes ${JSON.stringify(after.pr?.fixes)}`);
+  if (after.pr?.fixes?.at(-1)?.state !== "done") return;
+  console.log(`  pushed ${after.pr.headSha.slice(0, 7)}; waiting for CI on it…`);
+  const green = await waitForChecks(task.id, (c) => c.every((x) => x.bucket !== "pending"));
+  console.log(`  CI after the fix: ${green.checks.map((c) => `${c.name} ${c.bucket}`).join(", ")}`);
+}
 
 let id = 0;
 async function request<M extends MethodName>(method: M, params: Methods[M]["params"]): Promise<Methods[M]["result"]> {
@@ -169,6 +227,7 @@ try {
     console.log(
       `  ${shipped.pr?.url} (#${shipped.pr?.number}, draft ${shipped.pr?.draft}, head ${shipped.pr?.headSha.slice(0, 7)})`,
     );
+    if (values["fix-ci"] && shipped.worktree) await fixCiRound(shipped);
   }
   if (end.worktree) {
     console.log(
@@ -180,7 +239,7 @@ try {
         `  [${(sub.parent?.index ?? 0) + 1}] ${sub.state}: ${sub.run?.outcome ?? ""} (≈$${(sub.run?.costUsd ?? 0).toFixed(3)})`,
       );
     }
-    await request("task.cleanup", { cwd, id: created.id, deleteBranches: false });
+    if (!values["fix-ci"]) await request("task.cleanup", { cwd, id: created.id, deleteBranches: false });
     console.log(`after Clean up:\n${execSync("git worktree list", { cwd, encoding: "utf8" })}`);
   }
   console.log(`\ngit status:\n${execSync("git status --short", { cwd, encoding: "utf8" })}`);

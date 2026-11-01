@@ -30,7 +30,7 @@ import { PANEL_TAB_LABEL, PANEL_TABS, type PanelTab, parseHidden, serializeHidde
 import { SessionView } from "./SessionView.tsx";
 import { SettingsDialog } from "./SettingsDialog.tsx";
 import { Sidebar } from "./Sidebar.tsx";
-import { quitApp, readSelftestConfig, runSelftest } from "./selftest.ts";
+import { quitApp, readSelftestConfig, runSelftest, type SelftestConfig } from "./selftest.ts";
 import { loadSettings, type Settings, saveSettings, withRecent } from "./settings.ts";
 import type { SetupView } from "./setup/SetupPage.tsx";
 import { connect, isRpcError, onExit, onReady, request, requestWithTimeout, subscribe } from "./sidecar.ts";
@@ -57,6 +57,8 @@ import { menuShortcut, useMenuCommands } from "./useMenuCommands.ts";
 const REPO = "https://github.com/hafizhrf/AgentChainer";
 const SetupPage = lazy(() => import("./setup/SetupPage.tsx").then((m) => ({ default: m.SetupPage })));
 const TaskPage = lazy(() => import("./tasks/TaskPage.tsx").then((m) => ({ default: m.TaskPage })));
+// The M4-E2 bench is dev-only; it loads only when a self-test asks for it.
+const GraphBench = lazy(() => import("./graph/GraphBench.tsx").then((m) => ({ default: m.GraphBench })));
 
 /** Guards against React StrictMode running the mount effect twice in dev. */
 let selftestStarted = false;
@@ -88,6 +90,8 @@ export function App() {
   const [active, setActive] = useState<string | null>(null);
   const [confirm, confirmDialog] = useConfirm();
   const [settingsOpen, setSettingsOpen] = useState(false);
+  /** The M4-E2 graph bench, when a self-test asks for it (dev only). */
+  const [bench, setBench] = useState<SelftestConfig | null>(null);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [updatesOpen, setUpdatesOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = usePersistentFlag("agentchainer.sidebar", true);
@@ -147,6 +151,7 @@ export function App() {
         const cfg = await readSelftestConfig();
         if (!cfg || !checked.ready || selftestStarted) return;
         selftestStarted = true;
+        if (cfg.bench) return setBench(cfg);
         setCwd(cfg.cwd);
         const report = await runSelftest(cfg, {
           start: (dir, modelAlias) => startSession(dir, modelAlias, "default"),
@@ -817,6 +822,19 @@ export function App() {
     add("App", "report-issue", "Report an issue", () => void openUrl(`${REPO}/issues/new`));
     return cmds;
   }
+
+  if (bench)
+    return (
+      <Suspense fallback={null}>
+        <GraphBench
+          onDone={(report) =>
+            void request("debug.log", { message: JSON.stringify({ selftest: { graphBench: report } }) }).then(() =>
+              bench.stay ? undefined : quitApp(),
+            )
+          }
+        />
+      </Suspense>
+    );
 
   return (
     <Tooltip.Provider delayDuration={400}>

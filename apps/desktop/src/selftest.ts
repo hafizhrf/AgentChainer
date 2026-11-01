@@ -37,12 +37,16 @@ export type SelftestConfig = {
   stay?: boolean;
   theme?: "light" | "dark";
   open?: (typeof OPEN_VIEWS)[number];
+  /** Runs a bench instead of a turn: `graph` measures pan and zoom with 200 graph nodes (M4-E2); no model call. */
+  bench?: "graph";
 };
 
 export async function readSelftestConfig(): Promise<SelftestConfig | null> {
   const raw = await invoke<string | null>("selftest_config");
   if (!raw) return null;
   const cfg = JSON.parse(raw) as Partial<SelftestConfig>;
+  if (cfg.bench === "graph")
+    return { cwd: cfg.cwd ?? "", prompt: "", bench: "graph", ...(cfg.stay ? { stay: true } : {}) };
   if (typeof cfg.cwd !== "string" || typeof cfg.prompt !== "string") return null;
   return {
     cwd: cfg.cwd,

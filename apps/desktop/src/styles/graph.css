@@ -495,3 +495,19 @@ button.timeline-row:hover {
 .agent-drawer .agent-children {
   padding: 0;
 }
+
+/* ---------- The M4-E2 bench (dev only) ---------- */
+
+.graph-bench {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  background: var(--bg);
+}
+
+.graph-bench-status {
+  margin: 0;
+  padding: var(--space-2) var(--space-4);
+  border-top: 1px solid var(--border);
+  font-size: var(--text-sm);
+}

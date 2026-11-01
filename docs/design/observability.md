@@ -262,7 +262,11 @@ What shipped:
   - a backgrounded subagent and shell (CLI 2.1.314).
 - **E1:** a live session with ≥3 parallel subagents renders correctly, then again on replay. This is checked in the
   app (WebView2 remote debugging on Windows, as for M1) and with `spike-host` for the events.
-- **E2:** the synthetic 200-node scene, with frame times measured in the app on each OS.
+- **E2:** the synthetic 200-node scene (`graph/benchScene.ts`), with frame times measured in the app on each OS.
+  - Run it with `scripts/graph-bench.mjs`. This is the self-test's `bench: "graph"` mode: no model calls and no
+    workspace.
+  - It drives React Flow's viewport on every frame and records the animation frames.
+  - It passes at ≥ 55 fps with ≤ 5% dropped frames.
 
 ## 15. Delivery
 

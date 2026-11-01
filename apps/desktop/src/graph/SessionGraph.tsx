@@ -10,11 +10,13 @@ import {
   ReactFlow,
   type ReactFlowInstance,
 } from "@xyflow/react";
-import { Bot, Check, Loader2, Pause, Sparkles, Square, Wrench, X } from "lucide-react";
+import { Bot, Loader2, Sparkles, Wrench } from "lucide-react";
 import { type KeyboardEvent, memo, useEffect, useMemo, useRef, useState } from "react";
-import type { AgentStatus, Item } from "../transcript.ts";
+import type { Item } from "../transcript.ts";
 import { agentGraph, type GraphNode, MAIN_ID, moveFocus, structureKey } from "./agentGraph.ts";
 import { layoutGraph, NODE_SIZE } from "./layout.ts";
+import { StatusIcon } from "./StatusIcon.tsx";
+import { useNow } from "./useNow.ts";
 
 type NodeData = {
   node: GraphNode;
@@ -44,7 +46,8 @@ export default function SessionGraph({
   selected: string | null;
   onSelect: (agentId: string | null) => void;
 }) {
-  const now = useNow(running);
+  // Every 2 s, so a tool call that turns long gets its node (design §4).
+  const now = useNow(running, 2000);
   const [expanded, setExpanded] = useState<ReadonlySet<string>>(new Set());
   const [focused, setFocused] = useState<string | null>(null);
   const flow = useRef<ReactFlowInstance<FlowNode> | null>(null);
@@ -147,25 +150,6 @@ export default function SessionGraph({
       {!hasAgents && <p className="graph-empty muted">No subagents in this session yet.</p>}
     </div>
   );
-}
-
-/** Re-renders every 2 s while a turn runs, so a tool call that turns long gets its node (design §4). */
-function useNow(running: boolean): number | undefined {
-  const [now, setNow] = useState(() => Date.now());
-  useEffect(() => {
-    if (!running) return;
-    const t = setInterval(() => setNow(Date.now()), 2000);
-    return () => clearInterval(t);
-  }, [running]);
-  return running ? now : undefined;
-}
-
-function StatusIcon({ status }: { status: AgentStatus }) {
-  if (status === "running") return <Loader2 size={13} className="spin" aria-label="Running" />;
-  if (status === "done") return <Check size={13} aria-label="Done" />;
-  if (status === "stopped") return <Square size={13} aria-label="Stopped" />;
-  if (status === "paused") return <Pause size={13} aria-label="Paused" />;
-  return <X size={13} aria-label="Failed" />;
 }
 
 const Handles = () => (

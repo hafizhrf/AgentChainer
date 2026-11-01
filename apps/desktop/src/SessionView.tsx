@@ -5,6 +5,7 @@ import { Group, Panel, Separator, useDefaultLayout, usePanelRef } from "react-re
 import { type Attachment, Composer } from "./Composer.tsx";
 import type { Confirm } from "./Dialog.tsx";
 import { AgentDrawer } from "./graph/AgentDrawer.tsx";
+import { SessionTimeline } from "./graph/SessionTimeline.tsx";
 import { MODE_NAMES } from "./options.ts";
 import type { PanelTab } from "./panelTabs.ts";
 import { SessionHeader, type SessionMode } from "./SessionHeader.tsx";
@@ -161,6 +162,10 @@ export function SessionView({
 
   // Esc stops the running turn (M1-14), unless a dialog or menu is open: there it closes that instead. An open agent
   // drawer closes first, so closing it never stops the whole turn.
+  const selectAgent = (id: string | null) => {
+    setAgentId(id);
+    if (id && !rightOpen) onToggleRight();
+  };
   const drawerOpen = agentId !== null;
   useEffect(() => {
     if (hidden || (!tab.running && !drawerOpen)) return;
@@ -213,16 +218,22 @@ export function SessionView({
                         running={tab.running}
                         waiting={waiting}
                         selected={agent ? agent.id : null}
-                        onSelect={(id) => {
-                          setAgentId(id);
-                          if (id && !rightOpen) onToggleRight();
-                        }}
+                        onSelect={selectAgent}
                       />
                     </Suspense>
                   )}
+                  {view === "timeline" && (
+                    <SessionTimeline
+                      items={tab.items}
+                      waits={tab.waits}
+                      running={tab.running}
+                      selected={agent ? agent.id : null}
+                      onSelect={selectAgent}
+                    />
+                  )}
                   <div
                     className="transcript-scroll"
-                    hidden={view === "graph"}
+                    hidden={view !== "chat"}
                     onScroll={(e) => {
                       const el = e.currentTarget;
                       const near = el.scrollHeight - el.scrollTop - el.clientHeight < 80;

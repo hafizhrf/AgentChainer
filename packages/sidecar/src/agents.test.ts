@@ -76,15 +76,17 @@ describe("the agent library (M4-06)", () => {
   it("creates, renames and deletes project agents as runs that History can roll back", () => {
     const root = tmp();
     const input = { name: "planner", description: "Plans work", prompt: "You plan.", auto: true };
-    const created = saveAgent(root, input, "v1");
+    // Runs are listed by time, so each change gets its own.
+    const at = (s: number) => new Date(Date.UTC(2026, 10, 1, 9, 0, s));
+    const created = saveAgent(root, input, "v1", undefined, at(1));
     assert.match(read(root, ".claude/agents/planner.md"), /description: Plans work\. Use proactively\./);
     assert.throws(() => saveAgent(root, input, "v1"), /already exists/);
 
-    const renamed = saveAgent(root, { ...input, name: "architect", auto: false }, "v1", "planner");
+    const renamed = saveAgent(root, { ...input, name: "architect", auto: false }, "v1", "planner", at(2));
     assert.equal(existsSync(path.join(root, ".claude/agents/planner.md")), false);
     assert.match(read(root, ".claude/agents/architect.md"), /description: Plans work\n/);
 
-    const deleted = deleteAgent(root, "architect", "v1");
+    const deleted = deleteAgent(root, "architect", "v1", at(3));
     assert.equal(existsSync(path.join(root, ".claude/agents/architect.md")), false);
     assert.deepEqual(
       listRuns(root).map((r) => r.actions.map((a) => a.title)),

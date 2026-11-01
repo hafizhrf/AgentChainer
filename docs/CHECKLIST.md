@@ -1416,6 +1416,9 @@ Decisions: [ADR-0009](adr/0009-release-signing-and-updates.md). Maintainer steps
       `.agentchainer/deploys/`. Tested with stand-in CLIs. A live Vercel deploy waits for the owner's `vercel login`.
       Step 2 adds Cloudflare Workers: preview through `wrangler versions upload --preview-alias`, rollback to a
       version; Pages configs are detected and deferred. Tested with stand-in CLIs and wrangler's output shape.
+      Step 4 adds Firebase Hosting (channels for previews, `hosting:clone` to roll back) and Fly.io (production only,
+      rollback by redeploying the recorded image). Tested with stand-in CLIs; firebase-tools checked against its 15.34.2
+      source, flyctl only against its docs. Docker → registry follows in its own PR.
 - [ ] **M6-02** Environments are labeled preview or production. Production deploys always need explicit human approval.
       Credentials stay in each provider's own CLI.
       Note: step 3 is built: Workspace settings → Deploy plans a production deploy of the current branch (command,

@@ -57,6 +57,10 @@ export function Deploys({ cwd }: { cwd: string }) {
     }
   }
 
+  // Fly.io and Firebase roll back only to a deploy the app recorded; the others know their own previous one.
+  const canRollBack = (d: DeployRecord) =>
+    Boolean(d.previous?.deploymentId) || Boolean(targets?.find((t) => t.adapter === d.adapter)?.rollbackWithoutRecord);
+
   // The live production deploy of each provider: the newest one that worked.
   const live = new Set(
     (targets ?? []).flatMap((t) => {
@@ -86,7 +90,8 @@ export function Deploys({ cwd }: { cwd: string }) {
           <p className="muted">
             No deploy config found. Vercel needs <code>.vercel/project.json</code> (<code>vercel link</code>);
             Cloudflare Workers need <code>wrangler.toml</code>, <code>wrangler.json</code> or{" "}
-            <code>wrangler.jsonc</code>.
+            <code>wrangler.jsonc</code>; Firebase Hosting needs <code>firebase.json</code> with a default project;
+            Fly.io needs <code>fly.toml</code>.
           </p>
         )}
         <ul className="deploy-targets">
@@ -124,6 +129,7 @@ export function Deploys({ cwd }: { cwd: string }) {
                 key={d.id}
                 d={d}
                 live={live.has(d.id)}
+                canRollBack={canRollBack(d)}
                 busy={planning !== null}
                 planning={planning === d.id}
                 onRollback={() => void open(d.adapter, d)}
@@ -151,12 +157,14 @@ export function Deploys({ cwd }: { cwd: string }) {
 function DeployRow({
   d,
   live,
+  canRollBack,
   busy,
   planning,
   onRollback,
 }: {
   d: DeployRecord;
   live: boolean;
+  canRollBack: boolean;
   busy: boolean;
   planning: boolean;
   onRollback: () => void;
@@ -193,7 +201,7 @@ function DeployRow({
           <ExternalLink size={13} />
         </IconButton>
       )}
-      {live && (
+      {live && canRollBack && (
         <button type="button" className="ghost small" disabled={busy} onClick={onRollback}>
           {planning ? <Loader2 size={13} className="spin" /> : <Undo2 size={13} />}
           Roll back…

@@ -95,6 +95,27 @@ Each provider is an adapter with the same five steps:
 - Firebase Hosting: `hosting:channel:deploy` for previews, rollback through `hosting:clone` of the previous release
   **(verify)**.
 
+**As built (step 4), Firebase Hosting and Fly.io:**
+- **Firebase Hosting** (checked against firebase-tools 15.34.2's help and source, not a live deploy):
+  - detect: `firebase.json` with `hosting`, and a default project in `.firebaserc` (else "run `firebase use --add`");
+    one Hosting site for now;
+  - signed in: `firebase login:list`, which exits 0 either way, so its text is checked for "No authorized accounts";
+  - preview: `hosting:channel:deploy task-<id> --expires 7d --non-interactive --json`, read from the JSON's `url` and
+    `version`;
+  - production: `deploy --only hosting --message <objective> --non-interactive --json`, whose result is the live
+    release's `projects/<p>/sites/<site>/versions/<id>`; the URL is `https://<site>.web.app`;
+  - rollback: `hosting:clone <site>@<previous version> <site>:live`. Firebase has no "previous" of its own, so this
+    needs the version the app recorded.
+- **Fly.io** (flags from the flyctl reference on docs.fly.io; **not checked against an installed flyctl**):
+  - detect: `fly.toml` with `app`; signed in: `fly auth whoami`'s exit code;
+  - **no previews**: Fly deploys to production only, so the task's Deploy card leaves it out;
+  - production: `fly deploy --remote-only --yes`, building on Fly's builder. The URL is the `*.fly.dev` one in the
+    output, and the image (`registry.fly.io/<app>:deployment-…`) is recorded **(verify the output on a live deploy)**;
+  - rollback: `fly deploy --image <previous image> --remote-only --yes`, which needs the image the app recorded.
+- A rollback that needs a recorded deploy and has none is refused, with "roll back in the provider's console", and
+  the Deploy page doesn't offer it.
+- Docker → registry is its own step: it has no URL to smoke-test and needs the registry the user names.
+
 ## 5. Environments (M6-02, owner decision 2)
 
 - **Preview and production** are labelled by the adapter, never guessed from a branch name.

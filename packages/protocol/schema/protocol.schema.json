@@ -19520,7 +19520,9 @@
                   "type": "string",
                   "enum": [
                     "vercel",
-                    "cloudflare"
+                    "cloudflare",
+                    "firebase",
+                    "fly"
                   ]
                 },
                 "label": {
@@ -19540,13 +19542,28 @@
                 },
                 "hint": {
                   "type": "string"
+                },
+                "environments": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "enum": [
+                      "preview",
+                      "production"
+                    ]
+                  }
+                },
+                "rollbackWithoutRecord": {
+                  "type": "boolean"
                 }
               },
               "required": [
                 "adapter",
                 "label",
                 "config",
-                "state"
+                "state",
+                "environments",
+                "rollbackWithoutRecord"
               ],
               "additionalProperties": false
             }
@@ -19575,7 +19592,9 @@
             "type": "string",
             "enum": [
               "vercel",
-              "cloudflare"
+              "cloudflare",
+              "firebase",
+              "fly"
             ]
           }
         },
@@ -19597,7 +19616,9 @@
             "type": "string",
             "enum": [
               "vercel",
-              "cloudflare"
+              "cloudflare",
+              "firebase",
+              "fly"
             ]
           },
           "env": {
@@ -19716,7 +19737,9 @@
             "type": "string",
             "enum": [
               "vercel",
-              "cloudflare"
+              "cloudflare",
+              "firebase",
+              "fly"
             ]
           }
         },
@@ -19734,7 +19757,9 @@
             "type": "string",
             "enum": [
               "vercel",
-              "cloudflare"
+              "cloudflare",
+              "firebase",
+              "fly"
             ]
           },
           "label": {
@@ -19765,7 +19790,9 @@
                 "type": "string",
                 "enum": [
                   "vercel",
-                  "cloudflare"
+                  "cloudflare",
+                  "firebase",
+                  "fly"
                 ]
               },
               "env": {
@@ -19895,7 +19922,9 @@
             "type": "string",
             "enum": [
               "vercel",
-              "cloudflare"
+              "cloudflare",
+              "firebase",
+              "fly"
             ]
           },
           "confirm": {
@@ -19925,7 +19954,9 @@
             "type": "string",
             "enum": [
               "vercel",
-              "cloudflare"
+              "cloudflare",
+              "firebase",
+              "fly"
             ]
           },
           "env": {
@@ -20066,7 +20097,9 @@
             "type": "string",
             "enum": [
               "vercel",
-              "cloudflare"
+              "cloudflare",
+              "firebase",
+              "fly"
             ]
           },
           "env": {
@@ -20207,7 +20240,9 @@
                   "type": "string",
                   "enum": [
                     "vercel",
-                    "cloudflare"
+                    "cloudflare",
+                    "firebase",
+                    "fly"
                   ]
                 },
                 "env": {

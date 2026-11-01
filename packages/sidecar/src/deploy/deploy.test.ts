@@ -7,7 +7,7 @@ import { after, describe, it } from "node:test";
 import type { RunResult } from "../run-async.ts";
 import { newTask, taskBranch } from "../tasks/service.ts";
 import { saveTask } from "../tasks/store.ts";
-import { cloudflare, vercel } from "./adapters.ts";
+import { cloudflare, firebase, fly, vercel } from "./adapters.ts";
 import { resolveCli, scriptFromNpmShim } from "./cli.ts";
 import {
   type Clis,
@@ -380,6 +380,101 @@ describe("production deploys and rollback (M6-02, M6-03)", () => {
       rollbackDeploy(root, preview.id, "shop", vercelAt("https://x")),
       /previews don't take traffic/,
     );
+  });
+});
+
+describe("the Firebase Hosting and Fly.io adapters (M6-01)", () => {
+  /** What firebase-tools 15 prints with --json (command.js wraps the command's result). */
+  const CHANNEL = JSON.stringify({
+    status: "success",
+    result: {
+      shop: { site: "shop", url: "https://shop--task-1a2b3c4d-x1y2.web.app", version: "abc123", expireTime: "" },
+    },
+  });
+  const LIVE = JSON.stringify({ status: "success", result: { hosting: "projects/p1/sites/shop/versions/def456" } });
+
+  it("finds Firebase Hosting with a default project, and reads channel and live deploys", () => {
+    const root = tmp();
+    assert.equal(firebase.detect(root), null);
+    put(root, "firebase.json", '{"hosting":{"public":"dist"}}');
+    assert.match(firebase.detect(root)?.problem ?? "", /firebase use --add/);
+    put(root, ".firebaserc", '{"projects":{"default":"shop-prod"}}');
+    assert.deepEqual(firebase.detect(root), { config: "firebase.json" });
+    assert.equal(firebase.projectName(root), "shop-prod");
+    assert.deepEqual(firebase.deployArgs("preview", CTX).slice(0, 4), [
+      "hosting:channel:deploy",
+      "task-1a2b3c4d",
+      "--expires",
+      "7d",
+    ]);
+    assert.deepEqual(firebase.parse(result(0, `i  deploying\n${CHANNEL}`)), {
+      url: "https://shop--task-1a2b3c4d-x1y2.web.app",
+      deploymentId: "shop@abc123",
+    });
+    assert.deepEqual(firebase.parse(result(0, LIVE)), { url: "https://shop.web.app", deploymentId: "shop@def456" });
+    assert.deepEqual(firebase.rollbackArgs("shop@def456"), [
+      "hosting:clone",
+      "shop@def456",
+      "shop:live",
+      "--non-interactive",
+    ]);
+    assert.equal(firebase.rollbackArgs(), null);
+  });
+
+  it("deploys Fly.io to production only, and rolls back by redeploying the recorded image", () => {
+    const root = tmp();
+    put(root, "fly.toml", "# fly.toml\napp = 'shop-api'\nprimary_region = 'sin'\n");
+    assert.deepEqual(
+      [fly.detect(root), fly.projectName(root), fly.environments],
+      [{ config: "fly.toml" }, "shop-api", ["production"]],
+    );
+    const out =
+      "image: registry.fly.io/shop-api:deployment-01JABC\nVisit your newly deployed app at https://shop-api.fly.dev/\n";
+    assert.deepEqual(fly.parse(result(0, out)), {
+      url: "https://shop-api.fly.dev",
+      deploymentId: "registry.fly.io/shop-api:deployment-01JABC",
+    });
+    assert.deepEqual(fly.rollbackArgs("registry.fly.io/shop-api:deployment-01JABC"), [
+      "deploy",
+      "--image",
+      "registry.fly.io/shop-api:deployment-01JABC",
+      "--remote-only",
+      "--yes",
+    ]);
+    assert.equal(fly.rollbackArgs(), null);
+  });
+
+  it("refuses a Fly.io preview, and a rollback with no recorded deploy to go back to", async () => {
+    const { root, task } = linkedWorkspace();
+    rmSync(path.join(root, ".vercel"), { recursive: true });
+    put(root, "fly.toml", 'app = "shop-api"\n');
+    const g = (...args: string[]) =>
+      execFileSync("git", ["-c", "user.name=t", "-c", "user.email=t@example.invalid", ...args], { cwd: root });
+    g("add", "fly.toml");
+    g("commit", "-q", "-m", "fly");
+    const clis = fakeClis({
+      auth: result(0),
+      deploy: result(0, "image: registry.fly.io/shop-api:deployment-1\nhttps://shop-api.fly.dev/\n"),
+    });
+    const [target] = await deployTargets(root, clis);
+    assert.deepEqual(
+      [target?.adapter, target?.environments, target?.rollbackWithoutRecord],
+      ["fly", ["production"], false],
+    );
+    await assert.rejects(deployPreview(root, task.id, "fly", clis), /no previews/);
+    const { commit } = await productionPlan(root, "fly", clis);
+    const first = await deployProduction(root, "fly", { typed: "shop-api", commit }, clis);
+    assert.equal(first.deploymentId, "registry.fly.io/shop-api:deployment-1");
+    await assert.rejects(rollbackDeploy(root, first.id, "shop-api", clis), /no record of the Fly\.io deploy before/);
+    const second = await deployProduction(root, "fly", { typed: "shop-api", commit }, clis);
+    await rollbackDeploy(root, second.id, "shop-api", clis);
+    assert.deepEqual(clis.calls.at(-1)?.args, [
+      "deploy",
+      "--image",
+      "registry.fly.io/shop-api:deployment-1",
+      "--remote-only",
+      "--yes",
+    ]);
   });
 });
 

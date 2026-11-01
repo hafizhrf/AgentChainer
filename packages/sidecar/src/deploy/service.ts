@@ -33,19 +33,28 @@ const realClis: Clis = { resolve: (n) => resolveCli(n), runner: cliRunner };
 const HINTS: Record<string, string> = {
   vercel: "Install it with `npm i -g vercel`, then sign in with `vercel login` in a terminal.",
   cloudflare: "Install it with `npm i -g wrangler`, then sign in with `wrangler login` in a terminal.",
+  firebase: "Install it with `npm i -g firebase-tools`, then sign in with `firebase login` in a terminal.",
+  fly: "Install flyctl (fly.io/docs/flyctl/install), then sign in with `fly auth login` in a terminal.",
 };
+const LOGIN: Record<string, string> = { fly: "fly auth login" };
 
 async function targetOf(a: Adapter, root: string, clis: Clis): Promise<DeployTarget | null> {
   const found = a.detect(root);
   if (!found) return null;
-  const base = { adapter: a.id, label: a.label, config: found.config };
+  const base = {
+    adapter: a.id,
+    label: a.label,
+    config: found.config,
+    environments: [...a.environments],
+    rollbackWithoutRecord: a.rollbackArgs() !== null,
+  };
   const cli = clis.resolve(a.cli);
   if (!cli) return { ...base, state: "missing", hint: HINTS[a.id] ?? `Install the ${a.cli} CLI.` };
   if (found.problem) return { ...base, state: "not-linked", hint: found.problem };
   const signedIn = await a.signedIn(clis.runner(cli), root);
   return signedIn
     ? { ...base, state: "ready" }
-    : { ...base, state: "signed-out", hint: `Sign in with \`${a.cli} login\` in a terminal.` };
+    : { ...base, state: "signed-out", hint: `Sign in with \`${LOGIN[a.id] ?? `${a.cli} login`}\` in a terminal.` };
 }
 
 /** The providers `root` can deploy to. */
@@ -168,6 +177,8 @@ export async function deployPreview(
   now = () => new Date(),
 ): Promise<DeployRecord> {
   const adapter = adapterOf(adapterId);
+  if (!adapter.environments.includes("preview"))
+    throw invalid(`${adapter.label} has no previews; deploy to production instead.`);
   const task = loadTask(root, taskId);
   const wt = task.worktree;
   const code = wt && !wt.removed && existsSync(wt.path) ? codeRootIn(root, wt.path) : root;
@@ -309,15 +320,21 @@ export async function rollbackDeploy(
   if (liveProduction(root, adapter.id)?.id !== record.id) {
     throw invalid("A newer production deploy is live. Roll that one back instead.");
   }
+  const to = record.previous;
+  const args = adapter.rollbackArgs(to?.deploymentId);
+  if (!args) {
+    throw invalid(
+      `The app has no record of the ${adapter.label} deploy before this one, so there's nothing to go back to here. Roll back in the provider's console.`,
+    );
+  }
   checkTyped(await productionPlan(root, adapter.id, clis), typed);
   const cli = cliOf(adapter, clis);
   return exclusive(root, adapter, async () => {
-    const to = record.previous;
-    const args = adapter.rollbackArgs(to?.deploymentId);
     const started = now();
-    const r = await clis.runner(cli)(args, root, { timeoutMs: 300_000 });
-    // A Worker keeps its URL; each Vercel deployment has its own, so what is live again is the previous one's.
-    const url = adapter.id === "cloudflare" ? record.url : to?.url;
+    // A Fly rollback redeploys an image, which takes as long as a deploy.
+    const r = await clis.runner(cli)(args, root, { timeoutMs: 1_200_000 });
+    // Each Vercel deployment has its own URL, so what is live again is the previous one's; the others keep theirs.
+    const url = adapter.id === "vercel" ? to?.url : record.url;
     const base: Base = {
       id: newId(started),
       adapter: adapter.id,

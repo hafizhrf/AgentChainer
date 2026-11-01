@@ -643,10 +643,30 @@ export const TaskSchema = z.object({
       headSha: z.string(),
       draft: z.boolean(),
       createdAt: z.string(),
+      /** Fix CI rounds (M5-03), at most `MAX_CI_FIXES`: the check that failed, and how the round ended. */
+      fixes: z
+        .array(z.object({ check: z.string(), at: z.string(), state: z.enum(["done", "failed", "cancelled"]) }))
+        .optional(),
     })
     .optional(),
 });
 export type Task = z.infer<typeof TaskSchema>;
+
+/** How many Fix CI rounds a PR gets (design §6). */
+export const MAX_CI_FIXES = 3;
+
+/** One check on a task's PR, as `gh pr checks` reports it (M5-03). */
+export const PrCheckSchema = z.object({
+  name: z.string(),
+  workflow: z.string(),
+  state: z.string(),
+  /** pass, fail, pending, skipping or cancel. */
+  bucket: z.string(),
+  link: z.string(),
+  startedAt: z.string().optional(),
+  completedAt: z.string().optional(),
+});
+export type PrCheck = z.infer<typeof PrCheckSchema>;
 
 /**
  * Whether the app can make pull requests for a workspace through the user's own `gh` (M5-02, ADR-0002): `missing` when
@@ -1216,6 +1236,27 @@ export const methodSchemas = {
     params: TaskRef.extend({ title: z.string().trim().min(1).max(256), draft: z.boolean() }),
     result: TaskSchema,
   },
+  /** The task's PR on GitHub and its checks, read through `gh` (M5-03). The page polls it while it's open. */
+  "task.prStatus": {
+    params: TaskRef,
+    result: z.object({
+      state: z.string(),
+      draft: z.boolean(),
+      headSha: z.string(),
+      checks: z.array(PrCheckSchema),
+    }),
+  },
+  /**
+   * The failed steps' log of one of the PR's GitHub Actions checks, cut to its end and redacted (M5-03). The check is
+   * named by its link, which must be one of the PR's checks.
+   */
+  "task.ciLog": { params: TaskRef.extend({ link: z.string().min(1) }), result: z.object({ log: z.string() }) },
+  /**
+   * One Fix CI round (M5-03), after the user saw the log: the implementer fixes the code with the log as data, the
+   * gates run, and when they pass the branch is committed and pushed again (never forced). Runs in the background
+   * like a run; at most `MAX_CI_FIXES` rounds.
+   */
+  "task.fixCi": { params: TaskRef.extend({ link: z.string().min(1) }), result: TaskSchema },
   /** Other tasks whose live branches change the same files as this one's: merging both may conflict (M5-01). */
   "task.overlaps": {
     params: TaskRef,

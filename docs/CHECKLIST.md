@@ -25,7 +25,7 @@
 | [R1](#r1--v01-release) | v0.1 | Packaging & release | ◐ Pipeline, updater, security review and docs in place; publishing waits for M0-01 and M0-22 |
 | [M3](#m3--adaptive-planner--task-contracts-v02) | v0.2 | Adaptive planner, contracts, evidence | ◐ Every tier (S, M, L, XL) runs live on macOS and Windows, with gates, evidence and accepted risk (preview); left: the owner's click-through and the exit runs |
 | [M4](#m4--agent-observability-v02v03) | v0.2–0.3 | Agent observability graph | ◐ Agent tree, graph, drawer, stop, timeline, replay, background tasks and agent library in; E2 frame times left |
-| [M5](#m5--git-workflow-pr--quality-gates-v03) | v0.3 | Git workflow, PRs, gates | ◐ Design approved ([git-workflow.md](design/git-workflow.md)); a worktree for every task and Create PR in; CI status and Fix CI next |
+| [M5](#m5--git-workflow-pr--quality-gates-v03) | v0.3 | Git workflow, PRs, gates | ◐ Design approved ([git-workflow.md](design/git-workflow.md)); a worktree for every task, Create PR, CI status and Fix CI in; merge gates next |
 | [M6](#m6--deployment--workflow-canvas-v04) | v0.4 | Deploy adapters, workflow canvas | ☐ Not started |
 | [M7](#m7--evals--analytics-v05) | v0.5 | Evals & analytics | ☐ Not started |
 | [M8](#m8--multi-folder-workspaces--agent-fleet-proposed) | later | Multi-folder workspaces, agent fleet | ☐ Proposed (owner, 2026-10-30) |
@@ -1354,7 +1354,18 @@ Decisions: [ADR-0009](adr/0009-release-signing-and-updates.md). Maintainer steps
         - The S task fixed the seeded bug in its worktree, and the gates passed (≈$0.01, haiku).
         - It opened draft PR #1 into `main`, with the contract and the evidence in its body.
         - The repository's `test` workflow passed on it.
-- [ ] **M5-03** CI status polling, plus a "Fix CI" loop that reads failing logs. The loop is gated by approval and budget.
+- [x] **M5-03** CI status polling, plus a "Fix CI" loop that reads failing logs. The loop is gated by approval and budget.
+      Evidence: the step-3 PR ([design §6](design/git-workflow.md)).
+      - Requests: `task.prStatus`, `task.ciLog` (the PR's own GitHub Actions checks only; last 32 KB, redacted) and
+        `task.fixCi` (one approved round; gates; commit and push only when they pass; 3 rounds per PR).
+      - Tests: `github.test.ts`, `orchestrator.test.ts` (the round, the log as data, a failing gate), and
+        `service.test.ts` (the PR's own checks only, failing checks only, the round cap).
+      - Live on `hafizhrf/agentchainer-e2e`, haiku, ≈$0.02, through `live-task.ts --pr --fix-ci`:
+        - PR #2 was opened;
+        - a commit that rounds discounts up made CI fail;
+        - the log was read: `actual: 900, expected: 899`;
+        - one Fix CI round fixed the code; the gates passed; it was pushed;
+        - CI passed on the fix.
 - [ ] **M5-04** Merge gates: independent AI review of the diff, plus deterministic scanners (gitleaks; semgrep and trivy if installed).
 - [ ] **M5-05** Merge, force push and release tags always require a human.
 - [ ] **M5-06** GitLab support (optional).

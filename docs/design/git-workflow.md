@@ -139,6 +139,11 @@ Each one takes the task, never a path or a `gh` argument from the UI.
      - A CI log can carry text from anyone who can change the repository, so it is prompt-injection input (T-02).
   4. Run the local gates, then commit and push (no force).
   5. Watch CI again.
+- **As built:**
+  - a round is an Orchestrator entry (`fixCi`): a `ci-fix` step with the write step's role, then the gates once;
+  - when it ends Done, the service commits and pushes; a push that fails ends the round failed and says why;
+  - each round is recorded on the PR (`pr.fixes`) and in the run's timeline and evidence;
+  - only GitHub Actions checks have a log the app reads (`jobOf`); other CI gets a link to its page.
 - **Limits:**
   - at most 3 rounds per PR;
   - every round counts against the task's budget cap (T-11);

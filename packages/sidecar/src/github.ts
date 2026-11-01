@@ -2,7 +2,7 @@ import { spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { homedir } from "node:os";
 import path from "node:path";
-import type { GitHubStatus } from "@agentchainer/protocol";
+import type { GitHubStatus, PrCheck } from "@agentchainer/protocol";
 import { git } from "./workspace.ts";
 
 /**
@@ -122,4 +122,65 @@ export function createPr(
   const made = findPr(gh, root, pr.head);
   if (!made) throw new Error(`gh made the pull request, but it can't be read back: ${r.stdout.trim()}`);
   return made;
+}
+
+/**
+ * The PR's checks. `gh pr checks` exits non-zero while checks fail (1) or are pending (8), and says "no checks
+ * reported" when there are none, so the JSON on stdout is what counts.
+ */
+export function prChecks(gh: Gh, root: string, pr: number): PrCheck[] {
+  const r = gh(["pr", "checks", String(pr), "--json", "name,workflow,state,bucket,link,startedAt,completedAt"], root);
+  const out = r.stdout.trim();
+  if (out.startsWith("[")) return JSON.parse(out) as PrCheck[];
+  if (/no checks reported/i.test(r.stderr)) return [];
+  throw new Error(`gh pr checks failed: ${(r.stderr || r.stdout).trim() || `exit ${r.status}`}`);
+}
+
+/** The state of the PR on GitHub, and the commit its head points at. */
+export function prState(gh: Gh, root: string, pr: number): { state: string; draft: boolean; headSha: string } {
+  const r = gh(["pr", "view", String(pr), "--json", "state,isDraft,headRefOid"], root);
+  if (r.status !== 0) throw new Error(`gh pr view failed: ${(r.stderr || r.stdout).trim() || `exit ${r.status}`}`);
+  const v = JSON.parse(r.stdout) as { state: string; isDraft: boolean; headRefOid: string };
+  return { state: v.state, draft: v.isDraft, headSha: v.headRefOid };
+}
+
+/** A GitHub Actions job's id from a check's link (`…/actions/runs/<run>/job/<job>`), or null for other CI. */
+export function jobOf(link: string): string | null {
+  return /\/actions\/runs\/\d+\/job\/(\d+)(?:[/?#]|$)/.exec(link)?.[1] ?? null;
+}
+
+/** Secrets and personal details masked, as in the diagnostics bundle (`diagnostics.rs`). */
+const REDACT: [RegExp, string][] = [
+  [/sk-ant-[A-Za-z0-9_-]{8,}/g, "[redacted key]"],
+  [/\bsk-[A-Za-z0-9_-]{20,}/g, "[redacted key]"],
+  [/\bgh[pousr]_[A-Za-z0-9]{20,}/g, "[redacted token]"],
+  [/\bgithub_pat_[A-Za-z0-9_]{20,}/g, "[redacted token]"],
+  [/\bxox[abposr]-[A-Za-z0-9-]{10,}/g, "[redacted token]"],
+  [/\bAKIA[0-9A-Z]{16}\b/g, "[redacted key]"],
+  [/\bbearer\s+[A-Za-z0-9._~+/-]+=*/gi, "Bearer [redacted]"],
+  [
+    /\b([A-Z0-9_]*(?:api[_-]?key|token|secret|password|passwd|credential)[A-Z0-9_]*)(\\?"?\s*[:=]\s*\\?"?)[^\s"',\\]*[^\s"',\\0-9][^\s"',\\]*/gi,
+    "$1$2[redacted]",
+  ],
+  [/[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+\.[A-Za-z0-9.-]+/g, "[email]"],
+];
+
+export function redact(text: string, home = homedir()): string {
+  let out = home.length > 1 ? text.split(home).join("~") : text;
+  for (const [re, to] of REDACT) out = out.replace(re, to);
+  return out;
+}
+
+/** CI logs can be long; the end holds the failure. */
+export const MAX_LOG_CHARS = 32_000;
+
+/**
+ * The failed steps' log of one GitHub Actions job: its last `MAX_LOG_CHARS` characters, redacted. It is untrusted text
+ * from whoever can change the repository, so it goes to Claude as data only (design §6, T-02).
+ */
+export function failedJobLog(gh: Gh, root: string, job: string): string {
+  const r = gh(["run", "view", "--job", job, "--log-failed"], root);
+  if (r.status !== 0) throw new Error(`gh run view failed: ${(r.stderr || r.stdout).trim() || `exit ${r.status}`}`);
+  const log = r.stdout.length > MAX_LOG_CHARS ? `…\n${r.stdout.slice(-MAX_LOG_CHARS)}` : r.stdout;
+  return redact(log);
 }

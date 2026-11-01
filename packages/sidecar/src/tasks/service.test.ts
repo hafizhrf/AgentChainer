@@ -17,14 +17,17 @@ import {
   approveSubtasks,
   approveTask,
   cancelTask,
+  ciLog,
   cleanupTask,
   createTaskPr,
   deleteTaskSafe,
   draftTask,
+  fixCiTask,
   mergeResult,
   newTask,
   overlapsOf,
   prPreview,
+  prStatus,
   retriageTask,
   reviseTask,
   shortTitle,
@@ -419,6 +422,7 @@ describe("pull requests (M5-02)", () => {
     git(root, "config", `url.${bare}.pushInsteadOf`, URL);
     const prs = new Map<string, { number: number; base: string; title: string; body: string; draft: boolean }>();
     const calls: string[][] = [];
+    const checks: { name: string; workflow: string; state: string; bucket: string; link: string }[] = [];
     const out = (stdout: string, status = 0): GhResult => ({ status, stdout, stderr: "" });
     const gh: Gh = (args) => {
       calls.push(args);
@@ -426,7 +430,8 @@ describe("pull requests (M5-02)", () => {
       if (args[0] === "auth") return out("");
       const [cmd, sub] = args;
       if (cmd === "pr" && sub === "view") {
-        const head = args[2] ?? "";
+        // By branch, or by number.
+        const head = [...prs].find(([b, p]) => b === args[2] || String(p.number) === args[2])?.[0] ?? "";
         const pr = prs.get(head);
         if (!pr) return out("", 1);
         const sha = git(bare, "rev-parse", head).trim();
@@ -442,6 +447,9 @@ describe("pull requests (M5-02)", () => {
           }),
         );
       }
+      if (cmd === "pr" && sub === "checks")
+        return out(JSON.stringify(checks), checks.some((c) => c.bucket === "fail") ? 1 : 0);
+      if (cmd === "run" && sub === "view") return out("test  ✖ total counts quantity\n");
       if (cmd === "pr" && sub === "create") {
         const flag = (name: string) => args[args.indexOf(name) + 1] ?? "";
         prs.set(flag("--head"), {
@@ -455,7 +463,7 @@ describe("pull requests (M5-02)", () => {
       }
       return out("", 1);
     };
-    return { root, bare, gh, prs, calls };
+    return { root, bare, gh, prs, calls, checks };
   };
 
   /** A done M task with a change in its worktree. */
@@ -514,6 +522,28 @@ describe("pull requests (M5-02)", () => {
     );
     assert.ok(long.length <= 72 && long.endsWith("…"), long);
     assert.equal(long, "Fix total() in src/cart.js so each item contributes price times…");
+  });
+
+  it("reads only the PR's own checks' logs, and starts Fix CI only on a failing check, at most 3 times", () => {
+    const { root, gh, checks } = world();
+    const { id } = doneWithChange(root);
+    createTaskPr(root, id, { title: "Add coupons", draft: true }, gh);
+    const job = "https://github.com/acme/app/actions/runs/1/job/2";
+    checks.push({ name: "test", workflow: "test", state: "SUCCESS", bucket: "pass", link: job });
+    assert.equal(prStatus(root, id, gh).checks.length, 1);
+    assert.throws(
+      () => ciLog(root, id, "https://github.com/acme/app/actions/runs/9/job/9", gh),
+      /isn't one of the PR's/,
+    );
+    assert.match(ciLog(root, id, job, gh), /total counts quantity/);
+    const host = {} as Parameters<typeof fixCiTask>[3];
+    assert.throws(() => fixCiTask(root, id, job, host, gh, () => undefined), /isn't failing/);
+    const t = loadTask(root, id);
+    const at = "2026-11-01T00:00:00.000Z";
+    const done3 = [1, 2, 3].map(() => ({ check: "test", at, state: "failed" as const }));
+    saveTask(root, { ...t, pr: t.pr ? { ...t.pr, fixes: done3 } : undefined });
+    checks[0] = { ...checks[0], bucket: "fail" } as (typeof checks)[number];
+    assert.throws(() => fixCiTask(root, id, job, host, gh, () => undefined), /had its 3 Fix CI rounds/);
   });
 
   it("refuses without gh, without changes, or before the run is Done", () => {

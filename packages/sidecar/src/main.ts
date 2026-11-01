@@ -50,17 +50,20 @@ import {
   approveTask,
   type Claude,
   cancelTask,
+  ciLog,
   cleanupTask,
   continueTask,
   createTaskPr,
   deleteTaskSafe,
   draftTask,
+  fixCiTask,
   listTasksLive,
   mergeResult,
   newTask,
   overlapsOf,
   present,
   prPreview,
+  prStatus,
   resumeTask,
   retriageTask,
   reviseTask,
@@ -590,6 +593,22 @@ serve(
       requireFolder(cwd);
       await settleRun(id);
       return createTaskPr(cwd, id, { title, draft }, systemGh());
+    },
+
+    "task.prStatus": ({ cwd, id }) => {
+      requireFolder(cwd);
+      return prStatus(cwd, id, systemGh());
+    },
+
+    "task.ciLog": ({ cwd, id, link }) => {
+      requireFolder(cwd);
+      return { log: ciLog(cwd, id, link, systemGh()) };
+    },
+
+    "task.fixCi": async ({ cwd, id, link }) => {
+      requireFolder(cwd);
+      await settleRun(id);
+      return fixCiTask(cwd, id, link, sessionHost(await claude()), systemGh(), taskUpdated(cwd));
     },
 
     "task.overlaps": ({ cwd, id }) => {

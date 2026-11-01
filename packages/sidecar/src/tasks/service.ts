@@ -2,6 +2,7 @@ import { spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import path from "node:path";
 import {
+  MAX_CI_FIXES,
   type PermissionMode,
   RpcErrorCode,
   type Task,
@@ -14,7 +15,7 @@ import { AC_DIR } from "../ac-dir.ts";
 import { findTool, toolsDir } from "../bootstrap/tools.ts";
 import { detectWorkspace } from "../detect/detect.ts";
 import { branches, merge, pushBranch } from "../git.ts";
-import { createPr, findPr, type Gh, githubStatus } from "../github.ts";
+import { createPr, failedJobLog, findPr, type Gh, githubStatus, jobOf, prChecks, prState } from "../github.ts";
 import { RpcFailure } from "../rpc.ts";
 import type { AgentSdkModule } from "../sdk-loader.ts";
 import { git, listFiles, repoOf } from "../workspace.ts";
@@ -22,7 +23,7 @@ import { availableGates, draftContract, normalizeContract } from "./contract.ts"
 import { buildEvidence, type FileChange, renderEvidence, type SecretsScan, sectionLines } from "./evidence.ts";
 import shipped from "./library.json" with { type: "json" };
 import { LibrarySchema } from "./library.ts";
-import { newRun, Orchestrator, parseReview } from "./orchestrator.ts";
+import { newRun, Orchestrator, type OrchestratorDeps, parseReview } from "./orchestrator.ts";
 import { changedPaths, fileStats, type SessionHost, sessionRunner, startBase, untracked } from "./runner.ts";
 import { proposeSplit } from "./split.ts";
 import { createTask, deleteTask, listTasks, loadTask, readTaskFile, saveTask, writeTaskFile } from "./store.ts";
@@ -290,6 +291,21 @@ function launch(
   resume: boolean,
   setup = false,
 ): Promise<Task> {
+  const orchestrator = orchestratorFor(root, task, host, notify, {
+    resume,
+    ...(setup ? { setup: (signal: AbortSignal) => readyBranch(root, task, signal) } : {}),
+  });
+  return track(root, task.id, orchestrator, notify);
+}
+
+/** The orchestrator of a task's run, in its code folder, saving and reporting every change. */
+function orchestratorFor(
+  root: string,
+  task: Task,
+  host: SessionHost,
+  notify: (task: Task) => void,
+  extra: Pick<OrchestratorDeps, "resume" | "setup"> = {},
+): Orchestrator {
   const workflow = Object.values(library.workflows).find((w) => w.id === task.run?.workflow.id);
   if (!workflow) throw invalid(`The workflow ${task.run?.workflow.id} isn't in this version of the app.`);
   // The runner reports approvals and guard blocks as they happen; they go into the run's records.
@@ -310,10 +326,9 @@ function launch(
       saveTask(root, t);
       notify(present(t));
     },
-    resume,
-    ...(setup ? { setup: (signal: AbortSignal) => readyBranch(root, task, signal) } : {}),
+    ...extra,
   });
-  return track(root, task.id, orchestrator, notify);
+  return orchestrator;
 }
 
 /**
@@ -696,11 +711,11 @@ export function mergeResult(
  * Commits what a task's run left in its worktree, as one commit on its branch; nothing when it's all committed (an XL
  * task's branch holds merges). The user's commit hooks run, and one that fails stops the merge with its message.
  */
-function commitResult(root: string, task: Task): void {
+function commitResult(root: string, task: Task, title?: string): void {
   const wt = task.worktree;
   if (!wt || wt.removed || !existsSync(wt.path)) return;
   const objective = task.contract?.objective || task.request;
-  const subject = shortTitle(objective);
+  const subject = title ?? shortTitle(objective);
   const message = `${subject}\n\n${subject === objective ? "" : `${objective}\n\n`}AgentChainer task ${task.id}`;
   try {
     commitAll(codeRootIn(root, wt.path), message, wt.untracked);
@@ -893,6 +908,102 @@ export function createTaskPr(
   };
   saveTask(root, next);
   return present(next);
+}
+
+/* ---------- CI status and Fix CI (M5-03) ---------- */
+
+function withPr(root: string, id: string, gh: Gh | null): { task: Task; pr: NonNullable<Task["pr"]>; gh: Gh } {
+  const task = present(loadTask(root, id));
+  if (!task.pr) throw invalid("The task has no pull request yet.");
+  if (!gh) throw invalid("The GitHub CLI (gh) isn't installed.");
+  return { task, pr: task.pr, gh };
+}
+
+/** The task's PR on GitHub and its checks. */
+export function prStatus(root: string, id: string, gh: Gh | null) {
+  const { pr, gh: run } = withPr(root, id, gh);
+  return { ...prState(run, root, pr.number), checks: prChecks(run, root, pr.number) };
+}
+
+/** The failed steps' log of one of the PR's checks, named by its link, which must be one of the PR's. */
+export function ciLog(root: string, id: string, link: string, gh: Gh | null): string {
+  const { pr, gh: run } = withPr(root, id, gh);
+  if (!prChecks(run, root, pr.number).some((c) => c.link === link)) throw invalid("That isn't one of the PR's checks.");
+  const job = jobOf(link);
+  if (!job) throw invalid("Only GitHub Actions logs can be read here. Open the check's page instead.");
+  return failedJobLog(run, root, job);
+}
+
+/**
+ * Starts a Fix CI round on a failing check of the task's PR, after the user saw its log. It runs in the background
+ * like a run; when it ends Done, what it changed is committed and pushed (never forced). Rounds are capped.
+ */
+export function fixCiTask(
+  root: string,
+  id: string,
+  link: string,
+  host: SessionHost,
+  gh: Gh | null,
+  notify: (task: Task) => void,
+  now = new Date(),
+): Task {
+  const task = shippable(root, id);
+  const { pr, gh: run } = withPr(root, id, gh);
+  const fixes = pr.fixes ?? [];
+  if (fixes.length >= MAX_CI_FIXES) {
+    throw invalid(
+      `This PR had its ${MAX_CI_FIXES} Fix CI rounds. Look at the failure yourself, or run the task again.`,
+    );
+  }
+  const check = prChecks(run, root, pr.number).find((c) => c.link === link);
+  if (check?.bucket !== "fail") throw invalid("That check isn't failing.");
+  const job = jobOf(link);
+  if (!job) throw invalid("Only GitHub Actions logs can be read here. Open the check's page instead.");
+  const log = failedJobLog(run, root, job);
+  const running: Task = { ...task, state: "running", updatedAt: now.toISOString() };
+  saveTask(root, running);
+  notify(running);
+  const orchestrator = orchestratorFor(root, running, host, notify);
+  const round = {
+    run: () => orchestrator.fixCi({ check: check.name, log }),
+    cancel: () => orchestrator.cancel(),
+    get current() {
+      return orchestrator.current;
+    },
+  };
+  void track(root, id, round, notify).then((ended) => {
+    let state: "done" | "failed" | "cancelled" =
+      ended.state === "done" ? "done" : ended.state === "cancelled" ? "cancelled" : "failed";
+    let outcome: string | null = null;
+    const latest = loadTask(root, id);
+    if (state === "done" && latest.worktree) {
+      try {
+        commitResult(root, latest, `Fix CI: ${check.name}`);
+        pushBranch(root, latest.worktree.branch);
+      } catch (err) {
+        state = "failed";
+        outcome = `The fix passed the gates, but pushing it failed: ${err instanceof Error ? err.message : String(err)}`;
+      }
+    }
+    const head = latest.worktree ? git(["rev-parse", latest.worktree.branch], root).stdout.trim() : "";
+    const next: Task = {
+      ...latest,
+      ...(outcome && latest.run ? { state: "failed" as const, run: { ...latest.run, outcome } } : {}),
+      ...(latest.pr
+        ? {
+            pr: {
+              ...latest.pr,
+              ...(head && state === "done" ? { headSha: head } : {}),
+              fixes: [...(latest.pr.fixes ?? []), { check: check.name, at: now.toISOString(), state }],
+            },
+          }
+        : {}),
+      updatedAt: new Date().toISOString(),
+    };
+    saveTask(root, next);
+    notify(present(next));
+  });
+  return running;
 }
 
 /* ---------- Accepted risk (M3-10) and evidence (M3-09) ---------- */

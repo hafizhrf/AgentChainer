@@ -3,7 +3,15 @@ import { describe, it } from "node:test";
 import type { GateKind, GateRun, Task } from "@agentchainer/protocol";
 import shipped from "./library.json" with { type: "json" };
 import { type AgentStep, LibrarySchema, type Workflow } from "./library.ts";
-import { type AgentOutcome, demote, newRun, Orchestrator, type Runner, type StepTag } from "./orchestrator.ts";
+import {
+  type AgentOutcome,
+  demote,
+  newRun,
+  Orchestrator,
+  type OrchestratorDeps,
+  type Runner,
+  type StepTag,
+} from "./orchestrator.ts";
 
 const library = LibrarySchema.parse(shipped);
 
@@ -109,7 +117,7 @@ function fakeRunner(opts: {
   return { runner, calls, wasStopped: () => stopped };
 }
 
-function orchestrate(t: Task, runner: Runner, resume = false) {
+function orchestrate(t: Task, runner: Runner, resume = false, setup?: OrchestratorDeps["setup"]) {
   const files = new Map<string, string>();
   const saves: Task[] = [];
   const o = new Orchestrator(t, {
@@ -119,11 +127,45 @@ function orchestrate(t: Task, runner: Runner, resume = false) {
     save: (x) => saves.push(x),
     now: () => new Date("2026-10-30T01:00:00.000Z"),
     resume,
+    ...(setup ? { setup } : {}),
   });
   return { o, files, saves };
 }
 
 const timeline = (t: Task) => t.run?.steps.map((s) => `${s.id}:${s.status}`);
+
+describe("orchestrator: the task branch (M5-01)", () => {
+  it("readies the task's worktree before the baseline, as its first step", async () => {
+    const { runner } = fakeRunner({});
+    const { o } = orchestrate(task("S"), runner, false, async () => ({ ok: true, note: "agentchainer/t1" }));
+    const done = await o.run();
+    assert.equal(done.state, "done");
+    assert.deepEqual(timeline(done), ["setup:done", "baseline:done", "implement:done", "gates:done"]);
+    assert.equal(done.run?.steps[0]?.label, "Task branch");
+  });
+
+  it("ends the run failed when the setup fails, before any step", async () => {
+    const { runner, calls } = fakeRunner({});
+    const { o } = orchestrate(task("S"), runner, false, async () => ({ ok: false, note: "`npm ci` exited 1" }));
+    const done = await o.run();
+    assert.equal(done.state, "failed");
+    assert.deepEqual(timeline(done), ["setup:failed"]);
+    assert.match(done.run?.outcome ?? "", /Setting up the task branch failed: `npm ci` exited 1/);
+    assert.equal(calls.length, 0, "no session started");
+  });
+
+  it("doesn't set the branch up again when a resumed run finished it", async () => {
+    const { runner } = fakeRunner({});
+    let setups = 0;
+    const setup = async () => {
+      setups++;
+      return { ok: true, note: "" };
+    };
+    const first = await orchestrate(task("S"), runner, false, setup).o.run();
+    await orchestrate({ ...first, state: "running" }, runner, true, setup).o.run();
+    assert.equal(setups, 1);
+  });
+});
 
 describe("orchestrator", () => {
   it("runs an S task: implement, then gates that pass, ends done", async () => {

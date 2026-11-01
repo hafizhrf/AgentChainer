@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { existsSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { after, describe, it } from "node:test";
 import { RpcErrorCode } from "@agentchainer/protocol";
@@ -20,10 +21,12 @@ import {
   draftTask,
   mergeResult,
   newTask,
+  overlapsOf,
   retriageTask,
   reviseTask,
   splitTask,
   startTask,
+  taskBranch,
   taskEvidence,
 } from "./service.ts";
 import { listTasks, loadTask, saveTask, writeTaskFile } from "./store.ts";
@@ -298,6 +301,92 @@ describe("task flow", () => {
     assert.equal(existsSync(wt), false);
     assert.equal(loadTask(root, created.id).worktree?.removed, true);
     assert.throws(() => git(root, "rev-parse", "--verify", branchOf(created.id)), "the branch went too");
+  });
+});
+
+describe("a branch for every task (M5-01)", () => {
+  const git = (cwd: string, ...args: string[]) =>
+    execFileSync("git", ["-c", "user.name=t", "-c", "user.email=t@example.invalid", ...args], {
+      cwd,
+      encoding: "utf8",
+    });
+  /** An approved M task with its own worktree, ended Done. */
+  const doneM = (root: string, request: string) => {
+    const approved = approvedXl(newTask(root, request));
+    if (!approved.triage) throw new Error("no triage");
+    const { task } = taskBranch(root, { ...approved, triage: { ...approved.triage, chosen: "M" } });
+    const created = approved;
+    const wt = task.worktree;
+    if (!wt) throw new Error("no worktree");
+    const workflow = LibrarySchema.parse(shipped).workflows.M;
+    if (!workflow) throw new Error("no M workflow");
+    saveTask(root, {
+      ...task,
+      state: "done",
+      run: newRun(workflow, { permissionMode: "default", base: wt.base, untrackedAtStart: wt.untracked }, new Date()),
+    });
+    return { id: created.id, wt: wt.path };
+  };
+
+  it("gives a task its own worktree on agentchainer/<id> from HEAD, once", () => {
+    const root = copyFixture("sample-app");
+    const created = newTask(root, "Coupons");
+    const head = git(root, "rev-parse", "HEAD").trim();
+    const first = taskBranch(root, created);
+    assert.equal(first.fresh, true);
+    assert.deepEqual(
+      [first.task.worktree?.branch, first.task.worktree?.base, existsSync(first.task.worktree?.path ?? "")],
+      [branchOf(created.id), head, true],
+    );
+    const again = taskBranch(root, first.task);
+    assert.equal(again.fresh, false, "a re-run keeps its worktree");
+    assert.equal(again.task.worktree?.path, first.task.worktree?.path);
+  });
+
+  it("runs in the workspace when it has no git repository", () => {
+    const dir = mkdtempSync(join(tmpdir(), "ac-nogit-"));
+    try {
+      const created = newTask(dir, "Coupons");
+      const r = taskBranch(dir, created);
+      assert.deepEqual([r.fresh, r.task.worktree], [false, undefined]);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("commits what an M task's run left in its worktree, then merges its branch", () => {
+    const root = copyFixture("sample-app");
+    const { id, wt } = doneM(root, "Coupons");
+    writeFileSync(join(wt, "coupon.js"), "export const coupon = 1;\n");
+    const merged = mergeResult(root, id);
+    assert.deepEqual(merged, { merged: true, conflicts: [], into: "main" });
+    assert.equal(readFileSync(join(root, "coupon.js"), "utf8"), "export const coupon = 1;\n");
+    assert.match(git(root, "log", "-2", "--format=%s", branchOf(id)), /^Totals count quantity\.$/m);
+    cleanupTask(root, id, false);
+    assert.equal(existsSync(wt), false);
+    assert.equal(loadTask(root, id).worktree?.removed, true);
+  });
+
+  it("keeps a run's uncommitted work on its branch when its worktree is cleaned up", () => {
+    const root = copyFixture("sample-app");
+    const { id, wt } = doneM(root, "Coupons");
+    writeFileSync(join(wt, "coupon.js"), "export const coupon = 1;\n");
+    cleanupTask(root, id, false);
+    assert.equal(existsSync(wt), false);
+    assert.equal(git(root, "show", `${branchOf(id)}:coupon.js`), "export const coupon = 1;\n");
+  });
+
+  it("warns when two live tasks change the same files", () => {
+    const root = copyFixture("sample-app");
+    const a = doneM(root, "Coupons");
+    const b = doneM(root, "Discounts");
+    const c = doneM(root, "Docs");
+    writeFileSync(join(a.wt, "README.md"), "a\n");
+    writeFileSync(join(a.wt, "a-only.js"), "1\n");
+    writeFileSync(join(b.wt, "README.md"), "b\n");
+    writeFileSync(join(c.wt, "other.md"), "c\n");
+    assert.deepEqual(overlapsOf(root, a.id), [{ taskId: b.id, title: "Totals count quantity.", files: ["README.md"] }]);
+    assert.deepEqual(overlapsOf(root, c.id), []);
   });
 });
 

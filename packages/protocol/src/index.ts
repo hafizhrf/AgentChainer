@@ -1152,13 +1152,23 @@ export const methodSchemas = {
   "task.approveSubtasks": { params: TaskRef, result: TaskSchema },
   /** Picks a stopped, failed or interrupted XL run up again: merged sub-tasks are skipped, the others run. */
   "task.continue": { params: TaskRef, result: TaskSchema },
-  /** Merges an XL task's branch into the workspace's current branch; conflicts leave the merge in progress. */
+  /**
+   * Merges a finished task's branch into the workspace's current branch, after committing what its run left in its
+   * worktree (M5-01); conflicts leave the merge in progress.
+   */
   "task.mergeResult": {
     params: TaskRef,
     result: z.object({ merged: z.boolean(), conflicts: z.array(z.string()), into: z.string() }),
   },
-  /** Removes an XL task's worktrees, and its branches when asked. */
+  /** Removes a task's worktrees (an XL task's sub-tasks' too), and its branches when asked. */
   "task.cleanup": { params: TaskRef.extend({ deleteBranches: z.boolean() }), result: Ok },
+  /** Other tasks whose live branches change the same files as this one's: merging both may conflict (M5-01). */
+  "task.overlaps": {
+    params: TaskRef,
+    result: z.object({
+      overlaps: z.array(z.object({ taskId: z.string(), title: z.string(), files: z.array(z.string()) })),
+    }),
+  },
   /** Stops a draft, a triage or a run in progress. A stopped run leaves the working tree as it is. */
   "task.cancel": { params: TaskRef, result: z.object({ cancelled: z.boolean() }) },
   "task.list": { params: WorkspaceRef, result: z.object({ tasks: z.array(TaskSummarySchema) }) },

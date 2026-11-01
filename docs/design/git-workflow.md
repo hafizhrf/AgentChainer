@@ -1,6 +1,6 @@
 # Design: git workflow, pull requests and quality gates (M5)
 
-- **Status:** Draft, waiting for the owner. The owner made four decisions up front (§15).
+- **Status:** Approved (2026-11-01). The owner made four decisions up front (§15) and approved the draft (#61).
 - **Date:** 2026-11-01
 - **Covers:** M5-01…M5-06 and the exit criterion M5-E1. Scope source:
   PRD [F5](../PRD.md#f5--git-workflow-prs-and-quality-gates-p1).
@@ -49,18 +49,23 @@ current branch, now offered for every tier.
     workspace guard, and runs the baseline gates there.
   - `codeRootOf` then points at the worktree for every task. Steps, gates, the transcript and the evidence all run
     there.
-- **The run's result is one commit.** `commitAll` (`worktree.ts:66`) runs at the end of a run that is Done or
-  accepted, with the contract's objective as the message.
+- **The run's result is one commit.** `commitAll` (`worktree.ts:66`) makes it with the contract's objective as the
+  message.
+  - It runs when the result leaves the worktree: on Merge, on Clean up (so removing the folder loses no work), and from
+    step 2 on Create PR. A run that is run again in the same worktree keeps adding to the same, uncommitted change.
   - It stages everything except `.agentchainer/` and the files that were untracked at the start, as today.
-  - The user's commit hooks run. A hook that fails leaves the changes uncommitted and says so on the page.
+  - The user's commit hooks run. A hook that fails stops the Merge or the Clean up with its message.
 - **Parallel tasks are allowed.** While two tasks are live, the page compares the files each one has changed (`git diff
   --name-only` against its base). When they overlap, it shows a warning naming the files. Nothing is blocked; the
   overlap turns into a merge conflict only if both are merged.
 - **The local result.** `mergeResult` (`service.ts:594`) works for every tier, not only XL.
   - It merges the task branch into the current branch (`git merge --no-edit`).
   - It still requires a run that is Done or accepted, and a clean tree.
-- **Clean up stays manual.** There is a button, and the page prompts for it after a merge. It removes the worktree and,
-  if asked, the branch (`cleanupTask`, `service.ts:614`).
+- **Clean up stays manual:** a button on the result card. It removes the worktree and, if asked, the branch
+  (`cleanupTask`).
+- **A run that just ended:** its end is saved before its sessions close. Merge and Clean up wait for that, so a click
+  right after the end doesn't hit "still running" or a folder Windows won't remove (`settleRun`).
+- **No git:** a workspace without a repository, or without a commit, runs the task in place as before.
 - **Effects on M3:**
   - The workspace's own changes panel no longer shows a task's work. The task page shows it, from the worktree's diff
     against its base.

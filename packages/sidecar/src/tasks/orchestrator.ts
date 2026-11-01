@@ -198,6 +198,11 @@ export type OrchestratorDeps = {
   now?: () => Date;
   /** Continue an interrupted run instead of starting at its position afresh. */
   resume?: boolean;
+  /**
+   * Readies the task's own worktree before the baseline, e.g. installs its dependencies (M5-01). Runs as the "Task
+   * branch" step unless a run already finished it.
+   */
+  setup?: (signal: AbortSignal) => Promise<{ ok: boolean; note: string }>;
 };
 
 export class Orchestrator {
@@ -209,6 +214,8 @@ export class Orchestrator {
   private readonly now: () => Date;
   private cancelled = false;
   private resuming: boolean;
+  private readonly setup: OrchestratorDeps["setup"];
+  private readonly abort = new AbortController();
 
   constructor(task: Task, deps: OrchestratorDeps) {
     this.task = task;
@@ -218,6 +225,7 @@ export class Orchestrator {
     this.save = deps.save;
     this.now = deps.now ?? (() => new Date());
     this.resuming = deps.resume ?? false;
+    this.setup = deps.setup;
   }
 
   get current(): Task {
@@ -249,6 +257,7 @@ export class Orchestrator {
   /** Stops the run: the running turn or gate is interrupted, and the run ends `cancelled`. */
   cancel(): void {
     this.cancelled = true;
+    this.abort.abort();
     this.runner.stop();
   }
 
@@ -261,6 +270,11 @@ export class Orchestrator {
             s.status === "running" ? { ...s, status: "failed", endedAt: this.at(), note: "Interrupted" } : s,
           ),
         }));
+      }
+      if (!(await this.prepare())) {
+        return this.cancelled
+          ? this.end("cancelled", "Stopped by the user. The working tree is left as it is.")
+          : this.end("failed");
       }
       await this.baseline();
       if (this.cancelled) return this.end("cancelled", "Stopped by the user. The working tree is left as it is.");
@@ -481,6 +495,20 @@ export class Orchestrator {
       members.map((m, i) => `## ${m.label} (${m.role})\n\n${demote(answers[i]?.text ?? "")}`).join("\n\n"),
     );
     return true;
+  }
+
+  /** The task's worktree setup, once: false when it failed or was stopped. */
+  private async prepare(): Promise<boolean> {
+    if (!this.setup || this.rec.steps.some((s) => s.kind === "setup" && s.status === "done")) return true;
+    const id = this.begin({ step: "setup", label: "Task branch", kind: "setup" });
+    const r = await this.setup(this.abort.signal);
+    if (this.cancelled) {
+      this.finish(id, { status: "cancelled" });
+      return false;
+    }
+    this.finish(id, { status: r.ok ? "done" : "failed", note: r.note });
+    if (!r.ok) this.commit(() => ({ outcome: `Setting up the task branch failed: ${r.note}` }));
+    return r.ok;
   }
 
   /** The gates once before the first step: what already fails isn't the task's doing, and isn't its to fix. */

@@ -52,6 +52,17 @@ export function untracked(root: string): string[] {
     .filter(Boolean);
 }
 
+/** The paths a task changed since its base: tracked files that differ, and files created since. */
+export function changedPaths(root: string, base: string | null, untrackedAtStart: string[]): string[] {
+  if (!repoOf(root)) return [];
+  const tracked = base
+    ? git(["--no-optional-locks", "diff", "--name-only", "--no-renames", base, "--", "."], root).stdout.split("\n")
+    : [];
+  const before = new Set(untrackedAtStart);
+  const added = untracked(root).filter((f) => !before.has(f));
+  return [...new Set([...tracked, ...added])].filter((f) => f && !f.startsWith(".agentchainer/"));
+}
+
 /** The task's changes since its base: tracked files' diff, plus files created since, shown as new. */
 export function taskDiff(root: string, base: string | null, untrackedAtStart: string[]): string {
   if (!repoOf(root)) return "";

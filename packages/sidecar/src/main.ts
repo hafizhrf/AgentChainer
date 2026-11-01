@@ -56,10 +56,12 @@ import {
   listTasksLive,
   mergeResult,
   newTask,
+  overlapsOf,
   present,
   resumeTask,
   retriageTask,
   reviseTask,
+  settleRun,
   shutdownRuns,
   splitTask,
   startTask,
@@ -557,15 +559,22 @@ serve(
       return continueTask(cwd, id, sessionHost(await claude()), taskUpdated(cwd));
     },
 
-    "task.mergeResult": ({ cwd, id }) => {
+    "task.mergeResult": async ({ cwd, id }) => {
       requireFolder(cwd);
+      await settleRun(id);
       return mergeResult(cwd, id);
     },
 
-    "task.cleanup": ({ cwd, id, deleteBranches }) => {
+    "task.cleanup": async ({ cwd, id, deleteBranches }) => {
       requireFolder(cwd);
+      await settleRun(id);
       cleanupTask(cwd, id, deleteBranches);
       return { ok: true };
+    },
+
+    "task.overlaps": ({ cwd, id }) => {
+      requireFolder(cwd);
+      return { overlaps: overlapsOf(cwd, id) };
     },
 
     "task.list": ({ cwd }) => {

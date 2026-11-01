@@ -42,6 +42,39 @@ describe("checkBash", () => {
     blocked("git push origin +main");
   });
 
+  it("leaves merging, releases, tags and writes through gh api to a person (M5-05)", () => {
+    for (const cmd of [
+      "gh pr merge 7 --squash",
+      "cd app && gh pr merge --auto",
+      "gh release create v1.0.0",
+      "gh api -X POST repos/a/b/issues",
+      "gh api --method DELETE repos/a/b/git/refs/heads/x",
+      "gh api repos/a/b/issues -f title=hi",
+      "git tag v1.2.3",
+      "git tag -a v1 -m release",
+      "git tag -d v1",
+      "git push --tags",
+      "git push origin refs/tags/v1",
+      "git push origin --delete feature",
+      "git push origin :feature",
+    ]) {
+      blocked(cmd);
+    }
+    for (const cmd of [
+      "gh pr view 7 --json state",
+      "gh pr checks 7",
+      "gh pr create --draft --title x --body-file b.md",
+      "gh api repos/a/b/pulls/7",
+      "git tag",
+      "git tag -l 'v1.*'",
+      "git tag --list",
+      "git tag --contains HEAD",
+      "git push -u origin agentchainer/task-1",
+    ]) {
+      allowed(cmd);
+    }
+  });
+
   it("blocks recursive deletes outside the workspace", () => {
     blocked("rm -rf /");
     blocked("rm -rf ~");

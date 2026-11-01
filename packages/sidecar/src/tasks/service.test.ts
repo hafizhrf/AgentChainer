@@ -23,6 +23,8 @@ import {
   deleteTaskSafe,
   draftTask,
   fixCiTask,
+  mergeGates,
+  mergePrTask,
   mergeResult,
   newTask,
   overlapsOf,
@@ -447,6 +449,17 @@ describe("pull requests (M5-02)", () => {
           }),
         );
       }
+      if (cmd === "repo" && sub === "view") {
+        return out(
+          JSON.stringify({
+            mergeCommitAllowed: true,
+            squashMergeAllowed: true,
+            rebaseMergeAllowed: false,
+            viewerDefaultMergeMethod: "SQUASH",
+          }),
+        );
+      }
+      if (cmd === "pr" && (sub === "ready" || sub === "merge")) return out("");
       if (cmd === "pr" && sub === "checks")
         return out(JSON.stringify(checks), checks.some((c) => c.bucket === "fail") ? 1 : 0);
       if (cmd === "run" && sub === "view") return out("test  ✖ total counts quantity\n");
@@ -544,6 +557,87 @@ describe("pull requests (M5-02)", () => {
     saveTask(root, { ...t, pr: t.pr ? { ...t.pr, fixes: done3 } : undefined });
     checks[0] = { ...checks[0], bucket: "fail" } as (typeof checks)[number];
     assert.throws(() => fixCiTask(root, id, job, host, gh, () => undefined), /had its 3 Fix CI rounds/);
+  });
+
+  it("works out the merge gates, and merges only with a person's reason while a gate holds it back (M5-04, M5-05)", () => {
+    const { root, gh, calls, checks } = world();
+    const { id } = doneWithChange(root);
+    const t = createTaskPr(root, id, { title: "Add coupons", draft: true }, gh);
+    const sha = t.pr?.headSha ?? "";
+    checks.push({
+      name: "test",
+      workflow: "test",
+      state: "SUCCESS",
+      bucket: "pass",
+      link: "https://x/actions/runs/1/job/2",
+    });
+    const g = mergeGates(root, id, gh);
+    const by = Object.fromEntries(g.gates.map((x) => [x.id, x.state]));
+    assert.deepEqual([by.local, by.review, by.ci], ["pass", "missing", "pass"]);
+    assert.ok(["pass", "not-run"].includes(by.secrets ?? ""), "gitleaks when installed");
+    assert.deepEqual([g.methods, g.defaultMethod, g.headSha, g.draft], [["merge", "squash"], "squash", sha, true]);
+
+    assert.throws(
+      () => mergePrTask(root, id, { method: "squash", headSha: sha }, gh),
+      /held back by: Review of the PR/,
+    );
+    assert.throws(
+      () => mergePrTask(root, id, { method: "squash", headSha: "0000000" }, gh),
+      /changed since you checked/,
+    );
+    assert.throws(
+      () => mergePrTask(root, id, { method: "rebase", headSha: sha, acceptReason: "x" }, gh),
+      /doesn't allow rebase/,
+    );
+    assert.ok(!calls.some((c) => c[0] === "pr" && c[1] === "merge"), "nothing merged so far");
+
+    const merged = mergePrTask(root, id, { method: "squash", headSha: sha, acceptReason: "Reviewed by hand." }, gh);
+    const ready = calls.findIndex((c) => c[0] === "pr" && c[1] === "ready");
+    const merge = calls.findIndex((c) => c[0] === "pr" && c[1] === "merge");
+    assert.ok(ready >= 0 && ready < merge, "a draft is marked ready first");
+    assert.deepEqual(calls[merge], ["pr", "merge", "7", "--squash", "--match-head-commit", sha]);
+    assert.ok(!calls.flat().includes("--auto"));
+    assert.deepEqual(
+      [merged.pr?.merged?.method, merged.pr?.merged?.accepted, merged.mergedInto?.branch],
+      ["squash", "Reviewed by hand.", "main"],
+    );
+    assert.match(
+      taskEvidence(root, id).markdown,
+      /## Pull request[\s\S]*Merged by a person \(squash\)[\s\S]*accepted: Reviewed by hand\./,
+    );
+    assert.throws(() => mergePrTask(root, id, { method: "squash", headSha: sha }, gh), /merged already/);
+  });
+
+  it("counts the run's own review for the head it pushed", () => {
+    const { root, gh } = world();
+    const { id } = doneWithChange(root);
+    const t = loadTask(root, id);
+    const at = "2026-11-01T00:00:00.000Z";
+    if (!t.run) throw new Error("no run");
+    saveTask(root, {
+      ...t,
+      run: {
+        ...t.run,
+        steps: [
+          {
+            id: "review",
+            step: "review",
+            label: "Independent review",
+            kind: "agent",
+            status: "done",
+            startedAt: at,
+            costUsd: 0,
+          },
+        ],
+      },
+    });
+    writeTaskFile(root, id, "review.json", JSON.stringify({ verdict: "approve", findings: [], criteria: [] }));
+    const shipped = createTaskPr(root, id, { title: "Add coupons", draft: true }, gh);
+    assert.deepEqual(
+      [shipped.pr?.review?.source, shipped.pr?.review?.verdict, shipped.pr?.review?.headSha],
+      ["run", "approve", shipped.pr?.headSha],
+    );
+    assert.equal(mergeGates(root, id, gh).gates.find((x) => x.id === "review")?.state, "pass");
   });
 
   it("refuses without gh, without changes, or before the run is Done", () => {

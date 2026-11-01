@@ -3,6 +3,7 @@ import { existsSync } from "node:fs";
 import path from "node:path";
 import {
   MAX_CI_FIXES,
+  type MergeGate,
   type PermissionMode,
   RpcErrorCode,
   type Task,
@@ -15,7 +16,18 @@ import { AC_DIR } from "../ac-dir.ts";
 import { findTool, toolsDir } from "../bootstrap/tools.ts";
 import { detectWorkspace } from "../detect/detect.ts";
 import { branches, merge, pushBranch } from "../git.ts";
-import { createPr, failedJobLog, findPr, type Gh, githubStatus, jobOf, prChecks, prState } from "../github.ts";
+import {
+  createPr,
+  failedJobLog,
+  findPr,
+  type Gh,
+  githubStatus,
+  jobOf,
+  mergeMethods,
+  mergePullRequest,
+  prChecks,
+  prState,
+} from "../github.ts";
 import { RpcFailure } from "../rpc.ts";
 import type { AgentSdkModule } from "../sdk-loader.ts";
 import { git, listFiles, repoOf } from "../workspace.ts";
@@ -25,6 +37,7 @@ import shipped from "./library.json" with { type: "json" };
 import { LibrarySchema } from "./library.ts";
 import { newRun, Orchestrator, type OrchestratorDeps, parseReview } from "./orchestrator.ts";
 import { changedPaths, fileStats, type SessionHost, sessionRunner, startBase, untracked } from "./runner.ts";
+import { semgrepScan, trivyScan } from "./scanners.ts";
 import { proposeSplit } from "./split.ts";
 import { createTask, deleteTask, listTasks, loadTask, readTaskFile, saveTask, writeTaskFile } from "./store.ts";
 import { classify, classifyPrompt, DEFAULT_BUDGET_USD, signals, triageRecord } from "./triage.ts";
@@ -893,6 +906,9 @@ export function createTaskPr(
     const bodyFile = path.join(root, AC_DIR, "tasks", id, "pr-body.md");
     pr = createPr(gh, root, { base, head, title: opts.title, bodyFile, draft: opts.draft });
   }
+  const runReview = task.run?.steps.some((st) => st.step === "review" && st.status === "done")
+    ? storedReview(root, id)
+    : null;
   const next: Task = {
     ...loadTask(root, id),
     pr: {
@@ -903,6 +919,10 @@ export function createTaskPr(
       headSha: pr.headRefOid,
       draft: pr.isDraft,
       createdAt: now.toISOString(),
+      // The run's own review (M and L) covers what was just pushed (M5-04).
+      ...(runReview
+        ? { review: { ...runReview, headSha: pr.headRefOid, at: now.toISOString(), source: "run" as const } }
+        : {}),
     },
     updatedAt: now.toISOString(),
   };
@@ -1004,6 +1024,250 @@ export function fixCiTask(
     notify(present(next));
   });
   return running;
+}
+
+/* ---------- Merge gates and the human merge (M5-04, M5-05) ---------- */
+
+/** The verdict in the task's `review.json`, as a merge gate counts it. */
+function storedReview(
+  root: string,
+  id: string,
+): { verdict: "approve" | "changes-requested" | "unreadable"; mustFix: number } | null {
+  const text = readTaskFile(root, id, "review.json");
+  if (!text) return null;
+  try {
+    const json = JSON.parse(text) as unknown;
+    const review = parseReview(json, "");
+    if (!review) return { verdict: "unreadable", mustFix: 0 };
+    return { verdict: review.verdict, mustFix: review.findings.filter((f) => f.severity === "must-fix").length };
+  } catch {
+    return { verdict: "unreadable", mustFix: 0 };
+  }
+}
+
+/** Gate states that hold Merge back until a person accepts them with a reason. */
+const HOLDS = new Set<MergeGate["state"]>(["fail", "pending", "missing"]);
+
+/**
+ * The merge gates of the task's PR, worked out now (design §7). The scanners run on the task's worktree, and only
+ * when it is at the PR's head; otherwise they say so and don't hold Merge back.
+ */
+export function mergeGates(root: string, id: string, gh: Gh | null) {
+  const { task, pr, gh: run } = withPr(root, id, gh);
+  const state = prState(run, root, pr.number);
+  const head = state.headSha;
+  const gates: MergeGate[] = [];
+
+  gates.push(
+    task.state === "done"
+      ? { id: "local", label: "Local gates", state: "pass", detail: task.run?.outcome ?? "The run ended Done." }
+      : task.state === "accepted"
+        ? {
+            id: "local",
+            label: "Local gates",
+            state: "pass",
+            detail: `Accepted with risk: ${task.run?.acceptance?.reason ?? ""}`,
+          }
+        : { id: "local", label: "Local gates", state: "fail", detail: `The run is ${task.state}.` },
+  );
+
+  const rv = pr.review;
+  gates.push(
+    !rv
+      ? {
+          id: "review",
+          label: "Review of the PR",
+          state: "missing",
+          detail: "No independent review covers this PR yet.",
+        }
+      : rv.headSha !== head
+        ? {
+            id: "review",
+            label: "Review of the PR",
+            state: "missing",
+            detail: "The PR changed since its review. Review it again.",
+          }
+        : rv.verdict === "unreadable"
+          ? { id: "review", label: "Review of the PR", state: "fail", detail: "The review couldn't be read." }
+          : rv.mustFix
+            ? {
+                id: "review",
+                label: "Review of the PR",
+                state: "fail",
+                detail: `${rv.mustFix} must-fix finding${rv.mustFix === 1 ? "" : "s"}.`,
+              }
+            : {
+                id: "review",
+                label: "Review of the PR",
+                state: "pass",
+                detail: `No must-fix findings (${rv.verdict}; ${rv.source === "run" ? "the run's review" : "reviewed on the PR"}).`,
+              },
+  );
+
+  const wt = task.worktree;
+  const code = wt && !wt.removed && existsSync(wt.path) ? codeRootIn(root, wt.path) : null;
+  const atHead = code !== null && git(["rev-parse", "HEAD"], code).stdout.trim() === head;
+  if (!code || !atHead) {
+    const why = !code ? "The task's worktree was cleaned up." : "The task's worktree isn't at the PR's head.";
+    for (const [gid, label] of [
+      ["secrets", "Secrets (gitleaks)"],
+      ["semgrep", "semgrep"],
+      ["trivy", "trivy"],
+    ] as const) {
+      gates.push({ id: gid, label, state: "not-run", detail: why });
+    }
+  } else {
+    const files = git(["diff", "--name-only", "--no-renames", `${pr.base}...${head}`, "--", "."], code)
+      .stdout.split("\n")
+      .filter((f) => f && existsSync(path.join(code, ...f.split("/"))));
+    const secrets = scanSecrets(
+      code,
+      files.map((f): FileChange => ({ path: f, status: "modified", added: null, removed: null })),
+    );
+    gates.push(
+      !secrets.ran
+        ? { id: "secrets", label: "Secrets (gitleaks)", state: "not-run", detail: secrets.why }
+        : secrets.flagged.length
+          ? {
+              id: "secrets",
+              label: "Secrets (gitleaks)",
+              state: "fail",
+              detail: `Possible secrets in ${secrets.flagged.join(", ")}.`,
+            }
+          : {
+              id: "secrets",
+              label: "Secrets (gitleaks)",
+              state: "pass",
+              detail: `Nothing found in ${secrets.scanned} changed file${secrets.scanned === 1 ? "" : "s"}.`,
+            },
+    );
+    for (const [gid, label, result] of [
+      ["semgrep", "semgrep", semgrepScan(code, files)],
+      ["trivy", "trivy", trivyScan(code)],
+    ] as const) {
+      gates.push(
+        !result.ran
+          ? { id: gid, label, state: "not-run", detail: result.why }
+          : { id: gid, label, state: result.findings ? "fail" : "pass", detail: result.detail },
+      );
+    }
+  }
+
+  const checks = prChecks(run, root, pr.number);
+  const failed = checks.filter((c) => c.bucket === "fail" || c.bucket === "cancel");
+  const pending = checks.filter((c) => c.bucket === "pending");
+  gates.push(
+    !checks.length
+      ? { id: "ci", label: "CI", state: "not-run", detail: "No CI checks on this PR." }
+      : failed.length
+        ? { id: "ci", label: "CI", state: "fail", detail: `Failing: ${failed.map((c) => c.name).join(", ")}.` }
+        : pending.length
+          ? {
+              id: "ci",
+              label: "CI",
+              state: "pending",
+              detail: `Still running: ${pending.map((c) => c.name).join(", ")}.`,
+            }
+          : {
+              id: "ci",
+              label: "CI",
+              state: "pass",
+              detail: `${checks.length} check${checks.length === 1 ? "" : "s"} passed.`,
+            },
+  );
+  return { headSha: head, draft: state.draft, gates, ...mergeMethods(run, root) };
+}
+
+/**
+ * Runs the independent reviewer on the PR's change, in the background like a run (M5-04). Its verdict is recorded for
+ * the head it reviewed; a newer push makes it stale.
+ */
+export function reviewPrTask(
+  root: string,
+  id: string,
+  host: SessionHost,
+  gh: Gh | null,
+  notify: (task: Task) => void,
+  now = new Date(),
+): Task {
+  const task = shippable(root, id);
+  const { pr, gh: run } = withPr(root, id, gh);
+  const head = prState(run, root, pr.number).headSha;
+  const code = codeRootIn(root, task.worktree.path);
+  if (git(["rev-parse", "HEAD"], code).stdout.trim() !== head) {
+    throw invalid("The task's worktree isn't at the PR's head, so its diff isn't what the PR holds.");
+  }
+  const running: Task = { ...task, state: "running", updatedAt: now.toISOString() };
+  saveTask(root, running);
+  notify(running);
+  const orchestrator = orchestratorFor(root, running, host, notify);
+  const round = {
+    run: () => orchestrator.reviewPr(),
+    cancel: () => orchestrator.cancel(),
+    get current() {
+      return orchestrator.current;
+    },
+  };
+  void track(root, id, round, notify).then((ended) => {
+    const reviewed = ended.run?.steps.some(
+      (st) => st.step === "pr-review" && st.status === "done" && st.startedAt >= now.toISOString(),
+    );
+    const verdict = reviewed ? storedReview(root, id) : null;
+    const latest = loadTask(root, id);
+    if (!verdict || !latest.pr) return;
+    const next: Task = {
+      ...latest,
+      pr: { ...latest.pr, review: { ...verdict, headSha: head, at: new Date().toISOString(), source: "pr" } },
+      updatedAt: new Date().toISOString(),
+    };
+    saveTask(root, next);
+    notify(present(next));
+  });
+  return running;
+}
+
+/**
+ * Merges the task's PR on GitHub (M5-05): a person clicked Merge and confirmed. The gates are worked out again for the
+ * head they saw; gates that hold Merge back need the person's reason, which the task keeps.
+ */
+export function mergePrTask(
+  root: string,
+  id: string,
+  opts: { method: "merge" | "squash" | "rebase"; headSha: string; acceptReason?: string },
+  gh: Gh | null,
+  now = new Date(),
+): Task {
+  const { pr, gh: run } = withPr(root, id, gh);
+  if (runs.has(id)) throw invalid("The task is running. Wait for it to end.");
+  if (pr.merged) throw invalid("The PR is merged already.");
+  const g = mergeGates(root, id, run);
+  if (g.headSha !== opts.headSha) throw invalid("The PR changed since you checked its gates. Check them again.");
+  if (!g.methods.includes(opts.method)) throw invalid(`The repository doesn't allow ${opts.method} merges.`);
+  const held = g.gates.filter((x) => HOLDS.has(x.state));
+  if (held.length && !opts.acceptReason?.trim()) {
+    throw invalid(`Merge is held back by: ${held.map((x) => x.label).join(", ")}. Say why it's fine to merge anyway.`);
+  }
+  mergePullRequest(run, root, pr.number, opts.method, opts.headSha, g.draft);
+  const at = now.toISOString();
+  const latest = loadTask(root, id);
+  const next: Task = {
+    ...latest,
+    mergedInto: { branch: pr.base, at },
+    pr: {
+      ...pr,
+      draft: false,
+      merged: {
+        method: opts.method,
+        sha: opts.headSha,
+        at,
+        ...(held.length && opts.acceptReason ? { accepted: opts.acceptReason.trim() } : {}),
+      },
+    },
+    updatedAt: at,
+  };
+  saveTask(root, next);
+  writeEvidence(root, next);
+  return present(next);
 }
 
 /* ---------- Accepted risk (M3-10) and evidence (M3-09) ---------- */

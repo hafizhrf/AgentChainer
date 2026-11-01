@@ -25,7 +25,7 @@
 | [R1](#r1--v01-release) | v0.1 | Packaging & release | ◐ Pipeline, updater, security review and docs in place; publishing waits for M0-01 and M0-22 |
 | [M3](#m3--adaptive-planner--task-contracts-v02) | v0.2 | Adaptive planner, contracts, evidence | ◐ Every tier (S, M, L, XL) runs live on macOS and Windows, with gates, evidence and accepted risk (preview); left: the owner's click-through and the exit runs |
 | [M4](#m4--agent-observability-v02v03) | v0.2–0.3 | Agent observability graph | ◐ Agent tree, graph, drawer, stop, timeline, replay, background tasks and agent library in; E2 frame times left |
-| [M5](#m5--git-workflow-pr--quality-gates-v03) | v0.3 | Git workflow, PRs, gates | ◐ Design approved ([git-workflow.md](design/git-workflow.md)); a worktree for every task, Create PR, CI status and Fix CI in; merge gates next |
+| [M5](#m5--git-workflow-pr--quality-gates-v03) | v0.3 | Git workflow, PRs, gates | ◐ Design approved ([git-workflow.md](design/git-workflow.md)); a worktree for every task, Create PR, CI status, Fix CI and merge gates in; E1 next (owner merges) |
 | [M6](#m6--deployment--workflow-canvas-v04) | v0.4 | Deploy adapters, workflow canvas | ☐ Not started |
 | [M7](#m7--evals--analytics-v05) | v0.5 | Evals & analytics | ☐ Not started |
 | [M8](#m8--multi-folder-workspaces--agent-fleet-proposed) | later | Multi-folder workspaces, agent fleet | ☐ Proposed (owner, 2026-10-30) |
@@ -1366,8 +1366,23 @@ Decisions: [ADR-0009](adr/0009-release-signing-and-updates.md). Maintainer steps
         - the log was read: `actual: 900, expected: 899`;
         - one Fix CI round fixed the code; the gates passed; it was pushed;
         - CI passed on the fix.
-- [ ] **M5-04** Merge gates: independent AI review of the diff, plus deterministic scanners (gitleaks; semgrep and trivy if installed).
+- [x] **M5-04** Merge gates: independent AI review of the diff, plus deterministic scanners (gitleaks; semgrep and trivy if installed).
+      Evidence: the step-4 PR ([design §7](design/git-workflow.md)).
+      - `task.mergeGates` checks the local gates, a review of the current head, gitleaks, offline semgrep and trivy, and
+        CI. `task.reviewPr` runs the independent reviewer on the PR's diff.
+      - Tests: `service.test.ts`, `scanners.test.ts`, and `orchestrator.test.ts` (`reviewPr`).
+      - Live on `hafizhrf/agentchainer-e2e` PR #2:
+        - the review gate was missing at first;
+        - **Review the PR** ran: approve, no must-fix findings, ≈$0.07;
+        - after it, the review and CI gates passed;
+        - the scanners showed "not installed".
 - [ ] **M5-05** Merge, force push and release tags always require a human.
+      Note: built in the step-4 PR.
+      - `task.mergePr` runs only from the Merge dialog. It uses `--match-head-commit`, never `--auto`, and needs a reason
+        when a gate isn't green.
+      - The guard denies agents `gh pr merge`, `gh release`, writes through `gh api`, tags, and pushes that delete refs.
+      - Tests: `guard.test.ts` and `service.test.ts`.
+      - The box is ticked when the owner merges a PR from the app (E1).
 - [ ] **M5-06** GitLab support (optional).
 
 ### Exit criteria

@@ -184,3 +184,41 @@ export function failedJobLog(gh: Gh, root: string, job: string): string {
   const log = r.stdout.length > MAX_LOG_CHARS ? `…\n${r.stdout.slice(-MAX_LOG_CHARS)}` : r.stdout;
   return redact(log);
 }
+
+type Method = "merge" | "squash" | "rebase";
+
+/** The merge methods the repository allows, and the one GitHub would pick for this user. */
+export function mergeMethods(gh: Gh, root: string): { methods: Method[]; defaultMethod: Method } {
+  const r = gh(
+    ["repo", "view", "--json", "mergeCommitAllowed,squashMergeAllowed,rebaseMergeAllowed,viewerDefaultMergeMethod"],
+    root,
+  );
+  if (r.status !== 0) throw new Error(`gh repo view failed: ${(r.stderr || r.stdout).trim() || `exit ${r.status}`}`);
+  const v = JSON.parse(r.stdout) as {
+    mergeCommitAllowed: boolean;
+    squashMergeAllowed: boolean;
+    rebaseMergeAllowed: boolean;
+    viewerDefaultMergeMethod: string;
+  };
+  const methods: Method[] = [
+    ...(v.mergeCommitAllowed ? ["merge" as const] : []),
+    ...(v.squashMergeAllowed ? ["squash" as const] : []),
+    ...(v.rebaseMergeAllowed ? ["rebase" as const] : []),
+  ];
+  const named = v.viewerDefaultMergeMethod.toLowerCase();
+  const preferred = methods.find((m) => named.startsWith(m)) ?? methods[0] ?? "merge";
+  return { methods, defaultMethod: preferred };
+}
+
+/**
+ * Merges the PR, a person's decision (M5-05): marks a draft ready first, then `gh pr merge` with the head the gates
+ * were worked out for, so a newer push fails the merge instead of slipping in. Never `--auto`.
+ */
+export function mergePullRequest(gh: Gh, root: string, pr: number, method: Method, headSha: string, draft: boolean) {
+  if (draft) {
+    const ready = gh(["pr", "ready", String(pr)], root);
+    if (ready.status !== 0) throw new Error(`gh pr ready failed: ${(ready.stderr || ready.stdout).trim()}`);
+  }
+  const r = gh(["pr", "merge", String(pr), `--${method}`, "--match-head-commit", headSha], root);
+  if (r.status !== 0) throw new Error(`gh pr merge failed: ${(r.stderr || r.stdout).trim() || `exit ${r.status}`}`);
+}

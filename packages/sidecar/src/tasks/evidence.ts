@@ -75,6 +75,8 @@ export type Evidence = {
   security: { guardBlocks: GuardBlock[]; approvals: ApprovalRecord[]; secrets: SecretsScan };
   risks: { contract: string[]; fromImplementer: string[]; manual: string[] };
   cost: { steps: { label: string; durationMs: number | null; costUsd: number }[]; runUsd: number; totalUsd: number };
+  /** The task's pull request (M5): its review, its Fix CI rounds and how a person merged it. */
+  pr?: Task["pr"];
 };
 
 const failed = (g: GateRun) => g.exitCode !== 0 || g.timedOut;
@@ -230,6 +232,7 @@ export function buildEvidence({ task, files, summary, review, secrets, subtasks 
       runUsd: run?.costUsd ?? 0,
       totalUsd: task.costUsd,
     },
+    ...(task.pr ? { pr: task.pr } : {}),
   };
 }
 
@@ -363,6 +366,22 @@ export function renderEvidence(e: Evidence): string {
   for (const r of e.risks.fromImplementer) add(`- Claude says: ${r}`);
   for (const m of e.risks.manual) add(`- Check by hand: ${m}`);
   if (!e.risks.contract.length && !e.risks.fromImplementer.length && !e.risks.manual.length) add("None noted.");
+  const pr = e.pr;
+  if (pr) {
+    add("", "## Pull request", "", `- [#${pr.number}](${pr.url}): \`${pr.head}\` into \`${pr.base}\`.`);
+    if (pr.review) {
+      const by = pr.review.source === "run" ? "the run's review" : "a review of the PR";
+      add(
+        `- Review (${by}) of \`${pr.review.headSha.slice(0, 7)}\`: ${pr.review.verdict}, ${pr.review.mustFix} must-fix finding${pr.review.mustFix === 1 ? "" : "s"}.`,
+      );
+    }
+    for (const [i, f] of (pr.fixes ?? []).entries()) add(`- Fix CI round ${i + 1} on ${f.check}: ${f.state}.`);
+    if (pr.merged) {
+      add(
+        `- Merged by a person (${pr.merged.method}) at \`${pr.merged.sha.slice(0, 7)}\`, ${pr.merged.at}.${pr.merged.accepted ? ` Gates not green, accepted: ${pr.merged.accepted}` : ""}`,
+      );
+    }
+  }
   add("", "## Cost and time", "", "| Step | Time | Cost |", "|---|---|---|");
   for (const s of e.cost.steps) add(`| ${cell(s.label)} | ${seconds(s.durationMs)} | ${usd(s.costUsd)} |`);
   add("", `Run ${usd(e.cost.runUsd)}; with drafting and triage ${usd(e.cost.totalUsd)}. Estimates.`, "");

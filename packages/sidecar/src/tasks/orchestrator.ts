@@ -561,6 +561,56 @@ export class Orchestrator {
     }
   }
 
+  /**
+   * The independent review of a PR's change (M5-04): a fresh read-only session with the contract, the diff and the
+   * gates, as the M and L workflows run it, here for any tier. It writes `review.json` and leaves the task as it
+   * was: the verdict is a merge gate, not the run's outcome.
+   */
+  async reviewPr(): Promise<Task> {
+    const state = this.task.state === "running" ? (this.rec.acceptance ? "accepted" : "done") : this.task.state;
+    const outcome = this.rec.outcome;
+    try {
+      const step: AgentStep = {
+        id: "pr-review",
+        label: "Review of the PR",
+        role: "independent-reviewer",
+        access: "read",
+        fresh: true,
+        inputs: ["contract", "diff", "gates"],
+        output: "review",
+        limits: { maxTurns: 30, maxBudgetUsd: 1 },
+      };
+      const turn = await this.turnOf(step);
+      if (!turn) return this.end(state, this.cancelled ? outcome : (this.rec.outcome ?? outcome));
+      const review = parseReview(turn.out.structured, turn.out.text);
+      this.files.write("review.json", `${JSON.stringify(review ?? { unreadable: turn.out.text }, null, 2)}\n`);
+      const mustFix = review?.findings.filter((f) => f.severity === "must-fix").length ?? 0;
+      this.commit((r) => ({
+        steps: r.steps.map((s) =>
+          s.id === turn.id
+            ? {
+                ...s,
+                note: !review
+                  ? "The review couldn't be read; it's kept as text."
+                  : mustFix
+                    ? `${mustFix} must-fix finding${mustFix === 1 ? "" : "s"}.`
+                    : `No must-fix findings (${review.verdict}).`,
+              }
+            : s,
+        ),
+      }));
+      return this.end(state, outcome);
+    } catch (err) {
+      this.commit(() => ({ outcome }));
+      return this.end(
+        state,
+        `${outcome ?? ""} The PR review stopped on an error: ${err instanceof Error ? err.message : String(err)}`.trim(),
+      );
+    } finally {
+      await this.runner.close();
+    }
+  }
+
   /** The task's worktree setup, once: false when it failed or was stopped. */
   private async prepare(): Promise<boolean> {
     if (!this.setup || this.rec.steps.some((s) => s.kind === "setup" && s.status === "done")) return true;

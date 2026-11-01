@@ -164,6 +164,28 @@ describe("orchestrator: a Fix CI round (M5-03)", () => {
   });
 });
 
+describe("orchestrator: a review of the PR (M5-04)", () => {
+  it("runs the independent reviewer on the contract, diff and gates, and leaves the task as it was", async () => {
+    const { runner, calls } = fakeRunner({
+      outcomes: {
+        "start:pr-review": {
+          structured: { verdict: "changes-requested", findings: [{ severity: "must-fix", text: "x" }], criteria: [] },
+        },
+      },
+    });
+    const first = await orchestrate(task("S"), runner).o.run();
+    const { o, files } = orchestrate({ ...first, state: "running" }, runner);
+    const after = await o.reviewPr();
+    assert.equal(after.state, "done");
+    assert.equal(after.run?.outcome, first.run?.outcome);
+    assert.equal(after.run?.steps.at(-1)?.note, "1 must-fix finding.");
+    assert.match(files.get("review.json") ?? "", /changes-requested/);
+    const call = calls.filter((c) => c.kind === "start").at(-1);
+    assert.equal(call?.tag?.role, "independent-reviewer");
+    assert.match(call?.prompt ?? "", /Review this change against its contract[\s\S]*## Diff since the task started/);
+  });
+});
+
 describe("orchestrator: the task branch (M5-01)", () => {
   it("readies the task's worktree before the baseline, as its first step", async () => {
     const { runner } = fakeRunner({});

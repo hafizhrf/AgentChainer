@@ -3,7 +3,7 @@ import path from "node:path";
 import { RpcErrorCode } from "@agentchainer/protocol";
 import { RpcFailure } from "./rpc.ts";
 import type { AgentSdkModule } from "./sdk-loader.ts";
-import { git, gitOrThrow, insideWorkspace, repoOf } from "./workspace.ts";
+import { git, gitAsync, gitOrThrow, insideWorkspace, repoOf } from "./workspace.ts";
 
 /**
  * The git panel's operations (M1-30), on the system `git` CLI. There is no force push: no code path here passes
@@ -23,7 +23,10 @@ export type Branches = {
   merging: { branch: string | null; conflicts: string[] } | null;
 };
 
-/** Network operations: git must not prompt for credentials (there's no terminal to answer), and must not hang. */
+/**
+ * Network operations: git must not prompt for credentials (there's no terminal to answer), must not hang, and runs
+ * without blocking the sidecar (`gitAsync`), which the UI would otherwise restart after its health ping timed out.
+ */
 const NETWORK = { env: { GIT_TERMINAL_PROMPT: "0" }, timeoutMs: 120_000 };
 
 function requireRepo(cwd: string) {
@@ -102,19 +105,19 @@ export function switchBranch(cwd: string, branch: string, create: boolean, track
 }
 
 /** Updates every remote's branches, and forgets the ones deleted upstream. */
-export function fetchAll(cwd: string): string {
+export async function fetchAll(cwd: string): Promise<string> {
   requireRepo(cwd);
-  const r = git(["fetch", "--all", "--prune"], cwd, undefined, NETWORK);
+  const r = await gitAsync(["fetch", "--all", "--prune"], cwd, NETWORK);
   if (r.status !== 0) throw new Error(`git fetch failed: ${r.stderr.trim() || `exit ${r.status}`}`);
   return (r.stderr || r.stdout).trim();
 }
 
 /** Brings in the upstream's new commits, fast-forward only: never a merge commit made behind the user's back. */
-export function pull(cwd: string): string {
+export async function pull(cwd: string): Promise<string> {
   const { current, upstream } = branches(cwd);
   if (!current) throw new RpcFailure(RpcErrorCode.invalidParams, "Not on a branch (detached HEAD).");
   if (!upstream) throw new RpcFailure(RpcErrorCode.invalidParams, `${current} has no upstream yet: push it first.`);
-  const r = git(["pull", "--ff-only"], cwd, undefined, NETWORK);
+  const r = await gitAsync(["pull", "--ff-only"], cwd, NETWORK);
   if (r.status !== 0) {
     const err = r.stderr.trim();
     if (/fast-forward|diverg/i.test(err)) {
@@ -201,18 +204,28 @@ export function commit(cwd: string, message: string): string {
 }
 
 /** Pushes the current branch; a branch without an upstream is pushed to `origin` and tracked. Never forced. */
-export function push(cwd: string): string {
+export async function push(cwd: string): Promise<string> {
   const { upstream, current } = branches(cwd);
   if (!current) throw new RpcFailure(RpcErrorCode.invalidParams, "Not on a branch (detached HEAD).");
   const args = upstream ? ["push"] : ["push", "-u", "origin", current];
-  const r = git(args, cwd, undefined, NETWORK);
+  const r = await gitAsync(args, cwd, NETWORK);
   if (r.status !== 0) throw new Error(`git push failed: ${r.stderr.trim() || `exit ${r.status}`}`);
   return (r.stderr || r.stdout).trim();
 }
 
-/** Pushes `branch` to `origin` and tracks it, from any checkout of the repository: a task's branch (M5-02). Never forced. */
-export function pushBranch(cwd: string, branch: string): string {
-  const r = git(["push", "-u", "origin", `refs/heads/${branch}:refs/heads/${branch}`], cwd, undefined, NETWORK);
+/**
+ * Pushes `branch` to `origin` and tracks it, from any checkout of the repository: a task's branch (M5-02). Never forced.
+ * `config` adds `-c` settings for this one command, e.g. `gh` as the credential helper (`ghCredentialConfig`).
+ */
+export async function pushBranch(cwd: string, branch: string, config: string[] = []): Promise<string> {
+  const args = [
+    ...config.flatMap((c) => ["-c", c]),
+    "push",
+    "-u",
+    "origin",
+    `refs/heads/${branch}:refs/heads/${branch}`,
+  ];
+  const r = await gitAsync(args, cwd, NETWORK);
   if (r.status !== 0) throw new Error(`git push failed: ${r.stderr.trim() || `exit ${r.status}`}`);
   return (r.stderr || r.stdout).trim();
 }

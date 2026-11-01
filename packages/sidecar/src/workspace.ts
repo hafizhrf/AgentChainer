@@ -4,6 +4,7 @@ import path from "node:path";
 import type { FileDiff, FileStatus, Hunk, WorkspaceFile, WorkspaceFiles } from "@agentchainer/protocol";
 import { RpcErrorCode } from "@agentchainer/protocol";
 import { RpcFailure } from "./rpc.ts";
+import { type RunResult, runAsync } from "./run-async.ts";
 
 /**
  * Workspace files, git status, diffs and reverts for the file tree and changes panel (M1-25…M1-27). Everything goes
@@ -42,6 +43,15 @@ export function git(
     ...(input !== undefined ? { input } : {}),
   });
   return { status: r.status, stdout: r.stdout ?? "", stderr: r.stderr ?? "" };
+}
+
+/** `git` without blocking the event loop: for network commands, which can take longer than the UI's health ping. */
+export function gitAsync(
+  args: string[],
+  cwd: string,
+  opts: { env?: Record<string, string>; timeoutMs?: number } = {},
+): Promise<RunResult> {
+  return runAsync("git", args, { cwd, timeoutMs: opts.timeoutMs ?? 30_000, ...(opts.env ? { env: opts.env } : {}) });
 }
 
 export function gitOrThrow(args: string[], cwd: string, input?: string): string {

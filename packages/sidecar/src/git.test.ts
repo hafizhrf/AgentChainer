@@ -61,9 +61,9 @@ describe("git panel operations on real repos", () => {
     assert.equal(run(dir, "log", "-1", "--format=%B").trim(), "feat: add a\n\nBody line.");
   });
 
-  it("pushes a new branch with tracking, then reports ahead/behind", () => {
+  it("pushes a new branch with tracking, then reports ahead/behind", async () => {
     assert.equal(branches(dir).upstream, null);
-    push(dir);
+    await push(dir);
     const b = branches(dir);
     assert.deepEqual([b.current, b.upstream, b.ahead, b.behind], ["main", "origin/main", 0, 0]);
     writeFileSync(join(dir, "a.txt"), "a2\n");
@@ -72,14 +72,14 @@ describe("git panel operations on real repos", () => {
     assert.equal(branches(dir).ahead, 1);
   });
 
-  it("never forces: a diverged push fails instead of overwriting the remote", () => {
+  it("never forces: a diverged push fails instead of overwriting the remote", async () => {
     const other = join(root, "other");
     run(root, "clone", "-q", remote, other);
     writeFileSync(join(other, "b.txt"), "b\n");
     run(other, "add", "b.txt");
     run(other, "commit", "-q", "-m", "remote change");
     run(other, "push", "-q");
-    assert.throws(() => push(dir), /push failed/);
+    await assert.rejects(push(dir), /push failed/);
     assert.equal(run(other, "log", "-1", "--format=%s").trim(), "remote change", "remote kept its commit");
   });
 
@@ -131,13 +131,13 @@ describe("branch menu operations on real repos", () => {
   });
   after(() => rmSync(root, { recursive: true, force: true }));
 
-  it("lists remote-only branches, and checks one out as a tracking branch", () => {
+  it("lists remote-only branches, and checks one out as a tracking branch", async () => {
     assert.deepEqual(branches(dir).remote, []);
     run(other, "switch", "-q", "-c", "feature-r");
     change(other, "r.txt", "r\n", "remote feature");
     run(other, "push", "-q", "origin", "feature-r");
     run(other, "switch", "-q", "main");
-    fetchAll(dir);
+    await fetchAll(dir);
     assert.deepEqual(branches(dir).remote, ["origin/feature-r"]);
     assert.throws(() => switchBranch(dir, "origin/nope", false, true), /Not a remote branch/);
     switchBranch(dir, "origin/feature-r", false, true);
@@ -146,35 +146,35 @@ describe("branch menu operations on real repos", () => {
     switchBranch(dir, "main", false);
   });
 
-  it("fetch forgets branches deleted on the remote", () => {
+  it("fetch forgets branches deleted on the remote", async () => {
     run(other, "push", "-q", "origin", "main:gone");
-    fetchAll(dir);
+    await fetchAll(dir);
     assert.ok(branches(dir).remote.includes("origin/gone"));
     run(other, "push", "-q", "origin", "--delete", "gone");
-    fetchAll(dir);
+    await fetchAll(dir);
     assert.ok(!branches(dir).remote.includes("origin/gone"));
   });
 
-  it("pulls fast-forward only: a diverged branch fails and is left as it was", () => {
+  it("pulls fast-forward only: a diverged branch fails and is left as it was", async () => {
     change(other, "b.txt", "b\n", "remote b");
     run(other, "push", "-q");
-    pull(dir);
+    await pull(dir);
     assert.equal(head(dir), head(other));
 
     change(other, "c.txt", "c\n", "remote c");
     run(other, "push", "-q");
     change(dir, "d.txt", "d\n", "local d");
     const before = head(dir);
-    assert.throws(() => pull(dir), /diverged/);
+    await assert.rejects(pull(dir), /diverged/);
     assert.equal(head(dir), before);
     // The way out the message names: merge the upstream into the branch.
     assert.deepEqual(merge(dir, "origin/main"), { merged: true, conflicts: [] });
     assert.equal(run(dir, "rev-list", "--count", "HEAD..origin/main").trim(), "0");
   });
 
-  it("pull needs an upstream", () => {
+  it("pull needs an upstream", async () => {
     switchBranch(dir, "local-only", true);
-    assert.throws(() => pull(dir), /no upstream/);
+    await assert.rejects(pull(dir), /no upstream/);
     switchBranch(dir, "main", false);
   });
 

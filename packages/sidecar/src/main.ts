@@ -478,11 +478,11 @@ serve(
 
     "git.commit": ({ cwd, message }) => ({ sha: commit(cwd, message) }),
 
-    "git.push": ({ cwd }) => ({ output: push(cwd) }),
+    "git.push": async ({ cwd }) => ({ output: await push(cwd) }),
 
-    "git.fetch": ({ cwd }) => ({ output: fetchAll(cwd) }),
+    "git.fetch": async ({ cwd }) => ({ output: await fetchAll(cwd) }),
 
-    "git.pull": ({ cwd }) => ({ output: pull(cwd) }),
+    "git.pull": async ({ cwd }) => ({ output: await pull(cwd) }),
 
     "git.deleteBranch": ({ cwd, branch, force }) => deleteBranch(cwd, branch, force ?? false),
 
@@ -595,7 +595,7 @@ serve(
     "task.createPr": async ({ cwd, id, title, draft }) => {
       requireFolder(cwd);
       await settleRun(id);
-      return createTaskPr(cwd, id, { title, draft }, systemGh());
+      return await createTaskPr(cwd, id, { title, draft }, systemGh());
     },
 
     "task.prStatus": ({ cwd, id }) => {
@@ -603,9 +603,9 @@ serve(
       return prStatus(cwd, id, systemGh());
     },
 
-    "task.ciLog": ({ cwd, id, link }) => {
+    "task.ciLog": async ({ cwd, id, link }) => {
       requireFolder(cwd);
-      return { log: ciLog(cwd, id, link, systemGh()) };
+      return { log: await ciLog(cwd, id, link, systemGh()) };
     },
 
     "task.fixCi": async ({ cwd, id, link }) => {

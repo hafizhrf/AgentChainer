@@ -426,7 +426,7 @@ describe("pull requests (M5-02)", () => {
     const calls: string[][] = [];
     const checks: { name: string; workflow: string; state: string; bucket: string; link: string }[] = [];
     const out = (stdout: string, status = 0): GhResult => ({ status, stdout, stderr: "" });
-    const gh: Gh = (args) => {
+    const gh: Gh = async (args) => {
       calls.push(args);
       if (args[0] === "--version") return out("gh version 2.103.3 (2026-10-26)\n");
       if (args[0] === "auth") return out("");
@@ -497,20 +497,20 @@ describe("pull requests (M5-02)", () => {
     return { id: task.id, wt };
   };
 
-  it("previews the PR without sending anything: base, head, title, and a body from the contract and the evidence", () => {
+  it("previews the PR without sending anything: base, head, title, and a body from the contract and the evidence", async () => {
     const { root, gh, calls } = world();
     const { id, wt } = doneWithChange(root);
-    const p = prPreview(root, id, gh);
+    const p = await prPreview(root, id, gh);
     assert.deepEqual([p.github.state, p.base, p.head, p.title], ["ready", "main", wt.branch, "Totals count quantity"]);
     assert.match(p.body, /## Contract[\s\S]*\*\*Objective:\*\* Totals count quantity\.[\s\S]*## Evidence/);
     assert.match(p.body, /Opened from AgentChainer task `[^`]+`\.$/);
     assert.ok(!calls.some((c) => c[0] === "pr" && c[1] === "create"), "nothing was created");
   });
 
-  it("commits, pushes the task's branch without force, opens a draft PR, and records it", () => {
+  it("commits, pushes the task's branch without force, opens a draft PR, and records it", async () => {
     const { root, bare, gh, prs, calls } = world();
     const { id, wt } = doneWithChange(root);
-    const t = createTaskPr(root, id, { title: "Add coupons", draft: true }, gh, new Date("2026-11-01T12:00:00Z"));
+    const t = await createTaskPr(root, id, { title: "Add coupons", draft: true }, gh, new Date("2026-11-01T12:00:00Z"));
     assert.equal(git(bare, "show", `${wt.branch}:coupon.js`), "export const coupon = 1;\n", "pushed with the work");
     const made = prs.get(wt.branch);
     assert.deepEqual([made?.base, made?.title, made?.draft], ["main", "Add coupons", true]);
@@ -522,7 +522,7 @@ describe("pull requests (M5-02)", () => {
     assert.ok(!calls.flat().some((a) => /force|--show-token/.test(a)));
 
     // Again: the open PR is picked up, not made twice.
-    const again = createTaskPr(root, id, { title: "Add coupons", draft: true }, gh);
+    const again = await createTaskPr(root, id, { title: "Add coupons", draft: true }, gh);
     assert.equal(again.pr?.number, 7);
     assert.equal(prs.size, 1);
   });
@@ -537,32 +537,38 @@ describe("pull requests (M5-02)", () => {
     assert.equal(long, "Fix total() in src/cart.js so each item contributes price times…");
   });
 
-  it("reads only the PR's own checks' logs, and starts Fix CI only on a failing check, at most 3 times", () => {
+  it("reads only the PR's own checks' logs, and starts Fix CI only on a failing check, at most 3 times", async () => {
     const { root, gh, checks } = world();
     const { id } = doneWithChange(root);
-    createTaskPr(root, id, { title: "Add coupons", draft: true }, gh);
+    await createTaskPr(root, id, { title: "Add coupons", draft: true }, gh);
     const job = "https://github.com/acme/app/actions/runs/1/job/2";
     checks.push({ name: "test", workflow: "test", state: "SUCCESS", bucket: "pass", link: job });
-    assert.equal(prStatus(root, id, gh).checks.length, 1);
-    assert.throws(
-      () => ciLog(root, id, "https://github.com/acme/app/actions/runs/9/job/9", gh),
+    assert.equal((await prStatus(root, id, gh)).checks.length, 1);
+    await assert.rejects(
+      ciLog(root, id, "https://github.com/acme/app/actions/runs/9/job/9", gh),
       /isn't one of the PR's/,
     );
-    assert.match(ciLog(root, id, job, gh), /total counts quantity/);
+    assert.match(await ciLog(root, id, job, gh), /total counts quantity/);
     const host = {} as Parameters<typeof fixCiTask>[3];
-    assert.throws(() => fixCiTask(root, id, job, host, gh, () => undefined), /isn't failing/);
+    await assert.rejects(
+      fixCiTask(root, id, job, host, gh, () => undefined),
+      /isn't failing/,
+    );
     const t = loadTask(root, id);
     const at = "2026-11-01T00:00:00.000Z";
     const done3 = [1, 2, 3].map(() => ({ check: "test", at, state: "failed" as const }));
     saveTask(root, { ...t, pr: t.pr ? { ...t.pr, fixes: done3 } : undefined });
     checks[0] = { ...checks[0], bucket: "fail" } as (typeof checks)[number];
-    assert.throws(() => fixCiTask(root, id, job, host, gh, () => undefined), /had its 3 Fix CI rounds/);
+    await assert.rejects(
+      fixCiTask(root, id, job, host, gh, () => undefined),
+      /had its 3 Fix CI rounds/,
+    );
   });
 
-  it("works out the merge gates, and merges only with a person's reason while a gate holds it back (M5-04, M5-05)", () => {
+  it("works out the merge gates, and merges only with a person's reason while a gate holds it back (M5-04, M5-05)", async () => {
     const { root, gh, calls, checks } = world();
     const { id } = doneWithChange(root);
-    const t = createTaskPr(root, id, { title: "Add coupons", draft: true }, gh);
+    const t = await createTaskPr(root, id, { title: "Add coupons", draft: true }, gh);
     const sha = t.pr?.headSha ?? "";
     checks.push({
       name: "test",
@@ -571,27 +577,32 @@ describe("pull requests (M5-02)", () => {
       bucket: "pass",
       link: "https://x/actions/runs/1/job/2",
     });
-    const g = mergeGates(root, id, gh);
+    const g = await mergeGates(root, id, gh);
     const by = Object.fromEntries(g.gates.map((x) => [x.id, x.state]));
     assert.deepEqual([by.local, by.review, by.ci], ["pass", "missing", "pass"]);
     assert.ok(["pass", "not-run"].includes(by.secrets ?? ""), "gitleaks when installed");
     assert.deepEqual([g.methods, g.defaultMethod, g.headSha, g.draft], [["merge", "squash"], "squash", sha, true]);
 
-    assert.throws(
-      () => mergePrTask(root, id, { method: "squash", headSha: sha }, gh),
+    await assert.rejects(
+      mergePrTask(root, id, { method: "squash", headSha: sha }, gh),
       /held back by: Review of the PR/,
     );
-    assert.throws(
-      () => mergePrTask(root, id, { method: "squash", headSha: "0000000" }, gh),
+    await assert.rejects(
+      mergePrTask(root, id, { method: "squash", headSha: "0000000" }, gh),
       /changed since you checked/,
     );
-    assert.throws(
-      () => mergePrTask(root, id, { method: "rebase", headSha: sha, acceptReason: "x" }, gh),
+    await assert.rejects(
+      mergePrTask(root, id, { method: "rebase", headSha: sha, acceptReason: "x" }, gh),
       /doesn't allow rebase/,
     );
     assert.ok(!calls.some((c) => c[0] === "pr" && c[1] === "merge"), "nothing merged so far");
 
-    const merged = mergePrTask(root, id, { method: "squash", headSha: sha, acceptReason: "Reviewed by hand." }, gh);
+    const merged = await mergePrTask(
+      root,
+      id,
+      { method: "squash", headSha: sha, acceptReason: "Reviewed by hand." },
+      gh,
+    );
     const ready = calls.findIndex((c) => c[0] === "pr" && c[1] === "ready");
     const merge = calls.findIndex((c) => c[0] === "pr" && c[1] === "merge");
     assert.ok(ready >= 0 && ready < merge, "a draft is marked ready first");
@@ -605,10 +616,10 @@ describe("pull requests (M5-02)", () => {
       taskEvidence(root, id).markdown,
       /## Pull request[\s\S]*Merged by a person \(squash\)[\s\S]*accepted: Reviewed by hand\./,
     );
-    assert.throws(() => mergePrTask(root, id, { method: "squash", headSha: sha }, gh), /merged already/);
+    await assert.rejects(mergePrTask(root, id, { method: "squash", headSha: sha }, gh), /merged already/);
   });
 
-  it("counts the run's own review for the head it pushed", () => {
+  it("counts the run's own review for the head it pushed", async () => {
     const { root, gh } = world();
     const { id } = doneWithChange(root);
     const t = loadTask(root, id);
@@ -632,23 +643,26 @@ describe("pull requests (M5-02)", () => {
       },
     });
     writeTaskFile(root, id, "review.json", JSON.stringify({ verdict: "approve", findings: [], criteria: [] }));
-    const shipped = createTaskPr(root, id, { title: "Add coupons", draft: true }, gh);
+    const shipped = await createTaskPr(root, id, { title: "Add coupons", draft: true }, gh);
     assert.deepEqual(
       [shipped.pr?.review?.source, shipped.pr?.review?.verdict, shipped.pr?.review?.headSha],
       ["run", "approve", shipped.pr?.headSha],
     );
-    assert.equal(mergeGates(root, id, gh).gates.find((x) => x.id === "review")?.state, "pass");
+    assert.equal((await mergeGates(root, id, gh)).gates.find((x) => x.id === "review")?.state, "pass");
   });
 
-  it("refuses without gh, without changes, or before the run is Done", () => {
+  it("refuses without gh, without changes, or before the run is Done", async () => {
     const { root, gh } = world();
     const { id } = doneWithChange(root);
-    assert.throws(() => createTaskPr(root, id, { title: "x", draft: true }, null), /GitHub CLI \(gh\) isn't installed/);
+    await assert.rejects(
+      createTaskPr(root, id, { title: "x", draft: true }, null),
+      /GitHub CLI \(gh\) isn't installed/,
+    );
     const empty = doneWithChange(root);
     rmSync(join(empty.wt.path, "coupon.js"));
-    assert.throws(() => createTaskPr(root, empty.id, { title: "x", draft: true }, gh), /nothing to propose/);
+    await assert.rejects(createTaskPr(root, empty.id, { title: "x", draft: true }, gh), /nothing to propose/);
     saveTask(root, { ...loadTask(root, id), state: "failed" });
-    assert.throws(() => createTaskPr(root, id, { title: "x", draft: true }, gh), /once the run is Done/);
+    await assert.rejects(createTaskPr(root, id, { title: "x", draft: true }, gh), /once the run is Done/);
   });
 });
 

@@ -1,8 +1,8 @@
-import { spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { homedir } from "node:os";
 import path from "node:path";
 import type { GitHubStatus, PrCheck } from "@agentchainer/protocol";
+import { runAsync } from "./run-async.ts";
 import { git } from "./workspace.ts";
 
 /**
@@ -12,8 +12,11 @@ import { git } from "./workspace.ts";
  */
 
 export type GhResult = { status: number | null; stdout: string; stderr: string };
-/** Runs `gh` with an argument array in `cwd`. Tests pass a stand-in. */
-export type Gh = (args: string[], cwd: string) => GhResult;
+/**
+ * Runs `gh` with an argument array in `cwd`, without blocking the sidecar: its calls go over the network (`runAsync`).
+ * Tests pass a stand-in.
+ */
+export type Gh = (args: string[], cwd: string) => Promise<GhResult>;
 
 type Platform = NodeJS.Platform;
 
@@ -41,22 +44,12 @@ export function findGh(
 
 /** Never prompts (there is no terminal to answer), no colour or update notices in the output, and a timeout. */
 export function ghRunner(binary: string, timeoutMs = 60_000): Gh {
-  return (args, cwd) => {
-    const r = spawnSync(binary, args, {
+  return (args, cwd) =>
+    runAsync(binary, args, {
       cwd,
-      encoding: "utf8",
-      timeout: timeoutMs,
-      windowsHide: true,
-      env: {
-        ...process.env,
-        GH_PROMPT_DISABLED: "1",
-        NO_COLOR: "1",
-        GH_NO_UPDATE_NOTIFIER: "1",
-        GH_SPINNER_DISABLED: "1",
-      },
+      timeoutMs,
+      env: { GH_PROMPT_DISABLED: "1", NO_COLOR: "1", GH_NO_UPDATE_NOTIFIER: "1", GH_SPINNER_DISABLED: "1" },
     });
-    return { status: r.status, stdout: r.stdout ?? "", stderr: r.stderr ?? (r.error ? String(r.error) : "") };
-  };
 }
 
 export function systemGh(): Gh | null {
@@ -77,16 +70,16 @@ export function parseRemote(url: string): { host: string; repo: string } | null 
  * Whether pull requests can be made for `root`: `gh` installed, an `origin` on a GitHub host, and a `gh` login for
  * that host (`gh auth status --hostname`, whose output is dropped: it names the account).
  */
-export function githubStatus(root: string, gh: Gh | null): GitHubStatus {
+export async function githubStatus(root: string, gh: Gh | null): Promise<GitHubStatus> {
   if (!gh) return { state: "missing" };
-  const v = gh(["--version"], root);
+  const v = await gh(["--version"], root);
   if (v.status !== 0) return { state: "missing" };
   const version = /gh version (\S+)/.exec(v.stdout)?.[1];
   const base = version ? { version } : {};
   const url = git(["remote", "get-url", "origin"], root).stdout.trim();
   const remote = url ? parseRemote(url) : null;
   if (!remote) return { state: "no-remote", ...base };
-  const signedIn = gh(["auth", "status", "--hostname", remote.host], root).status === 0;
+  const signedIn = (await (await gh(["auth", "status", "--hostname", remote.host], root)).status) === 0;
   if (!signedIn && !remote.host.includes("github")) return { state: "no-remote", ...base };
   return { state: signedIn ? "ready" : "signed-out", ...base, host: remote.host, repo: remote.repo };
 }
@@ -103,23 +96,23 @@ type PrView = {
 };
 
 /** The open PR whose head is `branch`, or null. */
-export function findPr(gh: Gh, root: string, branch: string): PrView | null {
-  const r = gh(["pr", "view", branch, "--json", PR_FIELDS], root);
+export async function findPr(gh: Gh, root: string, branch: string): Promise<PrView | null> {
+  const r = await gh(["pr", "view", branch, "--json", PR_FIELDS], root);
   if (r.status !== 0) return null;
   const pr = JSON.parse(r.stdout) as PrView;
   return pr.state === "OPEN" ? pr : null;
 }
 
 /** Opens a PR from `head` into `base`, with the body read from a file; returns it as `gh pr view` shows it. */
-export function createPr(
+export async function createPr(
   gh: Gh,
   root: string,
   pr: { base: string; head: string; title: string; bodyFile: string; draft: boolean },
-): PrView {
+): Promise<PrView> {
   const args = ["pr", "create", "--base", pr.base, "--head", pr.head, "--title", pr.title, "--body-file", pr.bodyFile];
-  const r = gh(pr.draft ? [...args, "--draft"] : args, root);
+  const r = await gh(pr.draft ? [...args, "--draft"] : args, root);
   if (r.status !== 0) throw new Error(`gh pr create failed: ${(r.stderr || r.stdout).trim() || `exit ${r.status}`}`);
-  const made = findPr(gh, root, pr.head);
+  const made = await findPr(gh, root, pr.head);
   if (!made) throw new Error(`gh made the pull request, but it can't be read back: ${r.stdout.trim()}`);
   return made;
 }
@@ -128,8 +121,11 @@ export function createPr(
  * The PR's checks. `gh pr checks` exits non-zero while checks fail (1) or are pending (8), and says "no checks
  * reported" when there are none, so the JSON on stdout is what counts.
  */
-export function prChecks(gh: Gh, root: string, pr: number): PrCheck[] {
-  const r = gh(["pr", "checks", String(pr), "--json", "name,workflow,state,bucket,link,startedAt,completedAt"], root);
+export async function prChecks(gh: Gh, root: string, pr: number): Promise<PrCheck[]> {
+  const r = await gh(
+    ["pr", "checks", String(pr), "--json", "name,workflow,state,bucket,link,startedAt,completedAt"],
+    root,
+  );
   const out = r.stdout.trim();
   if (out.startsWith("[")) return JSON.parse(out) as PrCheck[];
   if (/no checks reported/i.test(r.stderr)) return [];
@@ -137,8 +133,12 @@ export function prChecks(gh: Gh, root: string, pr: number): PrCheck[] {
 }
 
 /** The state of the PR on GitHub, and the commit its head points at. */
-export function prState(gh: Gh, root: string, pr: number): { state: string; draft: boolean; headSha: string } {
-  const r = gh(["pr", "view", String(pr), "--json", "state,isDraft,headRefOid"], root);
+export async function prState(
+  gh: Gh,
+  root: string,
+  pr: number,
+): Promise<{ state: string; draft: boolean; headSha: string }> {
+  const r = await gh(["pr", "view", String(pr), "--json", "state,isDraft,headRefOid"], root);
   if (r.status !== 0) throw new Error(`gh pr view failed: ${(r.stderr || r.stdout).trim() || `exit ${r.status}`}`);
   const v = JSON.parse(r.stdout) as { state: string; isDraft: boolean; headRefOid: string };
   return { state: v.state, draft: v.isDraft, headSha: v.headRefOid };
@@ -178,8 +178,8 @@ export const MAX_LOG_CHARS = 32_000;
  * The failed steps' log of one GitHub Actions job: its last `MAX_LOG_CHARS` characters, redacted. It is untrusted text
  * from whoever can change the repository, so it goes to Claude as data only (design §6, T-02).
  */
-export function failedJobLog(gh: Gh, root: string, job: string): string {
-  const r = gh(["run", "view", "--job", job, "--log-failed"], root);
+export async function failedJobLog(gh: Gh, root: string, job: string): Promise<string> {
+  const r = await gh(["run", "view", "--job", job, "--log-failed"], root);
   if (r.status !== 0) throw new Error(`gh run view failed: ${(r.stderr || r.stdout).trim() || `exit ${r.status}`}`);
   const log = r.stdout.length > MAX_LOG_CHARS ? `…\n${r.stdout.slice(-MAX_LOG_CHARS)}` : r.stdout;
   return redact(log);
@@ -188,8 +188,8 @@ export function failedJobLog(gh: Gh, root: string, job: string): string {
 type Method = "merge" | "squash" | "rebase";
 
 /** The merge methods the repository allows, and the one GitHub would pick for this user. */
-export function mergeMethods(gh: Gh, root: string): { methods: Method[]; defaultMethod: Method } {
-  const r = gh(
+export async function mergeMethods(gh: Gh, root: string): Promise<{ methods: Method[]; defaultMethod: Method }> {
+  const r = await gh(
     ["repo", "view", "--json", "mergeCommitAllowed,squashMergeAllowed,rebaseMergeAllowed,viewerDefaultMergeMethod"],
     root,
   );
@@ -214,11 +214,33 @@ export function mergeMethods(gh: Gh, root: string): { methods: Method[]; default
  * Merges the PR, a person's decision (M5-05): marks a draft ready first, then `gh pr merge` with the head the gates
  * were worked out for, so a newer push fails the merge instead of slipping in. Never `--auto`.
  */
-export function mergePullRequest(gh: Gh, root: string, pr: number, method: Method, headSha: string, draft: boolean) {
+export async function mergePullRequest(
+  gh: Gh,
+  root: string,
+  pr: number,
+  method: Method,
+  headSha: string,
+  draft: boolean,
+): Promise<void> {
   if (draft) {
-    const ready = gh(["pr", "ready", String(pr)], root);
+    const ready = await gh(["pr", "ready", String(pr)], root);
     if (ready.status !== 0) throw new Error(`gh pr ready failed: ${(ready.stderr || ready.stdout).trim()}`);
   }
-  const r = gh(["pr", "merge", String(pr), `--${method}`, "--match-head-commit", headSha], root);
+  const r = await gh(["pr", "merge", String(pr), `--${method}`, "--match-head-commit", headSha], root);
   if (r.status !== 0) throw new Error(`gh pr merge failed: ${(r.stderr || r.stdout).trim() || `exit ${r.status}`}`);
+}
+
+/**
+ * Git settings that make one `git push` to a GitHub host use the user's `gh` login, as `gh auth setup-git` would
+ * configure for good: the helper list is cleared for this command, then `gh auth git-credential` answers for that host.
+ * The app never sees the token; `gh` hands it to git. Null without `gh` or for a remote elsewhere.
+ */
+export function ghCredentialConfig(root: string, binary = findGh()): string[] | null {
+  if (!binary) return null;
+  const url = git(["remote", "get-url", "origin"], root).stdout.trim();
+  // An ssh remote uses the user's ssh keys, not a credential helper.
+  const remote = /^https?:/.test(url) ? parseRemote(url) : null;
+  if (!remote) return null;
+  const helper = `!"${binary.replace(/\\/g, "/")}" auth git-credential`;
+  return ["credential.helper=", `credential.https://${remote.host}.helper=${helper}`];
 }

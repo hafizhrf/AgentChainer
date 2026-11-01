@@ -97,7 +97,10 @@ current branch, now offered for every tier.
 
 1. **Secrets check before anything leaves the machine.** gitleaks over the branch's changed files, as the evidence
    already does (`scanSecrets`, `service.ts:651`). A finding blocks the push until the user accepts it with a reason.
-2. **Push:** the existing `git.push` (`git.ts:204`).
+2. **Push:** `pushBranch` in `git.ts`. As built: to an https GitHub remote it uses the user's `gh` login as the
+   credential helper for that one command, so it doesn't depend on how git's own helper is set up. Every network call
+   (`git push`/`fetch`/`pull`, `gh`, the scanners) runs without blocking the sidecar: the UI restarts a sidecar that
+   doesn't answer its health ping within 5 s (M1-01), and a blocking push did exactly that.
    - It sets `-u origin agentchainer/<id>` and never forces.
    - It uses the user's own git credential helper, with `GIT_TERMINAL_PROMPT=0`.
 3. **The pull request:** `gh pr create`.

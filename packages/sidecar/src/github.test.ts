@@ -9,6 +9,7 @@ import {
   findGh,
   type Gh,
   type GhResult,
+  ghCredentialConfig,
   githubStatus,
   jobOf,
   MAX_LOG_CHARS,
@@ -27,7 +28,7 @@ const done = (stdout = "", status = 0): GhResult => ({ status, stdout, stderr: "
 /** A `gh` stand-in that is signed in to `hosts` and records its calls. */
 function fakeGh(hosts: string[] = ["github.com"]): Gh & { calls: string[][] } {
   const calls: string[][] = [];
-  const gh: Gh = (args) => {
+  const gh: Gh = async (args) => {
     calls.push(args);
     if (args[0] === "--version") return done("gh version 2.103.3 (2026-10-26)\n");
     if (args[0] === "auth") return done("", hosts.includes(args[3] ?? "") ? 0 : 1);
@@ -70,36 +71,53 @@ describe("GitHub through the user's gh (M5-02)", () => {
     assert.equal(parseRemote("/srv/git/app.git"), null);
   });
 
-  it("is ready only with gh, an origin on GitHub, and a login for its host; it never asks for the token", () => {
-    assert.deepEqual(githubStatus(repoWithOrigin("https://github.com/acme/app.git"), null), { state: "missing" });
+  it("is ready only with gh, an origin on GitHub, and a login for its host; it never asks for the token", async () => {
+    assert.deepEqual(await githubStatus(repoWithOrigin("https://github.com/acme/app.git"), null), { state: "missing" });
     const gh = fakeGh();
-    assert.deepEqual(githubStatus(repoWithOrigin("https://github.com/acme/app.git"), gh), {
+    assert.deepEqual(await githubStatus(repoWithOrigin("https://github.com/acme/app.git"), gh), {
       state: "ready",
       version: "2.103.3",
       host: "github.com",
       repo: "acme/app",
     });
-    assert.equal(githubStatus(repoWithOrigin(""), gh).state, "no-remote");
-    assert.equal(githubStatus(repoWithOrigin("https://gitlab.com/acme/app.git"), gh).state, "no-remote");
-    assert.equal(githubStatus(repoWithOrigin("https://github.example.com/acme/app.git"), gh).state, "signed-out");
+    assert.equal((await githubStatus(repoWithOrigin(""), gh)).state, "no-remote");
+    assert.equal((await githubStatus(repoWithOrigin("https://gitlab.com/acme/app.git"), gh)).state, "no-remote");
+    assert.equal(
+      (await githubStatus(repoWithOrigin("https://github.example.com/acme/app.git"), gh)).state,
+      "signed-out",
+    );
     assert.ok(gh.calls.every((c) => !c.includes("--show-token") && !c.includes("token")));
+  });
+});
+
+describe("pushing with the user's gh login", () => {
+  it("makes gh the credential helper for an https GitHub remote, for one command, and nothing for ssh", () => {
+    assert.deepEqual(
+      ghCredentialConfig(repoWithOrigin("https://github.com/acme/app.git"), "C:\\Program Files\\GitHub CLI\\gh.exe"),
+      [
+        "credential.helper=",
+        'credential.https://github.com.helper=!"C:/Program Files/GitHub CLI/gh.exe" auth git-credential',
+      ],
+    );
+    assert.equal(ghCredentialConfig(repoWithOrigin("git@github.com:acme/app.git"), "/usr/bin/gh"), null);
+    assert.equal(ghCredentialConfig(repoWithOrigin("https://github.com/acme/app.git"), null), null);
   });
 });
 
 describe("CI status and logs (M5-03)", () => {
   const answer =
     (r: GhResult): Gh =>
-    () =>
+    async () =>
       r;
 
-  it("reads checks from the JSON even when gh exits non-zero for failing or pending checks", () => {
+  it("reads checks from the JSON even when gh exits non-zero for failing or pending checks", async () => {
     const checks = [{ name: "test", workflow: "test", state: "FAILURE", bucket: "fail", link: "https://x/1" }];
-    assert.deepEqual(prChecks(answer(done(JSON.stringify(checks), 1)), ".", 1), checks);
+    assert.deepEqual(await prChecks(answer(done(JSON.stringify(checks), 1)), ".", 1), checks);
     assert.deepEqual(
-      prChecks(answer({ status: 1, stdout: "", stderr: "no checks reported on the 'x' branch" }), ".", 1),
+      await prChecks(answer({ status: 1, stdout: "", stderr: "no checks reported on the 'x' branch" }), ".", 1),
       [],
     );
-    assert.throws(() => prChecks(answer({ status: 4, stdout: "", stderr: "HTTP 401" }), ".", 1), /HTTP 401/);
+    await assert.rejects(prChecks(answer({ status: 4, stdout: "", stderr: "HTTP 401" }), ".", 1), /HTTP 401/);
   });
 
   it("knows a GitHub Actions job from its check link, and nothing else", () => {
@@ -108,13 +126,13 @@ describe("CI status and logs (M5-03)", () => {
     assert.equal(jobOf("https://circleci.com/gh/a/b/123"), null);
   });
 
-  it("keeps the log's end and masks secrets and emails, as diagnostics do", () => {
+  it("keeps the log's end and masks secrets and emails, as diagnostics do", async () => {
     assert.equal(
       redact("token=abc123def and ghp_0123456789abcdefghijABCD by dev@example.com in /home/u/app", "/home/u"),
       "token=[redacted] and [redacted token] by [email] in ~/app",
     );
     const long = `${"x".repeat(MAX_LOG_CHARS)}FAILED here`;
-    const log = failedJobLog(answer(done(long)), ".", "2");
+    const log = await failedJobLog(answer(done(long)), ".", "2");
     assert.ok(log.length <= MAX_LOG_CHARS + 2 && log.endsWith("FAILED here") && log.startsWith("…"));
   });
 });

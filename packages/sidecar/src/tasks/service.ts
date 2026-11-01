@@ -21,6 +21,7 @@ import {
   failedJobLog,
   findPr,
   type Gh,
+  ghCredentialConfig,
   githubStatus,
   jobOf,
   mergeMethods,
@@ -29,6 +30,7 @@ import {
   prState,
 } from "../github.ts";
 import { RpcFailure } from "../rpc.ts";
+import { runAsync } from "../run-async.ts";
 import type { AgentSdkModule } from "../sdk-loader.ts";
 import { git, listFiles, repoOf } from "../workspace.ts";
 import { availableGates, draftContract, normalizeContract } from "./contract.ts";
@@ -849,10 +851,10 @@ export function prBody(root: string, task: Task): string {
 }
 
 /** What Create PR would send, without sending anything. */
-export function prPreview(root: string, id: string, gh: Gh | null) {
+export async function prPreview(root: string, id: string, gh: Gh | null) {
   const task = shippable(root, id);
   return {
-    github: githubStatus(root, gh),
+    github: await githubStatus(root, gh),
     base: prBase(root, task),
     head: task.worktree.branch,
     title: shortTitle(task.contract?.objective || task.request),
@@ -864,15 +866,15 @@ export function prPreview(root: string, id: string, gh: Gh | null) {
  * Creates the task's PR: commits what the run left, scans the branch's changed files with gitleaks, pushes the branch
  * (never forced) and opens the PR through the user's `gh`. A branch with an open PR gets that one recorded.
  */
-export function createTaskPr(
+export async function createTaskPr(
   root: string,
   id: string,
   opts: { title: string; draft: boolean },
   gh: Gh | null,
   now = new Date(),
-): Task {
+): Promise<Task> {
   const task = shippable(root, id);
-  const status = githubStatus(root, gh);
+  const status = await githubStatus(root, gh);
   if (!gh || status.state !== "ready") {
     throw invalid(
       status.state === "missing"
@@ -894,17 +896,17 @@ export function createTaskPr(
     .stdout.split("\n")
     .filter((f) => f && existsSync(path.join(code, ...f.split("/"))))
     .map((f): FileChange => ({ path: f, status: "modified", added: null, removed: null }));
-  const scan = scanSecrets(code, changed);
+  const scan = await scanSecretsAsync(code, changed);
   if (scan.ran && scan.flagged.length) {
     throw invalid(`gitleaks flagged possible secrets in ${scan.flagged.join(", ")}. Remove them before pushing.`);
   }
-  pushBranch(root, head);
-  const existing = findPr(gh, root, head);
+  await pushBranch(root, head, ghCredentialConfig(root) ?? []);
+  const existing = await findPr(gh, root, head);
   let pr = existing;
   if (!pr) {
     writeTaskFile(root, id, "pr-body.md", prBody(root, task));
     const bodyFile = path.join(root, AC_DIR, "tasks", id, "pr-body.md");
-    pr = createPr(gh, root, { base, head, title: opts.title, bodyFile, draft: opts.draft });
+    pr = await createPr(gh, root, { base, head, title: opts.title, bodyFile, draft: opts.draft });
   }
   const runReview = task.run?.steps.some((st) => st.step === "review" && st.status === "done")
     ? storedReview(root, id)
@@ -940,15 +942,16 @@ function withPr(root: string, id: string, gh: Gh | null): { task: Task; pr: NonN
 }
 
 /** The task's PR on GitHub and its checks. */
-export function prStatus(root: string, id: string, gh: Gh | null) {
+export async function prStatus(root: string, id: string, gh: Gh | null) {
   const { pr, gh: run } = withPr(root, id, gh);
-  return { ...prState(run, root, pr.number), checks: prChecks(run, root, pr.number) };
+  return { ...(await prState(run, root, pr.number)), checks: await prChecks(run, root, pr.number) };
 }
 
 /** The failed steps' log of one of the PR's checks, named by its link, which must be one of the PR's. */
-export function ciLog(root: string, id: string, link: string, gh: Gh | null): string {
+export async function ciLog(root: string, id: string, link: string, gh: Gh | null): Promise<string> {
   const { pr, gh: run } = withPr(root, id, gh);
-  if (!prChecks(run, root, pr.number).some((c) => c.link === link)) throw invalid("That isn't one of the PR's checks.");
+  if (!(await prChecks(run, root, pr.number)).some((c) => c.link === link))
+    throw invalid("That isn't one of the PR's checks.");
   const job = jobOf(link);
   if (!job) throw invalid("Only GitHub Actions logs can be read here. Open the check's page instead.");
   return failedJobLog(run, root, job);
@@ -958,7 +961,7 @@ export function ciLog(root: string, id: string, link: string, gh: Gh | null): st
  * Starts a Fix CI round on a failing check of the task's PR, after the user saw its log. It runs in the background
  * like a run; when it ends Done, what it changed is committed and pushed (never forced). Rounds are capped.
  */
-export function fixCiTask(
+export async function fixCiTask(
   root: string,
   id: string,
   link: string,
@@ -966,7 +969,7 @@ export function fixCiTask(
   gh: Gh | null,
   notify: (task: Task) => void,
   now = new Date(),
-): Task {
+): Promise<Task> {
   const task = shippable(root, id);
   const { pr, gh: run } = withPr(root, id, gh);
   const fixes = pr.fixes ?? [];
@@ -975,11 +978,11 @@ export function fixCiTask(
       `This PR had its ${MAX_CI_FIXES} Fix CI rounds. Look at the failure yourself, or run the task again.`,
     );
   }
-  const check = prChecks(run, root, pr.number).find((c) => c.link === link);
+  const check = (await prChecks(run, root, pr.number)).find((c) => c.link === link);
   if (check?.bucket !== "fail") throw invalid("That check isn't failing.");
   const job = jobOf(link);
   if (!job) throw invalid("Only GitHub Actions logs can be read here. Open the check's page instead.");
-  const log = failedJobLog(run, root, job);
+  const log = await failedJobLog(run, root, job);
   const running: Task = { ...task, state: "running", updatedAt: now.toISOString() };
   saveTask(root, running);
   notify(running);
@@ -991,7 +994,7 @@ export function fixCiTask(
       return orchestrator.current;
     },
   };
-  void track(root, id, round, notify).then((ended) => {
+  void track(root, id, round, notify).then(async (ended) => {
     let state: "done" | "failed" | "cancelled" =
       ended.state === "done" ? "done" : ended.state === "cancelled" ? "cancelled" : "failed";
     let outcome: string | null = null;
@@ -999,7 +1002,7 @@ export function fixCiTask(
     if (state === "done" && latest.worktree) {
       try {
         commitResult(root, latest, `Fix CI: ${check.name}`);
-        pushBranch(root, latest.worktree.branch);
+        await pushBranch(root, latest.worktree.branch, ghCredentialConfig(root) ?? []);
       } catch (err) {
         state = "failed";
         outcome = `The fix passed the gates, but pushing it failed: ${err instanceof Error ? err.message : String(err)}`;
@@ -1052,9 +1055,9 @@ const HOLDS = new Set<MergeGate["state"]>(["fail", "pending", "missing"]);
  * The merge gates of the task's PR, worked out now (design §7). The scanners run on the task's worktree, and only
  * when it is at the PR's head; otherwise they say so and don't hold Merge back.
  */
-export function mergeGates(root: string, id: string, gh: Gh | null) {
+export async function mergeGates(root: string, id: string, gh: Gh | null) {
   const { task, pr, gh: run } = withPr(root, id, gh);
-  const state = prState(run, root, pr.number);
+  const state = await prState(run, root, pr.number);
   const head = state.headSha;
   const gates: MergeGate[] = [];
 
@@ -1120,7 +1123,7 @@ export function mergeGates(root: string, id: string, gh: Gh | null) {
     const files = git(["diff", "--name-only", "--no-renames", `${pr.base}...${head}`, "--", "."], code)
       .stdout.split("\n")
       .filter((f) => f && existsSync(path.join(code, ...f.split("/"))));
-    const secrets = scanSecrets(
+    const secrets = await scanSecretsAsync(
       code,
       files.map((f): FileChange => ({ path: f, status: "modified", added: null, removed: null })),
     );
@@ -1141,9 +1144,10 @@ export function mergeGates(root: string, id: string, gh: Gh | null) {
               detail: `Nothing found in ${secrets.scanned} changed file${secrets.scanned === 1 ? "" : "s"}.`,
             },
     );
+    const [semgrep, trivy] = await Promise.all([semgrepScan(code, files), trivyScan(code)]);
     for (const [gid, label, result] of [
-      ["semgrep", "semgrep", semgrepScan(code, files)],
-      ["trivy", "trivy", trivyScan(code)],
+      ["semgrep", "semgrep", semgrep],
+      ["trivy", "trivy", trivy],
     ] as const) {
       gates.push(
         !result.ran
@@ -1153,7 +1157,7 @@ export function mergeGates(root: string, id: string, gh: Gh | null) {
     }
   }
 
-  const checks = prChecks(run, root, pr.number);
+  const checks = await prChecks(run, root, pr.number);
   const failed = checks.filter((c) => c.bucket === "fail" || c.bucket === "cancel");
   const pending = checks.filter((c) => c.bucket === "pending");
   gates.push(
@@ -1175,24 +1179,24 @@ export function mergeGates(root: string, id: string, gh: Gh | null) {
               detail: `${checks.length} check${checks.length === 1 ? "" : "s"} passed.`,
             },
   );
-  return { headSha: head, draft: state.draft, gates, ...mergeMethods(run, root) };
+  return { headSha: head, draft: state.draft, gates, ...(await mergeMethods(run, root)) };
 }
 
 /**
  * Runs the independent reviewer on the PR's change, in the background like a run (M5-04). Its verdict is recorded for
  * the head it reviewed; a newer push makes it stale.
  */
-export function reviewPrTask(
+export async function reviewPrTask(
   root: string,
   id: string,
   host: SessionHost,
   gh: Gh | null,
   notify: (task: Task) => void,
   now = new Date(),
-): Task {
+): Promise<Task> {
   const task = shippable(root, id);
   const { pr, gh: run } = withPr(root, id, gh);
-  const head = prState(run, root, pr.number).headSha;
+  const head = (await prState(run, root, pr.number)).headSha;
   const code = codeRootIn(root, task.worktree.path);
   if (git(["rev-parse", "HEAD"], code).stdout.trim() !== head) {
     throw invalid("The task's worktree isn't at the PR's head, so its diff isn't what the PR holds.");
@@ -1230,24 +1234,24 @@ export function reviewPrTask(
  * Merges the task's PR on GitHub (M5-05): a person clicked Merge and confirmed. The gates are worked out again for the
  * head they saw; gates that hold Merge back need the person's reason, which the task keeps.
  */
-export function mergePrTask(
+export async function mergePrTask(
   root: string,
   id: string,
   opts: { method: "merge" | "squash" | "rebase"; headSha: string; acceptReason?: string },
   gh: Gh | null,
   now = new Date(),
-): Task {
+): Promise<Task> {
   const { pr, gh: run } = withPr(root, id, gh);
   if (runs.has(id)) throw invalid("The task is running. Wait for it to end.");
   if (pr.merged) throw invalid("The PR is merged already.");
-  const g = mergeGates(root, id, run);
+  const g = await mergeGates(root, id, run);
   if (g.headSha !== opts.headSha) throw invalid("The PR changed since you checked its gates. Check them again.");
   if (!g.methods.includes(opts.method)) throw invalid(`The repository doesn't allow ${opts.method} merges.`);
   const held = g.gates.filter((x) => HOLDS.has(x.state));
   if (held.length && !opts.acceptReason?.trim()) {
     throw invalid(`Merge is held back by: ${held.map((x) => x.label).join(", ")}. Say why it's fine to merge anyway.`);
   }
-  mergePullRequest(run, root, pr.number, opts.method, opts.headSha, g.draft);
+  await mergePullRequest(run, root, pr.number, opts.method, opts.headSha, g.draft);
   const at = now.toISOString();
   const latest = loadTask(root, id);
   const next: Task = {
@@ -1291,6 +1295,32 @@ export function acceptRisk(root: string, id: string, reason: string, now = new D
   saveTask(root, next);
   writeEvidence(root, next);
   return next;
+}
+
+/**
+ * `scanSecrets` without blocking the sidecar, for the PR's push and its merge gates, where the files can be many (the
+ * UI restarts a sidecar that doesn't answer its health ping within 5 s).
+ */
+export async function scanSecretsAsync(root: string, files: FileChange[]): Promise<SecretsScan> {
+  const gitleaks = findTool("gitleaks", toolsDir());
+  if (!gitleaks) return { ran: false, why: "gitleaks isn't installed" };
+  const targets = files.filter((f) => f.status !== "deleted");
+  const flagged: string[] = [];
+  for (const f of targets) {
+    const r = await runAsync(
+      gitleaks,
+      ["dir", path.join(root, ...f.path.split("/")), "--no-banner", "--redact", "--exit-code", "3"],
+      { cwd: root, timeoutMs: 60_000 },
+    );
+    if (r.status === 3) flagged.push(f.path);
+    else if (r.status !== 0) {
+      return {
+        ran: false,
+        why: `gitleaks failed: ${(r.stderr || r.stdout).trim().slice(0, 200) || `exit ${r.status}`}`,
+      };
+    }
+  }
+  return { ran: true, scanned: targets.length, flagged };
 }
 
 /** gitleaks over the changed files, when it's installed (the catalog's copy, or one on PATH). */

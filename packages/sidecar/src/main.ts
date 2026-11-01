@@ -12,6 +12,7 @@ import { proposals } from "./bootstrap/proposals.ts";
 import { toolsDir } from "./bootstrap/tools.ts";
 import { catalog } from "./catalog/index.ts";
 import { checkEnvironment, claudeVersion, findClaude } from "./claude.ts";
+import { setDockerImage } from "./deploy/adapters.ts";
 import {
   deployPreview,
   deployProduction,
@@ -670,6 +671,12 @@ serve(
     "deploy.rollback": async ({ cwd, id, confirm }) => {
       requireFolder(cwd);
       return rollbackDeploy(cwd, id, confirm);
+    },
+
+    "deploy.setDockerImage": ({ cwd, image }) => {
+      requireFolder(cwd);
+      setDockerImage(cwd, image);
+      return { ok: true as const };
     },
 
     "deploy.list": ({ cwd, taskId }) => {

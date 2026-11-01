@@ -13,7 +13,7 @@ import { RpcFailure } from "../rpc.ts";
 import { loadTask } from "../tasks/store.ts";
 import { codeRootIn } from "../tasks/worktree.ts";
 import { git } from "../workspace.ts";
-import { ADAPTERS, type Adapter } from "./adapters.ts";
+import { ADAPTERS, type Adapter, type DeployContext } from "./adapters.ts";
 import { type Cli, cliRunner, type RunCli, resolveCli } from "./cli.ts";
 import { runSmoke } from "./smoke.ts";
 
@@ -35,8 +35,13 @@ const HINTS: Record<string, string> = {
   cloudflare: "Install it with `npm i -g wrangler`, then sign in with `wrangler login` in a terminal.",
   firebase: "Install it with `npm i -g firebase-tools`, then sign in with `firebase login` in a terminal.",
   fly: "Install flyctl (fly.io/docs/flyctl/install), then sign in with `fly auth login` in a terminal.",
+  docker: "Install Docker (docs.docker.com/get-docker), then sign in to the registry with `docker login <registry>`.",
 };
-const LOGIN: Record<string, string> = { fly: "fly auth login" };
+/** What "not signed in" means, when it isn't `<cli> login`. */
+const SIGNED_OUT: Record<string, string> = {
+  fly: "Sign in with `fly auth login` in a terminal.",
+  docker: "Docker isn't running. Start it, and sign in to the registry with `docker login <registry>`.",
+};
 
 async function targetOf(a: Adapter, root: string, clis: Clis): Promise<DeployTarget | null> {
   const found = a.detect(root);
@@ -47,6 +52,7 @@ async function targetOf(a: Adapter, root: string, clis: Clis): Promise<DeployTar
     config: found.config,
     environments: [...a.environments],
     rollbackWithoutRecord: a.rollbackArgs() !== null,
+    ...(a.projectName(root) ? { project: a.projectName(root) ?? "" } : {}),
   };
   const cli = clis.resolve(a.cli);
   if (!cli) return { ...base, state: "missing", hint: HINTS[a.id] ?? `Install the ${a.cli} CLI.` };
@@ -54,7 +60,7 @@ async function targetOf(a: Adapter, root: string, clis: Clis): Promise<DeployTar
   const signedIn = await a.signedIn(clis.runner(cli), root);
   return signedIn
     ? { ...base, state: "ready" }
-    : { ...base, state: "signed-out", hint: `Sign in with \`${LOGIN[a.id] ?? `${a.cli} login`}\` in a terminal.` };
+    : { ...base, state: "signed-out", hint: SIGNED_OUT[a.id] ?? `Sign in with \`${a.cli} login\` in a terminal.` };
 }
 
 /** The providers `root` can deploy to. */
@@ -133,12 +139,13 @@ async function runDeploy(
   adapter: Adapter,
   base: Base,
   args: string[],
+  ctx: DeployContext,
   clis: Clis,
   now: () => Date,
 ): Promise<DeployRecord> {
   // A build can take several minutes on the provider's side.
   const r = await clis.runner(cliOf(adapter, clis))(args, code, { timeoutMs: 1_200_000 });
-  const out = r.status === 0 ? adapter.parse(r) : null;
+  const out = r.status === 0 ? adapter.parse(r, ctx) : null;
   let record: DeployRecord;
   if (!out) {
     const tail = tailOf(r);
@@ -148,7 +155,7 @@ async function runDeploy(
       status: "failed",
       error:
         r.status === 0
-          ? "The deploy finished, but its URL couldn't be read from the output."
+          ? "The deploy finished, but its result couldn't be read from the output."
           : adapter.id === "cloudflare" &&
               base.env === "preview" &&
               /does not exist|not found|deploy.*first/i.test(tail)
@@ -156,8 +163,9 @@ async function runDeploy(
             : tail || `exit ${r.status}`,
     };
   } else {
-    const smoke = await runSmoke(code, out.url, clis.fetch);
-    record = { ...base, endedAt: now().toISOString(), status: "done", ...out, smoke };
+    // A Docker image has no URL to smoke-test.
+    const smoke = out.url ? await runSmoke(code, out.url, clis.fetch) : undefined;
+    record = { ...base, endedAt: now().toISOString(), status: "done", ...out, ...(smoke ? { smoke } : {}) };
   }
   saveRecord(root, record);
   return record;
@@ -187,10 +195,14 @@ export async function deployPreview(
   return exclusive(root, adapter, () => {
     adapter.prepare(root, code);
     // Preview aliases are lowercase letters, digits and dashes; the task id's random part keeps it short and unique.
-    const args = adapter.deployArgs("preview", {
+    const commit = git(["rev-parse", "HEAD"], code).stdout.trim();
+    const ctx: DeployContext = {
       alias: `task-${taskId.slice(-8)}`,
       message: task.contract?.objective || task.request,
-    });
+      root,
+      commit,
+    };
+    const args = adapter.deployArgs("preview", ctx);
     const started = now();
     const base: Base = {
       id: newId(started),
@@ -198,11 +210,11 @@ export async function deployPreview(
       env: "preview",
       taskId,
       ...(wt ? { branch: wt.branch } : {}),
-      commit: git(["rev-parse", "HEAD"], code).stdout.trim(),
+      commit,
       command: `${adapter.cli} ${args.join(" ")}`,
       startedAt: started.toISOString(),
     };
-    return runDeploy(root, code, adapter, base, args, clis, now);
+    return runDeploy(root, code, adapter, base, args, ctx, clis, now);
   });
 }
 
@@ -227,9 +239,9 @@ export async function productionPlan(
   clis: Clis = realClis,
 ): Promise<DeployPlan> {
   const adapter = adapterOf(adapterId);
-  const args = adapter.deployArgs("production", { alias: "", message: "" });
   const branch = git(["rev-parse", "--abbrev-ref", "HEAD"], root).stdout.trim();
   const commit = git(["rev-parse", "HEAD"], root).stdout.trim();
+  const args = adapter.deployArgs("production", productionContext(root, commit));
   // Untracked files count too: a provider CLI uploads the folder, not the commit. The app's own folder doesn't.
   const dirty = git(["status", "--porcelain", "--", ".", `:(exclude)${AC_DIR}`], root).stdout.trim() !== "";
   const target = await targetOf(adapter, root, clis);
@@ -257,6 +269,14 @@ export async function productionPlan(
   };
 }
 
+/** A production deploy's context: the commit's subject is its message. */
+const productionContext = (root: string, commit: string): DeployContext => ({
+  alias: "",
+  message: commit ? git(["log", "-1", "--format=%s", commit], root).stdout.trim() : "",
+  root,
+  commit,
+});
+
 function checkTyped(plan: DeployPlan, typed: string): void {
   if (typed.trim() !== plan.project) throw invalid(`Type the project's name, ${plan.project}, to confirm.`);
 }
@@ -280,7 +300,8 @@ export async function deployProduction(
     throw invalid("The branch has moved since the plan was shown. Check the plan again before deploying.");
   }
   return exclusive(root, adapter, () => {
-    const args = adapter.deployArgs("production", { alias: "", message: "" });
+    const ctx = productionContext(root, plan.commit);
+    const args = adapter.deployArgs("production", ctx);
     const started = now();
     const before = liveProduction(root, adapter.id);
     const base: Base = {
@@ -293,7 +314,7 @@ export async function deployProduction(
       startedAt: started.toISOString(),
       ...(before ? { previous: previousOf(before) } : {}),
     };
-    return runDeploy(root, root, adapter, base, args, clis, now);
+    return runDeploy(root, root, adapter, base, args, ctx, clis, now);
   });
 }
 

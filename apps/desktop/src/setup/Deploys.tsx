@@ -91,24 +91,34 @@ export function Deploys({ cwd }: { cwd: string }) {
             No deploy config found. Vercel needs <code>.vercel/project.json</code> (<code>vercel link</code>);
             Cloudflare Workers need <code>wrangler.toml</code>, <code>wrangler.json</code> or{" "}
             <code>wrangler.jsonc</code>; Firebase Hosting needs <code>firebase.json</code> with a default project;
-            Fly.io needs <code>fly.toml</code>.
+            Fly.io needs <code>fly.toml</code>; a Docker image needs a <code>Dockerfile</code>.
           </p>
         )}
         <ul className="deploy-targets">
           {targets?.map((t) => (
-            <li key={t.adapter}>
-              <strong>{t.label}</strong>
-              <code className="muted">{t.config}</code>
-              <span className="grow muted">{t.state === "ready" ? "Signed in." : withCode(t.hint ?? "")}</span>
-              <button
-                type="button"
-                className="secondary small"
-                disabled={t.state !== "ready" || planning !== null}
-                onClick={() => void open(t.adapter)}
-              >
-                {planning === t.adapter ? <Loader2 size={13} className="spin" /> : <Rocket size={13} />}
-                Deploy to production…
-              </button>
+            <li key={t.adapter} className="deploy-target">
+              <div className="deploy-target-row">
+                <strong>{t.label}</strong>
+                <code className="muted">{t.config}</code>
+                {t.project && <span>{t.project}</span>}
+                <span className="grow muted">
+                  {t.state === "ready"
+                    ? t.adapter === "docker"
+                      ? "Docker is running."
+                      : "Signed in."
+                    : withCode(t.hint ?? "")}
+                </span>
+                <button
+                  type="button"
+                  className="secondary small"
+                  disabled={t.state !== "ready" || planning !== null}
+                  onClick={() => void open(t.adapter)}
+                >
+                  {planning === t.adapter ? <Loader2 size={13} className="spin" /> : <Rocket size={13} />}
+                  Deploy to production…
+                </button>
+              </div>
+              {t.adapter === "docker" && <DockerImage cwd={cwd} image={t.project ?? ""} onSaved={() => void load()} />}
             </li>
           ))}
         </ul>
@@ -194,7 +204,9 @@ function DeployRow({
           ? d.error
           : d.smoke
             ? `Smoke test ${d.smoke.ok ? "passed" : "failed"}: ${d.smoke.detail}`
-            : ""}
+            : d.adapter === "docker" && d.deploymentId
+              ? `Pushed ${d.deploymentId}`
+              : ""}
       </span>
       {d.url && (
         <IconButton label="Open the deployment" onClick={() => void openUrl(d.url ?? "")}>
@@ -208,6 +220,64 @@ function DeployRow({
         </button>
       )}
     </li>
+  );
+}
+
+/**
+ * The image a Docker deploy pushes to (`.agentchainer/docker.json`). The registry login stays with `docker login`;
+ * this is only the name.
+ */
+function DockerImage({ cwd, image, onSaved }: { cwd: string; image: string; onSaved: () => void }) {
+  const [value, setValue] = useState(image);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => setValue(image), [image]);
+
+  async function save() {
+    setBusy(true);
+    setError(null);
+    try {
+      await request("deploy.setDockerImage", { cwd, image: value.trim() || null });
+      onSaved();
+    } catch (err) {
+      setError(message(err));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <form
+      className="deploy-image"
+      onSubmit={(e) => {
+        e.preventDefault();
+        void save();
+      }}
+    >
+      <Field
+        label="Image to push to"
+        help={
+          <>
+            With its registry and no tag, e.g. <code>ghcr.io/you/app</code>. Saved in{" "}
+            <code>.agentchainer/docker.json</code>, which you can commit. Sign in with <code>docker login</code>.
+          </>
+        }
+      >
+        <input
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          placeholder="ghcr.io/you/app"
+          autoComplete="off"
+          spellCheck={false}
+        />
+      </Field>
+      <button type="submit" className="secondary small" disabled={busy || value.trim() === image}>
+        {busy && <Loader2 size={13} className="spin" />}
+        Save
+      </button>
+      {error && <p className="warn">{error}</p>}
+    </form>
   );
 }
 
@@ -259,9 +329,13 @@ function ConfirmDeploy({
       onOpenChange={(o) => !o && !busy && onClose()}
       title={rollback ? `Roll back ${plan.project} on ${plan.label}?` : `Deploy ${plan.project} to production?`}
       description={
-        rollback
-          ? "Production goes back to the deploy before this one, with the provider's own rollback. The smoke test runs again."
-          : "This deploys the workspace as it is now to the provider's production. The smoke test runs on the result."
+        plan.adapter === "docker"
+          ? rollback
+            ? "The latest tag goes back to the previous commit's image in the registry, without a build."
+            : "This builds the workspace's Dockerfile and pushes the image with the commit's tag and latest."
+          : rollback
+            ? "Production goes back to the deploy before this one, with the provider's own rollback. The smoke test runs again."
+            : "This deploys the workspace as it is now to the provider's production. The smoke test runs on the result."
       }
       role="alertdialog"
       actions={

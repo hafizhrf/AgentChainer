@@ -19522,7 +19522,8 @@
                     "vercel",
                     "cloudflare",
                     "firebase",
-                    "fly"
+                    "fly",
+                    "docker"
                   ]
                 },
                 "label": {
@@ -19555,6 +19556,9 @@
                 },
                 "rollbackWithoutRecord": {
                   "type": "boolean"
+                },
+                "project": {
+                  "type": "string"
                 }
               },
               "required": [
@@ -19594,7 +19598,8 @@
               "vercel",
               "cloudflare",
               "firebase",
-              "fly"
+              "fly",
+              "docker"
             ]
           }
         },
@@ -19618,7 +19623,8 @@
               "vercel",
               "cloudflare",
               "firebase",
-              "fly"
+              "fly",
+              "docker"
             ]
           },
           "env": {
@@ -19739,7 +19745,8 @@
               "vercel",
               "cloudflare",
               "firebase",
-              "fly"
+              "fly",
+              "docker"
             ]
           }
         },
@@ -19759,7 +19766,8 @@
               "vercel",
               "cloudflare",
               "firebase",
-              "fly"
+              "fly",
+              "docker"
             ]
           },
           "label": {
@@ -19792,7 +19800,8 @@
                   "vercel",
                   "cloudflare",
                   "firebase",
-                  "fly"
+                  "fly",
+                  "docker"
                 ]
               },
               "env": {
@@ -19924,7 +19933,8 @@
               "vercel",
               "cloudflare",
               "firebase",
-              "fly"
+              "fly",
+              "docker"
             ]
           },
           "confirm": {
@@ -19956,7 +19966,8 @@
               "vercel",
               "cloudflare",
               "firebase",
-              "fly"
+              "fly",
+              "docker"
             ]
           },
           "env": {
@@ -20099,7 +20110,8 @@
               "vercel",
               "cloudflare",
               "firebase",
-              "fly"
+              "fly",
+              "docker"
             ]
           },
           "env": {
@@ -20205,6 +20217,48 @@
         "additionalProperties": false
       }
     },
+    "deploy.setDockerImage": {
+      "params": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "cwd": {
+            "type": "string",
+            "minLength": 1
+          },
+          "image": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*(?:\\.[a-z0-9-]+)*(?::\\d+)?(?:\\/[a-z0-9]+(?:[._-][a-z0-9]+)*)+$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "cwd",
+          "image"
+        ],
+        "additionalProperties": false
+      },
+      "result": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "const": true
+          }
+        },
+        "required": [
+          "ok"
+        ],
+        "additionalProperties": false
+      }
+    },
     "deploy.list": {
       "params": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -20242,7 +20296,8 @@
                     "vercel",
                     "cloudflare",
                     "firebase",
-                    "fly"
+                    "fly",
+                    "docker"
                   ]
                 },
                 "env": {

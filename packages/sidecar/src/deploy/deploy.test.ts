@@ -7,7 +7,7 @@ import { after, describe, it } from "node:test";
 import type { RunResult } from "../run-async.ts";
 import { newTask, taskBranch } from "../tasks/service.ts";
 import { saveTask } from "../tasks/store.ts";
-import { cloudflare, firebase, fly, vercel } from "./adapters.ts";
+import { type Adapter, cloudflare, docker, firebase, fly, setDockerImage, vercel } from "./adapters.ts";
 import { resolveCli, scriptFromNpmShim } from "./cli.ts";
 import {
   type Clis,
@@ -34,7 +34,8 @@ const put = (root: string, rel: string, text: string) => {
   writeFileSync(path.join(root, rel), text);
 };
 const result = (status: number, stdout = "", stderr = ""): RunResult => ({ status, stdout, stderr });
-const CTX = { alias: "task-1a2b3c4d", message: "Ship the page" };
+const CTX = { alias: "task-1a2b3c4d", message: "Ship the page", root: ".", commit: "0123456789abcdef" };
+const parseWith = (a: Adapter, r: RunResult) => a.parse(r, CTX);
 
 /** A git workspace linked to Vercel, with a task that has its own worktree. */
 const linkedWorkspace = () => {
@@ -126,11 +127,11 @@ describe("the Vercel adapter (M6-01)", () => {
       "https://app-abc123-team.vercel.app\n",
       "Vercel CLI 65.9.0\nInspect: https://vercel.com/team/app/xyz\n",
     );
-    assert.deepEqual(vercel.parse(out), {
+    assert.deepEqual(parseWith(vercel, out), {
       url: "https://app-abc123-team.vercel.app",
       deploymentId: "https://app-abc123-team.vercel.app",
     });
-    assert.equal(vercel.parse(result(0, "", "Error: something")), null);
+    assert.equal(parseWith(vercel, result(0, "", "Error: something")), null);
     assert.deepEqual(vercel.deployArgs("preview", CTX), ["deploy", "--yes"]);
     assert.deepEqual(vercel.deployArgs("production", CTX), ["deploy", "--prod", "--yes"]);
     assert.deepEqual(vercel.rollbackArgs("https://a.vercel.app"), ["rollback", "https://a.vercel.app", "--yes"]);
@@ -238,11 +239,11 @@ describe("the Cloudflare Workers adapter (M6-01)", () => {
       "--message",
       "Ship the page",
     ]);
-    assert.deepEqual(cloudflare.parse(result(0, UPLOADED)), {
+    assert.deepEqual(parseWith(cloudflare, result(0, UPLOADED)), {
       url: "https://task-1a2b3c4d-shop.team.workers.dev",
       deploymentId: "0f3c6c1a-9b7d-4b8e-8a8e-2b1c3d4e5f60",
     });
-    assert.equal(cloudflare.parse(result(0, "Uploaded shop")), null);
+    assert.equal(parseWith(cloudflare, result(0, "Uploaded shop")), null);
     assert.deepEqual(cloudflare.rollbackArgs("0f3c6c1a"), [
       "rollback",
       "0f3c6c1a",
@@ -288,7 +289,8 @@ describe("the Cloudflare Workers adapter (M6-01)", () => {
     put(jsonc, "wrangler.jsonc", '// the shop\n{ "name": "shop-api", "main": "src/index.ts" }\n');
     assert.equal(cloudflare.projectName(jsonc), "shop-api");
     assert.deepEqual(
-      cloudflare.parse(
+      parseWith(
+        cloudflare,
         result(
           0,
           "Uploaded shop (1.1 sec)\nDeployed shop triggers (0.3 sec)\n  https://shop.team.workers.dev\nCurrent Version ID: 9a8b7c6d-1111-2222-3333-444455556666\n",
@@ -407,11 +409,14 @@ describe("the Firebase Hosting and Fly.io adapters (M6-01)", () => {
       "--expires",
       "7d",
     ]);
-    assert.deepEqual(firebase.parse(result(0, `i  deploying\n${CHANNEL}`)), {
+    assert.deepEqual(parseWith(firebase, result(0, `i  deploying\n${CHANNEL}`)), {
       url: "https://shop--task-1a2b3c4d-x1y2.web.app",
       deploymentId: "shop@abc123",
     });
-    assert.deepEqual(firebase.parse(result(0, LIVE)), { url: "https://shop.web.app", deploymentId: "shop@def456" });
+    assert.deepEqual(parseWith(firebase, result(0, LIVE)), {
+      url: "https://shop.web.app",
+      deploymentId: "shop@def456",
+    });
     assert.deepEqual(firebase.rollbackArgs("shop@def456"), [
       "hosting:clone",
       "shop@def456",
@@ -430,7 +435,7 @@ describe("the Firebase Hosting and Fly.io adapters (M6-01)", () => {
     );
     const out =
       "image: registry.fly.io/shop-api:deployment-01JABC\nVisit your newly deployed app at https://shop-api.fly.dev/\n";
-    assert.deepEqual(fly.parse(result(0, out)), {
+    assert.deepEqual(parseWith(fly, result(0, out)), {
       url: "https://shop-api.fly.dev",
       deploymentId: "registry.fly.io/shop-api:deployment-01JABC",
     });
@@ -475,6 +480,64 @@ describe("the Firebase Hosting and Fly.io adapters (M6-01)", () => {
       "--remote-only",
       "--yes",
     ]);
+  });
+});
+
+describe("the Docker image adapter (M6-01)", () => {
+  it("needs a named image, pushes the commit's tag and latest, and rolls latest back to the previous tag", () => {
+    const root = tmp();
+    put(root, "Dockerfile", "FROM scratch\n");
+    assert.match(docker.detect(root)?.problem ?? "", /Name the image/);
+    put(root, ".agentchainer/docker.json", '{"image":"GHCR.io/You/App:latest"}');
+    assert.match(docker.detect(root)?.problem ?? "", /Name the image/, "an invalid name counts as none");
+    setDockerImage(root, "ghcr.io/you/app");
+    assert.deepEqual([docker.detect(root), docker.projectName(root)], [{ config: "Dockerfile" }, "ghcr.io/you/app"]);
+    const ctx = { ...CTX, root };
+    assert.deepEqual(docker.deployArgs("production", ctx), [
+      "buildx",
+      "build",
+      "--push",
+      "--tag",
+      "ghcr.io/you/app:0123456789ab",
+      "--tag",
+      "ghcr.io/you/app:latest",
+      "--label",
+      "org.opencontainers.image.revision=0123456789abcdef",
+      ".",
+    ]);
+    assert.deepEqual(docker.parse(result(0), ctx), { deploymentId: "ghcr.io/you/app:0123456789ab" });
+    assert.deepEqual(docker.rollbackArgs("localhost:5000/you/app:0123456789ab"), [
+      "buildx",
+      "imagetools",
+      "create",
+      "--tag",
+      "localhost:5000/you/app:latest",
+      "localhost:5000/you/app:0123456789ab",
+    ]);
+    assert.equal(docker.rollbackArgs(), null);
+  });
+
+  it("deploys without a smoke test, and says Docker isn't running rather than asking for a login", async () => {
+    const { root } = linkedWorkspace();
+    rmSync(path.join(root, ".vercel"), { recursive: true });
+    put(root, "Dockerfile", "FROM scratch\n");
+    execFileSync("git", ["-c", "user.name=t", "-c", "user.email=t@example.invalid", "add", "Dockerfile"], {
+      cwd: root,
+    });
+    execFileSync("git", ["-c", "user.name=t", "-c", "user.email=t@example.invalid", "commit", "-qm", "docker"], {
+      cwd: root,
+    });
+    setDockerImage(root, "ghcr.io/you/app");
+    const down = await deployTargets(root, fakeClis({ info: result(1, "", "cannot connect") }));
+    assert.match(down[0]?.hint ?? "", /Docker isn't running/);
+    const clis = fakeClis({ info: result(0, "29.1.2"), buildx: result(0, "", "#12 pushing layers done") });
+    const { commit, project } = await productionPlan(root, "docker", clis);
+    assert.equal(project, "ghcr.io/you/app");
+    const r = await deployProduction(root, "docker", { typed: "ghcr.io/you/app", commit }, clis);
+    assert.deepEqual(
+      [r.status, r.url, r.smoke, r.deploymentId],
+      ["done", undefined, undefined, `ghcr.io/you/app:${commit.slice(0, 12)}`],
+    );
   });
 });
 

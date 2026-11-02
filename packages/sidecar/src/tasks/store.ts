@@ -140,7 +140,16 @@ export function listTasks(root: string): TaskSummary[] {
 }
 
 /** Files steps hand to each other (planner.md §6), and the body of the task's PR (M5-02), kept in the task's folder. */
-const HAND_OFF_FILES = new Set(["plan.md", "review.json", "summary.md", "evidence.json", "evidence.md", "pr-body.md"]);
+const HAND_OFF_FILES = new Set([
+  "plan.md",
+  "review.json",
+  "summary.md",
+  "evidence.json",
+  "evidence.md",
+  "pr-body.md",
+  // The project workflow a run started with (M6-04), so editing the file doesn't change a run under way.
+  "workflow.json",
+]);
 
 export function readTaskFile(root: string, id: string, name: string): string | null {
   if (!HAND_OFF_FILES.has(name)) throw new Error(`Not a task file: ${name}`);

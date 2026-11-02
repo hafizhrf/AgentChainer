@@ -857,6 +857,28 @@ fieldset.task-field legend {
   margin: 0;
 }
 
+.task-workflow-note {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-size: var(--text-sm);
+}
+
+/* Project workflow files the app can't use, with the schema's own message (M6-04). */
+.workflow-problems {
+  display: grid;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+  font-size: var(--text-sm);
+}
+
+.workflow-problems pre {
+  margin: var(--space-1) 0 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-size: var(--text-xs);
+}
+
 /* The production dialog's plan: what runs, where and from which commit. */
 .deploy-plan {
   display: grid;

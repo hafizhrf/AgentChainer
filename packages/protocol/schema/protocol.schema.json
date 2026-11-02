@@ -4138,6 +4138,16 @@
                         "type": "integer",
                         "minimum": -9007199254740991,
                         "maximum": 9007199254740991
+                      },
+                      "source": {
+                        "type": "string",
+                        "const": "project"
+                      },
+                      "file": {
+                        "type": "string"
+                      },
+                      "hash": {
+                        "type": "string"
                       }
                     },
                     "required": [
@@ -5137,6 +5147,16 @@
                         "type": "integer",
                         "minimum": -9007199254740991,
                         "maximum": 9007199254740991
+                      },
+                      "source": {
+                        "type": "string",
+                        "const": "project"
+                      },
+                      "file": {
+                        "type": "string"
+                      },
+                      "hash": {
+                        "type": "string"
                       }
                     },
                     "required": [
@@ -6245,6 +6265,16 @@
                         "type": "integer",
                         "minimum": -9007199254740991,
                         "maximum": 9007199254740991
+                      },
+                      "source": {
+                        "type": "string",
+                        "const": "project"
+                      },
+                      "file": {
+                        "type": "string"
+                      },
+                      "hash": {
+                        "type": "string"
                       }
                     },
                     "required": [
@@ -7372,6 +7402,16 @@
                         "type": "integer",
                         "minimum": -9007199254740991,
                         "maximum": 9007199254740991
+                      },
+                      "source": {
+                        "type": "string",
+                        "const": "project"
+                      },
+                      "file": {
+                        "type": "string"
+                      },
+                      "hash": {
+                        "type": "string"
                       }
                     },
                     "required": [
@@ -8368,6 +8408,16 @@
                         "type": "integer",
                         "minimum": -9007199254740991,
                         "maximum": 9007199254740991
+                      },
+                      "source": {
+                        "type": "string",
+                        "const": "project"
+                      },
+                      "file": {
+                        "type": "string"
+                      },
+                      "hash": {
+                        "type": "string"
                       }
                     },
                     "required": [
@@ -9376,6 +9426,16 @@
                         "type": "integer",
                         "minimum": -9007199254740991,
                         "maximum": 9007199254740991
+                      },
+                      "source": {
+                        "type": "string",
+                        "const": "project"
+                      },
+                      "file": {
+                        "type": "string"
+                      },
+                      "hash": {
+                        "type": "string"
                       }
                     },
                     "required": [
@@ -10372,6 +10432,16 @@
                         "type": "integer",
                         "minimum": -9007199254740991,
                         "maximum": 9007199254740991
+                      },
+                      "source": {
+                        "type": "string",
+                        "const": "project"
+                      },
+                      "file": {
+                        "type": "string"
+                      },
+                      "hash": {
+                        "type": "string"
                       }
                     },
                     "required": [
@@ -11374,6 +11444,16 @@
                         "type": "integer",
                         "minimum": -9007199254740991,
                         "maximum": 9007199254740991
+                      },
+                      "source": {
+                        "type": "string",
+                        "const": "project"
+                      },
+                      "file": {
+                        "type": "string"
+                      },
+                      "hash": {
+                        "type": "string"
                       }
                     },
                     "required": [
@@ -12411,6 +12491,16 @@
                         "type": "integer",
                         "minimum": -9007199254740991,
                         "maximum": 9007199254740991
+                      },
+                      "source": {
+                        "type": "string",
+                        "const": "project"
+                      },
+                      "file": {
+                        "type": "string"
+                      },
+                      "hash": {
+                        "type": "string"
                       }
                     },
                     "required": [
@@ -13407,6 +13497,16 @@
                         "type": "integer",
                         "minimum": -9007199254740991,
                         "maximum": 9007199254740991
+                      },
+                      "source": {
+                        "type": "string",
+                        "const": "project"
+                      },
+                      "file": {
+                        "type": "string"
+                      },
+                      "hash": {
+                        "type": "string"
                       }
                     },
                     "required": [
@@ -14403,6 +14503,16 @@
                         "type": "integer",
                         "minimum": -9007199254740991,
                         "maximum": 9007199254740991
+                      },
+                      "source": {
+                        "type": "string",
+                        "const": "project"
+                      },
+                      "file": {
+                        "type": "string"
+                      },
+                      "hash": {
+                        "type": "string"
                       }
                     },
                     "required": [
@@ -15611,6 +15721,16 @@
                         "type": "integer",
                         "minimum": -9007199254740991,
                         "maximum": 9007199254740991
+                      },
+                      "source": {
+                        "type": "string",
+                        "const": "project"
+                      },
+                      "file": {
+                        "type": "string"
+                      },
+                      "hash": {
+                        "type": "string"
                       }
                     },
                     "required": [
@@ -16731,6 +16851,16 @@
                         "type": "integer",
                         "minimum": -9007199254740991,
                         "maximum": 9007199254740991
+                      },
+                      "source": {
+                        "type": "string",
+                        "const": "project"
+                      },
+                      "file": {
+                        "type": "string"
+                      },
+                      "hash": {
+                        "type": "string"
                       }
                     },
                     "required": [
@@ -17829,6 +17959,16 @@
                         "type": "integer",
                         "minimum": -9007199254740991,
                         "maximum": 9007199254740991
+                      },
+                      "source": {
+                        "type": "string",
+                        "const": "project"
+                      },
+                      "file": {
+                        "type": "string"
+                      },
+                      "hash": {
+                        "type": "string"
                       }
                     },
                     "required": [
@@ -18844,6 +18984,16 @@
                         "type": "integer",
                         "minimum": -9007199254740991,
                         "maximum": 9007199254740991
+                      },
+                      "source": {
+                        "type": "string",
+                        "const": "project"
+                      },
+                      "file": {
+                        "type": "string"
+                      },
+                      "hash": {
+                        "type": "string"
                       }
                     },
                     "required": [
@@ -20410,6 +20560,107 @@
         "additionalProperties": false
       }
     },
+    "workflow.list": {
+      "params": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "cwd": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "cwd"
+        ],
+        "additionalProperties": false
+      },
+      "result": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "workflows": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "tier": {
+                  "type": "string",
+                  "enum": [
+                    "S",
+                    "M",
+                    "L",
+                    "XL"
+                  ]
+                },
+                "id": {
+                  "type": "string"
+                },
+                "version": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                "description": {
+                  "type": "string"
+                },
+                "steps": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                "source": {
+                  "type": "string",
+                  "enum": [
+                    "app",
+                    "project"
+                  ]
+                },
+                "file": {
+                  "type": "string"
+                },
+                "hash": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "tier",
+                "id",
+                "version",
+                "description",
+                "steps",
+                "source"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "problems": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "file": {
+                  "type": "string"
+                },
+                "error": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "file",
+                "error"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "workflows",
+          "problems"
+        ],
+        "additionalProperties": false
+      }
+    },
     "task.overlaps": {
       "params": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -20939,6 +21190,16 @@
                         "type": "integer",
                         "minimum": -9007199254740991,
                         "maximum": 9007199254740991
+                      },
+                      "source": {
+                        "type": "string",
+                        "const": "project"
+                      },
+                      "file": {
+                        "type": "string"
+                      },
+                      "hash": {
+                        "type": "string"
                       }
                     },
                     "required": [
@@ -22588,6 +22849,16 @@
                           "type": "integer",
                           "minimum": -9007199254740991,
                           "maximum": 9007199254740991
+                        },
+                        "source": {
+                          "type": "string",
+                          "const": "project"
+                        },
+                        "file": {
+                          "type": "string"
+                        },
+                        "hash": {
+                          "type": "string"
                         }
                       },
                       "required": [

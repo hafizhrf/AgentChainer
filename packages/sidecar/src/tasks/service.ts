@@ -8,6 +8,7 @@ import {
   RpcErrorCode,
   type Task,
   type TaskContract,
+  type TaskRun,
   type TaskSummary,
   type Tier,
   type Triage,
@@ -37,8 +38,9 @@ import { git, listFiles, repoOf } from "../workspace.ts";
 import { availableGates, draftContract, normalizeContract } from "./contract.ts";
 import { buildEvidence, type FileChange, renderEvidence, type SecretsScan, sectionLines } from "./evidence.ts";
 import shipped from "./library.json" with { type: "json" };
-import { LibrarySchema } from "./library.ts";
+import { LibrarySchema, type Workflow, WorkflowSchema, type XlWorkflow, XlWorkflowSchema } from "./library.ts";
 import { newRun, Orchestrator, type OrchestratorDeps, parseReview } from "./orchestrator.ts";
+import { type EffectiveLibrary, effectiveLibrary, workflowRef } from "./project-workflows.ts";
 import { changedPaths, fileStats, type SessionHost, sessionRunner, startBase, untracked } from "./runner.ts";
 import { semgrepScan, trivyScan } from "./scanners.ts";
 import { proposeSplit } from "./split.ts";
@@ -242,6 +244,62 @@ export function reviseTask(root: string, id: string, now = new Date()): Task {
 
 const library = LibrarySchema.parse(shipped);
 
+/** The workflows for `root`: the app's, with the project's valid files in their place (M6-04). */
+export const workflowsOf = (root: string): EffectiveLibrary => effectiveLibrary(root, library);
+
+/**
+ * A new run on `workflow`. A project's workflow is copied into the task's folder, so a resume runs the workflow the
+ * run started with, whatever happens to the file meanwhile.
+ */
+export function startRun(
+  root: string,
+  task: Task,
+  workflow: Workflow | XlWorkflow,
+  eff: EffectiveLibrary,
+  opts: Parameters<typeof newRun>[1],
+  now: Date,
+): TaskRun {
+  const ref = workflowRef(workflow, eff);
+  if (ref.source === "project") writeTaskFile(root, task.id, "workflow.json", `${JSON.stringify(workflow, null, 2)}\n`);
+  return newRun(ref, opts, now);
+}
+
+/** The project's workflow a run started with, from the copy kept with the task. */
+function keptWorkflow<T>(
+  root: string,
+  task: Task,
+  schema: { safeParse(v: unknown): { success: boolean; data?: T } },
+): T {
+  const ref = task.run?.workflow;
+  let parsed: { success: boolean; data?: T } = { success: false };
+  try {
+    const kept = readTaskFile(root, task.id, "workflow.json");
+    if (kept) parsed = schema.safeParse(JSON.parse(kept));
+  } catch {
+    // Reported below.
+  }
+  if (!parsed.success || !parsed.data) {
+    throw invalid(`The copy of the project's workflow this run started with (${ref?.file}) is missing or damaged.`);
+  }
+  return parsed.data;
+}
+
+/** The workflow a tier's run started with: the project's copy, or the app's by id. */
+export function runWorkflow(root: string, task: Task): Workflow {
+  const ref = task.run?.workflow;
+  if (ref?.source === "project") return keptWorkflow(root, task, WorkflowSchema);
+  const workflow = Object.values(library.workflows).find((w) => w.id === ref?.id);
+  if (!workflow) throw invalid(`The workflow ${ref?.id} isn't in this version of the app.`);
+  return workflow;
+}
+
+/** The XL workflow an XL run started with. */
+function runXlWorkflow(root: string, task: Task): XlWorkflow {
+  if (task.run?.workflow.source === "project") return keptWorkflow(root, task, XlWorkflowSchema);
+  if (!library.xl) throw invalid("This version of the app has no XL workflow.");
+  return library.xl;
+}
+
 /** Runs in progress in this sidecar, by task id: a tier's workflow, or an XL run. */
 const runs = new Map<string, { cancel: () => void; readonly current: Task }>();
 /** Each run's promise, until it has fully ended: its sessions closed after its end was saved. */
@@ -322,8 +380,7 @@ function orchestratorFor(
   notify: (task: Task) => void,
   extra: Pick<OrchestratorDeps, "resume" | "setup"> = {},
 ): Orchestrator {
-  const workflow = Object.values(library.workflows).find((w) => w.id === task.run?.workflow.id);
-  if (!workflow) throw invalid(`The workflow ${task.run?.workflow.id} isn't in this version of the app.`);
+  const workflow = runWorkflow(root, task);
   // The runner reports approvals and guard blocks as they happen; they go into the run's records.
   let orchestrator: Orchestrator | undefined;
   const runner = sessionRunner(codeRootOf(root, task), task, library, host, {
@@ -434,7 +491,8 @@ export function startTask(
   }
   if (task.triage.chosen === "XL") return startXl(root, task, host, opts, notify, now);
   if (task.parent) requireOwnRun(task);
-  const workflow = library.workflows[task.triage.chosen];
+  const eff = workflowsOf(root);
+  const workflow = eff.library.workflows[task.triage.chosen];
   if (!workflow) throw invalid(`${task.triage.chosen} tasks have no workflow in this version of the app.`);
   // A sub-task runs in the worktree its XL task made; any other task gets its own.
   const branched = task.parent ? { task, fresh: false } : taskBranch(root, task);
@@ -444,7 +502,7 @@ export function startTask(
   const started: Task = {
     ...branched.task,
     state: "running",
-    run: newRun(workflow, { ...opts, ...base }, now),
+    run: startRun(root, branched.task, workflow, eff, { ...opts, ...base }, now),
     updatedAt: now.toISOString(),
   };
   saveTask(root, started);
@@ -510,7 +568,7 @@ export async function splitTask(root: string, id: string, claude: Claude, model?
     throw invalid("Approve the contract with tier XL first.");
   }
   requireRepoWithCommit(root);
-  const xl = library.xl;
+  const xl = workflowsOf(root).library.xl;
   if (!xl) throw invalid("This version of the app has no XL workflow.");
   const previous = subtasksOf(root, task);
   if (previous.some((c) => c.run || (c.state !== "draft" && c.state !== "ready"))) {
@@ -605,7 +663,8 @@ function startXl(
   notify: (task: Task) => void,
   now: Date,
 ): Task {
-  const xl = library.xl;
+  const eff = workflowsOf(root);
+  const xl = eff.library.xl;
   if (!xl) throw invalid("This version of the app has no XL workflow.");
   if (task.state !== "ready") throw invalid("An XL run that stopped goes on with Continue.");
   requireRepoWithCommit(root);
@@ -616,7 +675,7 @@ function startXl(
   const started: Task = {
     ...task,
     state: "running",
-    run: newRun(xl, { ...opts, base: headOf(root), untrackedAtStart: [] }, now),
+    run: startRun(root, task, xl, eff, { ...opts, base: headOf(root), untrackedAtStart: [] }, now),
     updatedAt: now.toISOString(),
   };
   saveTask(root, started);
@@ -649,9 +708,9 @@ function launchXl(
   notify: (task: Task) => void,
   resume: boolean,
 ): Promise<Task> {
-  const xl = library.xl;
   const run = task.run;
-  if (!xl || !run) throw invalid("This version of the app has no XL workflow.");
+  if (!run) throw invalid("The XL task hasn't started.");
+  const xl = runXlWorkflow(root, task);
   const world = gitWorld(root, {
     load: (id) => present(loadTask(root, id)),
     save: (t) => {
@@ -659,7 +718,8 @@ function launchXl(
       notify(present(t));
     },
     runChild: (child, resumeChild) => {
-      const workflow = child.triage ? library.workflows[child.triage.chosen] : undefined;
+      const eff = workflowsOf(root);
+      const workflow = child.triage ? eff.library.workflows[child.triage.chosen] : undefined;
       const wt = child.worktree;
       if (!workflow || !wt) throw new Error(`Sub-task ${child.id} has no workflow or worktree.`);
       const now = new Date();
@@ -668,8 +728,11 @@ function launchXl(
         : {
             ...child,
             state: "running",
-            run: newRun(
+            run: startRun(
+              root,
+              child,
               workflow,
+              eff,
               {
                 permissionMode: run.permissionMode,
                 ...(run.model ? { model: run.model } : {}),

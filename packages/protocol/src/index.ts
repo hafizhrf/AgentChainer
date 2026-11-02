@@ -396,6 +396,24 @@ export const ApplyResultSchema = z.object({
 
 /** Task tiers: S (one agent → gates) up to XL (sub-tasks in worktrees). */
 export const TIERS = ["S", "M", "L", "XL"] as const;
+
+/** A project workflow file the app can't use, and why (M6-04). */
+export const ProjectWorkflowProblemSchema = z.object({ file: z.string(), error: z.string() });
+export type ProjectWorkflowProblem = z.infer<typeof ProjectWorkflowProblemSchema>;
+
+/** The workflow a tier runs: the app's, or the project's file that replaced it (M6-04). */
+export const TierWorkflowSchema = z.object({
+  tier: z.enum(TIERS),
+  id: z.string(),
+  version: z.number().int(),
+  description: z.string(),
+  /** How many steps (XL: its split step and the sub-tasks' workflows). */
+  steps: z.number().int(),
+  source: z.enum(["app", "project"]),
+  file: z.string().optional(),
+  hash: z.string().optional(),
+});
+export type TierWorkflow = z.infer<typeof TierWorkflowSchema>;
 export type Tier = (typeof TIERS)[number];
 export const TierSchema = z.enum(TIERS);
 
@@ -563,7 +581,14 @@ export const GuardBlockSchema = z.object({
 export type GuardBlock = z.infer<typeof GuardBlockSchema>;
 
 export const TaskRunSchema = z.object({
-  workflow: z.object({ id: z.string(), version: z.number().int() }),
+  /** The workflow it runs; `source: "project"` when the project's file replaced the app's (M6-04), with its hash. */
+  workflow: z.object({
+    id: z.string(),
+    version: z.number().int(),
+    source: z.literal("project").optional(),
+    file: z.string().optional(),
+    hash: z.string().optional(),
+  }),
   permissionMode: PermissionModeSchema,
   model: z.string().optional(),
   /** What the task's changes are measured from: a snapshot of the tree at the start, or null outside git. */
@@ -1446,6 +1471,14 @@ export const methodSchemas = {
     result: z.object({ deploys: z.array(DeployRecordSchema) }),
   },
   /** Other tasks whose live branches change the same files as this one's: merging both may conflict (M5-01). */
+  /**
+   * The workflow each tier runs in this workspace, and the project workflow files that can't be used, with why
+   * (M6-04). Reads `.agentchainer/workflows/` only.
+   */
+  "workflow.list": {
+    params: WorkspaceRef,
+    result: z.object({ workflows: z.array(TierWorkflowSchema), problems: z.array(ProjectWorkflowProblemSchema) }),
+  },
   "task.overlaps": {
     params: TaskRef,
     result: z.object({

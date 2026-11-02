@@ -1434,6 +1434,10 @@ Decisions: [ADR-0009](adr/0009-release-signing-and-updates.md). Maintainer steps
       Step 3 adds Roll back on the live production deploy: back to the recorded previous one (or the provider's own
       previous), typed-name confirmation, the smoke test again, and both records linked.
 - [ ] **M6-04** Editable workflow canvas: React Flow ⇄ workflow YAML round-trip, with validation, import/export and sharing.
+      Note: step 5 is built: a project's `.agentchainer/workflows/<tier>.yaml` replaces the app's workflow when it
+      passes the library's checks (otherwise the app's runs and Workspace settings → Workflows says why); a run keeps
+      a copy of the project workflow it started with, and the evidence names the file and its hash. The canvas
+      editor is step 6.
 
 ### Exit criteria
 

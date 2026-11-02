@@ -50,6 +50,7 @@ import { CreatePrDialog } from "./CreatePr.tsx";
 import { DeployCard } from "./DeployCard.tsx";
 import { MergeGates } from "./MergeGates.tsx";
 import { PrChecks } from "./PrChecks.tsx";
+import { ProjectWorkflowNote } from "./ProjectWorkflowNote.tsx";
 import {
   canAcceptRisk,
   canContinue,
@@ -651,21 +652,24 @@ export function TaskPage({
                   </button>
                 </>
               ) : isXl(task) && task.state !== "ready" ? null : (
-                <RunButton
-                  label={task.run ? "Run again" : "Run"}
-                  blocker={
-                    task.parent
-                      ? childRunBlocker(task, parentTask)
-                      : runBlocker(
-                          task,
-                          (task.subtasks ?? []).flatMap((id) => (children[id] ? [children[id]] : [])),
-                        )
-                  }
-                  busy={busy}
-                  runMode={runMode}
-                  onRunMode={setRunMode}
-                  onRun={() => void runTask(task.id)}
-                />
+                <>
+                  <ProjectWorkflowNote cwd={cwd} tier={task.triage?.chosen} />
+                  <RunButton
+                    label={task.run ? "Run again" : "Run"}
+                    blocker={
+                      task.parent
+                        ? childRunBlocker(task, parentTask)
+                        : runBlocker(
+                            task,
+                            (task.subtasks ?? []).flatMap((id) => (children[id] ? [children[id]] : [])),
+                          )
+                    }
+                    busy={busy}
+                    runMode={runMode}
+                    onRunMode={setRunMode}
+                    onRun={() => void runTask(task.id)}
+                  />
+                </>
               )}
             </>
           )}

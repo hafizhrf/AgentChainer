@@ -1,8 +1,8 @@
 import { createHash } from "node:crypto";
-import { existsSync, lstatSync, readdirSync, readFileSync } from "node:fs";
+import { existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { type ProjectWorkflowProblem, type TaskRun, TIERS, type TierWorkflow } from "@agentchainer/protocol";
-import { parse } from "yaml";
+import { parse, stringify } from "yaml";
 import { z } from "zod";
 import { AC_DIR } from "../ac-dir.ts";
 import {
@@ -116,4 +116,71 @@ export function tierWorkflows(eff: EffectiveLibrary): TierWorkflow[] {
     const w = tier === "XL" ? eff.library.xl : eff.library.workflows[tier];
     return w ? [entry(tier, w)] : [];
   });
+}
+
+/* ---------- The canvas (M6-04, design §9) ---------- */
+
+type Tier = TierWorkflow["tier"];
+const fileOf = (tier: Tier) => `${tier.toLowerCase()}.yaml`;
+
+/** The tier's workflow as YAML: the project's file as it is, or the app's rendered with a note on where it goes. */
+export function workflowSource(
+  root: string,
+  tier: Tier,
+  shipped: Library,
+): { yaml: string; source: "app" | "project"; file: string } {
+  const file = `${WORKFLOWS_DIR}/${fileOf(tier)}`;
+  const abs = path.join(root, file);
+  if (existsSync(abs) && lstatSync(abs).isFile() && lstatSync(abs).size <= MAX_BYTES) {
+    return { yaml: readFileSync(abs, "utf8"), source: "project", file };
+  }
+  const app = tier === "XL" ? shipped.xl : shipped.workflows[tier];
+  if (!app) throw new Error(`This version of the app has no ${tier} workflow.`);
+  const header = [
+    `# The app's ${tier} workflow (${app.id} v${app.version}), as a starting point.`,
+    `# Saved as ${file}, it replaces the app's ${tier} workflow in this project; share it through git.`,
+    "",
+  ].join("\n");
+  return { yaml: `${header}${stringify(app)}`, source: "app", file };
+}
+
+/** Why the YAML can't be used for `tier`, or null: the checks a run makes. */
+export function checkWorkflowText(tier: Tier, yaml: string, shipped: Library): string | null {
+  try {
+    const w = parseProjectWorkflow(fileOf(tier), yaml, shipped);
+    if (w.tier !== tier) return `This is a ${w.tier} workflow, not ${tier}.`;
+    return null;
+  } catch (err) {
+    return err instanceof Error ? err.message : String(err);
+  }
+}
+
+/** Saves a valid workflow as the project's file for `tier`, or removes the file (null), so the app's runs again. */
+export function saveProjectWorkflow(root: string, tier: Tier, yaml: string | null, shipped: Library): void {
+  const abs = path.join(root, WORKFLOWS_DIR, fileOf(tier));
+  if (yaml === null) {
+    rmSync(abs, { force: true });
+    return;
+  }
+  const error = checkWorkflowText(tier, yaml, shipped);
+  if (error) throw new Error(`The workflow can't be saved: ${error}`);
+  mkdirSync(path.dirname(abs), { recursive: true });
+  if (existsSync(abs) && !lstatSync(abs).isFile())
+    throw new Error(`${WORKFLOWS_DIR}/${fileOf(tier)} isn't a regular file.`);
+  writeFileSync(abs, yaml.endsWith("\n") ? yaml : `${yaml}\n`);
+}
+
+/** Import: a workflow file the person picked; only its text, at most the size a project file may have. */
+export function readWorkflowFile(file: string): string {
+  if (!/\.ya?ml$/i.test(file)) throw new Error("Pick a .yaml file.");
+  const stat = statSync(file);
+  if (!stat.isFile()) throw new Error("That isn't a file.");
+  if (stat.size > MAX_BYTES) throw new Error(`The file is larger than ${MAX_BYTES / 1024} KB.`);
+  return readFileSync(file, "utf8");
+}
+
+/** Export: writes the YAML where the person picked in the save dialog. */
+export function writeWorkflowFile(file: string, yaml: string): void {
+  if (!/\.ya?ml$/i.test(file)) throw new Error("Export to a .yaml file.");
+  writeFileSync(file, yaml.endsWith("\n") ? yaml : `${yaml}\n`);
 }

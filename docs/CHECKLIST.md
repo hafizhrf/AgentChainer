@@ -1438,6 +1438,10 @@ Decisions: [ADR-0009](adr/0009-release-signing-and-updates.md). Maintainer steps
       passes the library's checks (otherwise the app's runs and Workspace settings → Workflows says why); a run keeps
       a copy of the project workflow it started with, and the evidence names the file and its hash. The canvas
       editor is step 6.
+      Step 6 adds the canvas (Workflows → Edit): React Flow from the YAML, a form per step that edits the YAML in
+      place (comments kept), a YAML view, the sidecar's check as you edit, Save, Reset to the app's, Import and
+      Export. Checked in the app on Windows except Import and Export, whose system file dialog the CDP checks can't
+      drive (they're unit-tested); left unticked until those are tried by hand.
 
 ### Exit criteria
 

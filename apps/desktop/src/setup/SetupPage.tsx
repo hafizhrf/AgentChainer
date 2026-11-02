@@ -193,7 +193,7 @@ export function SetupPage({
           {scan && view === "commands" && <Commands profile={scan.profile} />}
           {view === "agents" && <Agents cwd={cwd} confirm={confirm} onChanged={() => void bootstrap.load()} />}
           {view === "permissions" && <Permissions cwd={cwd} confirm={confirm} />}
-          {view === "workflows" && <Workflows cwd={cwd} />}
+          {view === "workflows" && <Workflows cwd={cwd} confirm={confirm} />}
           {view === "deploy" && <Deploys cwd={cwd} />}
           {view === "history" && <History bootstrap={bootstrap} />}
         </main>

@@ -1451,10 +1451,14 @@ Decisions: [ADR-0009](adr/0009-release-signing-and-updates.md). Maintainer steps
 
 ## M7 — Evals & analytics (v0.5)
 
+→ PRD [F8](PRD.md#f6f9-p2) · design: [evals.md](design/evals.md) (draft)
+
 - [ ] **M7-01** Local metrics dashboard: gate pass rate, cost per task, cost per successful task, duration, retries, human-fix rate.
 - [ ] **M7-02** Eval harness: fixture tasks with acceptance tests, run headless to compare workflow templates, models and skill versions.
 - [ ] **M7-03** CI regression job for first-party skills and workflow templates.
 - [ ] **M7-04** Optional OpenTelemetry export (verify Claude Code's OTel support).
+      Deferred (owner, 2026-11-02): the app sends no telemetry (X-04), and Claude Code's OTel settings need
+      verifying first. Reopen when a user asks for it.
 
 ### Exit criteria
 

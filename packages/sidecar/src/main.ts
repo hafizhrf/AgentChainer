@@ -52,6 +52,7 @@ import { log, notify, RpcFailure, serve } from "./rpc.ts";
 import { loadSdk } from "./sdk-loader.ts";
 import { Session } from "./session.ts";
 import { replayEvents, retention, toSessionInfo } from "./stored-sessions.ts";
+import { computeMetrics, loadAllTasks } from "./tasks/metrics.ts";
 import {
   checkWorkflowText,
   readWorkflowFile,
@@ -732,6 +733,11 @@ serve(
         throw new RpcFailure(RpcErrorCode.invalidParams, err instanceof Error ? err.message : String(err));
       }
       return { ok: true as const };
+    },
+
+    "metrics.summary": ({ cwd, since, tier }) => {
+      requireFolder(cwd);
+      return computeMetrics(loadAllTasks(cwd), { ...(since ? { since } : {}), ...(tier ? { tier } : {}) });
     },
 
     "task.overlaps": ({ cwd, id }) => {

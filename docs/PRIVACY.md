@@ -38,6 +38,7 @@ work on a task (preview):
   - a record of items installed only for you, which is kept out of git;
   - the profile, kept out of git;
   - your tasks: each one's request, contract and triage (`tasks/`), kept out of git.
+    The Metrics page adds them up on your computer; nothing is sent.
 
 **Sessions** are the Claude CLI's own session files. AgentChainer lists and resumes them through the Agent SDK and
 doesn't keep a copy ([ADR-0004](adr/0004-session-data.md)).

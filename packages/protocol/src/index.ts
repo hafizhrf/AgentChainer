@@ -645,6 +645,56 @@ export const RunSummarySchema = z.object({
 });
 export type RunSummary = z.infer<typeof RunSummarySchema>;
 
+/** A task behind the metrics (M7-01): enough to list it and to see which numbers it counts in. */
+export const MetricsTaskSchema = z.object({
+  id: z.string(),
+  request: z.string(),
+  tier: z.string().nullable(),
+  state: z.enum(TASK_STATES),
+  createdAt: z.string(),
+  costUsd: z.number(),
+  runs: z.number().int(),
+  /** The latest run's last gate round; null when no gate ran. */
+  gatesPassed: z.boolean().nullable(),
+  fixRounds: z.number().int(),
+  ciFixes: z.number().int(),
+  /** Done, or its PR merged with every gate green. */
+  success: z.boolean(),
+  /** Accepted with risk, merged with gates not green, or a Fix CI round. */
+  neededPerson: z.boolean(),
+});
+export type MetricsTask = z.infer<typeof MetricsTaskSchema>;
+
+/** A workspace's task metrics (M7-01, docs/design/evals.md §4), computed locally; a rate is null with nothing to count. */
+export const MetricsSummarySchema = z.object({
+  tasks: z.number().int(),
+  runs: z.number().int(),
+  gatePass: z.object({ rate: z.number().nullable(), judged: z.number().int(), unjudged: z.number().int() }),
+  costUsd: z.object({
+    total: z.number(),
+    perTask: z.number().nullable(),
+    perSuccess: z.number().nullable(),
+    successes: z.number().int(),
+  }),
+  durationMs: z.object({ p50: z.number(), p90: z.number(), count: z.number().int() }).nullable(),
+  retries: z.object({ extraRuns: z.number().int(), fixRounds: z.number().int(), ciFixes: z.number().int() }),
+  humanFix: z.object({ rate: z.number().nullable(), tasks: z.number().int() }),
+  byTier: z.array(
+    z.object({ tier: z.string(), tasks: z.number().int(), successes: z.number().int(), costUsd: z.number() }),
+  ),
+  byWorkflow: z.array(
+    z.object({
+      key: z.string(),
+      label: z.string(),
+      runs: z.number().int(),
+      gatePassRate: z.number().nullable(),
+      costUsd: z.number(),
+    }),
+  ),
+  taskList: z.array(MetricsTaskSchema),
+});
+export type MetricsSummary = z.infer<typeof MetricsSummarySchema>;
+
 export const TaskSchema = z.object({
   id: TaskIdSchema,
   /** What the user asked for, verbatim. */
@@ -1536,6 +1586,11 @@ export const methodSchemas = {
   "workflow.export": {
     params: z.object({ path: z.string().min(1), yaml: z.string().max(65_536) }),
     result: z.object({ ok: z.literal(true) }),
+  },
+  /** The workspace's task metrics (M7-01), from its own task records; `since` and `tier` narrow them. */
+  "metrics.summary": {
+    params: WorkspaceRef.extend({ since: z.string().optional(), tier: z.enum(TIERS).optional() }),
+    result: MetricsSummarySchema,
   },
   "task.overlaps": {
     params: TaskRef,

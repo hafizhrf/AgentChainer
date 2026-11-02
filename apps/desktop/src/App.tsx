@@ -773,6 +773,7 @@ export function App() {
         ["permissions", "Permissions"],
         ["workflows", "Workflows"],
         ["deploy", "Deploy"],
+        ["metrics", "Metrics"],
         ["history", "History"],
       ];
       for (const [view, label] of views)

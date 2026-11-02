@@ -10,6 +10,7 @@ import {
   Save,
   ShieldCheck,
   Terminal,
+  Workflow,
 } from "lucide-react";
 import { type ReactNode, useCallback, useEffect, useState } from "react";
 import type { Confirm } from "../Dialog.tsx";
@@ -24,14 +25,23 @@ import { gapsOf, Overview } from "./Overview.tsx";
 import { Permissions } from "./Permissions.tsx";
 import { PlanView } from "./PlanView.tsx";
 import { useBootstrap } from "./useBootstrap.tsx";
+import { Workflows } from "./Workflows.tsx";
 
 type Scan = Methods["workspace.scan"]["result"];
-export type SetupView = "overview" | "plan" | "commands" | "agents" | "permissions" | "deploy" | "history";
+export type SetupView =
+  | "overview"
+  | "plan"
+  | "commands"
+  | "agents"
+  | "permissions"
+  | "workflows"
+  | "deploy"
+  | "history";
 
 /**
  * Workspace settings as a full page (UX-06), laid out like an IDE's project settings: what the workspace is made of at
  * the top, sections on the left (readiness, the setup plan, detected commands, agents, saved permission rules,
- * deploys, past runs), and the section's content on the right. Opens over the session or Home; Back returns there.
+ * the tiers' workflows, deploys, past runs), and the section's content on the right. Opens over the session or Home; Back returns there.
  */
 export function SetupPage({
   cwd,
@@ -90,6 +100,7 @@ export function SetupPage({
     { id: "commands", label: "Commands", icon: <Terminal size={16} className="nav-icon" /> },
     { id: "agents", label: "Agents", icon: <Bot size={16} className="nav-icon" /> },
     { id: "permissions", label: "Permissions", icon: <ShieldCheck size={16} className="nav-icon" /> },
+    { id: "workflows", label: "Workflows", icon: <Workflow size={16} className="nav-icon" /> },
     { id: "deploy", label: "Deploy", icon: <Rocket size={16} className="nav-icon" /> },
     {
       id: "history",
@@ -182,6 +193,7 @@ export function SetupPage({
           {scan && view === "commands" && <Commands profile={scan.profile} />}
           {view === "agents" && <Agents cwd={cwd} confirm={confirm} onChanged={() => void bootstrap.load()} />}
           {view === "permissions" && <Permissions cwd={cwd} confirm={confirm} />}
+          {view === "workflows" && <Workflows cwd={cwd} />}
           {view === "deploy" && <Deploys cwd={cwd} />}
           {view === "history" && <History bootstrap={bootstrap} />}
         </main>

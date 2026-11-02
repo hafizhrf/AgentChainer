@@ -743,12 +743,16 @@ export class Orchestrator {
 
 /** A fresh run record for `task`, measured from `base`. */
 export function newRun(
-  workflow: Pick<Workflow, "id" | "version">,
+  workflow: Pick<Workflow, "id" | "version"> & Partial<Pick<TaskRun["workflow"], "source" | "file" | "hash">>,
   opts: { permissionMode: TaskRun["permissionMode"]; model?: string; base: string | null; untrackedAtStart: string[] },
   now: Date,
 ): TaskRun {
   return {
-    workflow: { id: workflow.id, version: workflow.version },
+    workflow: {
+      id: workflow.id,
+      version: workflow.version,
+      ...(workflow.source ? { source: workflow.source, file: workflow.file, hash: workflow.hash } : {}),
+    },
     permissionMode: opts.permissionMode,
     ...(opts.model ? { model: opts.model } : {}),
     base: opts.base,

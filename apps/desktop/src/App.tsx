@@ -771,6 +771,7 @@ export function App() {
         ["commands", "Commands"],
         ["agents", "Agents"],
         ["permissions", "Permissions"],
+        ["workflows", "Workflows"],
         ["deploy", "Deploy"],
         ["history", "History"],
       ];

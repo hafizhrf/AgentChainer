@@ -195,6 +195,17 @@ The Deploy page lists them, and a task shows its preview deploys.
   Export and **Reset to the app's default**.
 - **Which workflow ran:** a run records whether it used the shipped workflow or the project's, with the file's hash,
   and the evidence names it.
+- **As built (step 5), the project's workflows:**
+  - `tasks/project-workflows.ts` reads `.agentchainer/workflows/*.yaml` (regular files up to 64 KB; links aren't
+    followed) and checks each like `buildLibrary`: the schema's cross-checks, `<tier>.yaml` named after its tier,
+    and read steps only with read-only roles. Roles stay the app's; a workflow names them, it can't define them;
+  - a file that fails is listed with the schema's message, and the app's workflow runs for that tier;
+  - a run records `source: project`, the file and the first 12 hex of its sha256, and keeps a copy of the
+    workflow in the task's folder (`workflow.json`). Resume and Continue run that copy, so editing the file
+    doesn't change a run under way. XL's own workflow and each sub-task's work the same way;
+  - Workspace settings → Workflows lists each tier's workflow and the files that aren't used; the task page says
+    "Runs the project's S workflow" next to Run; the evidence report names the workflow and the file's hash;
+  - the canvas that edits these files is step 6.
 
 ## 10. UI
 

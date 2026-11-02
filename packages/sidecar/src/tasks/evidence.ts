@@ -1,4 +1,12 @@
-import type { ApprovalRecord, DeployRecord, GateKind, GateRun, GuardBlock, Task } from "@agentchainer/protocol";
+import type {
+  ApprovalRecord,
+  DeployRecord,
+  GateKind,
+  GateRun,
+  GuardBlock,
+  Task,
+  TaskRun,
+} from "@agentchainer/protocol";
 import type { Review } from "./orchestrator.ts";
 
 /**
@@ -63,6 +71,8 @@ export type Evidence = {
     overrideReason?: string;
     budgetUsd: number;
     approvedAt?: string;
+    /** The workflow the run used, and the project's file when it replaced the app's (M6-04). */
+    workflow?: TaskRun["workflow"];
   };
   outcome: { state: Task["state"]; text: string; acceptance?: { reason: string; at: string } };
   files: (FileChange & { purpose: string | null })[];
@@ -205,6 +215,7 @@ export function buildEvidence({
       ...(triage?.override ? { overrideReason: triage.override.reason } : {}),
       budgetUsd: triage?.budgetUsd ?? 0,
       ...(contract?.approvedAt ? { approvedAt: contract.approvedAt } : {}),
+      ...(run ? { workflow: run.workflow } : {}),
     },
     outcome: {
       state: task.state,
@@ -288,6 +299,12 @@ export function renderEvidence(e: Evidence): string {
     `- **Tier:** ${e.task.tier}${e.task.tier !== e.task.proposed ? ` (proposed ${e.task.proposed}; changed because: ${e.task.overrideReason ?? "no reason"})` : ""}, budget $${e.task.budgetUsd}`,
   );
   if (e.task.approvedAt) add(`- **Contract approved:** ${e.task.approvedAt}`);
+  const w = e.task.workflow;
+  if (w) {
+    add(
+      `- **Workflow:** ${w.id} v${w.version}, ${w.source === "project" ? `the project's own (\`${w.file}\` at ${w.hash})` : "the app's"}`,
+    );
+  }
   add(`- **Outcome:** **${STATE_TEXT[e.outcome.state] ?? e.outcome.state}.** ${e.outcome.text}`);
   if (e.outcome.acceptance) {
     add(`- **Risk accepted** by the user at ${e.outcome.acceptance.at}: ${e.outcome.acceptance.reason}`);

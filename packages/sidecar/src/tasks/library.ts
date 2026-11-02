@@ -188,18 +188,24 @@ export function buildLibrary(workflows: Record<string, string>, roles: Record<st
     out.roles[r.data.name.slice(3)] = r.data;
   }
   for (const role of ROLES) if (!out.roles[role]) throw new Error(`agents/ac-${role}.md is missing`);
-  const readSteps = [
-    ...Object.values(out.workflows).flatMap((w) =>
-      w.steps.flatMap((x) => (isParallel(x) ? x.parallel : isGates(x) ? [] : [x])).map((s) => ({ w: w.id, s })),
-    ),
-    ...(out.xl ? [{ w: out.xl.id, s: out.xl.split }] : []),
-  ];
-  for (const { w, s } of readSteps) {
-    if (s.access === "read" && out.roles[s.role]?.tools !== "Read, Grep, Glob") {
+  checkReadRoles(
+    [...Object.values(out.workflows).flatMap(readStepsOf), ...(out.xl ? [{ w: out.xl.id, s: out.xl.split }] : [])],
+    out.roles,
+  );
+  return out;
+}
+
+/** A workflow's agent steps, parallel members included, with the workflow's id. */
+export const readStepsOf = (w: Workflow): { w: string; s: AgentStep }[] =>
+  w.steps.flatMap((x) => (isParallel(x) ? x.parallel : isGates(x) ? [] : [x])).map((s) => ({ w: w.id, s }));
+
+/** A read step must run with a role whose tools are read-only, or "read" would mean nothing. */
+export function checkReadRoles(steps: { w: string; s: AgentStep }[], roles: Library["roles"]): void {
+  for (const { w, s } of steps) {
+    if (s.access === "read" && roles[s.role]?.tools !== "Read, Grep, Glob") {
       throw new Error(`${w}/${s.id}: a read step's role must list tools: Read, Grep, Glob`);
     }
   }
-  return out;
 }
 
 export const libraryJsonText = (library: Library) => `${JSON.stringify(library, null, 2)}\n`;

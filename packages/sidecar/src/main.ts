@@ -52,6 +52,7 @@ import { log, notify, RpcFailure, serve } from "./rpc.ts";
 import { loadSdk } from "./sdk-loader.ts";
 import { Session } from "./session.ts";
 import { replayEvents, retention, toSessionInfo } from "./stored-sessions.ts";
+import { tierWorkflows } from "./tasks/project-workflows.ts";
 import type { SessionHost } from "./tasks/runner.ts";
 import {
   acceptRisk,
@@ -84,6 +85,7 @@ import {
   splitTask,
   startTask,
   taskEvidence,
+  workflowsOf,
   writeEvidence,
 } from "./tasks/service.ts";
 import { loadTask } from "./tasks/store.ts";
@@ -682,6 +684,12 @@ serve(
     "deploy.list": ({ cwd, taskId }) => {
       requireFolder(cwd);
       return { deploys: listDeploys(cwd, taskId) };
+    },
+
+    "workflow.list": ({ cwd }) => {
+      requireFolder(cwd);
+      const eff = workflowsOf(cwd);
+      return { workflows: tierWorkflows(eff), problems: eff.problems };
     },
 
     "task.overlaps": ({ cwd, id }) => {

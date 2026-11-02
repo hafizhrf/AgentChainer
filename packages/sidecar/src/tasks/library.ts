@@ -1,4 +1,4 @@
-import { GATE_KINDS, TIERS } from "@agentchainer/protocol";
+import { GATE_KINDS, STEP_INPUTS, TIERS, WORKFLOW_ROLES } from "@agentchainer/protocol";
 import { parse } from "yaml";
 import { z } from "zod";
 
@@ -8,14 +8,7 @@ import { z } from "zod";
  * `scripts/build-catalog.ts`, like the generators' skills, so nothing is parsed or fetched at runtime (ADR-0007).
  */
 
-export const ROLES = [
-  "implementer",
-  "architect",
-  "independent-reviewer",
-  "test-planner",
-  "security-reviewer",
-  "docs-writer",
-] as const;
+export const ROLES = WORKFLOW_ROLES;
 export type Role = (typeof ROLES)[number];
 
 const StepId = z.string().regex(/^[a-z][a-z0-9-]*$/);
@@ -37,7 +30,7 @@ export const AgentStepSchema = z
     /** read: Read, Grep and Glob only, isolated from the user's settings. write: the normal tools and approvals. */
     access: z.enum(["read", "write"]),
     /** What the step's prompt includes: the contract, the plan step's output, the diff since the base, gate runs. */
-    inputs: z.array(z.enum(["contract", "plan", "diff", "gates"])),
+    inputs: z.array(z.enum(STEP_INPUTS)),
     /** What the orchestrator keeps from the step's answer: `plan.md`, or `review.json` (structured output). */
     output: z.enum(["plan", "review"]).optional(),
     /** A new session that sees only its inputs, never another step's transcript. */

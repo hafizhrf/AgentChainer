@@ -206,6 +206,21 @@ The Deploy page lists them, and a task shows its preview deploys.
   - Workspace settings → Workflows lists each tier's workflow and the files that aren't used; the task page says
     "Runs the project's S workflow" next to Run; the evidence report names the workflow and the file's hash;
   - the canvas that edits these files is step 6.
+- **As built (step 6), the canvas:** Workspace settings → Workflows → Edit.
+  - The YAML text is the source of truth. Each edit from the form (a field, adding, moving or removing a step) is
+    applied to it through the `yaml` Document API in the UI (`workflows/workflowDoc.ts`), so comments, and a comment
+    above a step when the step moves, survive; small lists and maps stay on one line. The YAML view edits the text
+    directly.
+  - The graph is drawn from what the text parses to (`workflows/workflowGraph.ts`): steps top to bottom, a parallel
+    group's members side by side, fix rounds as dashed back edges. A workflow is a line, so the layout is computed
+    there rather than by dagre; M4's layout stays as it is. XL shows its split, the sub-tasks and the integration
+    gates, which can be edited but not added to or removed.
+  - The sidecar checks the text a moment after each edit, with the same checks a run makes (`workflow.check`), and
+    Save is off until it passes. A tier with no project file opens the app's workflow, rendered with a note on where
+    it's saved; it passes the checks as rendered.
+  - Save writes `.agentchainer/workflows/<tier>.yaml`; Reset removes it after a confirmation. Import and Export read
+    and write a `.yaml` file the person picks in the system's file dialog (up to 64 KB); sharing is through git.
+  - Keyboard: the step list beside the canvas selects any step; the form edits it.
 
 ## 10. UI
 

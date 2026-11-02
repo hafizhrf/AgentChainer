@@ -1,8 +1,10 @@
-import type { Methods } from "@agentchainer/protocol";
-import { RefreshCw, Workflow } from "lucide-react";
+import type { Methods, TierWorkflow } from "@agentchainer/protocol";
+import { Pencil, RefreshCw, Workflow } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
+import type { Confirm } from "../Dialog.tsx";
 import { request } from "../sidecar.ts";
 import { IconButton } from "../ui/IconButton.tsx";
+import { WorkflowEditor } from "../workflows/WorkflowEditor.tsx";
 
 type List = Methods["workflow.list"]["result"];
 
@@ -11,11 +13,12 @@ const message = (err: unknown) => (err instanceof Error ? err.message : String(e
 /**
  * The workflow each tier runs in this workspace (M6-04; docs/design/deploy-and-canvas.md §9): the app's, or the
  * project's own `.agentchainer/workflows/<tier>.yaml` when it passes the app's checks. A file that doesn't is listed
- * with why, and the app's workflow runs instead.
+ * with why, and the app's workflow runs instead. Edit opens a tier's workflow on the canvas.
  */
-export function Workflows({ cwd }: { cwd: string }) {
+export function Workflows({ cwd, confirm }: { cwd: string; confirm: Confirm }) {
   const [list, setList] = useState<List | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [editing, setEditing] = useState<TierWorkflow["tier"] | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -29,6 +32,20 @@ export function Workflows({ cwd }: { cwd: string }) {
   useEffect(() => {
     void load();
   }, [load]);
+
+  if (editing) {
+    return (
+      <WorkflowEditor
+        cwd={cwd}
+        tier={editing}
+        confirm={confirm}
+        onClose={(changed) => {
+          setEditing(null);
+          if (changed) void load();
+        }}
+      />
+    );
+  }
 
   return (
     <div className="setup-scroll">
@@ -67,6 +84,10 @@ export function Workflows({ cwd }: { cwd: string }) {
                   {w.id} v{w.version}
                 </span>
               )}
+              <button type="button" className="ghost small" onClick={() => setEditing(w.tier)}>
+                <Pencil size={13} />
+                Edit
+              </button>
             </li>
           ))}
         </ul>

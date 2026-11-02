@@ -128,6 +128,8 @@ Planned surface (v0.1):
 | request | `task.overlaps` | Other tasks whose live branches change the same files (M5-01) |
 | request | `github.status` | Whether the user's `gh` can make PRs for the workspace's `origin`: missing, no-remote, signed-out or ready; never the account (M5-02) |
 | request | `deploy.targets` / `deploy.preview` / `deploy.list` | The providers a workspace uses and their CLI's state; a task's preview deploy with the smoke test; the deploy records (M6) |
+| request | `workflow.get` / `workflow.check` / `workflow.save` | A tier's workflow YAML for the canvas (the project's file, else the app's); the check a run makes; saving a valid one as the project's, or removing it (M6-04) |
+| request | `workflow.import` / `workflow.export` | Reads or writes a `.yaml` workflow file at a path picked in the system's file dialog (M6-04) |
 | request | `workflow.list` | The workflow each tier runs in a workspace, the app's or the project's `.agentchainer/workflows/<tier>.yaml`, and the files that can't be used, with why (M6-04) |
 | request | `deploy.setDockerImage` | Names the image a Docker deploy pushes to, in `.agentchainer/docker.json` (M6-01) |
 | request | `deploy.plan` / `deploy.production` / `deploy.rollback` | What a production deploy of the current branch would run; the production deploy itself, given the project's name as typed and the plan's commit; rolling the live production deploy back to the one before it (M6-02, M6-03) |

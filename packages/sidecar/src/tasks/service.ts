@@ -243,6 +243,8 @@ export function reviseTask(root: string, id: string, now = new Date()): Task {
 /* ---------- Runs (M3-06) ---------- */
 
 const library = LibrarySchema.parse(shipped);
+/** The app's own library, as compiled into the app. */
+export const shippedLibrary = library;
 
 /** The workflows for `root`: the app's, with the project's valid files in their place (M6-04). */
 export const workflowsOf = (root: string): EffectiveLibrary => effectiveLibrary(root, library);

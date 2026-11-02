@@ -52,7 +52,14 @@ import { log, notify, RpcFailure, serve } from "./rpc.ts";
 import { loadSdk } from "./sdk-loader.ts";
 import { Session } from "./session.ts";
 import { replayEvents, retention, toSessionInfo } from "./stored-sessions.ts";
-import { tierWorkflows } from "./tasks/project-workflows.ts";
+import {
+  checkWorkflowText,
+  readWorkflowFile,
+  saveProjectWorkflow,
+  tierWorkflows,
+  workflowSource,
+  writeWorkflowFile,
+} from "./tasks/project-workflows.ts";
 import type { SessionHost } from "./tasks/runner.ts";
 import {
   acceptRisk,
@@ -81,6 +88,7 @@ import {
   reviewPrTask,
   reviseTask,
   settleRun,
+  shippedLibrary,
   shutdownRuns,
   splitTask,
   startTask,
@@ -690,6 +698,40 @@ serve(
       requireFolder(cwd);
       const eff = workflowsOf(cwd);
       return { workflows: tierWorkflows(eff), problems: eff.problems };
+    },
+
+    "workflow.get": ({ cwd, tier }) => {
+      requireFolder(cwd);
+      return workflowSource(cwd, tier, shippedLibrary);
+    },
+
+    "workflow.check": ({ tier, yaml }) => ({ error: checkWorkflowText(tier, yaml, shippedLibrary) }),
+
+    "workflow.save": ({ cwd, tier, yaml }) => {
+      requireFolder(cwd);
+      try {
+        saveProjectWorkflow(cwd, tier, yaml, shippedLibrary);
+      } catch (err) {
+        throw new RpcFailure(RpcErrorCode.invalidParams, err instanceof Error ? err.message : String(err));
+      }
+      return { ok: true as const };
+    },
+
+    "workflow.import": ({ path: file }) => {
+      try {
+        return { yaml: readWorkflowFile(file) };
+      } catch (err) {
+        throw new RpcFailure(RpcErrorCode.invalidParams, err instanceof Error ? err.message : String(err));
+      }
+    },
+
+    "workflow.export": ({ path: file, yaml }) => {
+      try {
+        writeWorkflowFile(file, yaml);
+      } catch (err) {
+        throw new RpcFailure(RpcErrorCode.invalidParams, err instanceof Error ? err.message : String(err));
+      }
+      return { ok: true as const };
     },
 
     "task.overlaps": ({ cwd, id }) => {

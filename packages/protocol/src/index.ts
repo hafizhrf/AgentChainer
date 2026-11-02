@@ -419,6 +419,18 @@ export const TierSchema = z.enum(TIERS);
 
 /** Gates the sidecar runs from the workspace profile's commands (M3-08). */
 export const GATE_KINDS = ["format", "lint", "typecheck", "test", "build", "smoke"] as const;
+
+/** The roles a workflow step runs with (`agents/ac-<role>.md`); the canvas offers these (M3-05, M6-04). */
+export const WORKFLOW_ROLES = [
+  "implementer",
+  "architect",
+  "independent-reviewer",
+  "test-planner",
+  "security-reviewer",
+  "docs-writer",
+] as const;
+/** What an agent step's prompt can include. */
+export const STEP_INPUTS = ["contract", "plan", "diff", "gates"] as const;
 export type GateKind = (typeof GATE_KINDS)[number];
 
 /** How a criterion is proved: by a gate run (`gate:test`), judged by the independent reviewer, or checked by the user. */
@@ -1478,6 +1490,33 @@ export const methodSchemas = {
   "workflow.list": {
     params: WorkspaceRef,
     result: z.object({ workflows: z.array(TierWorkflowSchema), problems: z.array(ProjectWorkflowProblemSchema) }),
+  },
+  /**
+   * A tier's workflow as YAML for the canvas (M6-04): the project's file when there is one (even an invalid one, to
+   * fix), else the app's, rendered as a starting point.
+   */
+  "workflow.get": {
+    params: WorkspaceRef.extend({ tier: z.enum(TIERS) }),
+    result: z.object({ yaml: z.string(), source: z.enum(["app", "project"]), file: z.string() }),
+  },
+  /** Checks a workflow's YAML the way a run would; null when it can be used. */
+  "workflow.check": {
+    params: WorkspaceRef.extend({ tier: z.enum(TIERS), yaml: z.string().max(65_536) }),
+    result: z.object({ error: z.string().nullable() }),
+  },
+  /** Saves a valid workflow as the project's `.agentchainer/workflows/<tier>.yaml`; null removes it (the app's again). */
+  "workflow.save": {
+    params: WorkspaceRef.extend({ tier: z.enum(TIERS), yaml: z.string().max(65_536).nullable() }),
+    result: z.object({ ok: z.literal(true) }),
+  },
+  /** Import and Export: a workflow file at a path the person picked in the system's file dialog. */
+  "workflow.import": {
+    params: z.object({ path: z.string().min(1) }),
+    result: z.object({ yaml: z.string() }),
+  },
+  "workflow.export": {
+    params: z.object({ path: z.string().min(1), yaml: z.string().max(65_536) }),
+    result: z.object({ ok: z.literal(true) }),
   },
   "task.overlaps": {
     params: TaskRef,

@@ -22195,6 +22195,347 @@
         "additionalProperties": false
       }
     },
+    "metrics.summary": {
+      "params": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "cwd": {
+            "type": "string",
+            "minLength": 1
+          },
+          "since": {
+            "type": "string"
+          },
+          "tier": {
+            "type": "string",
+            "enum": [
+              "S",
+              "M",
+              "L",
+              "XL"
+            ]
+          }
+        },
+        "required": [
+          "cwd"
+        ],
+        "additionalProperties": false
+      },
+      "result": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "tasks": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "runs": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "gatePass": {
+            "type": "object",
+            "properties": {
+              "rate": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "judged": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              "unjudged": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              }
+            },
+            "required": [
+              "rate",
+              "judged",
+              "unjudged"
+            ],
+            "additionalProperties": false
+          },
+          "costUsd": {
+            "type": "object",
+            "properties": {
+              "total": {
+                "type": "number"
+              },
+              "perTask": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "perSuccess": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "successes": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              }
+            },
+            "required": [
+              "total",
+              "perTask",
+              "perSuccess",
+              "successes"
+            ],
+            "additionalProperties": false
+          },
+          "durationMs": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "p50": {
+                    "type": "number"
+                  },
+                  "p90": {
+                    "type": "number"
+                  },
+                  "count": {
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991
+                  }
+                },
+                "required": [
+                  "p50",
+                  "p90",
+                  "count"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "retries": {
+            "type": "object",
+            "properties": {
+              "extraRuns": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              "fixRounds": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              "ciFixes": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              }
+            },
+            "required": [
+              "extraRuns",
+              "fixRounds",
+              "ciFixes"
+            ],
+            "additionalProperties": false
+          },
+          "humanFix": {
+            "type": "object",
+            "properties": {
+              "rate": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "tasks": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              }
+            },
+            "required": [
+              "rate",
+              "tasks"
+            ],
+            "additionalProperties": false
+          },
+          "byTier": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "tier": {
+                  "type": "string"
+                },
+                "tasks": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                "successes": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                "costUsd": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "tier",
+                "tasks",
+                "successes",
+                "costUsd"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "byWorkflow": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "key": {
+                  "type": "string"
+                },
+                "label": {
+                  "type": "string"
+                },
+                "runs": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                "gatePassRate": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
+                "costUsd": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "key",
+                "label",
+                "runs",
+                "gatePassRate",
+                "costUsd"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "taskList": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "request": {
+                  "type": "string"
+                },
+                "tier": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "state": {
+                  "type": "string",
+                  "enum": [
+                    "draft",
+                    "ready",
+                    "running",
+                    "done",
+                    "failed",
+                    "unverified",
+                    "cancelled",
+                    "interrupted",
+                    "accepted"
+                  ]
+                },
+                "createdAt": {
+                  "type": "string"
+                },
+                "costUsd": {
+                  "type": "number"
+                },
+                "runs": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                "gatesPassed": {
+                  "type": [
+                    "boolean",
+                    "null"
+                  ]
+                },
+                "fixRounds": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                "ciFixes": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                "success": {
+                  "type": "boolean"
+                },
+                "neededPerson": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "id",
+                "request",
+                "tier",
+                "state",
+                "createdAt",
+                "costUsd",
+                "runs",
+                "gatesPassed",
+                "fixRounds",
+                "ciFixes",
+                "success",
+                "neededPerson"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "tasks",
+          "runs",
+          "gatePass",
+          "costUsd",
+          "durationMs",
+          "retries",
+          "humanFix",
+          "byTier",
+          "byWorkflow",
+          "taskList"
+        ],
+        "additionalProperties": false
+      }
+    },
     "task.overlaps": {
       "params": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",

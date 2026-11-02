@@ -628,6 +628,23 @@ export const TaskRunSchema = z.object({
 });
 export type TaskRun = z.infer<typeof TaskRunSchema>;
 
+/** An earlier run of a task, kept when "Run again" replaced it (M7, docs/design/evals.md §3). */
+export const RunSummarySchema = z.object({
+  workflow: TaskRunSchema.shape.workflow,
+  model: z.string().optional(),
+  /** The state the task ended that run in. */
+  state: z.enum(TASK_STATES),
+  costUsd: z.number(),
+  /** How many gate rounds ran: the first, then one per fix round. */
+  gateRounds: z.number().int(),
+  /** Whether the last round passed every gate that ran; null when none ran. */
+  gatesPassed: z.boolean().nullable(),
+  fixRounds: z.number().int(),
+  startedAt: z.string(),
+  endedAt: z.string().optional(),
+});
+export type RunSummary = z.infer<typeof RunSummarySchema>;
+
 export const TaskSchema = z.object({
   id: TaskIdSchema,
   /** What the user asked for, verbatim. */
@@ -643,6 +660,8 @@ export const TaskSchema = z.object({
   costUsd: z.number(),
   /** The latest run; tasks from before runs existed have none. */
   run: TaskRunSchema.nullable().default(null),
+  /** The runs before `run`, oldest first (M7); tasks from before run history have none. */
+  runs: z.array(RunSummarySchema).optional(),
   /** A sub-task of an XL task (M3-07): its parent, and its place in the split. */
   parent: z.object({ id: TaskIdSchema, index: z.number().int().min(0) }).optional(),
   /** A sub-task's short title, from the split. */

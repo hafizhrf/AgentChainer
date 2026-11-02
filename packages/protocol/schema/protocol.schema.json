@@ -4562,6 +4562,94 @@
               }
             ]
           },
+          "runs": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "workflow": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "version": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "source": {
+                      "type": "string",
+                      "const": "project"
+                    },
+                    "file": {
+                      "type": "string"
+                    },
+                    "hash": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "version"
+                  ],
+                  "additionalProperties": false
+                },
+                "model": {
+                  "type": "string"
+                },
+                "state": {
+                  "type": "string",
+                  "enum": [
+                    "draft",
+                    "ready",
+                    "running",
+                    "done",
+                    "failed",
+                    "unverified",
+                    "cancelled",
+                    "interrupted",
+                    "accepted"
+                  ]
+                },
+                "costUsd": {
+                  "type": "number"
+                },
+                "gateRounds": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                "gatesPassed": {
+                  "type": [
+                    "boolean",
+                    "null"
+                  ]
+                },
+                "fixRounds": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                "startedAt": {
+                  "type": "string"
+                },
+                "endedAt": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "workflow",
+                "state",
+                "costUsd",
+                "gateRounds",
+                "gatesPassed",
+                "fixRounds",
+                "startedAt"
+              ],
+              "additionalProperties": false
+            }
+          },
           "parent": {
             "type": "object",
             "properties": {
@@ -5570,6 +5658,94 @@
                 "type": "null"
               }
             ]
+          },
+          "runs": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "workflow": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "version": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "source": {
+                      "type": "string",
+                      "const": "project"
+                    },
+                    "file": {
+                      "type": "string"
+                    },
+                    "hash": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "version"
+                  ],
+                  "additionalProperties": false
+                },
+                "model": {
+                  "type": "string"
+                },
+                "state": {
+                  "type": "string",
+                  "enum": [
+                    "draft",
+                    "ready",
+                    "running",
+                    "done",
+                    "failed",
+                    "unverified",
+                    "cancelled",
+                    "interrupted",
+                    "accepted"
+                  ]
+                },
+                "costUsd": {
+                  "type": "number"
+                },
+                "gateRounds": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                "gatesPassed": {
+                  "type": [
+                    "boolean",
+                    "null"
+                  ]
+                },
+                "fixRounds": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                "startedAt": {
+                  "type": "string"
+                },
+                "endedAt": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "workflow",
+                "state",
+                "costUsd",
+                "gateRounds",
+                "gatesPassed",
+                "fixRounds",
+                "startedAt"
+              ],
+              "additionalProperties": false
+            }
           },
           "parent": {
             "type": "object",
@@ -6688,6 +6864,94 @@
                 "type": "null"
               }
             ]
+          },
+          "runs": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "workflow": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "version": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "source": {
+                      "type": "string",
+                      "const": "project"
+                    },
+                    "file": {
+                      "type": "string"
+                    },
+                    "hash": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "version"
+                  ],
+                  "additionalProperties": false
+                },
+                "model": {
+                  "type": "string"
+                },
+                "state": {
+                  "type": "string",
+                  "enum": [
+                    "draft",
+                    "ready",
+                    "running",
+                    "done",
+                    "failed",
+                    "unverified",
+                    "cancelled",
+                    "interrupted",
+                    "accepted"
+                  ]
+                },
+                "costUsd": {
+                  "type": "number"
+                },
+                "gateRounds": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                "gatesPassed": {
+                  "type": [
+                    "boolean",
+                    "null"
+                  ]
+                },
+                "fixRounds": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                "startedAt": {
+                  "type": "string"
+                },
+                "endedAt": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "workflow",
+                "state",
+                "costUsd",
+                "gateRounds",
+                "gatesPassed",
+                "fixRounds",
+                "startedAt"
+              ],
+              "additionalProperties": false
+            }
           },
           "parent": {
             "type": "object",
@@ -7826,6 +8090,94 @@
               }
             ]
           },
+          "runs": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "workflow": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "version": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "source": {
+                      "type": "string",
+                      "const": "project"
+                    },
+                    "file": {
+                      "type": "string"
+                    },
+                    "hash": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "version"
+                  ],
+                  "additionalProperties": false
+                },
+                "model": {
+                  "type": "string"
+                },
+                "state": {
+                  "type": "string",
+                  "enum": [
+                    "draft",
+                    "ready",
+                    "running",
+                    "done",
+                    "failed",
+                    "unverified",
+                    "cancelled",
+                    "interrupted",
+                    "accepted"
+                  ]
+                },
+                "costUsd": {
+                  "type": "number"
+                },
+                "gateRounds": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                "gatesPassed": {
+                  "type": [
+                    "boolean",
+                    "null"
+                  ]
+                },
+                "fixRounds": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                "startedAt": {
+                  "type": "string"
+                },
+                "endedAt": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "workflow",
+                "state",
+                "costUsd",
+                "gateRounds",
+                "gatesPassed",
+                "fixRounds",
+                "startedAt"
+              ],
+              "additionalProperties": false
+            }
+          },
           "parent": {
             "type": "object",
             "properties": {
@@ -8831,6 +9183,94 @@
                 "type": "null"
               }
             ]
+          },
+          "runs": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "workflow": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "version": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "source": {
+                      "type": "string",
+                      "const": "project"
+                    },
+                    "file": {
+                      "type": "string"
+                    },
+                    "hash": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "version"
+                  ],
+                  "additionalProperties": false
+                },
+                "model": {
+                  "type": "string"
+                },
+                "state": {
+                  "type": "string",
+                  "enum": [
+                    "draft",
+                    "ready",
+                    "running",
+                    "done",
+                    "failed",
+                    "unverified",
+                    "cancelled",
+                    "interrupted",
+                    "accepted"
+                  ]
+                },
+                "costUsd": {
+                  "type": "number"
+                },
+                "gateRounds": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                "gatesPassed": {
+                  "type": [
+                    "boolean",
+                    "null"
+                  ]
+                },
+                "fixRounds": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                "startedAt": {
+                  "type": "string"
+                },
+                "endedAt": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "workflow",
+                "state",
+                "costUsd",
+                "gateRounds",
+                "gatesPassed",
+                "fixRounds",
+                "startedAt"
+              ],
+              "additionalProperties": false
+            }
           },
           "parent": {
             "type": "object",
@@ -9850,6 +10290,94 @@
               }
             ]
           },
+          "runs": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "workflow": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "version": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "source": {
+                      "type": "string",
+                      "const": "project"
+                    },
+                    "file": {
+                      "type": "string"
+                    },
+                    "hash": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "version"
+                  ],
+                  "additionalProperties": false
+                },
+                "model": {
+                  "type": "string"
+                },
+                "state": {
+                  "type": "string",
+                  "enum": [
+                    "draft",
+                    "ready",
+                    "running",
+                    "done",
+                    "failed",
+                    "unverified",
+                    "cancelled",
+                    "interrupted",
+                    "accepted"
+                  ]
+                },
+                "costUsd": {
+                  "type": "number"
+                },
+                "gateRounds": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                "gatesPassed": {
+                  "type": [
+                    "boolean",
+                    "null"
+                  ]
+                },
+                "fixRounds": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                "startedAt": {
+                  "type": "string"
+                },
+                "endedAt": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "workflow",
+                "state",
+                "costUsd",
+                "gateRounds",
+                "gatesPassed",
+                "fixRounds",
+                "startedAt"
+              ],
+              "additionalProperties": false
+            }
+          },
           "parent": {
             "type": "object",
             "properties": {
@@ -10855,6 +11383,94 @@
                 "type": "null"
               }
             ]
+          },
+          "runs": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "workflow": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "version": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "source": {
+                      "type": "string",
+                      "const": "project"
+                    },
+                    "file": {
+                      "type": "string"
+                    },
+                    "hash": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "version"
+                  ],
+                  "additionalProperties": false
+                },
+                "model": {
+                  "type": "string"
+                },
+                "state": {
+                  "type": "string",
+                  "enum": [
+                    "draft",
+                    "ready",
+                    "running",
+                    "done",
+                    "failed",
+                    "unverified",
+                    "cancelled",
+                    "interrupted",
+                    "accepted"
+                  ]
+                },
+                "costUsd": {
+                  "type": "number"
+                },
+                "gateRounds": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                "gatesPassed": {
+                  "type": [
+                    "boolean",
+                    "null"
+                  ]
+                },
+                "fixRounds": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                "startedAt": {
+                  "type": "string"
+                },
+                "endedAt": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "workflow",
+                "state",
+                "costUsd",
+                "gateRounds",
+                "gatesPassed",
+                "fixRounds",
+                "startedAt"
+              ],
+              "additionalProperties": false
+            }
           },
           "parent": {
             "type": "object",
@@ -11867,6 +12483,94 @@
                 "type": "null"
               }
             ]
+          },
+          "runs": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "workflow": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "version": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "source": {
+                      "type": "string",
+                      "const": "project"
+                    },
+                    "file": {
+                      "type": "string"
+                    },
+                    "hash": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "version"
+                  ],
+                  "additionalProperties": false
+                },
+                "model": {
+                  "type": "string"
+                },
+                "state": {
+                  "type": "string",
+                  "enum": [
+                    "draft",
+                    "ready",
+                    "running",
+                    "done",
+                    "failed",
+                    "unverified",
+                    "cancelled",
+                    "interrupted",
+                    "accepted"
+                  ]
+                },
+                "costUsd": {
+                  "type": "number"
+                },
+                "gateRounds": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                "gatesPassed": {
+                  "type": [
+                    "boolean",
+                    "null"
+                  ]
+                },
+                "fixRounds": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                "startedAt": {
+                  "type": "string"
+                },
+                "endedAt": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "workflow",
+                "state",
+                "costUsd",
+                "gateRounds",
+                "gatesPassed",
+                "fixRounds",
+                "startedAt"
+              ],
+              "additionalProperties": false
+            }
           },
           "parent": {
             "type": "object",
@@ -12915,6 +13619,94 @@
               }
             ]
           },
+          "runs": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "workflow": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "version": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "source": {
+                      "type": "string",
+                      "const": "project"
+                    },
+                    "file": {
+                      "type": "string"
+                    },
+                    "hash": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "version"
+                  ],
+                  "additionalProperties": false
+                },
+                "model": {
+                  "type": "string"
+                },
+                "state": {
+                  "type": "string",
+                  "enum": [
+                    "draft",
+                    "ready",
+                    "running",
+                    "done",
+                    "failed",
+                    "unverified",
+                    "cancelled",
+                    "interrupted",
+                    "accepted"
+                  ]
+                },
+                "costUsd": {
+                  "type": "number"
+                },
+                "gateRounds": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                "gatesPassed": {
+                  "type": [
+                    "boolean",
+                    "null"
+                  ]
+                },
+                "fixRounds": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                "startedAt": {
+                  "type": "string"
+                },
+                "endedAt": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "workflow",
+                "state",
+                "costUsd",
+                "gateRounds",
+                "gatesPassed",
+                "fixRounds",
+                "startedAt"
+              ],
+              "additionalProperties": false
+            }
+          },
           "parent": {
             "type": "object",
             "properties": {
@@ -13921,6 +14713,94 @@
               }
             ]
           },
+          "runs": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "workflow": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "version": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "source": {
+                      "type": "string",
+                      "const": "project"
+                    },
+                    "file": {
+                      "type": "string"
+                    },
+                    "hash": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "version"
+                  ],
+                  "additionalProperties": false
+                },
+                "model": {
+                  "type": "string"
+                },
+                "state": {
+                  "type": "string",
+                  "enum": [
+                    "draft",
+                    "ready",
+                    "running",
+                    "done",
+                    "failed",
+                    "unverified",
+                    "cancelled",
+                    "interrupted",
+                    "accepted"
+                  ]
+                },
+                "costUsd": {
+                  "type": "number"
+                },
+                "gateRounds": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                "gatesPassed": {
+                  "type": [
+                    "boolean",
+                    "null"
+                  ]
+                },
+                "fixRounds": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                "startedAt": {
+                  "type": "string"
+                },
+                "endedAt": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "workflow",
+                "state",
+                "costUsd",
+                "gateRounds",
+                "gatesPassed",
+                "fixRounds",
+                "startedAt"
+              ],
+              "additionalProperties": false
+            }
+          },
           "parent": {
             "type": "object",
             "properties": {
@@ -14926,6 +15806,94 @@
                 "type": "null"
               }
             ]
+          },
+          "runs": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "workflow": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "version": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "source": {
+                      "type": "string",
+                      "const": "project"
+                    },
+                    "file": {
+                      "type": "string"
+                    },
+                    "hash": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "version"
+                  ],
+                  "additionalProperties": false
+                },
+                "model": {
+                  "type": "string"
+                },
+                "state": {
+                  "type": "string",
+                  "enum": [
+                    "draft",
+                    "ready",
+                    "running",
+                    "done",
+                    "failed",
+                    "unverified",
+                    "cancelled",
+                    "interrupted",
+                    "accepted"
+                  ]
+                },
+                "costUsd": {
+                  "type": "number"
+                },
+                "gateRounds": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                "gatesPassed": {
+                  "type": [
+                    "boolean",
+                    "null"
+                  ]
+                },
+                "fixRounds": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                "startedAt": {
+                  "type": "string"
+                },
+                "endedAt": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "workflow",
+                "state",
+                "costUsd",
+                "gateRounds",
+                "gatesPassed",
+                "fixRounds",
+                "startedAt"
+              ],
+              "additionalProperties": false
+            }
           },
           "parent": {
             "type": "object",
@@ -16145,6 +17113,94 @@
               }
             ]
           },
+          "runs": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "workflow": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "version": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "source": {
+                      "type": "string",
+                      "const": "project"
+                    },
+                    "file": {
+                      "type": "string"
+                    },
+                    "hash": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "version"
+                  ],
+                  "additionalProperties": false
+                },
+                "model": {
+                  "type": "string"
+                },
+                "state": {
+                  "type": "string",
+                  "enum": [
+                    "draft",
+                    "ready",
+                    "running",
+                    "done",
+                    "failed",
+                    "unverified",
+                    "cancelled",
+                    "interrupted",
+                    "accepted"
+                  ]
+                },
+                "costUsd": {
+                  "type": "number"
+                },
+                "gateRounds": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                "gatesPassed": {
+                  "type": [
+                    "boolean",
+                    "null"
+                  ]
+                },
+                "fixRounds": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                "startedAt": {
+                  "type": "string"
+                },
+                "endedAt": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "workflow",
+                "state",
+                "costUsd",
+                "gateRounds",
+                "gatesPassed",
+                "fixRounds",
+                "startedAt"
+              ],
+              "additionalProperties": false
+            }
+          },
           "parent": {
             "type": "object",
             "properties": {
@@ -17275,6 +18331,94 @@
               }
             ]
           },
+          "runs": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "workflow": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "version": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "source": {
+                      "type": "string",
+                      "const": "project"
+                    },
+                    "file": {
+                      "type": "string"
+                    },
+                    "hash": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "version"
+                  ],
+                  "additionalProperties": false
+                },
+                "model": {
+                  "type": "string"
+                },
+                "state": {
+                  "type": "string",
+                  "enum": [
+                    "draft",
+                    "ready",
+                    "running",
+                    "done",
+                    "failed",
+                    "unverified",
+                    "cancelled",
+                    "interrupted",
+                    "accepted"
+                  ]
+                },
+                "costUsd": {
+                  "type": "number"
+                },
+                "gateRounds": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                "gatesPassed": {
+                  "type": [
+                    "boolean",
+                    "null"
+                  ]
+                },
+                "fixRounds": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                "startedAt": {
+                  "type": "string"
+                },
+                "endedAt": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "workflow",
+                "state",
+                "costUsd",
+                "gateRounds",
+                "gatesPassed",
+                "fixRounds",
+                "startedAt"
+              ],
+              "additionalProperties": false
+            }
+          },
           "parent": {
             "type": "object",
             "properties": {
@@ -18383,6 +19527,94 @@
               }
             ]
           },
+          "runs": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "workflow": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "version": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "source": {
+                      "type": "string",
+                      "const": "project"
+                    },
+                    "file": {
+                      "type": "string"
+                    },
+                    "hash": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "version"
+                  ],
+                  "additionalProperties": false
+                },
+                "model": {
+                  "type": "string"
+                },
+                "state": {
+                  "type": "string",
+                  "enum": [
+                    "draft",
+                    "ready",
+                    "running",
+                    "done",
+                    "failed",
+                    "unverified",
+                    "cancelled",
+                    "interrupted",
+                    "accepted"
+                  ]
+                },
+                "costUsd": {
+                  "type": "number"
+                },
+                "gateRounds": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                "gatesPassed": {
+                  "type": [
+                    "boolean",
+                    "null"
+                  ]
+                },
+                "fixRounds": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                "startedAt": {
+                  "type": "string"
+                },
+                "endedAt": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "workflow",
+                "state",
+                "costUsd",
+                "gateRounds",
+                "gatesPassed",
+                "fixRounds",
+                "startedAt"
+              ],
+              "additionalProperties": false
+            }
+          },
           "parent": {
             "type": "object",
             "properties": {
@@ -19407,6 +20639,94 @@
                 "type": "null"
               }
             ]
+          },
+          "runs": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "workflow": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "version": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "source": {
+                      "type": "string",
+                      "const": "project"
+                    },
+                    "file": {
+                      "type": "string"
+                    },
+                    "hash": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "version"
+                  ],
+                  "additionalProperties": false
+                },
+                "model": {
+                  "type": "string"
+                },
+                "state": {
+                  "type": "string",
+                  "enum": [
+                    "draft",
+                    "ready",
+                    "running",
+                    "done",
+                    "failed",
+                    "unverified",
+                    "cancelled",
+                    "interrupted",
+                    "accepted"
+                  ]
+                },
+                "costUsd": {
+                  "type": "number"
+                },
+                "gateRounds": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                "gatesPassed": {
+                  "type": [
+                    "boolean",
+                    "null"
+                  ]
+                },
+                "fixRounds": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                "startedAt": {
+                  "type": "string"
+                },
+                "endedAt": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "workflow",
+                "state",
+                "costUsd",
+                "gateRounds",
+                "gatesPassed",
+                "fixRounds",
+                "startedAt"
+              ],
+              "additionalProperties": false
+            }
           },
           "parent": {
             "type": "object",
@@ -21828,6 +23148,94 @@
               }
             ]
           },
+          "runs": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "workflow": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "version": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "source": {
+                      "type": "string",
+                      "const": "project"
+                    },
+                    "file": {
+                      "type": "string"
+                    },
+                    "hash": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "version"
+                  ],
+                  "additionalProperties": false
+                },
+                "model": {
+                  "type": "string"
+                },
+                "state": {
+                  "type": "string",
+                  "enum": [
+                    "draft",
+                    "ready",
+                    "running",
+                    "done",
+                    "failed",
+                    "unverified",
+                    "cancelled",
+                    "interrupted",
+                    "accepted"
+                  ]
+                },
+                "costUsd": {
+                  "type": "number"
+                },
+                "gateRounds": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                "gatesPassed": {
+                  "type": [
+                    "boolean",
+                    "null"
+                  ]
+                },
+                "fixRounds": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                "startedAt": {
+                  "type": "string"
+                },
+                "endedAt": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "workflow",
+                "state",
+                "costUsd",
+                "gateRounds",
+                "gatesPassed",
+                "fixRounds",
+                "startedAt"
+              ],
+              "additionalProperties": false
+            }
+          },
           "parent": {
             "type": "object",
             "properties": {
@@ -23486,6 +24894,94 @@
                   "type": "null"
                 }
               ]
+            },
+            "runs": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "workflow": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string"
+                      },
+                      "version": {
+                        "type": "integer",
+                        "minimum": -9007199254740991,
+                        "maximum": 9007199254740991
+                      },
+                      "source": {
+                        "type": "string",
+                        "const": "project"
+                      },
+                      "file": {
+                        "type": "string"
+                      },
+                      "hash": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "version"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "model": {
+                    "type": "string"
+                  },
+                  "state": {
+                    "type": "string",
+                    "enum": [
+                      "draft",
+                      "ready",
+                      "running",
+                      "done",
+                      "failed",
+                      "unverified",
+                      "cancelled",
+                      "interrupted",
+                      "accepted"
+                    ]
+                  },
+                  "costUsd": {
+                    "type": "number"
+                  },
+                  "gateRounds": {
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991
+                  },
+                  "gatesPassed": {
+                    "type": [
+                      "boolean",
+                      "null"
+                    ]
+                  },
+                  "fixRounds": {
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991
+                  },
+                  "startedAt": {
+                    "type": "string"
+                  },
+                  "endedAt": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "workflow",
+                  "state",
+                  "costUsd",
+                  "gateRounds",
+                  "gatesPassed",
+                  "fixRounds",
+                  "startedAt"
+                ],
+                "additionalProperties": false
+              }
             },
             "parent": {
               "type": "object",

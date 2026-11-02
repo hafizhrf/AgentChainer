@@ -41,6 +41,7 @@ import shipped from "./library.json" with { type: "json" };
 import { LibrarySchema, type Workflow, WorkflowSchema, type XlWorkflow, XlWorkflowSchema } from "./library.ts";
 import { newRun, Orchestrator, type OrchestratorDeps, parseReview } from "./orchestrator.ts";
 import { type EffectiveLibrary, effectiveLibrary, workflowRef } from "./project-workflows.ts";
+import { withPastRun } from "./run-history.ts";
 import { changedPaths, fileStats, type SessionHost, sessionRunner, startBase, untracked } from "./runner.ts";
 import { semgrepScan, trivyScan } from "./scanners.ts";
 import { proposeSplit } from "./split.ts";
@@ -504,6 +505,7 @@ export function startTask(
   const started: Task = {
     ...branched.task,
     state: "running",
+    ...withPastRun(branched.task),
     run: startRun(root, branched.task, workflow, eff, { ...opts, ...base }, now),
     updatedAt: now.toISOString(),
   };
@@ -677,6 +679,7 @@ function startXl(
   const started: Task = {
     ...task,
     state: "running",
+    ...withPastRun(task),
     run: startRun(root, task, xl, eff, { ...opts, base: headOf(root), untrackedAtStart: [] }, now),
     updatedAt: now.toISOString(),
   };
@@ -730,6 +733,7 @@ function launchXl(
         : {
             ...child,
             state: "running",
+            ...withPastRun(child),
             run: startRun(
               root,
               child,

@@ -1454,6 +1454,8 @@ Decisions: [ADR-0009](adr/0009-release-signing-and-updates.md). Maintainer steps
 → PRD [F8](PRD.md#f6f9-p2) · design: [evals.md](design/evals.md) (draft)
 
 - [ ] **M7-01** Local metrics dashboard: gate pass rate, cost per task, cost per successful task, duration, retries, human-fix rate.
+      Note: step 1 is built: "Run again" keeps the replaced run as a summary in `task.runs` (workflow, model, end
+      state, cost, gate rounds, whether the last round passed, fix rounds, times), so retries can be counted.
 - [ ] **M7-02** Eval harness: fixture tasks with acceptance tests, run headless to compare workflow templates, models and skill versions.
 - [ ] **M7-03** CI regression job for first-party skills and workflow templates.
 - [ ] **M7-04** Optional OpenTelemetry export (verify Claude Code's OTel support).

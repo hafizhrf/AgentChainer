@@ -68,6 +68,11 @@ reader; an XL task counts once, with its sub-tasks' costs inside it.
     - a workflow file, or the app's;
     - a model;
     - a skill version from `catalog/skills/`.
+  - As built (step 3): a variant is `name[:model=…,workflows=<dir>,workflows-ref=<git rev>]`. The first-party prompts
+    a task runs are the tier workflows and the role prompts in `agents/`; the skills in `skills/` feed the setup
+    generators, not task runs, so the task benchmark doesn't vary them. `workflows-ref=origin/main` is the usual
+    baseline for a workflow change. The contract is written in the case and triaged, not drafted, so every variant
+    starts from the same one.
   - `-n` repeats each case, because a single run is noisy. `--max-usd` caps the whole run and stops it cleanly.
     Haiku is the default unless the variant names a model.
   - Variants run on the same commit of the app, one after another, each on a fresh fixture copy.
@@ -142,3 +147,6 @@ Reopen it when a user asks for it.
 - The suite's size and mix. Proposed: 6–8 cases, S and M tasks on sample-app, plus one for each other stack with
   tests (go-service, python-uv-fastapi).
 - The default N and budget. Proposed: N=3, $3 per variant.
+
+**As built (step 3):** 7 cases: five on sample-app (four S, one M) and two S on go-service. python-uv-fastapi is
+left out for now: its gates need `uv`. Defaults are N=3 and a cap of $3 per variant for the whole benchmark.

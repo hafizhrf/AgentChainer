@@ -1461,6 +1461,10 @@ Decisions: [ADR-0009](adr/0009-release-signing-and-updates.md). Maintainer steps
       tile listing its tasks. Checked in the app with seeded task records; hand edits after Done are shown as not
       measured.
 - [ ] **M7-02** Eval harness: fixture tasks with acceptance tests, run headless to compare workflow templates, models and skill versions.
+      Note: step 3 is built: `scripts/benchmark.ts` with the library in `packages/sidecar/src/evals/` (shared with
+      `live-task.ts`), a 7-case suite in `test/evals/suite.json` with hidden acceptance tests, and a report with
+      each variant's pass and cost delta against the baseline and 95% intervals. Variants are a model and/or a set
+      of tier workflows (a folder, or `catalog/workflows/` at a git revision). Ticked with step 4's first report.
 - [ ] **M7-03** CI regression job for first-party skills and workflow templates.
 - [ ] **M7-04** Optional OpenTelemetry export (verify Claude Code's OTel support).
       Deferred (owner, 2026-11-02): the app sends no telemetry (X-04), and Claude Code's OTel settings need

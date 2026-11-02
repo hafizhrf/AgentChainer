@@ -1,0 +1,158 @@
+{
+  "version": 1,
+  "about": "Eval suite (M7-02, docs/design/evals.md §5): tasks on copies of fixtures/ with written contracts. After each run, hidden/<case id>/ is copied over the code and the checks run without a shell; a run passes when every check exits 0. Run: node packages/sidecar/scripts/benchmark.ts",
+  "cases": [
+    {
+      "id": "sample-quantity",
+      "fixture": "sample-app",
+      "request": "total() ignores the quantity: multiply each item's price by its quantity.",
+      "tier": "S",
+      "contract": {
+        "objective": "Cart totals count every unit of each item.",
+        "acceptanceCriteria": [
+          { "id": "ac1", "text": "total() returns the sum of price × quantity", "check": "gate:test" },
+          { "id": "ac2", "text": "A test covers an item with quantity above 1", "check": "gate:test" }
+        ],
+        "constraints": ["Keep amounts in cents"],
+        "outOfScope": ["applyDiscount"],
+        "risks": [],
+        "affectedAreas": ["src/cart.js", "test/cart.test.js"],
+        "openQuestions": []
+      },
+      "hidden": true,
+      "checks": [
+        { "name": "fixture tests", "argv": ["node", "--test"] },
+        { "name": "hidden test", "argv": ["node", "--test", "test/eval-quantity.test.js"] }
+      ]
+    },
+    {
+      "id": "sample-discount-clamp",
+      "fixture": "sample-app",
+      "request": "applyDiscount should treat a percentage below 0 as 0 and above 100 as 100.",
+      "tier": "S",
+      "contract": {
+        "objective": "applyDiscount never raises a price and never makes it negative.",
+        "acceptanceCriteria": [
+          { "id": "ac1", "text": "Percentages below 0 give the original amount", "check": "gate:test" },
+          { "id": "ac2", "text": "Percentages above 100 give 0", "check": "gate:test" },
+          { "id": "ac3", "text": "Tests cover both ends", "check": "gate:test" }
+        ],
+        "constraints": ["Keep rounding to whole cents"],
+        "outOfScope": ["total()"],
+        "risks": [],
+        "affectedAreas": ["src/cart.js", "test/cart.test.js"],
+        "openQuestions": []
+      },
+      "hidden": true,
+      "checks": [{ "name": "hidden test", "argv": ["node", "--test", "test/eval-discount-clamp.test.js"] }]
+    },
+    {
+      "id": "sample-with-tax",
+      "fixture": "sample-app",
+      "request": "Add withTax(cents, ratePercent) to src/cart.js: it adds tax at the given percentage and rounds to whole cents, halves up.",
+      "tier": "S",
+      "contract": {
+        "objective": "Callers can add a percentage tax to an amount in cents.",
+        "acceptanceCriteria": [
+          { "id": "ac1", "text": "withTax is exported from src/cart.js", "check": "gate:test" },
+          { "id": "ac2", "text": "It rounds to whole cents, halves up", "check": "gate:test" },
+          { "id": "ac3", "text": "A test covers a fractional rate", "check": "gate:test" }
+        ],
+        "constraints": ["No new dependencies"],
+        "outOfScope": ["total()", "applyDiscount"],
+        "risks": [],
+        "affectedAreas": ["src/cart.js", "test/cart.test.js"],
+        "openQuestions": []
+      },
+      "hidden": true,
+      "checks": [{ "name": "hidden test", "argv": ["node", "--test", "test/eval-with-tax.test.js"] }]
+    },
+    {
+      "id": "sample-format-cents",
+      "fixture": "sample-app",
+      "request": "Add formatCents(cents) to src/cart.js that shows an amount in cents as dollars, like $12.34, and a negative amount like -$0.05.",
+      "tier": "S",
+      "contract": {
+        "objective": "Amounts in cents can be shown as dollar strings.",
+        "acceptanceCriteria": [
+          { "id": "ac1", "text": "formatCents(1234) is \"$12.34\"", "check": "gate:test" },
+          { "id": "ac2", "text": "Negative amounts put the minus before the dollar sign", "check": "gate:test" },
+          { "id": "ac3", "text": "Tests cover zero and a negative amount", "check": "gate:test" }
+        ],
+        "constraints": ["No Intl or locale-dependent formatting"],
+        "outOfScope": ["total()", "applyDiscount"],
+        "risks": [],
+        "affectedAreas": ["src/cart.js", "test/cart.test.js"],
+        "openQuestions": []
+      },
+      "hidden": true,
+      "checks": [{ "name": "hidden test", "argv": ["node", "--test", "test/eval-format-cents.test.js"] }]
+    },
+    {
+      "id": "sample-validate-items",
+      "fixture": "sample-app",
+      "request": "total() should reject bad items: throw a TypeError when an item's price isn't a non-negative whole number of cents or its quantity isn't a positive whole number.",
+      "tier": "M",
+      "contract": {
+        "objective": "total() fails loudly on items it can't add up.",
+        "acceptanceCriteria": [
+          { "id": "ac1", "text": "A negative or fractional price throws a TypeError", "check": "gate:test" },
+          {
+            "id": "ac2",
+            "text": "A quantity of 0, a negative or a fractional quantity throws a TypeError",
+            "check": "gate:test"
+          },
+          { "id": "ac3", "text": "Valid items still add up", "check": "gate:test" }
+        ],
+        "constraints": ["Keep total()'s signature"],
+        "outOfScope": ["applyDiscount"],
+        "risks": ["Callers that pass a missing quantity would now throw"],
+        "affectedAreas": ["src/cart.js", "test/cart.test.js"],
+        "openQuestions": []
+      },
+      "hidden": true,
+      "checks": [{ "name": "hidden test", "argv": ["node", "--test", "test/eval-validate-items.test.js"] }]
+    },
+    {
+      "id": "go-sub",
+      "fixture": "go-service",
+      "request": "Add Sub(a, b int) int to main.go that returns a minus b, with a test.",
+      "tier": "S",
+      "contract": {
+        "objective": "The package has a Sub function next to Add.",
+        "acceptanceCriteria": [
+          { "id": "ac1", "text": "Sub returns a minus b", "check": "gate:test" },
+          { "id": "ac2", "text": "A test covers Sub", "check": "gate:test" }
+        ],
+        "constraints": [],
+        "outOfScope": ["main()"],
+        "risks": [],
+        "affectedAreas": ["main.go", "main_test.go"],
+        "openQuestions": []
+      },
+      "hidden": true,
+      "checks": [{ "name": "go test", "argv": ["go", "test", "./..."] }]
+    },
+    {
+      "id": "go-clamp",
+      "fixture": "go-service",
+      "request": "Add Clamp(v, lo, hi int) int to main.go that limits v to the range lo to hi, with tests.",
+      "tier": "S",
+      "contract": {
+        "objective": "The package can limit a value to a range.",
+        "acceptanceCriteria": [
+          { "id": "ac1", "text": "Values below lo give lo and above hi give hi", "check": "gate:test" },
+          { "id": "ac2", "text": "Values inside the range are unchanged", "check": "gate:test" },
+          { "id": "ac3", "text": "Tests cover both ends", "check": "gate:test" }
+        ],
+        "constraints": [],
+        "outOfScope": ["main()"],
+        "risks": [],
+        "affectedAreas": ["main.go", "main_test.go"],
+        "openQuestions": []
+      },
+      "hidden": true,
+      "checks": [{ "name": "go test", "argv": ["go", "test", "./..."] }]
+    }
+  ]
+}

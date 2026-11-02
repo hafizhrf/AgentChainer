@@ -16,13 +16,12 @@
 //   with --cwd on a throwaway repository you own: it pushes a branch and opens a real pull request
 //   cost: a few cents with haiku for an S task; an M or L task's review runs on Opus (≈$0.2–3).
 
-import { execSync, spawn } from "node:child_process";
+import { execSync } from "node:child_process";
 import { readFileSync, writeFileSync } from "node:fs";
-import { createInterface } from "node:readline";
-import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
-import type { MethodName, Methods, Task } from "@agentchainer/protocol";
+import type { Task } from "@agentchainer/protocol";
 import { copyFixture, removeFixtureCopies } from "../src/detect/fixture-copy.ts";
+import { SidecarClient } from "../src/evals/client.ts";
 
 const { values } = parseArgs({
   options: {
@@ -43,37 +42,18 @@ if (values.pr && !values.cwd) throw new Error("--pr needs --cwd: a checkout of a
 
 const cwd = values.cwd ?? copyFixture(values.fixture);
 console.log(`workspace: ${cwd}`);
-const child = spawn(process.execPath, [fileURLToPath(new URL("../src/main.ts", import.meta.url))], {
-  stdio: ["pipe", "pipe", "inherit"],
-});
-const pending = new Map<number, (m: { result?: unknown; error?: { message: string } }) => void>();
-let finished: (task: Task) => void = () => undefined;
-const done = new Promise<Task>((resolve) => (finished = resolve));
+const client = new SidecarClient();
+const request = client.request.bind(client);
 const lastStep = new Map<string, string>();
-/** The task this run is about; an XL task's sub-tasks report too, prefixed with their number. */
-let topId = "";
 
-createInterface({ input: child.stdout }).on("line", (line) => {
-  const m = JSON.parse(line);
-  if (m.id != null) {
-    pending.get(m.id)?.(m);
-    pending.delete(m.id);
-    return;
-  }
-  if (m.method === "permission.request") {
-    const p = m.params;
-    console.log(`  approve ${p.toolName} ${JSON.stringify(p.input).slice(0, 100)} (${p.task?.label ?? "?"})`);
-    void request("permission.respond", { sessionId: p.sessionId, requestId: p.requestId, allow: true });
-  }
-  if (m.method === "task.updated") {
-    const t: Task = m.params.task;
-    const step = t.run?.steps.at(-1);
-    const prefix = t.parent ? `    [${t.parent.index + 1}] ` : "  · ";
-    const line = step ? `${step.label}: ${step.status}${step.note ? ` (${step.note})` : ""}` : t.state;
-    if (line !== lastStep.get(t.id)) console.log(`${prefix}${line}`);
-    lastStep.set(t.id, line);
-    if (t.id === topId && !["running", "ready"].includes(t.state)) finished(t);
-  }
+client.onPermission = (p) =>
+  console.log(`  approve ${p.toolName} ${JSON.stringify(p.input).slice(0, 100)} (${p.task?.label ?? "?"})`);
+client.onUpdate((t) => {
+  const step = t.run?.steps.at(-1);
+  const prefix = t.parent ? `    [${t.parent.index + 1}] ` : "  · ";
+  const line = step ? `${step.label}: ${step.status}${step.note ? ` (${step.note})` : ""}` : t.state;
+  if (line !== lastStep.get(t.id)) console.log(`${prefix}${line}`);
+  lastStep.set(t.id, line);
 });
 
 /** Polls the PR's checks until `done` says so, or gives up after 10 minutes. */
@@ -115,7 +95,7 @@ async function fixCiRound(task: Task) {
       .map((l) => `    ${l}`)
       .join("\n")}`,
   );
-  const ended = new Promise<Task>((resolve) => (finished = resolve));
+  const ended = client.ended(task.id);
   await request("task.fixCi", { cwd, id: task.id, link: check.link });
   const round = await ended;
   // The push and the round's record come right after the run's end.
@@ -131,20 +111,9 @@ async function fixCiRound(task: Task) {
   console.log(`  CI after the fix: ${green.checks.map((c) => `${c.name} ${c.bucket}`).join(", ")}`);
 }
 
-let id = 0;
-async function request<M extends MethodName>(method: M, params: Methods[M]["params"]): Promise<Methods[M]["result"]> {
-  const n = ++id;
-  const reply = new Promise<{ result?: unknown; error?: { message: string } }>((r) => pending.set(n, r));
-  child.stdin.write(`${JSON.stringify({ jsonrpc: "2.0", id: n, method, params })}\n`);
-  const m = await reply;
-  if (m.error) throw new Error(`${method}: ${m.error.message}`);
-  return m.result as Methods[M]["result"];
-}
-
 try {
   await request("system.hello", { protocolVersion: 2 });
   const created = await request("task.create", { cwd, request: values.request });
-  topId = created.id;
   const drafted = await request("task.draft", { cwd, id: created.id, model: values.model });
   if (!drafted.contract || !drafted.triage) throw new Error("no contract");
   const tier = (values.tier ?? drafted.triage.proposed) as "S" | "M" | "L" | "XL";
@@ -170,6 +139,7 @@ try {
     await request("task.approveSubtasks", { cwd, id: created.id });
   }
   const t0 = Date.now();
+  const done = client.ended(created.id);
   await request("task.start", { cwd, id: created.id, permissionMode: "acceptEdits", model: values.model });
   if (values["stop-after"]) {
     setTimeout(() => {
@@ -244,12 +214,6 @@ try {
   }
   console.log(`\ngit status:\n${execSync("git status --short", { cwd, encoding: "utf8" })}`);
 } finally {
-  // Close stdin and let the sidecar end its sessions and exit: on Windows a folder that a live process still runs in
-  // can't be removed (EPERM). Killed only if it hangs.
-  const exited = new Promise((resolve) => child.once("exit", resolve));
-  child.stdin.end();
-  const timer = setTimeout(() => child.kill(), 10_000);
-  await exited;
-  clearTimeout(timer);
+  await client.close();
   if (!values.keep && !values.cwd) removeFixtureCopies();
 }

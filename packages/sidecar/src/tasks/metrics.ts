@@ -45,7 +45,7 @@ export const neededPerson = (t: Task) =>
   t.state === "accepted" || Boolean(t.pr?.merged?.accepted) || (t.pr?.fixes?.length ?? 0) > 0;
 
 /** The value below which `p` of the sorted samples fall (nearest rank). */
-function percentile(sorted: number[], p: number): number {
+export function percentile(sorted: number[], p: number): number {
   return sorted[Math.min(sorted.length - 1, Math.max(0, Math.ceil(p * sorted.length) - 1))] ?? 0;
 }
 

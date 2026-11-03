@@ -1106,6 +1106,27 @@ for the desktop shell, start screen and session view to be cleaned up (UX-02, UX
       in the evidence and Metrics). Checked in the app: a generated S workflow that added a test planner (sonnet,
       ≈$0.02, passed the checks, kept in the editor, not saved); a task's own flow (Claude kept the S flow for a small
       task and said why), then a haiku run to Done whose run and evidence name the task's own flow.
+- [ ] **UX-15** A proper title bar, like an IDE's. Owner request, 2026-11-03, with screenshots of today's bar and
+      VS Code's: today the OS title bar and a separate native menu row take two rows.
+  - On Windows and Linux: one custom title bar (`decorations: false`, a drag region) with the icon, the menus (File,
+    Edit, View, Help, the same items and shortcuts as `menu.rs`), the command palette's search field in the middle,
+    the panel toggles (sidebar, right panel, terminal), and the window buttons (minimize, maximize or restore,
+    close).
+  - On macOS: the native menu bar stays, with an overlay title bar (`titleBarStyle: Overlay`) and the traffic
+    lights inset.
+  - It follows the theme (light and dark), with keyboard access to the menus (Alt opens them on Windows), double-click
+    to maximize, and snap layouts on Windows 11 **(verify)**.
+  - It needs the window capabilities (minimize, maximize, close, start dragging), with a THREAT_MODEL note.
+- [ ] **UX-16** An app icon with its own meaning. Owner request, 2026-11-03: minimal like VS Code's, but on theme.
+  - The idea: AgentChainer chains agents into checked work, so the mark is two linked chain links whose join is a
+    check mark: agents linked, and every hand-off verified. It's a flat shape in one or two colors from the tokens,
+    with no gradient or text, and readable at 16 px.
+  - Deliverables:
+    - the SVG source in `apps/desktop/src-tauri/icons/`;
+    - every size regenerated with `tauri icon`;
+    - the title bar's and the About dialog's mark;
+    - a monochrome version for the macOS menu bar or tray, if one is ever added.
+  - No "Claude" or Anthropic marks (ADR-0002).
 
 ### Exit criteria
 
@@ -1551,13 +1572,18 @@ first.
   - Checked live on CLI 2.1.314: project settings, hooks and CLAUDE.md load only from the primary folder, not from
     the added ones.
   - The definition lives in the app's settings (owner decision, 2026-11-03).
-  - Progress (design §10, steps 2 and 3, PR pending):
+  - Progress (design §10, steps 2 and 3, #91):
     - workspaces are saved in settings, from a New workspace dialog;
     - Home and the sidebar list them, and a session started from one gets `session.start {folders}`;
     - `additionalDirectories` is passed, and the guard allows recursive deletes inside any of the folders;
     - the sidecar refuses a relative path, a drive, the home folder, a repeat or a nested folder;
     - a resumed chat keeps its folders.
-    Steps 4 (per-folder features) and 5 (tasks across folders) are still to come.
+  - Step 4:
+    - in a multi-folder session, a folder switcher above the right panel picks which folder its changes, files,
+      diff and git show;
+    - Workspace settings switch between the workspace's folders too, so readiness, the setup plan, commands and
+      permissions are per folder.
+    Step 5 (tasks across folders) is still to come.
 - [x] **M8-02** A fleet view: every running session and task step across workspaces, with live status (working,
       waiting for approval, idle, done), cost, and one click to open it. From CAO's dashboard and status badges; it
       extends M4's agent tree.

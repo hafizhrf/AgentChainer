@@ -117,3 +117,21 @@
   margin: 0;
   padding-left: var(--space-5);
 }
+
+/* Which of a multi-folder workspace's folders a panel shows (M8-01). */
+.folder-switcher {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.right-tabs > .folder-switcher {
+  padding: var(--space-2) var(--space-3);
+  border-bottom: 1px solid var(--border);
+}
+
+fieldset.folder-switcher {
+  margin: 0;
+  border: 0;
+}

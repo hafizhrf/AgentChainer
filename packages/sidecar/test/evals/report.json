@@ -1,0 +1,992 @@
+{
+  "version": 1,
+  "generatedAt": "2026-11-03T04:49:26.367Z",
+  "app": {
+    "commit": "0003f2d322776aeab469efd8d6a7cebd676a270e",
+    "dirty": false
+  },
+  "suite": {
+    "file": "packages/sidecar/test/evals/suite.json",
+    "cases": [
+      "sample-quantity",
+      "sample-discount-clamp",
+      "sample-with-tax",
+      "sample-format-cents",
+      "sample-validate-items",
+      "go-sub",
+      "go-clamp"
+    ]
+  },
+  "n": 3,
+  "maxUsd": 6,
+  "spentUsd": 0.7469872799999999,
+  "skipped": 0,
+  "inputs": {
+    "catalog/workflows/l.yaml": "4d46aeda826e40333aeed6f6e763d3e8923b4be9b023844b5a015414f5695fe7",
+    "catalog/workflows/m.yaml": "6799598afcddb005cf0fc2120f61b0e80a6d6cd04a5eabf117e3fc011b31d155",
+    "catalog/workflows/s.yaml": "740aec8fdcbea1525e856a2c8838427c486901a747aecdbff873aff90c6bdd74",
+    "catalog/workflows/xl.yaml": "942d3015b554ab02580c556d12fc828eb9f75d080cd43e2ca15be6b8251279d8",
+    "agents/ac-architect.md": "3ff02039a3a16b7c675b1b1873c6f0c4eb9112bf0769f5b764b4ff9dc44fa335",
+    "agents/ac-docs-writer.md": "4527d94390ba2debfdf661317c9f53188b4cca5c6cb9736f96fbddab77126357",
+    "agents/ac-implementer.md": "7eff58e0454d5ced92bacecea47b8dd0bc94193523d0cc4666cc30393e70d387",
+    "agents/ac-independent-reviewer.md": "a619adcbf29d72299343bddd0050d71a6f1c9d8fe20e2c483f2030a8730f9a9a",
+    "agents/ac-security-reviewer.md": "b6abab8b222dd2fbc46ede2556fbe0460f28af952aac6578874ee86124cd81d7",
+    "agents/ac-test-planner.md": "787927f21bab51ec1e66bc8d96d78be4868e2b1868712f88b6cf70a2df1819b1"
+  },
+  "variants": [
+    {
+      "name": "main",
+      "model": "haiku",
+      "workflowsFrom": "catalog/workflows@origin/main",
+      "workflows": {
+        "s.yaml": "740aec8fdcbea1525e856a2c8838427c486901a747aecdbff873aff90c6bdd74",
+        "m.yaml": "6799598afcddb005cf0fc2120f61b0e80a6d6cd04a5eabf117e3fc011b31d155",
+        "l.yaml": "4d46aeda826e40333aeed6f6e763d3e8923b4be9b023844b5a015414f5695fe7",
+        "xl.yaml": "942d3015b554ab02580c556d12fc828eb9f75d080cd43e2ca15be6b8251279d8"
+      },
+      "runs": 21,
+      "passes": 21,
+      "passRate": 1,
+      "passInterval": [
+        0.8453561767357979,
+        0.9999999999999999
+      ],
+      "costPerRun": 0.01872926857142857,
+      "costPerPass": 0.01872926857142857,
+      "durationP50Ms": 24738,
+      "fixRounds": 0,
+      "errors": 0,
+      "cases": [
+        {
+          "case": "sample-quantity",
+          "runs": 3,
+          "passes": 3,
+          "costUsd": 0.007231980000000002,
+          "durationMs": 22183,
+          "fixRounds": 0
+        },
+        {
+          "case": "sample-discount-clamp",
+          "runs": 3,
+          "passes": 3,
+          "costUsd": 0.008159963333333334,
+          "durationMs": 24043.333333333332,
+          "fixRounds": 0
+        },
+        {
+          "case": "sample-with-tax",
+          "runs": 3,
+          "passes": 3,
+          "costUsd": 0.008750646666666667,
+          "durationMs": 30883.333333333332,
+          "fixRounds": 0
+        },
+        {
+          "case": "sample-format-cents",
+          "runs": 3,
+          "passes": 3,
+          "costUsd": 0.007636696666666667,
+          "durationMs": 22796,
+          "fixRounds": 0
+        },
+        {
+          "case": "sample-validate-items",
+          "runs": 3,
+          "passes": 3,
+          "costUsd": 0.08509134333333333,
+          "durationMs": 39713.666666666664,
+          "fixRounds": 0
+        },
+        {
+          "case": "go-sub",
+          "runs": 3,
+          "passes": 3,
+          "costUsd": 0.006650183333333334,
+          "durationMs": 25030.333333333332,
+          "fixRounds": 0
+        },
+        {
+          "case": "go-clamp",
+          "runs": 3,
+          "passes": 3,
+          "costUsd": 0.007584066666666667,
+          "durationMs": 24191.666666666668,
+          "fixRounds": 0
+        }
+      ]
+    },
+    {
+      "name": "branch",
+      "model": "haiku",
+      "workflowsFrom": null,
+      "workflows": {},
+      "runs": 21,
+      "passes": 21,
+      "passRate": 1,
+      "passInterval": [
+        0.8453561767357979,
+        0.9999999999999999
+      ],
+      "costPerRun": 0.016841554285714287,
+      "costPerPass": 0.016841554285714287,
+      "durationP50Ms": 23954,
+      "fixRounds": 0,
+      "errors": 0,
+      "cases": [
+        {
+          "case": "sample-quantity",
+          "runs": 3,
+          "passes": 3,
+          "costUsd": 0.007209963333333334,
+          "durationMs": 21543,
+          "fixRounds": 0
+        },
+        {
+          "case": "sample-discount-clamp",
+          "runs": 3,
+          "passes": 3,
+          "costUsd": 0.0077515299999999995,
+          "durationMs": 23289,
+          "fixRounds": 0
+        },
+        {
+          "case": "sample-with-tax",
+          "runs": 3,
+          "passes": 3,
+          "costUsd": 0.008024126666666668,
+          "durationMs": 26749,
+          "fixRounds": 0
+        },
+        {
+          "case": "sample-format-cents",
+          "runs": 3,
+          "passes": 3,
+          "costUsd": 0.007601903333333333,
+          "durationMs": 24701.333333333332,
+          "fixRounds": 0
+        },
+        {
+          "case": "sample-validate-items",
+          "runs": 3,
+          "passes": 3,
+          "costUsd": 0.07281433333333333,
+          "durationMs": 45014,
+          "fixRounds": 0
+        },
+        {
+          "case": "go-sub",
+          "runs": 3,
+          "passes": 3,
+          "costUsd": 0.006716550000000001,
+          "durationMs": 21455.333333333332,
+          "fixRounds": 0
+        },
+        {
+          "case": "go-clamp",
+          "runs": 3,
+          "passes": 3,
+          "costUsd": 0.0077724733333333325,
+          "durationMs": 29016.333333333332,
+          "fixRounds": 0
+        }
+      ]
+    }
+  ],
+  "deltas": [
+    {
+      "variant": "branch",
+      "baseline": "main",
+      "passRate": {
+        "diff": 0,
+        "interval": [
+          -0.15464382326420212,
+          0.15464382326420212
+        ]
+      },
+      "costPerRun": {
+        "diff": -0.0018877142857142842,
+        "interval": [
+          -0.017906424044042597,
+          0.014130995472614028
+        ]
+      },
+      "verdict": "no clear difference in passes; no clear difference in cost"
+    }
+  ],
+  "runs": [
+    {
+      "case": "sample-quantity",
+      "variant": "main",
+      "passed": true,
+      "state": "done",
+      "gatesPassed": true,
+      "failedGates": [],
+      "costUsd": 0.007154370000000001,
+      "durationMs": 20988,
+      "fixRounds": 0,
+      "checks": [
+        {
+          "name": "fixture tests",
+          "exitCode": 0
+        },
+        {
+          "name": "hidden test",
+          "exitCode": 0
+        }
+      ]
+    },
+    {
+      "case": "sample-quantity",
+      "variant": "branch",
+      "passed": true,
+      "state": "done",
+      "gatesPassed": true,
+      "failedGates": [],
+      "costUsd": 0.0072007500000000006,
+      "durationMs": 20102,
+      "fixRounds": 0,
+      "checks": [
+        {
+          "name": "fixture tests",
+          "exitCode": 0
+        },
+        {
+          "name": "hidden test",
+          "exitCode": 0
+        }
+      ]
+    },
+    {
+      "case": "sample-discount-clamp",
+      "variant": "main",
+      "passed": true,
+      "state": "done",
+      "gatesPassed": true,
+      "failedGates": [],
+      "costUsd": 0.007942040000000001,
+      "durationMs": 23790,
+      "fixRounds": 0,
+      "checks": [
+        {
+          "name": "hidden test",
+          "exitCode": 0
+        }
+      ]
+    },
+    {
+      "case": "sample-discount-clamp",
+      "variant": "branch",
+      "passed": true,
+      "state": "done",
+      "gatesPassed": true,
+      "failedGates": [],
+      "costUsd": 0.00872338,
+      "durationMs": 26400,
+      "fixRounds": 0,
+      "checks": [
+        {
+          "name": "hidden test",
+          "exitCode": 0
+        }
+      ]
+    },
+    {
+      "case": "sample-with-tax",
+      "variant": "main",
+      "passed": true,
+      "state": "done",
+      "gatesPassed": true,
+      "failedGates": [],
+      "costUsd": 0.00830216,
+      "durationMs": 28362,
+      "fixRounds": 0,
+      "checks": [
+        {
+          "name": "hidden test",
+          "exitCode": 0
+        }
+      ]
+    },
+    {
+      "case": "sample-with-tax",
+      "variant": "branch",
+      "passed": true,
+      "state": "done",
+      "gatesPassed": true,
+      "failedGates": [],
+      "costUsd": 0.00779114,
+      "durationMs": 24895,
+      "fixRounds": 0,
+      "checks": [
+        {
+          "name": "hidden test",
+          "exitCode": 0
+        }
+      ]
+    },
+    {
+      "case": "sample-format-cents",
+      "variant": "main",
+      "passed": true,
+      "state": "done",
+      "gatesPassed": true,
+      "failedGates": [],
+      "costUsd": 0.0086564,
+      "durationMs": 25606,
+      "fixRounds": 0,
+      "checks": [
+        {
+          "name": "hidden test",
+          "exitCode": 0
+        }
+      ]
+    },
+    {
+      "case": "sample-format-cents",
+      "variant": "branch",
+      "passed": true,
+      "state": "done",
+      "gatesPassed": true,
+      "failedGates": [],
+      "costUsd": 0.00713595,
+      "durationMs": 21240,
+      "fixRounds": 0,
+      "checks": [
+        {
+          "name": "hidden test",
+          "exitCode": 0
+        }
+      ]
+    },
+    {
+      "case": "sample-validate-items",
+      "variant": "main",
+      "passed": true,
+      "state": "done",
+      "gatesPassed": true,
+      "failedGates": [],
+      "costUsd": 0.09658271999999998,
+      "durationMs": 38763,
+      "fixRounds": 0,
+      "checks": [
+        {
+          "name": "hidden test",
+          "exitCode": 0
+        }
+      ]
+    },
+    {
+      "case": "sample-validate-items",
+      "variant": "branch",
+      "passed": true,
+      "state": "done",
+      "gatesPassed": true,
+      "failedGates": [],
+      "costUsd": 0.06184663,
+      "durationMs": 48342,
+      "fixRounds": 0,
+      "checks": [
+        {
+          "name": "hidden test",
+          "exitCode": 0
+        }
+      ]
+    },
+    {
+      "case": "go-sub",
+      "variant": "main",
+      "passed": true,
+      "state": "failed",
+      "gatesPassed": false,
+      "failedGates": [
+        "lint `make lint`",
+        "test `make test`"
+      ],
+      "costUsd": 0.0066195099999999995,
+      "durationMs": 21807,
+      "fixRounds": 0,
+      "checks": [
+        {
+          "name": "go test",
+          "exitCode": 0
+        }
+      ]
+    },
+    {
+      "case": "go-sub",
+      "variant": "branch",
+      "passed": true,
+      "state": "failed",
+      "gatesPassed": false,
+      "failedGates": [
+        "lint `make lint`",
+        "test `make test`"
+      ],
+      "costUsd": 0.00655935,
+      "durationMs": 19557,
+      "fixRounds": 0,
+      "checks": [
+        {
+          "name": "go test",
+          "exitCode": 0
+        }
+      ]
+    },
+    {
+      "case": "go-clamp",
+      "variant": "main",
+      "passed": true,
+      "state": "failed",
+      "gatesPassed": false,
+      "failedGates": [
+        "lint `make lint`",
+        "test `make test`"
+      ],
+      "costUsd": 0.008636820000000002,
+      "durationMs": 27118,
+      "fixRounds": 0,
+      "checks": [
+        {
+          "name": "go test",
+          "exitCode": 0
+        }
+      ]
+    },
+    {
+      "case": "go-clamp",
+      "variant": "branch",
+      "passed": true,
+      "state": "failed",
+      "gatesPassed": false,
+      "failedGates": [
+        "lint `make lint`",
+        "test `make test`"
+      ],
+      "costUsd": 0.00847244,
+      "durationMs": 33493,
+      "fixRounds": 0,
+      "checks": [
+        {
+          "name": "go test",
+          "exitCode": 0
+        }
+      ]
+    },
+    {
+      "case": "sample-quantity",
+      "variant": "main",
+      "passed": true,
+      "state": "done",
+      "gatesPassed": true,
+      "failedGates": [],
+      "costUsd": 0.007356420000000001,
+      "durationMs": 20823,
+      "fixRounds": 0,
+      "checks": [
+        {
+          "name": "fixture tests",
+          "exitCode": 0
+        },
+        {
+          "name": "hidden test",
+          "exitCode": 0
+        }
+      ]
+    },
+    {
+      "case": "sample-quantity",
+      "variant": "branch",
+      "passed": true,
+      "state": "done",
+      "gatesPassed": true,
+      "failedGates": [],
+      "costUsd": 0.00722759,
+      "durationMs": 21436,
+      "fixRounds": 0,
+      "checks": [
+        {
+          "name": "fixture tests",
+          "exitCode": 0
+        },
+        {
+          "name": "hidden test",
+          "exitCode": 0
+        }
+      ]
+    },
+    {
+      "case": "sample-discount-clamp",
+      "variant": "main",
+      "passed": true,
+      "state": "done",
+      "gatesPassed": true,
+      "failedGates": [],
+      "costUsd": 0.008619030000000001,
+      "durationMs": 25454,
+      "fixRounds": 0,
+      "checks": [
+        {
+          "name": "hidden test",
+          "exitCode": 0
+        }
+      ]
+    },
+    {
+      "case": "sample-discount-clamp",
+      "variant": "branch",
+      "passed": true,
+      "state": "done",
+      "gatesPassed": true,
+      "failedGates": [],
+      "costUsd": 0.007806930000000001,
+      "durationMs": 21916,
+      "fixRounds": 0,
+      "checks": [
+        {
+          "name": "hidden test",
+          "exitCode": 0
+        }
+      ]
+    },
+    {
+      "case": "sample-with-tax",
+      "variant": "main",
+      "passed": true,
+      "state": "done",
+      "gatesPassed": true,
+      "failedGates": [],
+      "costUsd": 0.00907571,
+      "durationMs": 31641,
+      "fixRounds": 0,
+      "checks": [
+        {
+          "name": "hidden test",
+          "exitCode": 0
+        }
+      ]
+    },
+    {
+      "case": "sample-with-tax",
+      "variant": "branch",
+      "passed": true,
+      "state": "done",
+      "gatesPassed": true,
+      "failedGates": [],
+      "costUsd": 0.00843107,
+      "durationMs": 29832,
+      "fixRounds": 0,
+      "checks": [
+        {
+          "name": "hidden test",
+          "exitCode": 0
+        }
+      ]
+    },
+    {
+      "case": "sample-format-cents",
+      "variant": "main",
+      "passed": true,
+      "state": "done",
+      "gatesPassed": true,
+      "failedGates": [],
+      "costUsd": 0.0069195900000000015,
+      "durationMs": 21111,
+      "fixRounds": 0,
+      "checks": [
+        {
+          "name": "hidden test",
+          "exitCode": 0
+        }
+      ]
+    },
+    {
+      "case": "sample-format-cents",
+      "variant": "branch",
+      "passed": true,
+      "state": "done",
+      "gatesPassed": true,
+      "failedGates": [],
+      "costUsd": 0.007526959999999999,
+      "durationMs": 28910,
+      "fixRounds": 0,
+      "checks": [
+        {
+          "name": "hidden test",
+          "exitCode": 0
+        }
+      ]
+    },
+    {
+      "case": "sample-validate-items",
+      "variant": "main",
+      "passed": true,
+      "state": "done",
+      "gatesPassed": true,
+      "failedGates": [],
+      "costUsd": 0.06275917,
+      "durationMs": 44114,
+      "fixRounds": 0,
+      "checks": [
+        {
+          "name": "hidden test",
+          "exitCode": 0
+        }
+      ]
+    },
+    {
+      "case": "sample-validate-items",
+      "variant": "branch",
+      "passed": true,
+      "state": "done",
+      "gatesPassed": true,
+      "failedGates": [],
+      "costUsd": 0.059230780000000004,
+      "durationMs": 40889,
+      "fixRounds": 0,
+      "checks": [
+        {
+          "name": "hidden test",
+          "exitCode": 0
+        }
+      ]
+    },
+    {
+      "case": "go-sub",
+      "variant": "main",
+      "passed": true,
+      "state": "failed",
+      "gatesPassed": false,
+      "failedGates": [
+        "lint `make lint`",
+        "test `make test`"
+      ],
+      "costUsd": 0.006561360000000001,
+      "durationMs": 19922,
+      "fixRounds": 0,
+      "checks": [
+        {
+          "name": "go test",
+          "exitCode": 0
+        }
+      ]
+    },
+    {
+      "case": "go-sub",
+      "variant": "branch",
+      "passed": true,
+      "state": "failed",
+      "gatesPassed": false,
+      "failedGates": [
+        "lint `make lint`",
+        "test `make test`"
+      ],
+      "costUsd": 0.00673287,
+      "durationMs": 22524,
+      "fixRounds": 0,
+      "checks": [
+        {
+          "name": "go test",
+          "exitCode": 0
+        }
+      ]
+    },
+    {
+      "case": "go-clamp",
+      "variant": "main",
+      "passed": true,
+      "state": "failed",
+      "gatesPassed": false,
+      "failedGates": [
+        "lint `make lint`",
+        "test `make test`"
+      ],
+      "costUsd": 0.00713335,
+      "durationMs": 23527,
+      "fixRounds": 0,
+      "checks": [
+        {
+          "name": "go test",
+          "exitCode": 0
+        }
+      ]
+    },
+    {
+      "case": "go-clamp",
+      "variant": "branch",
+      "passed": true,
+      "state": "failed",
+      "gatesPassed": false,
+      "failedGates": [
+        "lint `make lint`",
+        "test `make test`"
+      ],
+      "costUsd": 0.00756257,
+      "durationMs": 30187,
+      "fixRounds": 0,
+      "checks": [
+        {
+          "name": "go test",
+          "exitCode": 0
+        }
+      ]
+    },
+    {
+      "case": "sample-quantity",
+      "variant": "main",
+      "passed": true,
+      "state": "done",
+      "gatesPassed": true,
+      "failedGates": [],
+      "costUsd": 0.007185150000000001,
+      "durationMs": 24738,
+      "fixRounds": 0,
+      "checks": [
+        {
+          "name": "fixture tests",
+          "exitCode": 0
+        },
+        {
+          "name": "hidden test",
+          "exitCode": 0
+        }
+      ]
+    },
+    {
+      "case": "sample-quantity",
+      "variant": "branch",
+      "passed": true,
+      "state": "done",
+      "gatesPassed": true,
+      "failedGates": [],
+      "costUsd": 0.007201550000000001,
+      "durationMs": 23091,
+      "fixRounds": 0,
+      "checks": [
+        {
+          "name": "fixture tests",
+          "exitCode": 0
+        },
+        {
+          "name": "hidden test",
+          "exitCode": 0
+        }
+      ]
+    },
+    {
+      "case": "sample-discount-clamp",
+      "variant": "main",
+      "passed": true,
+      "state": "done",
+      "gatesPassed": true,
+      "failedGates": [],
+      "costUsd": 0.00791882,
+      "durationMs": 22886,
+      "fixRounds": 0,
+      "checks": [
+        {
+          "name": "hidden test",
+          "exitCode": 0
+        }
+      ]
+    },
+    {
+      "case": "sample-discount-clamp",
+      "variant": "branch",
+      "passed": true,
+      "state": "done",
+      "gatesPassed": true,
+      "failedGates": [],
+      "costUsd": 0.00672428,
+      "durationMs": 21551,
+      "fixRounds": 0,
+      "checks": [
+        {
+          "name": "hidden test",
+          "exitCode": 0
+        }
+      ]
+    },
+    {
+      "case": "sample-with-tax",
+      "variant": "main",
+      "passed": true,
+      "state": "done",
+      "gatesPassed": true,
+      "failedGates": [],
+      "costUsd": 0.00887407,
+      "durationMs": 32647,
+      "fixRounds": 0,
+      "checks": [
+        {
+          "name": "hidden test",
+          "exitCode": 0
+        }
+      ]
+    },
+    {
+      "case": "sample-with-tax",
+      "variant": "branch",
+      "passed": true,
+      "state": "done",
+      "gatesPassed": true,
+      "failedGates": [],
+      "costUsd": 0.00785017,
+      "durationMs": 25520,
+      "fixRounds": 0,
+      "checks": [
+        {
+          "name": "hidden test",
+          "exitCode": 0
+        }
+      ]
+    },
+    {
+      "case": "sample-format-cents",
+      "variant": "main",
+      "passed": true,
+      "state": "done",
+      "gatesPassed": true,
+      "failedGates": [],
+      "costUsd": 0.007334100000000001,
+      "durationMs": 21671,
+      "fixRounds": 0,
+      "checks": [
+        {
+          "name": "hidden test",
+          "exitCode": 0
+        }
+      ]
+    },
+    {
+      "case": "sample-format-cents",
+      "variant": "branch",
+      "passed": true,
+      "state": "done",
+      "gatesPassed": true,
+      "failedGates": [],
+      "costUsd": 0.0081428,
+      "durationMs": 23954,
+      "fixRounds": 0,
+      "checks": [
+        {
+          "name": "hidden test",
+          "exitCode": 0
+        }
+      ]
+    },
+    {
+      "case": "sample-validate-items",
+      "variant": "main",
+      "passed": true,
+      "state": "done",
+      "gatesPassed": true,
+      "failedGates": [],
+      "costUsd": 0.09593214,
+      "durationMs": 36264,
+      "fixRounds": 0,
+      "checks": [
+        {
+          "name": "hidden test",
+          "exitCode": 0
+        }
+      ]
+    },
+    {
+      "case": "sample-validate-items",
+      "variant": "branch",
+      "passed": true,
+      "state": "done",
+      "gatesPassed": true,
+      "failedGates": [],
+      "costUsd": 0.09736559,
+      "durationMs": 45811,
+      "fixRounds": 0,
+      "checks": [
+        {
+          "name": "hidden test",
+          "exitCode": 0
+        }
+      ]
+    },
+    {
+      "case": "go-sub",
+      "variant": "main",
+      "passed": true,
+      "state": "failed",
+      "gatesPassed": false,
+      "failedGates": [
+        "lint `make lint`",
+        "test `make test`"
+      ],
+      "costUsd": 0.00676968,
+      "durationMs": 33362,
+      "fixRounds": 0,
+      "checks": [
+        {
+          "name": "go test",
+          "exitCode": 0
+        }
+      ]
+    },
+    {
+      "case": "go-sub",
+      "variant": "branch",
+      "passed": true,
+      "state": "failed",
+      "gatesPassed": false,
+      "failedGates": [
+        "lint `make lint`",
+        "test `make test`"
+      ],
+      "costUsd": 0.00685743,
+      "durationMs": 22285,
+      "fixRounds": 0,
+      "checks": [
+        {
+          "name": "go test",
+          "exitCode": 0
+        }
+      ]
+    },
+    {
+      "case": "go-clamp",
+      "variant": "main",
+      "passed": true,
+      "state": "failed",
+      "gatesPassed": false,
+      "failedGates": [
+        "lint `make lint`",
+        "test `make test`"
+      ],
+      "costUsd": 0.006982030000000001,
+      "durationMs": 21930,
+      "fixRounds": 0,
+      "checks": [
+        {
+          "name": "go test",
+          "exitCode": 0
+        }
+      ]
+    },
+    {
+      "case": "go-clamp",
+      "variant": "branch",
+      "passed": true,
+      "state": "failed",
+      "gatesPassed": false,
+      "failedGates": [
+        "lint `make lint`",
+        "test `make test`"
+      ],
+      "costUsd": 0.0072824100000000004,
+      "durationMs": 23369,
+      "fixRounds": 0,
+      "checks": [
+        {
+          "name": "go test",
+          "exitCode": 0
+        }
+      ]
+    }
+  ]
+}

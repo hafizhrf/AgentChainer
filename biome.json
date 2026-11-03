@@ -14,6 +14,7 @@
       "!**/src-tauri/gen",
       "!**/test/fixtures",
       "!**/test/snapshots",
+      "!packages/sidecar/test/evals/report.json",
       "!fixtures",
       "!**/dist"
     ]

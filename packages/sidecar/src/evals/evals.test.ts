@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { execFileSync, spawnSync } from "node:child_process";
 import { existsSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -7,6 +8,7 @@ import { fileURLToPath } from "node:url";
 import type { Task } from "@agentchainer/protocol";
 import { removeFixtureCopies } from "../detect/fixture-copy.ts";
 import { WORKFLOWS_DIR } from "../tasks/project-workflows.ts";
+import { checkReport } from "./check.ts";
 import type { SidecarClient } from "./client.ts";
 import {
   delta,
@@ -75,12 +77,14 @@ function fakeClient(work: (cwd: string) => void, cost = 0.05) {
 
 const caseOf = (id: string) => suite.cases.find((c) => c.id === id) as EvalCase;
 const hiddenRoot = path.join(evalsDir, "hidden");
+const root = evalsDir;
 
 describe("eval suite (M7-02)", () => {
   it("parses, and every hidden case has its hidden files", () => {
     assert.ok(suite.cases.length >= 6);
     for (const c of suite.cases) {
       assert.equal(existsSync(path.join(hiddenRoot, c.id)), c.hidden, c.id);
+      if (c.start) assert.ok(existsSync(path.join(evalsDir, "start", c.start)), `${c.id}: start/${c.start}`);
     }
   });
 
@@ -93,7 +97,7 @@ describe("eval suite (M7-02)", () => {
       );
     });
     const row = await runCase(client as unknown as SidecarClient, caseOf("sample-quantity"), app, {
-      hiddenRoot,
+      root,
       cancelAbove: 5,
     });
     assert.deepEqual(
@@ -125,12 +129,24 @@ describe("eval suite (M7-02)", () => {
       );
     });
     const row = await runCase(client as unknown as SidecarClient, caseOf("sample-discount-clamp"), app, {
-      hiddenRoot,
+      root,
       cancelAbove: 5,
     });
     assert.equal(row.state, "done");
     assert.equal(row.passed, false);
     assert.notEqual(row.checks[0]?.exitCode, 0);
+  });
+
+  it("starts from the case's start files, committed, so the fixture's own tests pass", async () => {
+    let tests = -1;
+    let status = "?";
+    const client = fakeClient((cwd) => {
+      const { NODE_TEST_CONTEXT: _runner, ...env } = process.env;
+      tests = spawnSync(process.execPath, ["--test"], { cwd, env, stdio: "ignore" }).status ?? -1;
+      status = execFileSync("git", ["status", "--porcelain", "--untracked-files=no"], { cwd, encoding: "utf8" });
+    });
+    await runCase(client as unknown as SidecarClient, caseOf("sample-with-tax"), app, { root, cancelAbove: 5 });
+    assert.deepEqual([tests, status], [0, ""]);
   });
 
   it("puts a variant's workflows in the fixture copy before the run", async () => {
@@ -140,7 +156,7 @@ describe("eval suite (M7-02)", () => {
     });
     const variant = parseVariant("main:workflows-ref=HEAD,model=sonnet", repoRoot);
     await runCase(client as unknown as SidecarClient, caseOf("sample-with-tax"), variant, {
-      hiddenRoot,
+      root,
       cancelAbove: 5,
     });
     assert.equal(seen, variant.workflows["s.yaml"]);
@@ -239,7 +255,7 @@ describe("report", () => {
     assert.match(md, /\| app \| haiku \| the app's \| 2\/3 \(67%\) \|/);
     assert.match(md, /## Against app/);
     assert.match(md, /- app \/ a: failed; hidden test → 1/);
-    assert.match(md, /- new \/ b: failed; failed gates: lint `golangci-lint run`/);
+    assert.match(md, /- new \/ b: 1 run failed; failed gates: lint `golangci-lint run`/);
     assert.match(md, /`catalog\/workflows\/s\.yaml` [0-9a-f]{12}/);
   });
 
@@ -248,5 +264,59 @@ describe("report", () => {
     assert.ok("catalog/workflows/s.yaml" in inputs && "agents/ac-implementer.md" in inputs);
     const text = readFileSync(path.join(repoRoot, "catalog/workflows/s.yaml"), "utf8").replace(/\r\n/g, "\n");
     assert.equal(inputs["catalog/workflows/s.yaml"], sha256(text));
+  });
+});
+
+describe("report check (M7-03)", () => {
+  const inputs = { "catalog/workflows/s.yaml": sha256("s"), "agents/ac-implementer.md": sha256("i") };
+  const run: CaseRun = {
+    case: "a",
+    variant: "app",
+    passed: true,
+    state: "done",
+    gatesPassed: true,
+    failedGates: [],
+    costUsd: 0.01,
+    durationMs: 1000,
+    fixRounds: 0,
+    checks: [{ name: "hidden test", exitCode: 0 }],
+  };
+  const report: EvalReport = {
+    version: 1,
+    generatedAt: "2026-11-03T00:00:00.000Z",
+    app: { commit: "abc", dirty: false },
+    suite: { file: "test/evals/suite.json", cases: ["a"] },
+    n: 1,
+    maxUsd: 3,
+    spentUsd: 0.01,
+    skipped: 0,
+    inputs,
+    variants: [summarize(app, [run], ["a"])],
+    deltas: [],
+    runs: [run],
+  };
+  const md = renderMarkdown(report);
+
+  it("passes a report made with today's files", () => {
+    assert.deepEqual(checkReport(report, md, { ...inputs }), []);
+  });
+
+  it("names each workflow or role prompt that changed, appeared or went since the report", () => {
+    assert.deepEqual(
+      checkReport(report, md, { "catalog/workflows/s.yaml": sha256("s2"), "agents/ac-new.md": sha256("n") }),
+      [
+        "catalog/workflows/s.yaml changed since the report.",
+        "agents/ac-new.md is new since the report.",
+        "agents/ac-implementer.md was removed since the report.",
+      ],
+    );
+  });
+
+  it("fails without a report, with no runs, or with a Markdown that doesn't match", () => {
+    assert.match(checkReport(null, null, inputs)[0] ?? "", /no eval report/);
+    assert.deepEqual(checkReport({ ...report, runs: [] }, renderMarkdown({ ...report, runs: [] }), inputs), [
+      "The report has no runs.",
+    ]);
+    assert.deepEqual(checkReport(report, `${md}edited`, inputs), ["report.md isn't the one report.json renders to."]);
   });
 });

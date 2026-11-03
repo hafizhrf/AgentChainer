@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "about": "Eval suite (M7-02, docs/design/evals.md §5): tasks on copies of fixtures/ with written contracts. After each run, hidden/<case id>/ is copied over the code and the checks run without a shell; a run passes when every check exits 0. Run: node packages/sidecar/scripts/benchmark.ts",
+  "about": "Eval suite (M7-02, docs/design/evals.md §5): tasks on copies of fixtures/ with written contracts. start/<name>/ is copied over the fixture and committed before the run (sample-fixed fixes sample-app's seeded quantity bug, so those cases' gates start green). After each run, hidden/<case id>/ is copied over the code and the checks run without a shell; a run passes when every check exits 0. Run: node packages/sidecar/scripts/benchmark.ts",
   "cases": [
     {
       "id": "sample-quantity",
@@ -28,6 +28,7 @@
     {
       "id": "sample-discount-clamp",
       "fixture": "sample-app",
+      "start": "sample-fixed",
       "request": "applyDiscount should treat a percentage below 0 as 0 and above 100 as 100.",
       "tier": "S",
       "contract": {
@@ -49,6 +50,7 @@
     {
       "id": "sample-with-tax",
       "fixture": "sample-app",
+      "start": "sample-fixed",
       "request": "Add withTax(cents, ratePercent) to src/cart.js: it adds tax at the given percentage and rounds to whole cents, halves up.",
       "tier": "S",
       "contract": {
@@ -70,6 +72,7 @@
     {
       "id": "sample-format-cents",
       "fixture": "sample-app",
+      "start": "sample-fixed",
       "request": "Add formatCents(cents) to src/cart.js that shows an amount in cents as dollars, like $12.34, and a negative amount like -$0.05.",
       "tier": "S",
       "contract": {
@@ -91,6 +94,7 @@
     {
       "id": "sample-validate-items",
       "fixture": "sample-app",
+      "start": "sample-fixed",
       "request": "total() should reject bad items: throw a TypeError when an item's price isn't a non-negative whole number of cents or its quantity isn't a positive whole number.",
       "tier": "M",
       "contract": {

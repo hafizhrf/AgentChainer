@@ -1453,19 +1453,24 @@ Decisions: [ADR-0009](adr/0009-release-signing-and-updates.md). Maintainer steps
 
 → PRD [F8](PRD.md#f6f9-p2) · design: [evals.md](design/evals.md) (draft)
 
-- [ ] **M7-01** Local metrics dashboard: gate pass rate, cost per task, cost per successful task, duration, retries, human-fix rate.
+- [x] **M7-01** Local metrics dashboard: gate pass rate, cost per task, cost per successful task, duration, retries, human-fix rate.
       Note: step 1 is built: "Run again" keeps the replaced run as a summary in `task.runs` (workflow, model, end
       state, cost, gate rounds, whether the last round passed, fix rounds, times), so retries can be counted.
       Step 2 adds `metrics.summary` and Workspace settings → Metrics: gate pass rate, cost per task and per
       successful task, run time p50/p90, retries, and tasks that needed a person, by tier and by workflow, each
       tile listing its tasks. Checked in the app with seeded task records; hand edits after Done are shown as not
-      measured.
-- [ ] **M7-02** Eval harness: fixture tasks with acceptance tests, run headless to compare workflow templates, models and skill versions.
+      measured. Evidence: #78 (run history) and #79 (metrics and the view).
+- [x] **M7-02** Eval harness: fixture tasks with acceptance tests, run headless to compare workflow templates, models and skill versions.
       Note: step 3 is built: `scripts/benchmark.ts` with the library in `packages/sidecar/src/evals/` (shared with
       `live-task.ts`), a 7-case suite in `test/evals/suite.json` with hidden acceptance tests, and a report with
       each variant's pass and cost delta against the baseline and 95% intervals. Variants are a model and/or a set
-      of tier workflows (a folder, or `catalog/workflows/` at a git revision). Ticked with step 4's first report.
-- [ ] **M7-03** CI regression job for first-party skills and workflow templates.
+      of tier workflows (a folder, or `catalog/workflows/` at a git revision). Evidence: #80, and the first report
+      (`packages/sidecar/test/evals/report.md`, step 4): 7 cases × N=3, an A/A run of `origin/main`'s workflows
+      against the branch's, 21/21 each, ≈$0.75. Skill versions aren't a variant: `skills/` feed the setup generators,
+      not task runs (design §5).
+- [x] **M7-03** CI regression job for first-party skills and workflow templates.
+      `scripts/check-eval-report.ts` in the Checks job fails when a tier workflow or role prompt differs from the
+      files the committed report was made with (shown failing on an edited `s.yaml`, passing when restored).
 - [ ] **M7-04** Optional OpenTelemetry export (verify Claude Code's OTel support).
       Deferred (owner, 2026-11-02): the app sends no telemetry (X-04), and Claude Code's OTel settings need
       verifying first. Reopen when a user asks for it.
@@ -1473,6 +1478,8 @@ Decisions: [ADR-0009](adr/0009-release-signing-and-updates.md). Maintainer steps
 ### Exit criteria
 
 - [ ] **M7-E1** A change to a workflow template reports its success and cost delta on the benchmark before merge.
+      Note: in place since M7-03: CI blocks a workflow change until its report is committed, and CONTRIBUTING asks
+      for the report's summary in the PR. Ticked with the first PR that changes a workflow and carries its delta.
 
 ---
 

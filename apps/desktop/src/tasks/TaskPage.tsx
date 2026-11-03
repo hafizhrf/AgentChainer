@@ -15,6 +15,7 @@ import {
   AlertTriangle,
   ArrowLeft,
   ArrowUp,
+  CalendarClock,
   ChevronRight,
   CircleCheck,
   CircleHelp,
@@ -133,6 +134,7 @@ export function TaskPage({
   approvals,
   onAnswerApproval,
   onStopFromApproval,
+  onSchedule,
 }: {
   cwd: string;
   taskId: string;
@@ -152,6 +154,8 @@ export function TaskPage({
   approvals: PermissionRequest[];
   onAnswerApproval: (request: PermissionRequest, answer: PermissionAnswer) => void;
   onStopFromApproval: (request: PermissionRequest) => void;
+  /** Schedules the task to run again (M8-05). */
+  onSchedule?: (task: Task) => void;
 }) {
   const [task, setTask] = useState<Task | null>(null);
   const [modelAlias, setModelAlias] = useState(model);
@@ -797,6 +801,18 @@ export function TaskPage({
                       onRunMode={setRunMode}
                       onRun={() => void runTask(task.id)}
                     />
+                    {/* An approved task of its own can run on a schedule (M8-05); an XL run needs its split approved. */}
+                    {onSchedule && task.contract?.approvedAt && !task.parent && task.triage?.chosen !== "XL" && (
+                      <button
+                        type="button"
+                        className="secondary"
+                        title="Run this task again on a schedule, while AgentChainer is open"
+                        onClick={() => onSchedule(task)}
+                      >
+                        <CalendarClock size={14} />
+                        Schedule…
+                      </button>
+                    )}
                   </>
                 )}
               </>

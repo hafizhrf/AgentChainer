@@ -594,6 +594,40 @@ export const CadenceSchema = z.discriminatedUnion("kind", [
 ]);
 export type Cadence = z.infer<typeof CadenceSchema>;
 
+const at = (clock: string) => clock.split(":").map(Number) as [number, number];
+
+/** The first time the cadence names strictly after `after`, in local time. */
+export function nextRun(cadence: Cadence, after: Date): Date {
+  if (cadence.kind === "hourly") {
+    // On the hour, every N hours counted from midnight: 1 → every hour, 6 → 00:00, 06:00, 12:00, 18:00.
+    const t = new Date(after);
+    t.setMinutes(0, 0, 0);
+    do t.setHours(t.getHours() + 1);
+    while (t.getHours() % cadence.every !== 0 || t <= after);
+    return t;
+  }
+  const [h, m] = at(cadence.at);
+  const t = new Date(after);
+  t.setHours(h, m, 0, 0);
+  // Day by day through the calendar (setDate keeps the local time across daylight-saving changes).
+  for (let i = 0; i < 8; i++) {
+    const allowed = cadence.kind === "daily" || cadence.days.includes(t.getDay());
+    if (allowed && t > after) return t;
+    t.setDate(t.getDate() + 1);
+    t.setHours(h, m, 0, 0);
+  }
+  throw new Error("No run time in the next week.");
+}
+
+/** The cadence in words: "Every 6 hours", "Daily at 02:00", "Mon, Wed at 09:30". */
+export function cadenceText(c: Cadence): string {
+  if (c.kind === "hourly") return c.every === 1 ? "Every hour" : `Every ${c.every} hours`;
+  if (c.kind === "daily") return `Daily at ${c.at}`;
+  const names = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+  const days = [...c.days].sort((a, b) => ((a + 6) % 7) - ((b + 6) % 7));
+  return `${days.length === 7 ? "Every day" : days.map((d) => names[d]).join(", ")} at ${c.at}`;
+}
+
 /**
  * A scheduled flow (M8-05, docs/design/scheduled-flows.md): one approved task run again on a cadence, while the app
  * is open. Kept in the workspace's `.agentchainer/schedules.json`, which git ignores.

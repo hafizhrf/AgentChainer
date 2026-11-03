@@ -68,6 +68,8 @@
   - a scheduled run ended, with its state and cost.
 - **Schedule…** sits on a task that can be scheduled.
 - **Fleet → Scheduled** lists every schedule in the watched workspaces, with enable, Run now, edit and delete.
+- A workspace with a schedule is remembered as a recent workspace, and stays in the watch list, so its schedules run
+  again after a restart.
 
 ## 4. Security
 

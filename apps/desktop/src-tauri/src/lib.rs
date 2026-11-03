@@ -230,6 +230,8 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
+        // A scheduled run that needs the person, or ended (M8-05).
+        .plugin(tauri_plugin_notification::init())
         // Edit → Paste in the title bar's menu (UX-15) reads the clipboard's text; nothing else uses it.
         .plugin(tauri_plugin_clipboard_manager::init());
     // The native menu bar on macOS only; Windows and Linux get the UI's title bar with its menus (UX-15).

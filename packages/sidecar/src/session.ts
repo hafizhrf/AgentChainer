@@ -71,6 +71,13 @@ export type SessionOptions = {
    * without asking: they only start or message sessions whose own tool calls are asked about as usual.
    */
   appTools?: McpSdkServerConfigWithInstance;
+  /**
+   * An agent profile's tools (M8-04): only these built-in tools are available (the SDK's `tools`). With `readOnly`,
+   * they replace the read tools, and the read-only hook still applies.
+   */
+  tools?: string[];
+  /** Tools removed from the session, e.g. `mcp__*` for a profile that names no MCP server (M8-04). */
+  disallowedTools?: string[];
 };
 
 /** The name of the app's in-process MCP server, so its tools are `mcp__agentchainer__<tool>`. */
@@ -198,7 +205,8 @@ export class Session {
         // Like the CLI: the user's and the project's settings, CLAUDE.md, skills and hooks (ARCHITECTURE §5.1).
         // A read-only task step is isolated instead, like the generators.
         settingSources: options.readOnly ? [] : ["user", "project", "local"],
-        ...(options.readOnly ? { tools: READ_TOOLS } : {}),
+        ...(options.readOnly ? { tools: options.tools ?? READ_TOOLS } : options.tools ? { tools: options.tools } : {}),
+        ...(options.disallowedTools?.length ? { disallowedTools: options.disallowedTools } : {}),
         ...(append ? { systemPrompt: { type: "preset" as const, preset: "claude_code" as const, append } } : {}),
         ...(options.maxTurns ? { maxTurns: options.maxTurns } : {}),
         ...(options.outputFormat ? { outputFormat: options.outputFormat } : {}),

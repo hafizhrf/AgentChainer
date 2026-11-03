@@ -189,7 +189,10 @@ They're used as ideas only; no code is copied.
     - XL keeps its fixed split; a Team chat is for open-ended work.
 - **M8-04 Agent profiles manager:** create from a template, edit, clone and delete profiles, each validated before
   saving and with its own tool allowlist. It builds on M3-05's roles and UX-10's Plugins page.
-  - Open: the profiles' file format, and the scope (user or project).
+  - Designed in [agent-profiles.md](agent-profiles.md), 2026-11-03:
+    - profiles are the CLI's own `.claude/agents/*.md`, in project or user scope;
+    - they run as Team workers and as new chats;
+    - workflow roles stay shipped.
 - **M8-05 Scheduled flows:** run a task template on a schedule (e.g. a nightly dependency bump), with a budget cap and
   an evidence report per run.
   - Open: schedules run only while the app is open; v0.x installs no OS service.

@@ -452,6 +452,22 @@ describe("Session app tools and turn ends (M8-03)", () => {
     s?.close();
   });
 
+  it("passes an agent profile's tools, and keeps them read-only under the read-only hook (M8-04)", () => {
+    const { sdk, options } = fakeSdk([]);
+    const s = new Session(
+      sdk,
+      { cwd: "/w", claudePath: "claude", tools: ["Read", "Bash"], disallowedTools: ["mcp__*"] },
+      callbacks(),
+    );
+    assert.deepEqual([options().tools, options().disallowedTools], [["Read", "Bash"], ["mcp__*"]]);
+    s.close();
+    const r = fakeSdk([]);
+    const ro = new Session(r.sdk, { cwd: "/w", claudePath: "claude", readOnly: true, tools: ["Read"] }, callbacks());
+    assert.deepEqual(r.options().tools, ["Read"]);
+    assert.equal(r.options().disallowedTools, undefined);
+    ro.close();
+  });
+
   it("names a worker's supervisor in its fleet item", () => {
     const { sdk } = fakeSdk([]);
     const s = new Session(sdk, { cwd: "/w", claudePath: "claude" }, callbacks());

@@ -3,7 +3,17 @@ import { describe, it } from "node:test";
 import type { AgentEvent } from "@agentchainer/protocol";
 import type { AgentSdkModule } from "./sdk-loader.ts";
 import type { TurnResult } from "./session.ts";
-import { type Handoff, MAX_WORKERS, type Member, Team, TeamError, teamTools, type WorkerSpec } from "./team.ts";
+import {
+  type Handoff,
+  MAX_WORKERS,
+  type Member,
+  TEAM_INSTRUCTIONS,
+  Team,
+  TeamError,
+  teamInstructions,
+  teamTools,
+  type WorkerSpec,
+} from "./team.ts";
 
 /** A stand-in session: turns run until the test ends them with `finish`. */
 class FakeMember implements Member {
@@ -244,5 +254,49 @@ describe("teamTools (M8-03)", () => {
       content: [{ type: "text", text: "No worker nope; list_workers shows them." }],
       isError: true,
     });
+  });
+});
+
+describe("Team workers with agent profiles (M8-04)", () => {
+  const explainer = {
+    name: "explainer",
+    description: "Explains",
+    scope: "project" as const,
+    prompt: "You explain.",
+    tools: ["Read"],
+  };
+
+  it("starts a worker as a profile, and refuses an unknown one as the tool's error", async () => {
+    const specs: WorkerSpec[] = [];
+    const team = new Team(
+      5,
+      {
+        emit: () => undefined,
+        open: (spec) => {
+          specs.push(spec);
+          return new FakeMember(`w${specs.length}`);
+        },
+      },
+      (name) => {
+        if (name === "explainer") return explainer;
+        throw new Error(`There is no agent profile named ${name}.`);
+      },
+    );
+    await team.assign({ name: "a", prompt: "x", profile: "explainer" }, false);
+    assert.deepEqual(specs[0]?.profile, explainer);
+    await assert.rejects(team.assign({ name: "b", prompt: "x", profile: "ghost" }, false), (err: Error) => {
+      assert.ok(err instanceof TeamError);
+      assert.match(err.message, /no agent profile named ghost/);
+      return true;
+    });
+    assert.equal(specs.length, 1, "no worker for an unknown profile");
+  });
+
+  it("lists the profiles in the supervisor's instructions", () => {
+    assert.equal(teamInstructions([]), TEAM_INSTRUCTIONS);
+    assert.match(
+      teamInstructions([{ name: "explainer", description: "Explains code.\nMore." }]),
+      /Agent profiles a worker can run as[\s\S]*- explainer: Explains code\.$/,
+    );
   });
 });

@@ -64,11 +64,14 @@ export const AgentNameSchema = z
   .string()
   .regex(/^[a-z0-9][a-z0-9-]{0,63}$/, "Use lowercase letters, digits and hyphens, up to 64 characters.");
 
+/** Where an agent lives: the project's `.claude/agents/`, or the user's `~/.claude/agents/` (both editable, M8-04). */
+export const AgentScopeSchema = z.enum(["project", "user"]);
+export type AgentScope = z.infer<typeof AgentScopeSchema>;
+
 /** A subagent definition: `.claude/agents/<name>.md` in the project, or the user's `~/.claude/agents` (M4-06). */
 export const AgentDefinitionSchema = z.object({
   name: z.string(),
-  /** The user's agents are listed read-only. */
-  scope: z.enum(["project", "user"]),
+  scope: AgentScopeSchema,
   /** Where it lives, for display: `.claude/agents/x.md` or `~/.claude/agents/x.md`. */
   file: z.string(),
   description: z.string(),
@@ -97,8 +100,77 @@ export const AgentInputSchema = z.object({
     .optional(),
   prompt: z.string().trim().min(1).max(100_000),
   auto: z.boolean(),
+  /** Where it's saved (M8-04); the project when omitted. */
+  scope: AgentScopeSchema.optional(),
 });
 export type AgentInput = z.infer<typeof AgentInputSchema>;
+
+/**
+ * The CLI's built-in tools an agent profile may list (M8-04), grouped as the tool picker shows them. When the app runs
+ * a profile, only the tools it lists are available.
+ */
+export const KNOWN_TOOLS = {
+  read: ["Read", "Grep", "Glob"],
+  edit: ["Edit", "MultiEdit", "Write", "NotebookEdit"],
+  shell: ["Bash", "BashOutput", "KillShell"],
+  web: ["WebFetch", "WebSearch"],
+  other: ["TodoWrite", "Agent", "Task", "Skill", "AskUserQuestion"],
+} as const;
+const BUILT_IN_TOOLS = new Set<string>(Object.values(KNOWN_TOOLS).flat());
+
+/** An MCP server's tools in a profile: `mcp__server`, `mcp__server__*` or `mcp__server__tool`. */
+export const MCP_TOOL_ENTRY = /^mcp__[A-Za-z0-9_-]+(__(\*|[A-Za-z0-9_-]+))?$/;
+
+/** A profile's `tools` field as a list; empty when it lists none, which means every tool. */
+export const toolList = (tools: string | undefined): string[] =>
+  (tools ?? "")
+    .split(",")
+    .map((t) => t.trim())
+    .filter(Boolean);
+
+/** Model aliases a profile may name, besides a full `claude-…` id. */
+export const AGENT_MODELS = ["inherit", "haiku", "sonnet", "opus", "fable"] as const;
+
+/**
+ * What's wrong with an agent before it's saved (M8-04): the form shows these live, and the sidecar checks again.
+ * `taken` are the other agents' names in the same scope.
+ */
+export function agentProblems(
+  agent: { name: string; description: string; tools?: string | undefined; model?: string | undefined; prompt: string },
+  taken: readonly string[] = [],
+): string[] {
+  const problems: string[] = [];
+  const name = AgentNameSchema.safeParse(agent.name);
+  if (!name.success) problems.push(`Name: ${name.error.issues[0]?.message ?? "not a valid name"}`);
+  else if (taken.includes(agent.name)) problems.push(`Name: an agent named ${agent.name} already exists here.`);
+  if (!agent.description.trim()) problems.push("Description: say when Claude should use this agent.");
+  else if (agent.description.length > 2000) problems.push("Description: keep it under 2,000 characters.");
+  if (!agent.prompt.trim()) problems.push("Prompt: write the agent's instructions.");
+  else if (agent.prompt.length > 100_000) problems.push("Prompt: keep it under 100,000 characters.");
+  const model = agent.model?.trim();
+  if (model && !(AGENT_MODELS as readonly string[]).includes(model) && !/^claude-[a-z0-9.-]+(\[1m\])?$/.test(model)) {
+    problems.push(`Model: ${model} isn't inherit, haiku, sonnet, opus, fable or a claude-… model id.`);
+  }
+  const tools = toolList(agent.tools);
+  const unknown = tools.filter((t) => !BUILT_IN_TOOLS.has(t) && !MCP_TOOL_ENTRY.test(t));
+  if (unknown.length)
+    problems.push(`Tools: ${unknown.join(", ")} ${unknown.length > 1 ? "aren't" : "isn't"} a known tool.`);
+  const repeated = tools.filter((t, i) => tools.indexOf(t) !== i);
+  if (repeated.length) problems.push(`Tools: ${[...new Set(repeated)].join(", ")} listed twice.`);
+  return problems;
+}
+
+/** A starting point for a new agent (M8-04): a shipped task role or a bundled starter. Nothing is saved from it. */
+export const AgentTemplateSchema = z.object({
+  id: z.string(),
+  source: z.enum(["role", "starter"]),
+  name: z.string(),
+  description: z.string(),
+  tools: z.string().optional(),
+  model: z.string().optional(),
+  prompt: z.string(),
+});
+export type AgentTemplate = z.infer<typeof AgentTemplateSchema>;
 
 /** Wording that asks Claude to start an agent on its own, as the CLI's docs suggest ("use proactively", M4-06). */
 const AUTO_AGENT = /\bproactively\b|\bMUST BE USED\b/i;
@@ -1223,6 +1295,11 @@ export const methodSchemas = {
        * reports. Needs `maxBudgetUsd`, which then caps the chat and its workers together.
        */
       team: z.boolean().optional(),
+      /**
+       * An agent profile to run as (M8-04): a project or user agent's prompt, model and tools. Only the tools it lists
+       * are available; `model` overrides its model.
+       */
+      profile: AgentNameSchema.optional(),
     }),
     result: z.object({ sessionId: SessionIdSchema }),
   },
@@ -1309,13 +1386,16 @@ export const methodSchemas = {
    */
   "agents.save": {
     params: z.object({ cwd: z.string().min(1), agent: AgentInputSchema, previousName: AgentNameSchema.optional() }),
-    result: z.object({ runId: z.string() }),
+    /** No run for a user agent (M8-04): it isn't the workspace's, so History can't roll it back. */
+    result: z.object({ runId: z.string().optional() }),
   },
-  /** Deletes a project agent, as a recorded run that History can roll back. */
+  /** Deletes a project agent as a recorded run that History can roll back, or a user agent (M8-04). */
   "agents.delete": {
-    params: z.object({ cwd: z.string().min(1), name: AgentNameSchema }),
-    result: z.object({ runId: z.string() }),
+    params: z.object({ cwd: z.string().min(1), name: AgentNameSchema, scope: AgentScopeSchema.optional() }),
+    result: z.object({ runId: z.string().optional() }),
   },
+  /** Starting points for a new agent (M8-04): the shipped task roles and a few starters. */
+  "agents.templates": { params: Empty, result: z.object({ templates: z.array(AgentTemplateSchema) }) },
   "permissions.remove": {
     params: z.object({
       cwd: z.string().min(1),
@@ -1832,6 +1912,8 @@ export const SessionOpenedSchema = z.object({
   name: z.string(),
   /** `read`: Read, Grep and Glob only. `write`: the supervisor's tools, under the usual approvals. */
   access: z.enum(["read", "write"]),
+  /** The agent profile the worker runs as (M8-04). */
+  profile: z.string().optional(),
 });
 export type SessionOpened = z.infer<typeof SessionOpenedSchema>;
 

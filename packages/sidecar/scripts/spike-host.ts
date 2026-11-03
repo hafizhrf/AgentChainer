@@ -1,7 +1,7 @@
 // Drives the sidecar the way the Rust core will (spikes S2/S3) and checks real behaviour
 // against the user's own `claude` CLI.
 //
-// Usage: node scripts/spike-host.ts --cwd <empty scratch dir> [--model haiku] [--scenario basic|mode|interrupt|guard|auto|subagents|nested|background|sessions|approvals|plan|fixtures|image|team|exit|all] [--record out.jsonl] [--sidecar <executable> --data-dir <dir>]
+// Usage: node scripts/spike-host.ts --cwd <empty scratch dir> [--model haiku] [--scenario basic|mode|interrupt|guard|auto|subagents|nested|background|sessions|approvals|plan|fixtures|image|team|profile|exit|all] [--record out.jsonl] [--sidecar <executable> --data-dir <dir>]
 // Makes real model calls with the user's own login (haiku keeps a full run around a few cents).
 import { execFileSync, spawn, spawnSync } from "node:child_process";
 import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
@@ -911,6 +911,82 @@ async function team() {
   state.sessionId = main;
 }
 
+/**
+ * Agent profiles (M8-04): a project profile saved through `agents.save` runs a chat with only its tools (a read-only
+ * one can't write), and a Team worker runs as it. A few cents on haiku.
+ */
+async function profile() {
+  writeFileSync(join(cwd, "PROFILE.md"), "The secret word is pineapple.\n");
+  await request("agents.save", {
+    cwd,
+    agent: {
+      name: "spike-reader",
+      description: "Reads files and answers questions about them, read-only.",
+      tools: "Read, Grep, Glob",
+      model: "haiku",
+      prompt: "You read files and answer questions about them. Start every answer with READER:",
+      auto: false,
+    },
+  });
+  const refused = await request("agents.save", {
+    cwd,
+    agent: { name: "spike-bad", description: "Bad", tools: "Read, Teleport", prompt: "x", auto: false },
+  }).then(
+    () => "saved",
+    (err: Error) => err.message,
+  );
+  check("a profile with an unknown tool is refused", /Teleport isn't a known tool/.test(refused), refused);
+
+  const main = state.sessionId;
+  state.sessionId = (await request("session.start", { cwd, profile: "spike-reader" })).sessionId;
+  const before = permissionLog.length;
+  const t = await turn(
+    "Read PROFILE.md and tell me the secret word. Then try to create a file named profile-probe.txt containing hi.",
+    undefined,
+    { settle: false },
+  );
+  const started = t.events.find((e) => e.type === "session.started");
+  // A tool the profile doesn't list isn't there: the CLI answers "No such tool available".
+  const ran = t.events.flatMap((e) => (e.type === "tool.completed" && !e.isError ? [e.toolUseId] : []));
+  const tools = t.events.flatMap((e) => (e.type === "tool.started" && ran.includes(e.toolUseId) ? [e.name] : []));
+  const missing = t.events.some((e) => e.type === "tool.completed" && /No such tool available/.test(e.output));
+  check(
+    "a chat runs as the profile: its prompt, its model, and only its tools",
+    /READER:/.test(t.reply) &&
+      /pineapple/i.test(t.reply) &&
+      started?.type === "session.started" &&
+      /haiku/i.test(started.model) &&
+      !exists("profile-probe.txt") &&
+      tools.every((n) => ["Read", "Grep", "Glob"].includes(n)) &&
+      (missing || !t.events.some((e) => e.type === "tool.started" && e.name === "Write")) &&
+      permissionLog.length === before,
+    `model=${started?.type === "session.started" ? started.model : "?"} ran=${tools.join(",")} write refused=${missing} file=${exists("profile-probe.txt")} reply=${JSON.stringify(t.reply.slice(0, 100))}`,
+  );
+  await request("session.close", { sessionId: state.sessionId });
+  await request("session.delete", { cwd, sessionId: state.sessionId });
+
+  state.sessionId = (
+    await request("session.start", { cwd, model: values.model, team: true, maxBudgetUsd: 0.5 })
+  ).sessionId;
+  const openedBefore = openedLog.length;
+  const h = await turn(
+    "Use the `handoff` tool once: a worker named 'reader' with profile 'spike-reader' that tells the secret word in " +
+      "PROFILE.md. Reply with exactly: WORD <the word>",
+    undefined,
+    { settle: false },
+  );
+  const opened = openedLog.slice(openedBefore);
+  check(
+    "a Team worker runs as a profile",
+    opened.some((o) => o.profile === "spike-reader") && /WORD\s+pineapple/i.test(h.reply),
+    `opened=${opened.map((o) => `${o.name}:${o.profile ?? "-"}`).join(",")} reply=${JSON.stringify(h.reply.slice(0, 80))}`,
+  );
+  await request("session.close", { sessionId: state.sessionId });
+  await request("session.delete", { cwd, sessionId: state.sessionId });
+  state.others.clear();
+  state.sessionId = main;
+}
+
 const scenarios: Record<string, () => Promise<void>> = {
   basic,
   mode,
@@ -926,6 +1002,7 @@ const scenarios: Record<string, () => Promise<void>> = {
   fixtures,
   image,
   team,
+  profile,
   exit,
 };
 // "all" skips exit, which needs an empty --cwd of its own.
@@ -943,6 +1020,8 @@ for (const file of [
   "calc.txt",
   "team-src",
   "TEAM.md",
+  "PROFILE.md",
+  "profile-probe.txt",
   ".claude",
 ]) {
   rmSync(join(cwd, file), { recursive: true, force: true });

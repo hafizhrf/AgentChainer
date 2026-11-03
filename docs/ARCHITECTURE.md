@@ -97,7 +97,8 @@ Planned surface (v0.1):
 | request | `session.send` | Push a user message into the streaming input `{sessionId, text}` → `{messageId}`. Planned: @files, images |
 | request | `session.interrupt` | Interrupt the running turn |
 | request | `session.stopAgent` | Stop one subagent by its task id; the turn goes on (M4-05) |
-| request | `agents.list` / `agents.save` / `agents.delete` | The project's `.claude/agents/` (written as recorded runs History can roll back) and the user's agents, read-only (M4-06) |
+| request | `agents.list` / `agents.save` / `agents.delete` | The project's `.claude/agents/` (written as recorded runs History can roll back, M4-06) and, with `scope: "user"`, the user's `~/.claude/agents/` (written in place, no run, M8-04). Every save is checked with `agentProblems` (known tools, MCP entries, model, names) |
+| request | `agents.templates` | Starting points for a new agent profile: the 6 shipped roles and 4 starters (M8-04). `session.start {profile}` runs a chat as a profile, and a Team's `assign`/`handoff` take `profile` for a worker: its prompt, model and only its tools ([agent-profiles.md](design/agent-profiles.md)) |
 | request | `session.setMode` | `setPermissionMode()` mid-session |
 | request | `session.setModel` / `session.setEffort` | `setModel()` / `applyFlagSettings({effortLevel})` mid-session |
 | request | `session.close` | End a live session (tab closed); the transcript stays resumable |

@@ -33,6 +33,7 @@ describe("the slash menu (UX-12)", () => {
         ["effort", true],
         ["usage", true],
         ["fork", true],
+        ["task", true],
         ["help", true],
         ["compact", false],
         ["insights", false],
@@ -240,5 +241,19 @@ describe("model choices from the CLI (UX-12)", () => {
       { value: "haiku", label: "Haiku 5.5", hint: "Fastest" },
       { value: "claude-opus-4-8", label: "claude-opus-4-8" },
     ]);
+  });
+});
+
+describe("a chat as a task's context (UX-13)", () => {
+  it("keeps the newest messages, as you and Claude lines, within the limit", async () => {
+    const { chatContext } = await import("./commands.ts");
+    const items: Item[] = [
+      { kind: "notice", id: 1, text: "Session started" },
+      { kind: "user", id: 2, text: "The cart total is wrong" },
+      { kind: "assistant", id: 3, text: "It ignores quantity.", open: false },
+      { kind: "user", id: 4, text: "Fix it" },
+    ];
+    assert.equal(chatContext(items), "you: The cart total is wrong\nClaude: It ignores quantity.\nyou: Fix it");
+    assert.equal(chatContext(items, 45), "Claude: It ignores quantity.\nyou: Fix it");
   });
 });

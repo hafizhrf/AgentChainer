@@ -78,6 +78,11 @@ describe("task flow", () => {
   it("drafts, triages on the draft, and approves the contract and tier together", async () => {
     const root = copyFixture("sample-app");
     assert.throws(() => newTask(root, "   "), /Describe the task/);
+    assert.equal(
+      newTask(copyFixture("sample-app"), "From a chat", "  you: hi  ").chatContext,
+      "you: hi",
+      "the chat it came from is kept",
+    );
     const created = newTask(root, " Fix total() ");
     assert.equal(created.request, "Fix total()");
     assert.deepEqual(created.availableGates, ["test"]);

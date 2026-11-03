@@ -30,6 +30,8 @@ export type Tab = {
   models: ModelOption[];
   /** How full the context window was after the last turn (UX-12); null until a turn reports it. */
   context: Omit<Extract<AgentEvent, { type: "context.usage" }>, "type"> | null;
+  /** What the composer starts as (UX-13): New in Task mode opens a chat whose composer makes a task. */
+  kind?: "chat" | "task";
   /** Set while Claude switched itself to plan mode (UX-12): the mode to go back to. */
   planSwitch: { previous: PermissionMode } | null;
   items: Item[];

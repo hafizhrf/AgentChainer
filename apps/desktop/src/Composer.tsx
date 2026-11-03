@@ -44,6 +44,7 @@ export function Composer({
   files,
   seed,
   onSend,
+  onTask,
   onCommand,
   onInterrupt,
   onResume,
@@ -59,6 +60,8 @@ export function Composer({
   /** Text to put in the composer (a starter prompt); a new object each time it's used. */
   seed: { text: string } | null;
   onSend: (text: string, images: Attachment[]) => void;
+  /** Makes a task of the text (UX-13); without it (the Tasks preview off), the composer is chat only. */
+  onTask?: (text: string) => void;
   onCommand: (name: AppCommand, arg: string) => void;
   onInterrupt: () => void;
   onResume: () => void;
@@ -73,6 +76,11 @@ export function Composer({
   const [pasteError, setPasteError] = useState<string | null>(null);
   const [pick, setPick] = useState(0);
   const [dropping, setDropping] = useState(false);
+  /** Chat sends to Claude; Task makes a task of the text, which Claude drafts a contract for first (UX-13). */
+  const [kind, setKind] = useState<"chat" | "task">(onTask ? (tab.kind ?? "chat") : "chat");
+  useEffect(() => {
+    if (tab.kind && onTask) setKind(tab.kind);
+  }, [tab.kind, onTask]);
   /** A picker or panel a slash command opened (UX-12). */
   const [popup, setPopup] = useState<PopupKind | null>(null);
   const closePopup = () => {
@@ -175,7 +183,12 @@ export function Composer({
     const command = parseAppCommand(text);
     // `/model`, `/usage`… without an argument open their picker or panel, like the CLI's.
     if (command && !command.arg && POPUP_COMMANDS.has(command.name)) return setPopup(command.name as PopupKind);
+    if (command?.name === "task" && !command.arg && onTask) return setKind("task");
     if (command) return onCommand(command.name, command.arg);
+    if (kind === "task" && onTask && !command) {
+      setKind("chat");
+      return onTask(text);
+    }
     setImages([]);
     if (tab.running || queue.length > 0) setQueue((q) => [...q, { text, images }]);
     else onSend(text, images);
@@ -391,7 +404,10 @@ export function Composer({
       )}
       {popup === "usage" && <UsagePopup tab={tab} onClose={closePopup} />}
       {popup === "help" && <HelpPopup commands={tab.slashCommands} onClose={closePopup} />}
-      <div className={`composer-box${dropping ? " dropping" : ""}`} data-mode={tab.mode}>
+      <div
+        className={`composer-box${dropping ? " dropping" : ""}${kind === "task" ? " task-kind" : ""}`}
+        data-mode={kind === "task" ? "plan" : tab.mode}
+      >
         {suggestions.length > 0 && (
           <ul className="suggestions" aria-label={token?.kind === "@" ? "Matching files" : "Matching commands"}>
             {suggestions.map((s, i) => (
@@ -434,9 +450,11 @@ export function Composer({
               ? "This session ended. Resume it to continue."
               : dropping
                 ? "Drop to attach as @path"
-                : tab.running
-                  ? "Claude is working… type a follow-up to queue it"
-                  : "Ask Claude to do something… @ for files, / for commands"
+                : kind === "task"
+                  ? "Describe the task. Claude reads the project and drafts a contract for you to approve first."
+                  : tab.running
+                    ? "Claude is working… type a follow-up to queue it"
+                    : "Ask Claude to do something… @ for files, / for commands"
           }
           onChange={(e) => {
             setDraft(e.target.value);
@@ -452,6 +470,23 @@ export function Composer({
           disabled={tab.ended}
         />
         <div className="composer-toolbar">
+          {onTask && (
+            <fieldset className="segmented kind-switch">
+              <legend className="sr-only">Send as</legend>
+              {(["chat", "task"] as const).map((k) => (
+                <button
+                  key={k}
+                  type="button"
+                  className={kind === k ? "active" : undefined}
+                  aria-pressed={kind === k}
+                  title={k === "chat" ? "Talk with Claude" : "A task: a contract first, then a verified run"}
+                  onClick={() => setKind(k)}
+                >
+                  {k === "chat" ? "Chat" : "Task"}
+                </button>
+              ))}
+            </fieldset>
+          )}
           <Select
             compact
             label="Permission profile"

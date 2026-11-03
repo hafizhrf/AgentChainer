@@ -46,6 +46,7 @@ export function SessionView({
   onToggleRight,
   onToggleTerminal,
   onSend,
+  onTask,
   onCommand,
   onAnswer,
   onInterrupt,
@@ -73,6 +74,8 @@ export function SessionView({
   onToggleRight: () => void;
   onToggleTerminal: () => void;
   onSend: (text: string, images: Attachment[]) => void;
+  /** Makes a task of the composer's text (UX-13), when the Tasks preview is on. */
+  onTask?: (text: string) => void;
   /** An app slash command typed in the composer (UX-12). */
   onCommand: (name: AppCommand, arg: string) => void;
   /** Answers a request shown in the thread: Claude's questions (UX-12). */
@@ -323,6 +326,7 @@ export function SessionView({
                       onSend(text, images);
                     }}
                     onCommand={onCommand}
+                    {...(onTask ? { onTask } : {})}
                     onInterrupt={onInterrupt}
                     onResume={onResume}
                     onModeChange={onModeChange}

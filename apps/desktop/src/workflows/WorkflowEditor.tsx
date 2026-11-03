@@ -12,12 +12,15 @@ import {
   Plus,
   RotateCcw,
   Save,
+  Sparkles,
   Trash2,
   Upload,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { Confirm } from "../Dialog.tsx";
+import { InlineDiff } from "../InlineDiff.tsx";
 import { request } from "../sidecar.ts";
+import { lineDiff } from "../textdiff.ts";
 import { Field } from "../ui/Field.tsx";
 import { IconButton } from "../ui/IconButton.tsx";
 import { Select } from "../ui/Select.tsx";
@@ -60,6 +63,11 @@ export function WorkflowEditor({
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [changed, setChanged] = useState(false);
+  /** Generate with AI (UX-14): the person's description, and what came back, to keep or discard. */
+  const [gen, setGen] = useState<{
+    description: string;
+    result: { yaml: string; summary: string; costUsd: number } | null;
+  } | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -165,6 +173,14 @@ export function WorkflowEditor({
     }
   }
 
+  const generate = () =>
+    act("generate", async () => {
+      if (!gen || text === null || tier === "XL") return;
+      const r = await request("workflow.generate", { cwd, tier, description: gen.description.trim(), current: text });
+      if (!r.yaml) throw new Error(`${r.error ?? "Nothing came back."} (≈$${r.costUsd.toFixed(3)} spent)`);
+      setGen({ ...gen, result: { yaml: r.yaml, summary: r.summary, costUsd: r.costUsd } });
+    });
+
   const saveFile = () =>
     act("save", async () => {
       if (text === null) return;
@@ -244,6 +260,18 @@ export function WorkflowEditor({
             <Code size={13} /> YAML
           </button>
         </fieldset>
+        {tier !== "XL" && (
+          <button
+            type="button"
+            className="secondary small"
+            disabled={busy !== null || text === null}
+            onClick={() => setGen(gen ? null : { description: "", result: null })}
+            aria-expanded={gen !== null}
+          >
+            <Sparkles size={13} />
+            Generate with AI
+          </button>
+        )}
         <IconButton label="Import a workflow file" disabled={busy !== null} onClick={() => void importFile()}>
           <Upload size={15} />
         </IconButton>
@@ -280,6 +308,67 @@ export function WorkflowEditor({
         )}
       </div>
       {error && <p className="warn workflow-error">{error}</p>}
+      {gen && (
+        <section className="workflow-generate" aria-label="Generate with AI">
+          {!gen.result ? (
+            <>
+              <Field
+                label="Describe the flow you want"
+                help="Claude rewrites this workflow from your description, starting from what's in the editor. It's checked like one you write; nothing is saved until you keep it and Save."
+              >
+                <textarea
+                  rows={3}
+                  value={gen.description}
+                  placeholder="e.g. Plan with the architect, have a test planner list the tests first, then implement, then a security review before the gates."
+                  onChange={(e) => setGen({ ...gen, description: e.target.value })}
+                />
+              </Field>
+              <div className="workflow-generate-actions">
+                <span className="grow" />
+                <button type="button" className="secondary small" onClick={() => setGen(null)}>
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  className="small"
+                  disabled={!gen.description.trim() || busy !== null}
+                  onClick={() => void generate()}
+                >
+                  {busy === "generate" ? <Loader2 size={13} className="spin" /> : <Sparkles size={13} />}
+                  {busy === "generate" ? "Generating…" : "Generate"}
+                </button>
+              </div>
+            </>
+          ) : (
+            <>
+              <p className="flow-text">
+                <strong>Claude's flow:</strong> {gen.result.summary}{" "}
+                <span className="muted">(≈${gen.result.costUsd.toFixed(3)}, passes the checks)</span>
+              </p>
+              <div className="workflow-generate-diff">
+                <InlineDiff diffs={[lineDiff(text ?? "", gen.result.yaml)]} />
+              </div>
+              <div className="workflow-generate-actions">
+                <span className="grow" />
+                <button type="button" className="secondary small" onClick={() => setGen(null)}>
+                  Discard
+                </button>
+                <button
+                  type="button"
+                  className="small"
+                  onClick={() => {
+                    setText(gen.result?.yaml ?? text);
+                    setSelected(null);
+                    setGen(null);
+                  }}
+                >
+                  Keep it in the editor
+                </button>
+              </div>
+            </>
+          )}
+        </section>
+      )}
 
       {text === null ? (
         <p className="muted setup-pad">Loading the workflow…</p>

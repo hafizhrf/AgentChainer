@@ -303,7 +303,7 @@ export function renderEvidence(e: Evidence): string {
   const w = e.task.workflow;
   if (w) {
     add(
-      `- **Workflow:** ${w.id} v${w.version}, ${w.source === "project" ? `the project's own (\`${w.file}\` at ${w.hash})` : "the app's"}`,
+      `- **Workflow:** ${w.id} v${w.version}, ${w.source === "task" ? `the task's own flow (at ${w.hash})` : w.source === "project" ? `the project's own (\`${w.file}\` at ${w.hash})` : "the app's"}`,
     );
   }
   add(`- **Outcome:** **${STATE_TEXT[e.outcome.state] ?? e.outcome.state}.** ${e.outcome.text}`);

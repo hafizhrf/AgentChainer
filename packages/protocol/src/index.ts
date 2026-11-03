@@ -596,11 +596,14 @@ export const GuardBlockSchema = z.object({
 export type GuardBlock = z.infer<typeof GuardBlockSchema>;
 
 export const TaskRunSchema = z.object({
-  /** The workflow it runs; `source: "project"` when the project's file replaced the app's (M6-04), with its hash. */
+  /**
+   * The workflow it runs; `source: "project"` when the project's file replaced the app's (M6-04), `"task"` when the
+   * task has its own flow (UX-14), with its hash.
+   */
   workflow: z.object({
     id: z.string(),
     version: z.number().int(),
-    source: z.literal("project").optional(),
+    source: z.enum(["project", "task"]).optional(),
     file: z.string().optional(),
     hash: z.string().optional(),
   }),
@@ -702,6 +705,11 @@ export const TaskSchema = z.object({
   id: TaskIdSchema,
   /** What the user asked for, verbatim. */
   request: z.string(),
+  /**
+   * The task's own flow (UX-14): a workflow AI proposed for this task, checked like a project's, approved with the
+   * contract; its run follows it instead of the tier's.
+   */
+  flow: z.object({ yaml: z.string().max(65_536), summary: z.string(), hash: z.string(), at: z.string() }).optional(),
   /** The chat a task was made from (UX-13, "Make this a task"): its last messages, which drafting reads. */
   chatContext: z.string().max(12_000).optional(),
   state: z.enum(TASK_STATES),
@@ -1467,12 +1475,21 @@ export const methodSchemas = {
     result: TaskSchema,
   },
   /**
+   * AI writes the task's own flow from its contract (UX-14): the tier's workflow, changed only where the task calls for
+   * it, checked like a project's. A draft S, M or L task only; the person drops it or approves it with the contract.
+   */
+  "task.proposeFlow": { params: TaskRef.extend({ model: z.string().optional() }), result: TaskSchema },
+  /** Drops the task's own flow: it runs its tier's again. */
+  "task.dropFlow": { params: TaskRef, result: TaskSchema },
+  /**
    * The workflow a task's Flow tab draws (UX-14): its run's, or before a run, its tier's now. Null before triage.
    * The workflow's own shape, as in its YAML.
    */
   "task.workflow": {
     params: TaskRef,
-    result: z.object({ workflow: z.record(z.string(), z.unknown()), source: z.enum(["app", "project"]) }).nullable(),
+    result: z
+      .object({ workflow: z.record(z.string(), z.unknown()), source: z.enum(["app", "project", "task"]) })
+      .nullable(),
   },
   /**
    * The person's message to a running task's current step (UX-13): it goes into the turn that's running, as in a chat.
@@ -1645,6 +1662,24 @@ export const methodSchemas = {
   "workflow.get": {
     params: WorkspaceRef.extend({ tier: z.enum(TIERS) }),
     result: z.object({ yaml: z.string(), source: z.enum(["app", "project"]), file: z.string() }),
+  },
+  /**
+   * Generate with AI (UX-14): a model writes the tier's workflow from the person's description, starting from `current`
+   * (the editor's text). It's checked like a hand-written one and retried once; nothing is saved.
+   */
+  "workflow.generate": {
+    params: WorkspaceRef.extend({
+      tier: z.enum(["S", "M", "L"]),
+      description: z.string().min(1).max(4000),
+      current: z.string().max(65_536),
+      model: z.string().optional(),
+    }),
+    result: z.object({
+      yaml: z.string().nullable(),
+      summary: z.string(),
+      error: z.string().optional(),
+      costUsd: z.number(),
+    }),
   },
   /** Checks a workflow's YAML the way a run would; null when it can be used. */
   "workflow.check": {

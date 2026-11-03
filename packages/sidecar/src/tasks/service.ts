@@ -1,4 +1,5 @@
 import { spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import { existsSync } from "node:fs";
 import path from "node:path";
 import {
@@ -14,6 +15,7 @@ import {
   type Triage,
 } from "@agentchainer/protocol";
 import type { SDKMessage } from "@anthropic-ai/claude-agent-sdk";
+import { stringify as stringifyYaml } from "yaml";
 import { AC_DIR } from "../ac-dir.ts";
 import { findTool, toolsDir } from "../bootstrap/tools.ts";
 import { listDeploys } from "../deploy/service.ts";
@@ -38,10 +40,17 @@ import type { AgentSdkModule } from "../sdk-loader.ts";
 import { git, listFiles, repoOf } from "../workspace.ts";
 import { availableGates, draftContract, normalizeContract } from "./contract.ts";
 import { buildEvidence, type FileChange, renderEvidence, type SecretsScan, sectionLines } from "./evidence.ts";
+import { generateWorkflow } from "./generate-workflow.ts";
 import shipped from "./library.json" with { type: "json" };
 import { LibrarySchema, type Workflow, WorkflowSchema, type XlWorkflow, XlWorkflowSchema } from "./library.ts";
 import { newRun, Orchestrator, type OrchestratorDeps, parseReview } from "./orchestrator.ts";
-import { type EffectiveLibrary, effectiveLibrary, workflowRef } from "./project-workflows.ts";
+import {
+  type EffectiveLibrary,
+  effectiveLibrary,
+  parseProjectWorkflow,
+  type WorkflowRef,
+  workflowRef,
+} from "./project-workflows.ts";
 import { withPastRun } from "./run-history.ts";
 import { changedPaths, fileStats, type SessionHost, sessionRunner, startBase, untracked } from "./runner.ts";
 import { semgrepScan, trivyScan } from "./scanners.ts";
@@ -286,10 +295,74 @@ export function startRun(
   eff: EffectiveLibrary,
   opts: Parameters<typeof newRun>[1],
   now: Date,
+  /** The task's own flow's hash, when the run follows it (UX-14). */
+  taskFlow?: string,
 ): TaskRun {
-  const ref = workflowRef(workflow, eff);
-  if (ref.source === "project") writeTaskFile(root, task.id, "workflow.json", `${JSON.stringify(workflow, null, 2)}\n`);
+  const ref: WorkflowRef = taskFlow
+    ? { id: workflow.id, version: workflow.version, source: "task", file: "task flow", hash: taskFlow }
+    : workflowRef(workflow, eff);
+  if (ref.source) writeTaskFile(root, task.id, "workflow.json", `${JSON.stringify(workflow, null, 2)}\n`);
   return newRun(ref, opts, now);
+}
+
+/** The task's own flow as a workflow (UX-14); it was checked when proposed, and is checked again here. */
+function flowOf(task: Task): Workflow | null {
+  const tier = task.triage?.chosen;
+  if (!task.flow || !tier || tier === "XL") return null;
+  try {
+    const w = parseProjectWorkflow(`${tier.toLowerCase()}.yaml`, task.flow.yaml, library);
+    return "split" in w ? null : w;
+  } catch (err) {
+    throw invalid(`The task's own flow can't run: ${err instanceof Error ? err.message : String(err)}`);
+  }
+}
+
+/**
+ * AI writes the task's own flow from its contract (UX-14): the tier's workflow, changed only where the task calls for
+ * it. Kept on the task when it passes the checks; its spend is recorded either way.
+ */
+export async function proposeFlow(root: string, id: string, claude: Claude, model?: string): Promise<Task> {
+  const task = loadTask(root, id);
+  requireDraft(task);
+  const tier = task.triage?.chosen;
+  const contract = task.contract;
+  if (!contract || !tier) throw invalid("Draft the contract first.");
+  if (tier === "XL") throw invalid("An XL task's sub-tasks each follow their own tier's flow.");
+  const current = workflowsOf(root).library.workflows[tier];
+  if (!current) throw invalid(`${tier} tasks have no workflow in this version of the app.`);
+  return cancellable(id, async (controller) => {
+    const r = await generateWorkflow(
+      claude.sdk,
+      claude.claudePath,
+      root,
+      tier,
+      stringifyYaml(current),
+      { contract },
+      library,
+      { ...(model ? { model } : {}), abortController: controller },
+    );
+    const at = new Date().toISOString();
+    const hash = r.yaml ? createHash("sha256").update(r.yaml).digest("hex").slice(0, 12) : "";
+    const next: Task = {
+      ...task,
+      costUsd: task.costUsd + r.costUsd,
+      ...(r.yaml ? { flow: { yaml: r.yaml, summary: r.summary, hash, at } } : {}),
+      updatedAt: at,
+    };
+    saveTask(root, next);
+    if (!r.yaml) throw invalid(r.error ?? "No flow was proposed.");
+    return next;
+  });
+}
+
+/** Drops the task's own flow: it runs its tier's again. */
+export function dropFlow(root: string, id: string): Task {
+  const task = loadTask(root, id);
+  requireDraft(task);
+  const { flow: _dropped, ...rest } = task;
+  const next: Task = { ...rest, updatedAt: new Date().toISOString() };
+  saveTask(root, next);
+  return next;
 }
 
 /** The project's workflow a run started with, from the copy kept with the task. */
@@ -315,7 +388,7 @@ function keptWorkflow<T>(
 /** The workflow a tier's run started with: the project's copy, or the app's by id. */
 export function runWorkflow(root: string, task: Task): Workflow {
   const ref = task.run?.workflow;
-  if (ref?.source === "project") return keptWorkflow(root, task, WorkflowSchema);
+  if (ref?.source === "project" || ref?.source === "task") return keptWorkflow(root, task, WorkflowSchema);
   const workflow = Object.values(library.workflows).find((w) => w.id === ref?.id);
   if (!workflow) throw invalid(`The workflow ${ref?.id} isn't in this version of the app.`);
   return workflow;
@@ -335,14 +408,16 @@ function runXlWorkflow(root: string, task: Task): XlWorkflow {
 export function taskWorkflow(
   root: string,
   id: string,
-): { workflow: Workflow | XlWorkflow; source: "app" | "project" } | null {
+): { workflow: Workflow | XlWorkflow; source: "app" | "project" | "task" } | null {
   const task = loadTask(root, id);
   if (task.run) {
-    const source = task.run.workflow.source === "project" ? "project" : "app";
+    const source = task.run.workflow.source ?? "app";
     return { workflow: task.triage?.chosen === "XL" ? runXlWorkflow(root, task) : runWorkflow(root, task), source };
   }
   const tier = task.triage?.chosen;
   if (!tier) return null;
+  const own = flowOf(task);
+  if (own) return { workflow: own, source: "task" };
   const eff = workflowsOf(root);
   const workflow = tier === "XL" ? eff.library.xl : eff.library.workflows[tier];
   if (!workflow) return null;
@@ -546,7 +621,8 @@ export function startTask(
   if (task.triage.chosen === "XL") return startXl(root, task, host, opts, notify, now);
   if (task.parent) requireOwnRun(task);
   const eff = workflowsOf(root);
-  const workflow = eff.library.workflows[task.triage.chosen];
+  const own = flowOf(task);
+  const workflow = own ?? eff.library.workflows[task.triage.chosen];
   if (!workflow) throw invalid(`${task.triage.chosen} tasks have no workflow in this version of the app.`);
   // A sub-task runs in the worktree its XL task made; any other task gets its own.
   const branched = task.parent ? { task, fresh: false } : taskBranch(root, task);
@@ -557,7 +633,7 @@ export function startTask(
     ...branched.task,
     state: "running",
     ...withPastRun(branched.task),
-    run: startRun(root, branched.task, workflow, eff, { ...opts, ...base }, now),
+    run: startRun(root, branched.task, workflow, eff, { ...opts, ...base }, now, own ? task.flow?.hash : undefined),
     updatedAt: now.toISOString(),
   };
   saveTask(root, started);

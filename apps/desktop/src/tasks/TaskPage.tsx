@@ -829,6 +829,7 @@ export function TaskPage({
               cwd={cwd}
               subtasks={(task.subtasks ?? []).flatMap((id) => (children[id] ? [children[id]] : []))}
               onOpenTask={(id) => void open(id)}
+              onTask={show}
               onJump={(id) => {
                 setFocus({ id, at: Date.now() });
                 requestAnimationFrame(() =>

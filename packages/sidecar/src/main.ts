@@ -54,6 +54,7 @@ import { log, notify, RpcFailure, serve } from "./rpc.ts";
 import { loadSdk } from "./sdk-loader.ts";
 import { Session } from "./session.ts";
 import { replayEvents, retention, toSessionInfo } from "./stored-sessions.ts";
+import { generateWorkflow } from "./tasks/generate-workflow.ts";
 import { computeMetrics, loadAllTasks } from "./tasks/metrics.ts";
 import {
   checkWorkflowText,
@@ -76,6 +77,7 @@ import {
   createTaskPr,
   deleteTaskSafe,
   draftTask,
+  dropFlow,
   fixCiTask,
   listTasksLive,
   mergeGates,
@@ -85,6 +87,7 @@ import {
   newTask,
   overlapsOf,
   present,
+  proposeFlow,
   prPreview,
   prStatus,
   resumeTask,
@@ -553,6 +556,16 @@ serve(
       return draftTask(cwd, id, await claude(), model, draftEvents(cwd, id));
     },
 
+    "task.proposeFlow": async ({ cwd, id, model }) => {
+      requireFolder(cwd);
+      return proposeFlow(cwd, id, await claude(), model);
+    },
+
+    "task.dropFlow": ({ cwd, id }) => {
+      requireFolder(cwd);
+      return dropFlow(cwd, id);
+    },
+
     "task.workflow": ({ cwd, id }) => {
       requireFolder(cwd);
       return taskWorkflow(cwd, id);
@@ -736,6 +749,14 @@ serve(
     "workflow.get": ({ cwd, tier }) => {
       requireFolder(cwd);
       return workflowSource(cwd, tier, shippedLibrary);
+    },
+
+    "workflow.generate": async ({ cwd, tier, description, current, model }) => {
+      requireFolder(cwd);
+      const { sdk, claudePath } = await claude();
+      return generateWorkflow(sdk, claudePath, cwd, tier, current, { description }, shippedLibrary, {
+        ...(model ? { model } : {}),
+      });
     },
 
     "workflow.check": ({ tier, yaml }) => ({ error: checkWorkflowText(tier, yaml, shippedLibrary) }),

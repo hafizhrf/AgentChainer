@@ -882,7 +882,7 @@ fieldset.task-field legend {
   border-bottom: 1px solid var(--border);
 }
 
-.workflow-status {
+.step-status {
   padding: var(--space-1) var(--space-3);
   border-bottom: 1px solid var(--border);
   font-size: var(--text-sm);
@@ -1417,7 +1417,7 @@ div.draft-block.live {
   font-size: var(--text-xs);
 }
 
-.workflow-status {
+.step-status {
   display: inline-flex;
   align-items: center;
   gap: 4px;
@@ -1425,16 +1425,16 @@ div.draft-block.live {
   font-size: var(--text-xs);
 }
 
-.workflow-status.running {
+.step-status.running {
   color: var(--mode-plan);
   font-weight: 600;
 }
 
-.workflow-status.done {
+.step-status.done {
   color: var(--ok);
 }
 
-.workflow-status.failed {
+.step-status.failed {
   color: var(--err);
   font-weight: 600;
 }
@@ -1451,4 +1451,42 @@ div.draft-block.live {
 .graph-node.workflow-step.status-pending,
 .graph-node.workflow-step.status-skipped {
   opacity: 0.7;
+}
+
+/* ---------- Generate with AI in the workflow editor (UX-14) ---------- */
+
+.workflow-generate {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: 0 var(--space-4) var(--space-2);
+  padding: var(--space-3);
+  border: 1px solid var(--mode-plan);
+  border-radius: var(--radius);
+  background: var(--surface);
+  font-size: var(--text-sm);
+}
+
+.workflow-generate-diff {
+  max-height: 320px;
+  overflow: auto;
+}
+
+.workflow-generate-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.flow-own {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-1);
+  margin: 0 var(--space-4) var(--space-2);
+  font-size: var(--text-sm);
+}
+
+.flow-text {
+  margin: 0;
 }

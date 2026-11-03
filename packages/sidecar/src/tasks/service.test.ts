@@ -23,6 +23,7 @@ import {
   createTaskPr,
   deleteTaskSafe,
   draftTask,
+  dropFlow,
   fixCiTask,
   mergeGates,
   mergePrTask,
@@ -30,6 +31,7 @@ import {
   messageRun,
   newTask,
   overlapsOf,
+  proposeFlow,
   prPreview,
   prStatus,
   retriageTask,
@@ -779,5 +781,40 @@ describe("a task's flow (UX-14)", () => {
       join(root, ".agentchainer", "workflows", "s.yaml"),
     );
     assert.equal(taskWorkflow(root, created.id)?.source, "project");
+  });
+
+  it("keeps a flow AI proposed for the task, draws it, and drops it again", async () => {
+    const root = copyFixture("sample-app");
+    const created = newTask(root, "Fix total()");
+    const triage = {
+      signals: [],
+      floor: "S" as const,
+      model: null,
+      proposed: "S" as const,
+      chosen: "S" as const,
+      budgetUsd: 1,
+      at: "2026-11-03T00:00:00.000Z",
+    };
+    const contract = normalizeContract("Fix total()", { objective: "Totals count quantity." }, []);
+    saveTask(root, { ...created, triage, contract });
+    const s = readFileSync(fileURLToPath(new URL("../../../../catalog/workflows/s.yaml", import.meta.url)), "utf8");
+    const sdk = {
+      query: () =>
+        (async function* () {
+          yield {
+            type: "result",
+            subtype: "success",
+            total_cost_usd: 0.04,
+            structured_output: { yaml: s, summary: "As the tier's." },
+          };
+        })(),
+    } as unknown as AgentSdkModule;
+    const proposed = await proposeFlow(root, created.id, { sdk, claudePath: "claude" });
+    assert.equal(proposed.flow?.summary, "As the tier's.");
+    assert.match(proposed.flow?.hash ?? "", /^[0-9a-f]{12}$/);
+    assert.equal(proposed.costUsd, created.costUsd + 0.04);
+    assert.equal(taskWorkflow(root, created.id)?.source, "task");
+    assert.equal(dropFlow(root, created.id).flow, undefined);
+    assert.equal(taskWorkflow(root, created.id)?.source, "app");
   });
 });

@@ -370,7 +370,15 @@ export class Orchestrator {
 
   private tag(stepId: string, label: string, role?: string): StepTag {
     const title = (this.task.title ?? this.task.request).slice(0, 80);
-    return { id: this.task.id, stepId, label, title, ...(role ? { role } : {}) };
+    return {
+      id: this.task.id,
+      stepId,
+      label,
+      title,
+      ...(role ? { role } : {}),
+      // Nobody may be watching a scheduled run: the UI notifies on its approvals (M8-05).
+      ...(this.task.run?.trigger === "schedule" ? { scheduled: true } : {}),
+    };
   }
 
   /** The latest session of a template step (where its fixes go). */
@@ -754,7 +762,14 @@ export class Orchestrator {
 /** A fresh run record for `task`, measured from `base`. */
 export function newRun(
   workflow: Pick<Workflow, "id" | "version"> & Partial<Pick<TaskRun["workflow"], "source" | "file" | "hash">>,
-  opts: { permissionMode: TaskRun["permissionMode"]; model?: string; base: string | null; untrackedAtStart: string[] },
+  opts: {
+    permissionMode: TaskRun["permissionMode"];
+    model?: string;
+    base: string | null;
+    untrackedAtStart: string[];
+    /** A schedule started it (M8-05). */
+    scheduled?: boolean;
+  },
   now: Date,
 ): TaskRun {
   return {
@@ -777,5 +792,6 @@ export function newRun(
     approvals: [],
     guardBlocks: [],
     costUsd: 0,
+    ...(opts.scheduled ? { trigger: "schedule" as const } : {}),
   };
 }

@@ -14,7 +14,10 @@ export function lastRoundPassed(run: Pick<TaskRun, "gates">): boolean | null {
 }
 
 /** A run as the history keeps it, with the state the task ended that run in. */
-export function summarizeRun(run: TaskRun, state: Task["state"]): RunSummary {
+/** The file a run's own evidence report is kept in, by its number among the task's runs (M8-05). */
+export const runEvidenceFile = (n: number) => `evidence-${n}.md`;
+
+export function summarizeRun(run: TaskRun, state: Task["state"], n?: number): RunSummary {
   return {
     workflow: run.workflow,
     ...(run.model ? { model: run.model } : {}),
@@ -25,16 +28,20 @@ export function summarizeRun(run: TaskRun, state: Task["state"]): RunSummary {
     fixRounds: run.fixRounds,
     startedAt: run.startedAt,
     ...(run.endedAt ? { endedAt: run.endedAt } : {}),
+    ...(run.trigger ? { trigger: run.trigger } : {}),
+    ...(n !== undefined && run.endedAt ? { evidence: runEvidenceFile(n) } : {}),
   };
 }
 
 /** The history with `task`'s current run added, for a task about to start a new one; nothing when it hasn't run. */
 export function withPastRun(task: Task): Pick<Task, "runs"> {
   if (!task.run) return task.runs ? { runs: task.runs } : {};
-  return { runs: [...(task.runs ?? []), summarizeRun(task.run, task.state)] };
+  const past = task.runs ?? [];
+  return { runs: [...past, summarizeRun(task.run, task.state, past.length + 1)] };
 }
 
 /** Every run of a task, oldest first: the kept summaries, then the latest. */
 export function allRuns(task: Task): RunSummary[] {
-  return [...(task.runs ?? []), ...(task.run ? [summarizeRun(task.run, task.state)] : [])];
+  const past = task.runs ?? [];
+  return [...past, ...(task.run ? [summarizeRun(task.run, task.state, past.length + 1)] : [])];
 }

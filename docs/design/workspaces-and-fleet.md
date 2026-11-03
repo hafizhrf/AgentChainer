@@ -195,7 +195,10 @@ They're used as ideas only; no code is copied.
     - workflow roles stay shipped.
 - **M8-05 Scheduled flows:** run a task template on a schedule (e.g. a nightly dependency bump), with a budget cap and
   an evidence report per run.
-  - Open: schedules run only while the app is open; v0.x installs no OS service.
+  - Designed in [scheduled-flows.md](scheduled-flows.md), 2026-11-03:
+    - a schedule re-runs an approved task;
+    - it runs only while the app is open, with one catch-up for a missed time;
+    - edits go ahead, and anything else waits for the person.
 - **M8-06 Lessons from outcomes:** suggest additions to `CLAUDE.md` from finished tasks' evidence. It's opt-in, and
   each suggestion is approved by the person.
   - Open: which evidence counts, and how a suggestion is deduplicated.

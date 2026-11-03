@@ -83,6 +83,32 @@ describe("run history (M7)", () => {
     assert.equal(withPastRun(back).runs?.length, 2);
   });
 
+  it("names each ended run's own evidence report, and keeps whether a schedule started it (M8-05)", () => {
+    const root = copyFixture("sample-app");
+    const first: Task = { ...newTask(root, "Bump deps"), state: "done", run: run() };
+    const second: Task = {
+      ...first,
+      ...withPastRun(first),
+      run: run({
+        ...newRun(
+          { id: "tier-s", version: 1 },
+          { permissionMode: "acceptEdits", base: null, untrackedAtStart: [], scheduled: true },
+          new Date("2026-11-04T02:00:00.000Z"),
+        ),
+        endedAt: undefined,
+      }),
+    };
+    assert.equal(second.run?.trigger, "schedule");
+    assert.deepEqual(
+      allRuns(second).map((r) => [r.evidence, r.trigger]),
+      [
+        ["evidence-1.md", undefined],
+        [undefined, "schedule"],
+      ],
+      "a run still going has no report yet",
+    );
+  });
+
   it("counts a task from before run history as its one run", () => {
     const root = copyFixture("sample-app");
     const old: Task = { ...newTask(root, "Old"), state: "done", run: run() };

@@ -1,7 +1,7 @@
 // Drives the sidecar the way the Rust core will (spikes S2/S3) and checks real behaviour
 // against the user's own `claude` CLI.
 //
-// Usage: node scripts/spike-host.ts --cwd <empty scratch dir> [--model haiku] [--scenario basic|mode|interrupt|guard|auto|subagents|nested|background|sessions|approvals|plan|fixtures|image|team|profile|exit|all] [--record out.jsonl] [--sidecar <executable> --data-dir <dir>]
+// Usage: node scripts/spike-host.ts --cwd <empty scratch dir> [--model haiku] [--scenario basic|mode|interrupt|guard|auto|subagents|nested|background|sessions|approvals|plan|fixtures|image|team|profile|schedule|exit|all] [--record out.jsonl] [--sidecar <executable> --data-dir <dir>]
 // Makes real model calls with the user's own login (haiku keeps a full run around a few cents).
 import { execFileSync, spawn, spawnSync } from "node:child_process";
 import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
@@ -65,6 +65,8 @@ const state = {
     | null,
 };
 const permissionLog: PermissionRequest[] = [];
+/** Waiting for a task's updates, by task id (M8-05). */
+const taskWaiters = new Map<string, (task: Notifications["task.updated"]["task"]) => void>();
 /** Sessions the sidecar opened on its own: a Team chat's workers (M8-03). */
 const openedLog: Notifications["session.opened"][] = [];
 
@@ -105,6 +107,14 @@ function onLine(line: string) {
       );
     if (event.type === "error") console.log(`    [error] ${event.message}`);
     state.onEvent?.(event);
+  } else if (frame.method === "task.updated") {
+    const { task } = frame.params as Notifications["task.updated"];
+    taskWaiters.get(task.id)?.(task);
+  } else if (frame.method === "schedule.changed") {
+    const { schedule } = frame.params as Notifications["schedule.changed"];
+    console.log(
+      `    [schedule.changed] ${schedule.id} last=${JSON.stringify(schedule.lastRun ?? null)} next=${schedule.nextAt}`,
+    );
   } else if (frame.method === "session.opened") {
     const opened = frame.params as Notifications["session.opened"];
     console.log(`    [session.opened] ${opened.name} (${opened.access}) of ${opened.parentId.slice(0, 8)}`);
@@ -987,6 +997,109 @@ async function profile() {
   state.sessionId = main;
 }
 
+/** Resolves with the task once an update says its run ended. */
+function runEnded(id: string, timeoutMs = 300_000): Promise<Notifications["task.updated"]["task"] | null> {
+  return new Promise((resolve) => {
+    const timer = setTimeout(() => resolve(null), timeoutMs);
+    let started = false;
+    taskWaiters.set(id, (task) => {
+      if (task.state === "running") started = true;
+      else if (started) {
+        clearTimeout(timer);
+        taskWaiters.delete(id);
+        resolve(task);
+      }
+    });
+  });
+}
+
+/**
+ * Scheduled flows (M8-05): an S task in a copy of the sample app is drafted, approved and run once on haiku, then
+ * scheduled daily at the next minute; the sidecar's minute check runs it again as a scheduled run, with the same
+ * model, and both runs keep their own evidence. About $0.03 on haiku; takes two or three minutes.
+ */
+async function schedule() {
+  const app = join(cwd, "sched-app");
+  rmSync(app, { recursive: true, force: true });
+  cpSync(fileURLToPath(new URL("../../../fixtures/sample-app", import.meta.url)), app, { recursive: true });
+  const git = (...a: string[]) =>
+    execFileSync("git", ["-c", "user.name=spike", "-c", "user.email=spike@example.invalid", ...a], {
+      cwd: app,
+      encoding: "utf8",
+    });
+  git("init", "-q", "-b", "main");
+  git("add", ".");
+  git("commit", "-q", "-m", "sample app");
+
+  const created = await request("task.create", {
+    cwd: app,
+    request: "Add a one-line comment at the very top of src/cart.js that says: Cart helpers.",
+  });
+  const drafted = await request("task.draft", { cwd: app, id: created.id, model: values.model });
+  if (!drafted.contract || !drafted.triage) throw new Error("no contract");
+  await request("task.approve", {
+    cwd: app,
+    id: created.id,
+    contract: drafted.contract,
+    tier: "S",
+    ...(drafted.triage.proposed !== "S" ? { reason: "spike: a schedule test" } : {}),
+    budgetUsd: drafted.triage.budgetUsd,
+  });
+  const refused = await request("schedule.save", {
+    cwd: app,
+    taskId: "2026-01-01-00000000",
+    cadence: { kind: "daily", at: "02:00" },
+    enabled: true,
+  }).then(
+    () => "saved",
+    (err: Error) => err.message,
+  );
+  check("a schedule needs a real, approved task", /No task/.test(refused), refused);
+
+  console.log("  ▶ first run, by hand, on haiku");
+  const first = runEnded(created.id);
+  await request("task.start", { cwd: app, id: created.id, permissionMode: "acceptEdits", model: values.model });
+  const one = await first;
+  console.log(`    first run: ${one?.state} ($${one?.run?.costUsd.toFixed(3)})`);
+
+  // Daily at the next whole minute that's at least 20 s away.
+  const at = new Date(Date.now() + 80_000);
+  const clock = `${String(at.getHours()).padStart(2, "0")}:${String(at.getMinutes()).padStart(2, "0")}`;
+  const saved = await request("schedule.save", {
+    cwd: app,
+    taskId: created.id,
+    cadence: { kind: "daily", at: clock },
+    enabled: true,
+  });
+  console.log(`  ▶ scheduled daily at ${clock}; next ${saved.schedule.nextAt}`);
+  await request("schedule.watch", { cwds: [app] });
+  const second = await runEnded(created.id, 360_000);
+  const after = (await request("schedule.list", { cwd: app })).schedules[0];
+  const nextIn = after ? new Date(after.nextAt).getTime() - Date.now() : 0;
+  check(
+    "the schedule runs the task again at its time, as a scheduled run with the same model",
+    second?.run?.trigger === "schedule" &&
+      second.run.model === one?.run?.model &&
+      second.run.permissionMode === "acceptEdits" &&
+      after?.lastRun?.state === "started" &&
+      nextIn > 20 * 3600_000,
+    `state=${second?.state} trigger=${second?.run?.trigger} model=${second?.run?.model} last=${after?.lastRun?.state} next in ${(nextIn / 3600_000).toFixed(1)} h`,
+  );
+  const dir = join(app, ".agentchainer", "tasks", created.id);
+  // The report is written just after the run's last update.
+  for (let i = 0; i < 40 && !existsSync(join(dir, "evidence-2.md")); i++) await sleep(250);
+  check(
+    "each run keeps its own evidence report",
+    existsSync(join(dir, "evidence-1.md")) &&
+      existsSync(join(dir, "evidence-2.md")) &&
+      second?.runs?.[0]?.evidence === "evidence-1.md",
+    `files=${readdirSync(dir)
+      .filter((f) => f.startsWith("evidence"))
+      .join(",")}`,
+  );
+  await request("schedule.delete", { cwd: app, id: saved.schedule.id });
+}
+
 const scenarios: Record<string, () => Promise<void>> = {
   basic,
   mode,
@@ -1003,6 +1116,7 @@ const scenarios: Record<string, () => Promise<void>> = {
   image,
   team,
   profile,
+  schedule,
   exit,
 };
 // "all" skips exit, which needs an empty --cwd of its own.
@@ -1022,6 +1136,7 @@ for (const file of [
   "TEAM.md",
   "PROFILE.md",
   "profile-probe.txt",
+  "sched-app",
   ".claude",
 ]) {
   rmSync(join(cwd, file), { recursive: true, force: true });

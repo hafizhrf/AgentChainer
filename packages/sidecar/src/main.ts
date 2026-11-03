@@ -67,6 +67,7 @@ import {
   writeWorkflowFile,
 } from "./tasks/project-workflows.ts";
 import type { SessionHost } from "./tasks/runner.ts";
+import { Scheduler } from "./tasks/schedules.ts";
 import {
   acceptRisk,
   approveSubtasks,
@@ -96,6 +97,8 @@ import {
   retriageTask,
   reviewPrTask,
   reviseTask,
+  runningTask,
+  schedulable,
   settleRun,
   shippedLibrary,
   shutdownRuns,
@@ -196,6 +199,40 @@ function sessionHost({ sdk, claudePath }: Claude): SessionHost {
 }
 
 const taskUpdated = (cwd: string) => (task: Task) => notify("task.updated", { cwd, task });
+
+/**
+ * Scheduled flows (M8-05): the watched workspaces' schedules, checked once a minute while the app is open. A run
+ * starts like Run again, in `acceptEdits`: edits go ahead, anything else waits for the person, who is notified.
+ */
+const scheduler = new Scheduler({
+  start: (cwd, taskId, check) => {
+    if (check) {
+      schedulable(cwd, taskId);
+      return;
+    }
+    // Starting needs the SDK, which is async: the checks that can refuse a run are made first, here.
+    if (runningTask(taskId)) throw new Error("The task is already running.");
+    // Like Run again: the model of the task's last run, so a schedule never switches it to a costlier one.
+    const model = schedulable(cwd, taskId).run?.model;
+    void claude().then(
+      (c) =>
+        startTask(
+          cwd,
+          taskId,
+          sessionHost(c),
+          { permissionMode: "acceptEdits", scheduled: true, ...(model ? { model } : {}) },
+          taskUpdated(cwd),
+        ),
+      (err: unknown) => log(`a scheduled run couldn't start: ${err instanceof Error ? err.message : String(err)}`),
+    );
+  },
+  title: (cwd, taskId) => {
+    const task = loadTask(cwd, taskId);
+    return (task.title ?? task.request).slice(0, 120);
+  },
+  changed: (schedule) => notify("schedule.changed", { schedule }),
+  deleted: (cwd, id) => notify("schedule.deleted", { cwd, id }),
+});
 
 /**
  * Drafting's messages as agent events tagged with the task's "draft" step (UX-13), so its thread shows what drafting
@@ -464,6 +501,34 @@ serve(
     },
 
     "agents.templates": () => ({ templates: agentTemplates() }),
+
+    "schedule.list": ({ cwd }) => {
+      if (cwd) requireFolder(cwd);
+      return { schedules: scheduler.list(cwd) };
+    },
+
+    "schedule.save": ({ cwd, id, taskId, cadence, enabled }) => {
+      requireFolder(cwd);
+      try {
+        return { schedule: scheduler.save(cwd, { ...(id ? { id } : {}), taskId, cadence, enabled }) };
+      } catch (err) {
+        if (err instanceof RpcFailure) throw err;
+        throw new RpcFailure(RpcErrorCode.invalidParams, err instanceof Error ? err.message : String(err));
+      }
+    },
+
+    "schedule.delete": ({ cwd, id }) => {
+      requireFolder(cwd);
+      scheduler.delete(cwd, id);
+      return { ok: true };
+    },
+
+    "schedule.runNow": ({ cwd, id }) => {
+      requireFolder(cwd);
+      return { schedule: scheduler.runNow(cwd, id) };
+    },
+
+    "schedule.watch": ({ cwds }) => ({ schedules: scheduler.watch(cwds) }),
 
     "permissions.remove": ({ cwd, behavior, rule, scope }) => {
       removeRule(cwd, behavior, rule, scope ?? "workspace");
@@ -915,6 +980,7 @@ serve(
   () => {
     // Runs still going stay `running` on disk, so they read back as interrupted and can be resumed.
     shutdownRuns();
+    scheduler.stop();
     for (const session of sessions.values()) session.close();
   },
 );

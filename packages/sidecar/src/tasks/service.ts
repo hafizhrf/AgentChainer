@@ -53,7 +53,7 @@ import {
   type WorkflowRef,
   workflowRef,
 } from "./project-workflows.ts";
-import { withPastRun } from "./run-history.ts";
+import { runEvidenceFile, withPastRun } from "./run-history.ts";
 import { changedPaths, fileStats, type SessionHost, sessionRunner, startBase, untracked } from "./runner.ts";
 import { semgrepScan, trivyScan } from "./scanners.ts";
 import { proposeSplit } from "./split.ts";
@@ -453,6 +453,9 @@ export async function settleRun(id: string): Promise<void> {
 let shuttingDown = false;
 
 /** A run that says it's running but has no orchestrator here was cut off (the app quit): it's `interrupted`. */
+/** Whether the task's run is going on in this sidecar. */
+export const runningTask = (id: string) => runs.has(id);
+
 export function present(task: Task): Task {
   return task.state === "running" && !runs.has(task.id) ? { ...task, state: "interrupted" } : task;
 }
@@ -489,6 +492,22 @@ function codeRootOf(root: string, task: Task): string {
 
 /** Tasks a new run can start from. */
 const STARTABLE = new Set<Task["state"]>(["ready", "done", "accepted", "failed", "unverified", "cancelled"]);
+
+/**
+ * Whether a schedule may run this task (M8-05): an approved S, M or L task of its own, whose last run isn't left
+ * interrupted. Throws with the reason, for the schedule's form or its last run.
+ */
+export function schedulable(root: string, id: string): Task {
+  const task = present(loadTask(root, id));
+  if (!task.contract?.approvedAt || !task.triage) {
+    throw invalid("Approve the task's contract and tier first: a schedule runs an approved task.");
+  }
+  if (task.triage.chosen === "XL")
+    throw invalid("An XL task can't be scheduled: each run's split needs your approval.");
+  if (task.parent) throw invalid("A sub-task runs with its XL task; schedule a task of its own.");
+  if (task.state === "interrupted") throw invalid("Its last run was interrupted: resume or stop it first.");
+  return task;
+}
 
 /**
  * Runs a task's tier workflow in the background, in its code folder (a sub-task's worktree, or the workspace); its
@@ -645,12 +664,13 @@ export function startTask(
   root: string,
   id: string,
   host: SessionHost,
-  opts: { permissionMode: PermissionMode; model?: string },
+  opts: { permissionMode: PermissionMode; model?: string; scheduled?: boolean },
   notify: (task: Task) => void,
   now = new Date(),
 ): Task {
   const task = present(loadTask(root, id));
   if (runs.has(id)) throw invalid("The task is already running.");
+  if (opts.scheduled) schedulable(root, id);
   if (!STARTABLE.has(task.state) || !task.contract?.approvedAt || !task.triage) {
     throw invalid("Approve the contract and the tier first.");
   }
@@ -1815,6 +1835,8 @@ export function writeEvidence(root: string, task: Task, now = new Date()): { mar
   const markdown = renderEvidence(evidence);
   writeTaskFile(root, task.id, "evidence.json", `${JSON.stringify(evidence, null, 2)}\n`);
   writeTaskFile(root, task.id, "evidence.md", markdown);
+  // Each run keeps its own report, which the next run's would otherwise replace (M8-05).
+  if (task.run.endedAt) writeTaskFile(root, task.id, runEvidenceFile((task.runs?.length ?? 0) + 1), markdown);
   return { markdown, path: path.join(root, AC_DIR, "tasks", task.id, "evidence.md") };
 }
 

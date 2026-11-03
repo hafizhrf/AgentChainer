@@ -32,6 +32,11 @@ export type Tab = {
   models: ModelOption[];
   /** How full the context window was after the last turn (UX-12); null until a turn reports it. */
   context: Omit<Extract<AgentEvent, { type: "context.usage" }>, "type"> | null;
+  /** A Team chat's worker (M8-03): the supervisor's session id, and what the worker may do. */
+  parentId?: string;
+  access?: "read" | "write";
+  /** A Team chat (M8-03): what it and its workers spent together, against its one cap. */
+  team?: { capUsd: number; spentUsd: number; stopped: boolean };
   /** What the composer starts as (UX-13): New in Task mode opens a chat whose composer makes a task. */
   kind?: "chat" | "task";
   /** Set while Claude switched itself to plan mode (UX-12): the mode to go back to. */
@@ -89,12 +94,19 @@ export function newTab(
     effort?: Effort | null;
     budgetUsd?: number | null;
     folders?: string[];
+    parentId?: string;
+    access?: "read" | "write";
+    /** A Team chat's cap (M8-03). */
+    teamCapUsd?: number;
   },
 ): Tab {
   return {
     sessionId,
     cwd,
     ...(options.folders?.length ? { folders: options.folders } : {}),
+    ...(options.parentId ? { parentId: options.parentId } : {}),
+    ...(options.access ? { access: options.access } : {}),
+    ...(options.teamCapUsd ? { team: { capUsd: options.teamCapUsd, spentUsd: 0, stopped: false } } : {}),
     title: options.title,
     modelAlias: options.modelAlias ?? "",
     effort: options.effort ?? null,
@@ -184,6 +196,12 @@ export function tabEvent(tab: Tab, e: AgentEvent, now?: number): Tab {
     }
     case "background.changed":
       return { ...tab, background: e.tasks };
+    // The sidecar starts these turns itself (M8-03): a worker's assignment, and a supervisor's delivered reports.
+    case "user.message":
+    case "worker.message":
+      return { ...tab, running: true, items: applyEvent(tab.items, e, now) };
+    case "team.budget":
+      return { ...tab, team: { capUsd: e.capUsd, spentUsd: e.spentUsd, stopped: e.stopped } };
     case "turn.started":
       return { ...tab, running: true, items: applyEvent(tab.items, e, now) };
     case "error":

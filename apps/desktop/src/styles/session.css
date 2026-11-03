@@ -1290,3 +1290,45 @@
 .chat-dock[hidden] {
   display: none;
 }
+
+/* A Team chat's worker reported back (M8-03): a card, so it never reads as the person's own message. */
+.msg.worker-report {
+  white-space: normal;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
+.msg.worker-report.failed {
+  border-left-color: var(--err);
+}
+
+.worker-report-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--muted);
+  font-size: var(--text-sm);
+}
+
+.msg.worker-report:hover .msg-meta {
+  opacity: 1;
+}
+
+/* The Team toggle and its spend (M8-03). */
+.team-toggle[aria-pressed="true"] {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+.team-spend {
+  color: var(--muted);
+  font-size: var(--text-xs);
+  white-space: nowrap;
+}
+
+.team-spend.stopped {
+  color: var(--err);
+}

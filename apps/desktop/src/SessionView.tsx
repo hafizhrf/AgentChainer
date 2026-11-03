@@ -49,6 +49,7 @@ export function SessionView({
   onToggleTerminal,
   onSend,
   onTask,
+  onTeam,
   onCommand,
   onAnswer,
   onInterrupt,
@@ -78,6 +79,8 @@ export function SessionView({
   onSend: (text: string, images: Attachment[]) => void;
   /** Makes a task of the composer's text (UX-13), when the Tasks preview is on. */
   onTask?: (text: string) => void;
+  /** Starts the chat over as a Team chat, or back as a plain one (M8-03); only before anything is sent. */
+  onTeam: (on: boolean) => void;
   /** An app slash command typed in the composer (UX-12). */
   onCommand: (name: AppCommand, arg: string) => void;
   /** Answers a request shown in the thread: Claude's questions (UX-12). */
@@ -336,6 +339,7 @@ export function SessionView({
                       }}
                       onCommand={onCommand}
                       {...(onTask ? { onTask } : {})}
+                      onTeam={onTeam}
                       onInterrupt={onInterrupt}
                       onResume={onResume}
                       onModeChange={onModeChange}

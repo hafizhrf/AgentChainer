@@ -54,6 +54,7 @@ import {
 } from "./tabs.ts";
 import { HomeTasks } from "./tasks/HomeTasks.tsx";
 import { type TaskTab, taskKey } from "./tasks/taskTabs.ts";
+import { TEAM_CAP_USD, usd } from "./team.ts";
 import { asTheme } from "./theme.ts";
 import { applyEvent, closeAssistant, type Item, nextId, setMessageId } from "./transcript.ts";
 import { UpdateDialog } from "./UpdateDialog.tsx";
@@ -255,6 +256,9 @@ export function App() {
       if (n.method === "fleet.changed") {
         const { item } = n.params;
         setFleet((f) => ({ ...f, [item.sessionId]: item }));
+        // A Team chat's worker ends with its supervisor, or at the team's cap (M8-03): its tab can't send any more.
+        if (item.parentId && item.status === "ended")
+          patchTab(item.sessionId, (t) => ({ ...t, ended: true, running: false }));
         return;
       }
       if (n.method === "permission.request") {
@@ -273,8 +277,28 @@ export function App() {
         if (task.state !== "running") setTaskApprovals((q) => q.filter((p) => p.task?.id !== task.id));
         return;
       }
-      // A Team chat's worker (M8-03). Nothing in the UI starts a Team chat yet; its tab comes with the Team toggle.
-      if (n.method === "session.opened") return;
+      // A Team chat's worker (M8-03): its tab opens beside the supervisor's without taking focus, before its events.
+      if (n.method === "session.opened") {
+        const { sessionId, parentId, cwd: dir, name, access } = n.params;
+        setTabs((ts) => {
+          const parent = ts.find((t) => t.sessionId === parentId);
+          const tab = newTab(sessionId, dir, {
+            title: name,
+            mode: "default",
+            parentId,
+            access,
+            modelAlias: parent?.modelAlias ?? "",
+            ...(parent?.folders?.length ? { folders: parent.folders } : {}),
+            items: [
+              notice(
+                `Worker started by “${parent?.title ?? "its supervisor"}”, ${access === "write" ? "allowed to edit with your approval" : "read only"}`,
+              ),
+            ],
+          });
+          return [...ts, tab];
+        });
+        return;
+      }
       const { sessionId, event, task } = n.params;
       if (event.type === "turn.completed") {
         if (task && !tabsRef.current.some((t) => t.sessionId === sessionId)) recordStepCost(sessionId, event, task.cwd);
@@ -448,9 +472,12 @@ export function App() {
     modelAlias: string,
     mode: PermissionMode,
     folders: string[] = [],
+    team = false,
   ): Promise<string | null> {
     try {
-      const { effort, budgetUsd, showThinking } = sessionOptions(mode);
+      const { effort, budgetUsd: cap, showThinking } = sessionOptions(mode);
+      // A Team chat (M8-03) always has a cap, for it and its workers together.
+      const budgetUsd = team ? (cap ?? TEAM_CAP_USD) : cap;
       // Before the session starts, so what's applied (plugins, settings) is there from its first turn.
       const applied = settings?.autoApply ? await autoApply(dir) : [];
       const { sessionId } = await request("session.start", {
@@ -461,12 +488,32 @@ export function App() {
         ...(budgetUsd ? { maxBudgetUsd: budgetUsd } : {}),
         showThinking,
         ...(folders.length ? { folders } : {}),
+        ...(team ? { team } : {}),
       });
       const also = folders.length ? `, with ${folders.map(folderName).join(", ")}` : "";
-      const items = [notice(`Session started in ${folderName(dir)}${also}`), ...applied.map(notice)];
+      const items = [
+        notice(`Session started in ${folderName(dir)}${also}`),
+        ...(team && budgetUsd
+          ? [
+              notice(
+                `A Team chat: Claude can start worker sessions, each in its own tab, all within a ${usd(budgetUsd)} cap.`,
+              ),
+            ]
+          : []),
+        ...applied.map(notice),
+      ];
       setTabs((ts) => [
         ...ts,
-        newTab(sessionId, dir, { title: NEW_TITLE, mode, items, modelAlias, effort, budgetUsd, folders }),
+        newTab(sessionId, dir, {
+          title: NEW_TITLE,
+          mode,
+          items,
+          modelAlias,
+          effort,
+          budgetUsd,
+          folders,
+          ...(team && budgetUsd ? { teamCapUsd: budgetUsd } : {}),
+        }),
       ]);
       setActive(sessionId);
       setRuntimeNotice(null);
@@ -614,7 +661,7 @@ export function App() {
     const id = t.sessionId;
     switch (name) {
       case "clear":
-        void startSession(t.cwd, t.modelAlias, t.mode, t.folders);
+        void startSession(t.cwd, t.modelAlias, t.mode, t.folders, t.team !== undefined);
         return;
       case "fork":
         void forkTab(id);
@@ -750,6 +797,15 @@ export function App() {
     } catch (err) {
       addNotice(sessionId, `Couldn't open ${file}: ${err}`);
     }
+  }
+
+  /** Starts a chat nothing was sent to over as a Team chat, or as a plain one (M8-03): the tools come with the start. */
+  async function setTeam(t: Tab, on: boolean) {
+    if (!isFresh(t)) return;
+    const id = await startSession(t.cwd, t.modelAlias, t.mode, t.folders ?? [], on);
+    if (!id) return;
+    void request("session.close", { sessionId: t.sessionId }).catch(() => undefined);
+    setTabs((ts) => ts.filter((x) => x.sessionId !== t.sessionId));
   }
 
   function closeTab(sessionId: string) {
@@ -1185,6 +1241,7 @@ export function App() {
                     onToggleTerminal={() => toggleTerminal(t.sessionId)}
                     onSend={(text, images) => void sendText(t.sessionId, text, images)}
                     {...(settings?.tasksPreview === true ? { onTask: (text: string) => void makeTask(t, text) } : {})}
+                    onTeam={(on) => void setTeam(t, on)}
                     onCommand={(name, arg) => runCommand(t, name, arg)}
                     onAnswer={(req, reply) => void answer(req, reply)}
                     onInterrupt={() => void request("session.interrupt", { sessionId: t.sessionId })}

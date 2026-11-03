@@ -1659,13 +1659,25 @@ first.
       what's waiting and working. Checked in the app: a chat waiting for an approval in one workspace and a task step
       waiting in another at once; Answer opened the task's thread at its approval card; Stop moved the chat to idle
       and ended the task. Not built: listing a row's subagents (the session's graph has them).
-- [ ] **M8-03** Supervisor and worker sessions: a supervisor session hands work to worker sessions (assign, hand
+- [x] **M8-03** Supervisor and worker sessions: a supervisor session hands work to worker sessions (assign, hand
       off, send a message, an inbox) through an in-app MCP server, under the app's approvals and budgets. From CAO's
       supervisor/worker model; it goes beyond XL's fixed split (M3-07).
       → design: [supervisor.md](design/supervisor.md) (owner decisions, 2026-11-03).
   - Sidecar (PR 1): the Team, its in-process MCP server and `session.opened`. Unit tests, and the live `team`
     scenario on haiku: 5 of 5 checks passed, about $0.03.
-  - UI (PR 2): the Team toggle, nested worker tabs, worker cards and the fleet rows. The box is ticked then.
+  - UI (PR 2):
+    - a **Team** toggle in a new chat's composer (the chat starts over as a Team chat, with Settings' cap or $2);
+    - worker tabs nested under their supervisor, with their access;
+    - Team tool rows named by what they do, with a `read`/`write` badge;
+    - worker reports as cards;
+    - the team's spend against its cap in the composer;
+    - "worker of …" rows in the fleet view.
+  - Checked in the app over CDP, dark and light, on haiku:
+    - a read worker and a write worker were assigned;
+    - the write worker's approval showed in its own tab, and the sidebar and Fleet showed it waiting;
+    - `notes.txt` was written after Allow once;
+    - both reports reached the supervisor as cards, and it summed them up;
+    - closing the supervisor ended both workers.
 - [ ] **M8-04** An agent profiles manager: create from a template, edit, clone and delete, validated before saving,
       with per-profile tool allowlists. From CAO's profile editor; builds on M3-05's roles and UX-10's Plugins page.
 - [ ] **M8-05** Scheduled flows: run a task template on a schedule (e.g. a nightly dependency bump), locally, with a

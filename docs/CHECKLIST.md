@@ -1137,16 +1137,24 @@ for the desktop shell, start screen and session view to be cleaned up (UX-02, UX
     - Alt.
   - Still to check by hand: dragging and snap layouts on Windows 11 (the custom buttons don't show the snap flyout
     **(verify)**), and macOS and Linux.
-- [ ] **UX-16** An app icon with its own meaning. Owner request, 2026-11-03: minimal like VS Code's, but on theme.
-  - The idea: AgentChainer chains agents into checked work, so the mark is two linked chain links whose join is a
-    check mark: agents linked, and every hand-off verified. It's a flat shape in one or two colors from the tokens,
-    with no gradient or text, and readable at 16 px.
+- [x] **UX-16** An app icon with its own meaning. Owner request, 2026-11-03: minimal like VS Code's, but on theme.
+  - The idea: AgentChainer chains agents into checked work. The first sketch was two chain links whose join is a
+    check mark; the owner chose three nodes linked into a check instead (2026-11-03), which reads at 16 px. Each node
+    is an agent, each link a hand-off, and the chain they make is a check: work passed along and verified. It's a flat
+    shape in one or two colors from the tokens, with no gradient or text.
   - Deliverables:
     - the SVG source in `apps/desktop/src-tauri/icons/`;
     - every size regenerated with `tauri icon`;
     - the title bar's and the About dialog's mark;
     - a monochrome version for the macOS menu bar or tray, if one is ever added.
   - No "Claude" or Anthropic marks (ADR-0002).
+  Note: done.
+  - `icons/icon.svg` is the dark theme's accent (`#7fb89a`) mark on its surface (`#1c201e`), on a rounded tile with
+    the macOS grid's margin. Every desktop size (`.ico`, `.icns`, the PNGs) was regenerated from it with
+    `tauri icon src-tauri/icons/icon.svg`; the mobile outputs aren't kept.
+  - The title bar shows the same path (`BrandMark.tsx`, UX-15) in `currentColor`, which is also the monochrome
+    version. The macOS About dialog uses the app icon.
+  - Checked: the 128 px and 32 px PNGs read as the check on its tile.
 
 ### Exit criteria
 

@@ -53,6 +53,7 @@ import { Select } from "../ui/Select.tsx";
 import { ApprovalCard } from "./ApprovalCard.tsx";
 import { CreatePrDialog } from "./CreatePr.tsx";
 import { DeployCard } from "./DeployCard.tsx";
+import { FlowPanel } from "./FlowPanel.tsx";
 import { MergeGates } from "./MergeGates.tsx";
 import { PrChecks } from "./PrChecks.tsx";
 import { ProjectWorkflowNote } from "./ProjectWorkflowNote.tsx";
@@ -172,6 +173,10 @@ export function TaskPage({
   const [accepting, setAccepting] = useState(false);
   const [acceptReason, setAcceptReason] = useState("");
   const [sideOpen, setSideOpen] = useState(true);
+  const [sideTab, setSideTab] = useState<"task" | "flow">("task");
+  /** A step to show in the thread, from the Flow tab: the run opens it, and the thread scrolls to it. */
+  const [focus, setFocus] = useState<{ id: string; at: number } | null>(null);
+  const threadRef = useRef<HTMLDivElement>(null);
   /** An XL task's sub-tasks, and a sub-task's XL task, as they are now. */
   const [children, setChildren] = useState<Record<string, Task>>({});
   const [parentTask, setParentTask] = useState<Task | null>(null);
@@ -468,7 +473,7 @@ export function TaskPage({
           </div>
         )}
 
-        <div className="task-thread-scroll">
+        <div className="task-thread-scroll" ref={threadRef}>
           <div className="thread">
             <div className="msg user task-request-msg">
               {task.chatContext && <span className="chip">From a chat</span>}
@@ -623,6 +628,7 @@ export function TaskPage({
                 cwd={cwd}
                 items={stepItems}
                 live={liveSessions}
+                focus={focus}
                 onLoaded={(sessionId, items) => setStepItems((all) => ({ ...all, [sessionId]: items }))}
                 onOpenTask={(id) => void open(id)}
               />
@@ -800,8 +806,39 @@ export function TaskPage({
       </div>
 
       {sideOpen && (
-        <aside className="task-side" aria-label="Task">
-          <TaskFacts task={task} cwd={cwd} onOpenTask={(id) => void open(id)} />
+        <aside className={`task-side${sideTab === "flow" ? " wide" : ""}`} aria-label="Task">
+          <fieldset className="segmented side-tabs">
+            <legend className="sr-only">Panel</legend>
+            {(["task", "flow"] as const).map((k) => (
+              <button
+                key={k}
+                type="button"
+                aria-pressed={sideTab === k}
+                className={sideTab === k ? "active" : undefined}
+                onClick={() => setSideTab(k)}
+              >
+                {k === "task" ? "Task" : "Flow"}
+              </button>
+            ))}
+          </fieldset>
+          {sideTab === "task" ? (
+            <TaskFacts task={task} cwd={cwd} onOpenTask={(id) => void open(id)} />
+          ) : (
+            <FlowPanel
+              task={task}
+              cwd={cwd}
+              subtasks={(task.subtasks ?? []).flatMap((id) => (children[id] ? [children[id]] : []))}
+              onOpenTask={(id) => void open(id)}
+              onJump={(id) => {
+                setFocus({ id, at: Date.now() });
+                requestAnimationFrame(() =>
+                  threadRef.current
+                    ?.querySelector(`[data-step="${CSS.escape(id)}"]`)
+                    ?.scrollIntoView({ behavior: "smooth", block: "start" }),
+                );
+              }}
+            />
+          )}
         </aside>
       )}
 
@@ -1464,6 +1501,7 @@ function RunView({
   cwd,
   items,
   live,
+  focus,
   onLoaded,
   onOpenTask,
 }: {
@@ -1472,6 +1510,8 @@ function RunView({
   items: StepItems;
   /** Running steps' sessions, by step id, until each step records its own. */
   live: Record<string, string>;
+  /** A step picked on the Flow tab: it opens. */
+  focus: { id: string; at: number } | null;
   onLoaded: (sessionId: string, items: StepItems[string]) => void;
   /** Opens a sub-task's page, from an XL run's timeline. */
   onOpenTask: (id: string) => void;
@@ -1479,6 +1519,11 @@ function RunView({
   const run = task.run;
   const [open, setOpen] = useState<string | null>(null);
   const [, tick] = useState(0);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: opens the step picked on the Flow tab, each time it's picked.
+  useEffect(() => {
+    const entry = focus && task.run?.steps.find((s) => s.id === focus.id);
+    if (entry) void toggle(entry, true);
+  }, [focus]);
   // Running steps' durations count up.
   useEffect(() => {
     if (task.state !== "running") return;
@@ -1491,8 +1536,8 @@ function RunView({
   const shown = open ?? running?.id ?? null;
   const before = failedBefore(task);
 
-  async function toggle(entry: StepRun) {
-    const next = shown === entry.id ? "" : entry.id;
+  async function toggle(entry: StepRun, keepOpen = false) {
+    const next = shown === entry.id && !keepOpen ? "" : entry.id;
     setOpen(next);
     const sessionId = entry.sessionId;
     if (next && sessionId && !items[sessionId] && entry.status !== "running") {
@@ -1526,7 +1571,7 @@ function RunView({
         const sessionId = entry.sessionId ?? live[entry.id];
         const sessionItems = sessionId ? items[sessionId] : undefined;
         return (
-          <section key={entry.id} className={`step-block task-step ${entry.status}`} id={`step-${entry.id}`}>
+          <section key={entry.id} className={`step-block task-step ${entry.status}`} data-step={entry.id}>
             <button
               type="button"
               className="task-step-head step-head"

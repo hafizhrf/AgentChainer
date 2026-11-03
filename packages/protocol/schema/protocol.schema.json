@@ -11971,6 +11971,59 @@
         "additionalProperties": false
       }
     },
+    "task.workflow": {
+      "params": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "cwd": {
+            "type": "string",
+            "minLength": 1
+          },
+          "id": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}-[0-9a-f]{8}$"
+          }
+        },
+        "required": [
+          "cwd",
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "result": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "anyOf": [
+          {
+            "type": "object",
+            "properties": {
+              "workflow": {
+                "type": "object",
+                "propertyNames": {
+                  "type": "string"
+                },
+                "additionalProperties": {}
+              },
+              "source": {
+                "type": "string",
+                "enum": [
+                  "app",
+                  "project"
+                ]
+              }
+            },
+            "required": [
+              "workflow",
+              "source"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "null"
+          }
+        ]
+      }
+    },
     "task.message": {
       "params": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",

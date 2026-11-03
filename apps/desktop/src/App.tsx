@@ -10,18 +10,19 @@ import {
   PROTOCOL_VERSION,
   RpcErrorCode,
   type SessionInfo,
+  type Task,
 } from "@agentchainer/protocol";
 import * as Tooltip from "@radix-ui/react-tooltip";
 import { invoke } from "@tauri-apps/api/core";
 import { save } from "@tauri-apps/plugin-dialog";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { X } from "lucide-react";
-import { lazy, Suspense, useEffect, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { Group, Panel, Separator, useDefaultLayout } from "react-resizable-panels";
 import { applyTheme } from "./appearance.ts";
 import { CommandPalette, type PaletteCommand } from "./CommandPalette.tsx";
 import type { Attachment } from "./Composer.tsx";
-import { APP_COMMANDS, type AppCommand, effortFromArg, modeFromArg, modelFromArg } from "./commands.ts";
+import { APP_COMMANDS, type AppCommand, chatContext, effortFromArg, modeFromArg, modelFromArg } from "./commands.ts";
 import { useConfirm } from "./Dialog.tsx";
 import { joinPath } from "./files.ts";
 import { HomeView, pickFolder } from "./HomeView.tsx";
@@ -39,6 +40,7 @@ import {
   asMode,
   closeWaits,
   folderName,
+  isFresh,
   newTab,
   permissionAnswered,
   permissionAsked,
@@ -46,7 +48,8 @@ import {
   tabEvent,
   updateTab,
 } from "./tabs.ts";
-import { WorkspaceStep } from "./tasks/WorkspaceStep.tsx";
+import { HomeTasks } from "./tasks/HomeTasks.tsx";
+import { type TaskTab, taskKey } from "./tasks/taskTabs.ts";
 import { asTheme } from "./theme.ts";
 import { applyEvent, closeAssistant, type Item, nextId, setMessageId } from "./transcript.ts";
 import { UpdateDialog } from "./UpdateDialog.tsx";
@@ -116,9 +119,8 @@ export function App() {
   const [taskApprovals, setTaskApprovals] = useState<PermissionRequest[]>([]);
   /** Task step sessions' running cost totals, for each turn's spend in cost history. */
   const stepTotals = useRef(new Map<string, number>());
-  /** The task page (M3 preview), open over the session it came from (or Home when `back` is null). */
-  /** The task page; `cwd` is null while New task asks for the workspace first. */
-  const [taskView, setTaskView] = useState<{ cwd: string | null; model: string; back: string | null } | null>(null);
+  /** Tasks open as tabs (UX-13), beside the sessions; the active one is `task:<id>` in `active`. */
+  const [taskTabs, setTaskTabs] = useState<TaskTab[]>([]);
   /** Self-test screenshots only: the right panel's tab. */
   const [panelTab, setPanelTab] = useState<PanelTab | undefined>(undefined);
   const [showFirstChange, setShowFirstChange] = useState(false);
@@ -137,6 +139,22 @@ export function App() {
   const alive = useRef(false);
 
   const patchTab = (sessionId: string, fn: (tab: Tab) => Tab) => setTabs((ts) => updateTab(ts, sessionId, fn));
+  /** A task thread reports its task as it changes, for its tab in the sidebar (UX-13). */
+  const onTaskChange = useCallback((task: Task, busy: boolean) => {
+    setTaskTabs((all) =>
+      all.map((t) =>
+        t.id === task.id
+          ? {
+              ...t,
+              title: (task.title ?? task.request).slice(0, 60),
+              state: task.state,
+              busy: busy || task.state === "running",
+            }
+          : t,
+      ),
+    );
+  }, []);
+
   const addNotice = (sessionId: string, text: string) =>
     patchTab(sessionId, (t) => ({ ...t, items: [...closeAssistant(t.items), notice(text)] }));
 
@@ -590,6 +608,12 @@ export function App() {
         );
         return;
       }
+      case "task":
+        if (settings?.tasksPreview !== true) {
+          addNotice(id, "Tasks are a preview: turn them on in Settings, then try /task again.");
+        } else if (arg) void makeTask(t, arg);
+        else addNotice(id, "Say what to do after /task, or pick Task in the composer.");
+        return;
       case "help":
         addNotice(
           id,
@@ -714,11 +738,57 @@ export function App() {
     }
   }
 
-  /** Shows a session, or Home for null; closes the setup and task pages if they're open. */
-  function show(sessionId: string | null) {
+  /** Shows a session or a task (`task:<id>`), or Home for null; closes Workspace settings if it's open. */
+  function show(key: string | null) {
     setSetup(null);
-    setTaskView(null);
-    setActive(sessionId);
+    setActive(key);
+  }
+
+  /** Opens a task in its tab (UX-13); `autoDraft` drafts a new one as soon as it's loaded. */
+  function openTask(dir: string, id: string, options: { autoDraft?: boolean; model?: string; title?: string } = {}) {
+    setTaskTabs((all) =>
+      all.some((t) => t.id === id)
+        ? all
+        : [
+            ...all,
+            {
+              id,
+              cwd: dir,
+              title: options.title ?? "Task",
+              state: "draft",
+              busy: Boolean(options.autoDraft),
+              autoDraft: Boolean(options.autoDraft),
+              model: options.model ?? model,
+            },
+          ],
+    );
+    show(taskKey(id));
+  }
+
+  function closeTaskTab(id: string) {
+    const rest = taskTabs.filter((t) => t.id !== id);
+    setTaskTabs(rest);
+    if (active === taskKey(id))
+      setActive(tabs.at(-1)?.sessionId ?? (rest.at(-1) ? taskKey(rest.at(-1)?.id ?? "") : null));
+  }
+
+  /**
+   * Makes a task from the composer's Task mode or `/task` (UX-13): an empty chat becomes the task; a chat with history
+   * stays, and its last messages go to drafting as context.
+   */
+  async function makeTask(t: Tab, text: string) {
+    try {
+      const context = isFresh(t) ? "" : chatContext(t.items);
+      const created = await request("task.create", {
+        cwd: t.cwd,
+        request: text,
+        ...(context ? { context } : {}),
+      });
+      if (isFresh(t)) closeTab(t.sessionId);
+      openTask(t.cwd, created.id, { autoDraft: true, model: t.modelAlias, title: text.slice(0, 60) });
+    } catch (err) {
+      addNotice(t.sessionId, `Couldn't make the task: ${err}`);
+    }
   }
 
   function openWorkspace(dir: string) {
@@ -741,21 +811,16 @@ export function App() {
   }
 
   /**
-   * Opens the task page for the active session's folder, or Home's; with neither, the page asks for the folder first.
-   * Only with the Tasks preview on.
+   * New in Task mode (UX-13): a new chat in the active tab's folder, or Home's, with its composer set to Task. With no
+   * folder yet, Home asks for one. Only with the Tasks preview on.
    */
-  function newTask() {
+  async function newTask() {
     if (settings?.tasksPreview !== true) return;
-    const t = tabs.find((x) => x.sessionId === active);
-    setSetup(null);
-    setTaskView({ cwd: t?.cwd ?? (cwd.trim() || null), model: t?.modelAlias ?? model, back: t?.sessionId ?? null });
-  }
-
-  /** The folder New task asked for: it becomes Home's workspace too, and a recent one. */
-  function chooseTaskWorkspace(dir: string) {
-    setCwd(dir);
-    void rememberWorkspace(dir);
-    setTaskView((view) => view && { ...view, cwd: dir });
+    const t = tabs.find((x) => x.sessionId === active) ?? taskTabs.find((x) => taskKey(x.id) === active);
+    const dir = t?.cwd ?? cwd.trim();
+    if (!dir) return show(null);
+    const id = await startSession(dir, model, mode);
+    if (id) patchTab(id, (x) => ({ ...x, kind: "task" }));
   }
 
   const toggleTerminal = (sessionId: string) =>
@@ -915,11 +980,14 @@ export function App() {
               <Sidebar
                 tabs={tabs}
                 // A page over the session (Workspace settings, a task) is what's shown, not the session.
-                active={setup || taskView ? null : active}
+                active={setup ? null : active}
+                taskTabs={taskTabs}
+                onCloseTask={closeTaskTab}
+                waitingTasks={new Set(taskApprovals.flatMap((p) => (p.task ? [p.task.id] : [])))}
                 recent={settings?.recentWorkspaces ?? []}
                 ready={env ? env.ready : null}
                 onNew={() => show(null)}
-                {...(settings?.tasksPreview === true ? { onNewTask: newTask } : {})}
+                {...(settings?.tasksPreview === true ? { onNewTask: () => void newTask() } : {})}
                 onSelect={show}
                 onClose={closeTab}
                 onOpenWorkspace={openWorkspace}
@@ -939,7 +1007,7 @@ export function App() {
                 </div>
               )}
               <div className="main-body">
-                {active === null && !setup && !taskView && (
+                {active === null && !setup && (
                   <HomeView
                     env={env}
                     checking={checking}
@@ -959,13 +1027,17 @@ export function App() {
                     openIds={new Set(tabs.filter((t) => !t.ended).map((t) => t.sessionId))}
                     onOpenStored={openStored}
                     confirm={confirm}
-                  />
+                  >
+                    {settings?.tasksPreview === true && hello !== null && workspace && (
+                      <HomeTasks cwd={workspace} onOpen={(id, title) => openTask(workspace, id, { title })} />
+                    )}
+                  </HomeView>
                 )}
                 {tabs.map((t) => (
                   <SessionView
                     key={t.sessionId}
                     tab={t}
-                    hidden={t.sessionId !== active || setup !== null || taskView !== null}
+                    hidden={t.sessionId !== active || setup !== null}
                     panelTab={panelTab}
                     hiddenTabs={hiddenTabs}
                     onHiddenTabsChange={(next) => setHiddenTabs(() => next)}
@@ -975,6 +1047,7 @@ export function App() {
                     onToggleRight={() => setRightOpen((v) => !v)}
                     onToggleTerminal={() => toggleTerminal(t.sessionId)}
                     onSend={(text, images) => void sendText(t.sessionId, text, images)}
+                    {...(settings?.tasksPreview === true ? { onTask: (text: string) => void makeTask(t, text) } : {})}
                     onCommand={(name, arg) => runCommand(t, name, arg)}
                     onAnswer={(req, reply) => void answer(req, reply)}
                     onInterrupt={() => void request("session.interrupt", { sessionId: t.sessionId })}
@@ -1007,29 +1080,25 @@ export function App() {
                     />
                   </Suspense>
                 )}
-                {taskView && !setup && taskView.cwd === null && (
-                  <WorkspaceStep
-                    recent={settings?.recentWorkspaces ?? []}
-                    homeDir={hello?.homeDir ?? null}
-                    backLabel={taskView.back ? "Back to session" : "Back to Home"}
-                    onBack={() => setTaskView(null)}
-                    onChoose={chooseTaskWorkspace}
-                  />
-                )}
-                {taskView?.cwd && !setup && (
-                  <Suspense fallback={<div className="setup-page" />}>
-                    <TaskPage
-                      key={taskView.cwd}
-                      cwd={taskView.cwd}
-                      model={taskView.model}
-                      mode={mode}
-                      backLabel={taskView.back ? "Back to session" : "Back to Home"}
-                      confirm={confirm}
-                      onBack={() => setTaskView(null)}
-                      onOpenFile={(file) =>
-                        invoke("open_in_editor", { file, line: null, editor: settings?.editor ?? "system" })
-                      }
-                    />
+                {taskTabs.length > 0 && (
+                  <Suspense fallback={null}>
+                    {taskTabs.map((t) => (
+                      <TaskPage
+                        key={`${t.cwd}-${t.id}`}
+                        cwd={t.cwd}
+                        taskId={t.id}
+                        model={t.model}
+                        mode={mode}
+                        hidden={active !== taskKey(t.id) || setup !== null}
+                        autoDraft={t.autoDraft}
+                        confirm={confirm}
+                        onClose={() => closeTaskTab(t.id)}
+                        onChange={onTaskChange}
+                        onOpenFile={(file) =>
+                          invoke("open_in_editor", { file, line: null, editor: settings?.editor ?? "system" })
+                        }
+                      />
+                    ))}
                   </Suspense>
                 )}
               </div>

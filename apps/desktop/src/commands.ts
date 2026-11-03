@@ -9,7 +9,7 @@ import type { Item } from "./transcript.ts";
  * every other command is sent to Claude as text, as typed.
  */
 
-export type AppCommand = "clear" | "model" | "mode" | "effort" | "usage" | "fork" | "help";
+export type AppCommand = "clear" | "model" | "mode" | "effort" | "usage" | "fork" | "task" | "help";
 
 export const APP_COMMANDS: (SlashCommand & { name: AppCommand })[] = [
   { name: "clear", description: "Start a new chat in this folder", argumentHint: "" },
@@ -23,6 +23,11 @@ export const APP_COMMANDS: (SlashCommand & { name: AppCommand })[] = [
     aliases: ["cost", "stats", "context"],
   },
   { name: "fork", description: "Fork this chat into a new tab", argumentHint: "" },
+  {
+    name: "task",
+    description: "Make a task from this chat: Claude drafts a contract first",
+    argumentHint: "<what to do>",
+  },
   { name: "help", description: "List the app's commands", argumentHint: "" },
 ];
 
@@ -135,4 +140,25 @@ export function mention(cwd: string, path: string): string {
   const same = p.toLowerCase().startsWith(`${root.toLowerCase()}/`);
   const rel = same ? p.slice(root.length + 1) : p;
   return rel.includes(" ") ? `@"${rel}"` : `@${rel}`;
+}
+
+/**
+ * The chat a task is made from (UX-13), for its drafting: the last messages, newest kept, as "you:" and "Claude:"
+ * lines, at most `max` characters.
+ */
+export function chatContext(items: Item[], max = 12_000): string {
+  const lines: string[] = [];
+  for (const i of items) {
+    if (i.kind === "user" && i.text.trim()) lines.push(`you: ${i.text.trim()}`);
+    else if (i.kind === "assistant" && i.text.trim()) lines.push(`Claude: ${i.text.trim()}`);
+  }
+  const out: string[] = [];
+  let size = 0;
+  for (const line of lines.reverse()) {
+    const cut = line.length > 2000 ? `${line.slice(0, 2000)}…` : line;
+    if (size + cut.length + 1 > max) break;
+    out.unshift(cut);
+    size += cut.length + 1;
+  }
+  return out.join("\n");
 }

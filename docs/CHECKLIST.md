@@ -1076,6 +1076,14 @@ for the desktop shell, start screen and session view to be cleaned up (UX-02, UX
       panel; drafting streams in the thread; the contract and triage as editable cards refined by replying; steps
       stream in the thread and the running step can be messaged; approvals and results as cards; a Task tab; "Make
       this a task".
+      Note: step 2 is built: one New (Chat | Task in the composer; ⌘⇧N opens a chat in Task mode; `/task <what>` makes
+      a task from a chat, with its last messages as drafting's context); tasks open as tabs with their own sidebar
+      section and status; a task's thread shows the request, drafting as it reads (`agent.event`s on the `draft`
+      step), the contract as a card (read, or edit in place) and triage, Approve on the card, and a composer whose
+      reply redrafts the contract (`task.redraft`); a right panel with the task's facts; Home lists the workspace's
+      tasks. The run, its results and the footer actions stay as they were inside the thread until step 3. Checked in
+      the app with haiku: a task from an empty chat, streamed drafting, a reply that removed a constraint, Approve and
+      run to Done with its gates, result and evidence in the thread; `/task` from a chat with history.
 - [ ] **UX-14** A live and AI-made workflow canvas (§6). A Flow tab shows the run's workflow with each step's live
       status, hand-offs and fix rounds; Generate with AI drafts project workflows; M/L/XL tasks may get their own
       flow, approved with the contract.

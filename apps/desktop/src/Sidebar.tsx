@@ -1,16 +1,20 @@
 import { CircleAlert, CircleCheck, ClipboardList, Folder, Loader2, Plus, Settings } from "lucide-react";
-
 import { folderName, type Tab } from "./tabs.ts";
+import { stateLabel } from "./tasks/run.ts";
+import { type TaskTab, taskKey } from "./tasks/taskTabs.ts";
 import { ActionMenu } from "./ui/ActionMenu.tsx";
 import { IconButton } from "./ui/IconButton.tsx";
 import { menuShortcut } from "./useMenuCommands.ts";
 
 /**
- * The left column (UX-03): new session, open sessions with their status, recent workspaces, and at the bottom the
- * readiness state and Settings.
+ * The left column (UX-03): New, the open chats and tasks with their status (UX-13), recent workspaces, and at the
+ * bottom the readiness state and Settings. A task is started from a chat's composer (Task), so there's one New.
  */
 export function Sidebar({
   tabs,
+  taskTabs,
+  waitingTasks,
+  onCloseTask,
   active,
   recent,
   ready,
@@ -22,13 +26,17 @@ export function Sidebar({
   onSettings,
 }: {
   tabs: Tab[];
-  /** The active session; null while Home is shown. */
+  taskTabs: TaskTab[];
+  /** Tasks with a step waiting for an approval. */
+  waitingTasks: ReadonlySet<string>;
+  onCloseTask: (id: string) => void;
+  /** The active session, or a task's `task:<id>`; null while Home is shown. */
   active: string | null;
   recent: string[];
   /** null while the readiness check hasn't run yet. */
   ready: boolean | null;
   onNew: () => void;
-  /** Set only while the Tasks preview is on. */
+  /** Set only while the Tasks preview is on: New with the composer in Task mode. */
   onNewTask?: () => void;
   onSelect: (sessionId: string) => void;
   onClose: (sessionId: string) => void;
@@ -39,25 +47,23 @@ export function Sidebar({
     <nav className="sidebar" aria-label="Sessions and workspaces">
       <div className="sidebar-top">
         <span className="brand">AgentChainer</span>
-        <button type="button" className={`new-session${active === null ? " current" : ""}`} onClick={onNew}>
+        <button
+          type="button"
+          className={`new-session${active === null ? " current" : ""}`}
+          onClick={onNew}
+          title={onNewTask ? `New chat; pick Task in its composer for a task (${menuShortcut("new-task")})` : undefined}
+        >
           <Plus size={16} />
-          New session
+          New
           <kbd>{menuShortcut("new-session")}</kbd>
         </button>
-        {onNewTask && (
-          <button type="button" className="new-session secondary" onClick={onNewTask}>
-            <ClipboardList size={16} />
-            New task
-            <kbd>{menuShortcut("new-task")}</kbd>
-          </button>
-        )}
       </div>
 
       <div className="sidebar-scroll">
         <section>
-          <h2 className="sidebar-heading">Sessions</h2>
+          <h2 className="sidebar-heading">Chats</h2>
           {tabs.length === 0 ? (
-            <p className="sidebar-empty">Open sessions show up here.</p>
+            <p className="sidebar-empty">Open chats show up here.</p>
           ) : (
             <ul className="nav-list">
               {tabs.map((t) => (
@@ -88,6 +94,50 @@ export function Sidebar({
             </ul>
           )}
         </section>
+
+        {taskTabs.length > 0 && (
+          <section>
+            <h2 className="sidebar-heading">Tasks</h2>
+            <ul className="nav-list">
+              {taskTabs.map((t) => {
+                const key = taskKey(t.id);
+                return (
+                  <li key={t.id} className={`nav-row${key === active ? " active" : ""}`}>
+                    <button
+                      type="button"
+                      className="nav-main"
+                      aria-current={key === active ? "page" : undefined}
+                      title={`${t.title}\n${t.cwd}`}
+                      onClick={() => onSelect(key)}
+                    >
+                      <span className="nav-title">
+                        <ClipboardList size={13} aria-hidden className="nav-kind" />
+                        {t.title}
+                      </span>
+                      <span className="nav-sub">
+                        {folderName(t.cwd)} · {t.state === "draft" ? "draft" : stateLabel(t.state).label}
+                      </span>
+                    </button>
+                    {waitingTasks.has(t.id) ? (
+                      <span
+                        className="nav-status approval"
+                        role="img"
+                        title="Waiting for your approval"
+                        aria-label="Waiting for approval"
+                      />
+                    ) : t.busy ? (
+                      <Loader2 className="nav-status spin" size={14} aria-label="Working" />
+                    ) : null}
+                    <ActionMenu
+                      label={`Actions for ${t.title}`}
+                      items={[{ label: "Close task tab", onSelect: () => onCloseTask(t.id) }]}
+                    />
+                  </li>
+                );
+              })}
+            </ul>
+          </section>
+        )}
 
         {recent.length > 0 && (
           <section>

@@ -7,7 +7,7 @@ import type { WorkspaceProfile } from "@agentchainer/protocol";
 import { detectWorkspace } from "../detect/detect.ts";
 import { copyFixture, removeFixtureCopies } from "../detect/fixture-copy.ts";
 import type { AgentSdkModule } from "../sdk-loader.ts";
-import { availableGates, cleanArea, cleanAreas, draftContract, normalizeContract } from "./contract.ts";
+import { availableGates, cleanArea, cleanAreas, draftContract, draftPrompt, normalizeContract } from "./contract.ts";
 
 const profile = (commands: string[]): WorkspaceProfile => ({
   stacks: ["node"],
@@ -149,6 +149,36 @@ describe("drafting", () => {
     assert.equal(seen.persistSession, false);
     assert.equal(execFileSync("git", ["status", "--porcelain"], { cwd: root, encoding: "utf8" }), "");
     assert.ok(!existsSync(join(root, "stray.txt")));
+  });
+
+  it("passes every message on and reads the chat and the reply it's given (UX-13)", async () => {
+    const root = copyFixture("sample-app");
+    let prompt = "";
+    const seen: string[] = [];
+    const sdk = {
+      query: ({ prompt: p }: { prompt: string }) => {
+        prompt = p;
+        return (async function* () {
+          yield { type: "assistant", message: { content: [] }, parent_tool_use_id: null };
+          yield { type: "result", subtype: "error_max_turns", total_cost_usd: 0.01 };
+        })();
+      },
+    } as unknown as AgentSdkModule;
+    const current = normalizeContract("Fix total", { objective: "Totals count quantity." }, []);
+    await draftContract(sdk, "claude", root, "Fix total", detectWorkspace(root), {
+      extra: { context: "you: the cart is wrong", current, feedback: "Leave applyDiscount alone" },
+      onMessage: (m) => void seen.push(m.type),
+    });
+    assert.deepEqual(seen, ["assistant", "result"]);
+    assert.match(prompt, /The chat this task comes from[^\n]*\nyou: the cart is wrong/);
+    assert.match(prompt, /"objective":"Totals count quantity\."/);
+    assert.match(prompt, /The person's reply: Leave applyDiscount alone/);
+  });
+
+  it("drafts from the request alone when there's nothing else", () => {
+    const root = copyFixture("sample-app");
+    const p = draftPrompt("Fix total", detectWorkspace(root), ["test"]);
+    assert.match(p, /^Request: Fix total\n\nWorkspace/);
   });
 
   it("returns the error and the cost when the session stops", async () => {

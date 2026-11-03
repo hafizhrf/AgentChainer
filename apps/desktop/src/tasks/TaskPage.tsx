@@ -14,6 +14,7 @@ import { openUrl } from "@tauri-apps/plugin-opener";
 import {
   AlertTriangle,
   ArrowLeft,
+  ArrowUp,
   ChevronRight,
   CircleCheck,
   CircleHelp,
@@ -26,6 +27,7 @@ import {
   ListTree,
   Loader2,
   MinusCircle,
+  PanelRight,
   Play,
   Scale,
   Square,
@@ -39,6 +41,7 @@ import { isRpcError } from "../rpc-client.ts";
 import { request, subscribe } from "../sidecar.ts";
 import { TranscriptView } from "../TranscriptView.tsx";
 import { folderName } from "../tabs.ts";
+import type { Item } from "../transcript.ts";
 import { ActionMenu } from "../ui/ActionMenu.tsx";
 import { CopyButton } from "../ui/CopyButton.tsx";
 import { EditableList, StringList } from "../ui/EditableList.tsx";
@@ -102,65 +105,64 @@ const RUN_MODES: Exclude<PermissionMode, "plan">[] = ["default", "acceptEdits", 
 const message = (err: unknown) => (err instanceof Error ? err.message : String(err));
 const usd = (n: number) => `≈$${n.toFixed(n < 0.1 ? 4 : 2)}`;
 
+/** One entry of a task's thread, in order: a drafting (its events) or the person's reply to the contract. */
+type ThreadEntry = { kind: "draft"; sessionId: string } | { kind: "reply"; text: string; at: number };
+
 /**
- * A task (M3, preview): the request, a contract Claude drafts from the repository (read-only), and a tier from triage,
- * approved together; then the run (M3-06): each step a Claude session shown in a timeline, the gates the app runs
- * itself, and fix rounds; then the evidence report (M3-09), and Done or Accepted with risk (M3-10). Opens over Home or
- * a session, like Workspace settings.
+ * A task as a thread (UX-13, docs/design/chat-and-tasks.md §5), in its own tab: the request, drafting as it reads the
+ * project, the contract and the triage as cards that a reply refines, approve on the card; then the run (M3-06), its
+ * evidence (M3-09) and its outcome (M3-10). The right panel holds the task's facts and the workspace's files.
  */
 export function TaskPage({
   cwd,
+  taskId,
   model,
   mode,
-  backLabel,
+  hidden,
+  autoDraft,
   confirm,
-  onBack,
   onOpenFile,
+  onClose,
+  onChange,
 }: {
   cwd: string;
+  taskId: string;
   model: string;
   /** The default permission profile, for a run's write steps. */
   mode: PermissionMode;
-  backLabel: string;
+  hidden: boolean;
+  /** A task just made from the composer: drafting starts as soon as it's loaded. */
+  autoDraft: boolean;
   confirm: Confirm;
-  onBack: () => void;
   /** Opens a file (an absolute path) in the editor from settings. */
   onOpenFile: (file: string) => Promise<unknown>;
+  onClose: () => void;
+  /** The shown task as it changes, for its tab in the sidebar. */
+  onChange?: (task: Task, busy: boolean) => void;
 }) {
-  const [tasks, setTasks] = useState<TaskSummary[]>([]);
   const [task, setTask] = useState<Task | null>(null);
-  const [text, setText] = useState("");
   const [modelAlias, setModelAlias] = useState(model);
   const [busy, setBusy] = useState<Busy>(null);
   const [error, setError] = useState<string | null>(null);
   const [edited, setEdited] = useState<TaskContract | null>(null);
+  const [editing, setEditing] = useState(false);
   const [tier, setTier] = useState<Tier>("S");
   const [reason, setReason] = useState("");
   const [budget, setBudget] = useState("");
   const [runMode, setRunMode] = useState<Exclude<PermissionMode, "plan">>(mode === "plan" ? "default" : mode);
   const [stepItems, setStepItems] = useState<StepItems>({});
+  const [thread, setThread] = useState<ThreadEntry[]>([]);
   const [accepting, setAccepting] = useState(false);
   const [acceptReason, setAcceptReason] = useState("");
+  const [sideOpen, setSideOpen] = useState(true);
   /** An XL task's sub-tasks, and a sub-task's XL task, as they are now. */
   const [children, setChildren] = useState<Record<string, Task>>({});
   const [parentTask, setParentTask] = useState<Task | null>(null);
-  const taskId = useRef<string | null>(null);
-  taskId.current = task?.id ?? null;
+  const shownId = useRef<string | null>(null);
+  shownId.current = task?.id ?? null;
+  const drafted = useRef(false);
 
-  const loadList = useCallback(async () => {
-    try {
-      setTasks((await request("task.list", { cwd })).tasks);
-    } catch (err) {
-      setError(message(err));
-    }
-  }, [cwd]);
-
-  useEffect(() => {
-    void loadList();
-  }, [loadList]);
-
-  // A run reports through notifications: the task as it changes, and its steps' session events.
-  // biome-ignore lint/correctness/useExhaustiveDependencies: subscribes once per workspace; handlers only set state.
+  // A run and a drafting report through notifications: the task as it changes, and its sessions' events.
   useEffect(
     () =>
       subscribe((n) => {
@@ -172,9 +174,15 @@ export function TaskPage({
             return known ? { ...all, [updated.id]: newer(known, updated, "notification") } : all;
           });
           setParentTask((p) => (p?.id === updated.id ? newer(p, updated, "notification") : p));
-          if (!taskId.current) void loadList();
-        } else if (n.method === "agent.event" && n.params.task && n.params.task.id === taskId.current) {
-          const { sessionId, event } = n.params;
+        } else if (n.method === "agent.event" && n.params.task && n.params.task.id === shownId.current) {
+          const { sessionId, event, task: tag } = n.params;
+          if (tag.stepId === "draft") {
+            setThread((all) =>
+              all.some((e) => e.kind === "draft" && e.sessionId === sessionId)
+                ? all
+                : [...all, { kind: "draft", sessionId }],
+            );
+          }
           setStepItems((items) => withStepEvent(items, sessionId, event, Date.now()));
         }
       }),
@@ -211,6 +219,10 @@ export function TaskPage({
     };
   }, [cwd, parentId]);
 
+  useEffect(() => {
+    if (task) onChange?.(task, busy !== null);
+  }, [task, busy, onChange]);
+
   function show(t: Task) {
     setTask((current) => newer(current, t, "reply"));
     setEdited(t.contract);
@@ -236,17 +248,35 @@ export function TaskPage({
   const draft = (id: string) =>
     step("draft", id, () => request("task.draft", { cwd, id, ...(modelAlias ? { model: modelAlias } : {}) }));
 
-  async function start() {
-    setError(null);
-    try {
-      const created = await request("task.create", { cwd, request: text });
-      setTask(created);
-      setText("");
-      await draft(created.id);
-    } catch (err) {
-      setError(message(err));
-    }
+  /** The person's reply to the draft: drafting runs again with it and the current contract (UX-13). */
+  async function reply(text: string) {
+    if (!task) return;
+    setThread((all) => [...all, { kind: "reply", text, at: Date.now() }]);
+    setEditing(false);
+    await step("draft", task.id, () =>
+      request("task.redraft", { cwd, id: task.id, feedback: text, ...(modelAlias ? { model: modelAlias } : {}) }),
+    );
   }
+
+  // The thread opens on the task; a new one drafts at once.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: loads once per task tab.
+  useEffect(() => {
+    let live = true;
+    request("task.get", { cwd, id: taskId }).then(
+      (t) => {
+        if (!live) return;
+        show(t);
+        if (autoDraft && !drafted.current && t.state === "draft" && !t.contract) {
+          drafted.current = true;
+          void draft(t.id);
+        }
+      },
+      (err: unknown) => live && setError(message(err)),
+    );
+    return () => {
+      live = false;
+    };
+  }, [cwd, taskId]);
 
   /** Approves the contract and the tier, and starts the run right away for an S task (planner.md §15). */
   async function approve(contract: TaskContract, andRun: boolean, id: string) {
@@ -263,6 +293,7 @@ export function TaskPage({
           budgetUsd: Number(budget),
         }),
       );
+      setEditing(false);
       if (andRun) await runTask(id);
     } catch (err) {
       setError(message(err));
@@ -306,10 +337,12 @@ export function TaskPage({
     await step("continue", id, () => request("task.continue", { cwd, id }));
   }
 
+  /** Shows another task in this tab: an XL task's sub-task, or back to the XL task. */
   async function open(id: string) {
     try {
       show(await request("task.get", { cwd, id }));
       setStepItems({});
+      setThread([]);
       setError(null);
     } catch (err) {
       setError(message(err));
@@ -326,410 +359,629 @@ export function TaskPage({
     if (!ok) return;
     try {
       await request("task.delete", { cwd, id: t.id });
-      if (task?.id === t.id) {
-        setTask(null);
-        setEdited(null);
-      }
-      await loadList();
+      onClose();
     } catch (err) {
       setError(message(err));
     }
   }
 
-  function back() {
-    if (task?.parent) void open(task.parent.id);
-    else if (task) {
-      setTask(null);
-      setEdited(null);
-      setError(null);
-      void loadList();
-    } else onBack();
-  }
-
   const triage = task?.triage ?? null;
   const stale = Boolean(task?.contract && edited && contractChanged(edited, task.contract));
-  /** The contract as the form holds it, for the footer's actions. */
+  /** The contract as the card holds it. */
   const form = edited ?? task?.contract ?? null;
-  /** The page shows one stage at a time; a new stage starts at the top. */
-  const stage = !task ? "request" : busy === "draft" ? "drafting" : !task.contract ? "empty" : task.state;
-  const scroller = useRef<HTMLDivElement>(null);
-  // biome-ignore lint/correctness/useExhaustiveDependencies: scrolls when the stage changes, not on every render.
-  useEffect(() => {
-    // A block body: Chromium's scrollTo returns a promise, which React would take for the clean-up (a blank page).
-    scroller.current?.scrollTo({ top: 0 });
-  }, [stage]);
   const blocker =
     edited && triage
       ? approveBlocker({ edited, stale, tier, proposed: triage.proposed, reason, budget })
       : "Draft the contract first.";
+  const drafting = busy === "draft";
+  const lastDraft = [...thread].reverse().find((e) => e.kind === "draft");
+  const bottom = useRef<HTMLDivElement>(null);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: follow the thread as it grows.
+  useEffect(() => {
+    bottom.current?.scrollIntoView({ block: "end" });
+  }, [thread.length, task?.state, task?.contract, drafting]);
+
+  if (!task) {
+    return (
+      <div className="task-thread" hidden={hidden}>
+        <div className="task-thread-main">
+          {error ? <p className="warn">{error}</p> : <p className="muted task-loading">Opening the task…</p>}
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="setup-page task-page">
-      <header className="setup-header">
-        <button type="button" className="ghost small" onClick={back} disabled={busy !== null}>
-          <ArrowLeft size={14} />
-          {task?.parent ? "XL task" : task ? "All tasks" : backLabel}
-        </button>
-        <div className="setup-title">
-          <h1>{task?.parent ? `Sub-task ${task.parent.index + 1}` : task ? "Task" : "New task"}</h1>
-          <span className="muted" title={cwd}>
-            {folderName(cwd)}
-          </span>
-        </div>
-        <span className="chip" title="A preview: tasks of every tier run; XL sub-tasks run in git worktrees.">
-          Preview
-        </span>
-        <span className="grow" />
-        {task && <StateBadge task={task} />}
-      </header>
-      {error && (
-        <div className="banner" role="alert">
-          <span className="grow">{error}</span>
-          <IconButton label="Dismiss" onClick={() => setError(null)}>
-            <X size={14} />
-          </IconButton>
-        </div>
-      )}
-
-      <div className="setup-scroll task-scroll" ref={scroller}>
-        {!task && (
-          <>
-            <section className="card">
-              <div className="card-title">
-                <ClipboardList size={16} aria-hidden />
-                <h2>What should be done?</h2>
-              </div>
-              <textarea
-                // biome-ignore lint/a11y/noAutofocus: the page was opened to describe a task.
-                autoFocus
-                rows={5}
-                value={text}
-                onChange={(e) => setText(e.target.value)}
-                placeholder="Describe the task as you would in chat…"
-                aria-label="Task request"
-              />
-              <p className="field-help">
-                Claude reads the project, without changing anything, and drafts a contract: the objective, what counts
-                as done, and what's out of scope. Triage then proposes a tier. You edit and approve both.
-              </p>
-              <div className="card-footer">
-                <div className="task-model">
-                  <Select
-                    value={modelAlias}
-                    onChange={setModelAlias}
-                    options={modelChoices(undefined, modelAlias)}
-                    label="Model for the draft"
-                  />
-                </div>
-                <span className="grow" />
-                <button type="button" disabled={!text.trim() || busy !== null} onClick={() => void start()}>
-                  Draft contract
-                </button>
-              </div>
-            </section>
-            <TaskList tasks={tasks} onOpen={(id) => void open(id)} onDiscard={(t) => void discard(t)} />
-          </>
-        )}
-
-        {task && busy === "draft" && (
-          <section className="card task-drafting" aria-live="polite">
-            <Loader2 size={18} className="spin" aria-hidden />
-            <div className="grow">
-              <strong>Claude is reading the project to draft the contract.</strong>
-              <p className="muted">
-                Read-only: it can't change files. Triage runs next. <Elapsed />
-              </p>
-            </div>
+    <div className="task-thread" hidden={hidden}>
+      <div className="task-thread-main">
+        <header className="task-thread-header">
+          {task.parent && (
             <button
               type="button"
-              className="secondary"
-              onClick={() => void request("task.cancel", { cwd, id: task.id })}
+              className="ghost small"
+              onClick={() => task.parent && void open(task.parent.id)}
+              disabled={busy !== null}
             >
-              Cancel
+              <ArrowLeft size={14} />
+              XL task
             </button>
-          </section>
-        )}
-
-        {task && busy !== "draft" && !task.contract && (
-          <section className="card">
-            <Quote text={task.request} />
-            <div className="card-footer">
-              <div className="task-model">
-                <Select
-                  value={modelAlias}
-                  onChange={setModelAlias}
-                  options={modelChoices(undefined, modelAlias)}
-                  label="Model for the draft"
-                />
-              </div>
-              <span className="grow" />
-              <button type="button" className="secondary" onClick={() => void discard(task)}>
-                Discard
-              </button>
-              <button type="button" onClick={() => void draft(task.id)}>
-                Draft contract
-              </button>
-            </div>
-          </section>
-        )}
-
-        {task && busy !== "draft" && task.state === "draft" && edited && triage && (
-          <div className="task-review">
-            <ContractForm request={task.request} contract={edited} gates={task.availableGates} onChange={setEdited} />
-            <TriageCard
-              triage={triage}
-              stale={stale}
-              tier={tier}
-              onTier={(t) => {
-                setTier(t);
-                setBudget(String(t === triage.chosen ? triage.budgetUsd : DEFAULT_BUDGET_USD[t]));
-              }}
-              reason={reason}
-              onReason={setReason}
-              budget={budget}
-              onBudget={setBudget}
-              {...(task.parent ? { tiers: TIERS.filter((t) => t !== "XL") } : {})}
-            />
+          )}
+          <ClipboardList size={16} aria-hidden />
+          <div className="task-thread-title">
+            <h1 title={task.request}>
+              {task.parent ? `Sub-task ${task.parent.index + 1}: ` : ""}
+              {task.title ?? task.request}
+            </h1>
+            <span className="muted" title={cwd}>
+              {folderName(cwd)} · {usd(task.costUsd)} spent
+            </span>
+          </div>
+          <span className="grow" />
+          <StateBadge task={task} />
+          <IconButton
+            label={sideOpen ? "Hide the task panel" : "Show the task panel"}
+            onClick={() => setSideOpen((v) => !v)}
+          >
+            <PanelRight size={15} />
+          </IconButton>
+          <IconButton label="Close the task tab" onClick={onClose}>
+            <X size={15} />
+          </IconButton>
+        </header>
+        {error && (
+          <div className="banner" role="alert">
+            <span className="grow">{error}</span>
+            <IconButton label="Dismiss" onClick={() => setError(null)}>
+              <X size={14} />
+            </IconButton>
           </div>
         )}
 
-        {task && busy === "split" && (
-          <section className="card task-drafting" aria-live="polite">
-            <Loader2 size={18} className="spin" aria-hidden />
-            <div className="grow">
-              <strong>Claude is reading the project to split the task into sub-tasks.</strong>
-              <p className="muted">
-                Read-only: it can't change files. Each sub-task gets its own contract and tier. <Elapsed />
-              </p>
+        <div className="task-thread-scroll">
+          <div className="thread">
+            <div className="msg user task-request-msg">
+              {task.chatContext && <span className="chip">From a chat</span>}
+              <p>{task.request}</p>
             </div>
-            <button
-              type="button"
-              className="secondary"
-              onClick={() => void request("task.cancel", { cwd, id: task.id })}
-            >
-              Cancel
-            </button>
-          </section>
-        )}
 
-        {task?.run && task.state !== "draft" && task.state !== "ready" && (
-          <RunView
-            task={task}
-            cwd={cwd}
-            items={stepItems}
-            onLoaded={(sessionId, items) => setStepItems((all) => ({ ...all, [sessionId]: items }))}
-            onOpenTask={(id) => void open(id)}
-          />
-        )}
-
-        {task && <Overlaps task={task} cwd={cwd} onOpenTask={(id) => void open(id)} />}
-
-        {task?.worktree && !task.parent && task.state !== "running" && (
-          <ResultCard task={task} cwd={cwd} confirm={confirm} onChanged={(t) => show(t)} onError={setError} />
-        )}
-
-        {task?.worktree &&
-          !task.worktree.removed &&
-          !task.parent &&
-          (task.state === "done" || task.state === "accepted") && (
-            <DeployCard task={task} cwd={cwd} onChanged={() => void open(task.id)} />
-          )}
-
-        {task?.subtasks?.length ? (
-          <SubtasksCard
-            task={task}
-            cwd={cwd}
-            subtasks={task.subtasks.flatMap((id) => (children[id] ? [children[id]] : []))}
-            busy={busy}
-            onOpen={(id) => void open(id)}
-            onApproveAll={() => void approveAll(task.id)}
-            onSplitAgain={() => void split(task.id)}
-          />
-        ) : null}
-
-        {task?.run && task.state !== "draft" && task.state !== "ready" && task.state !== "running" && (
-          <EvidenceCard
-            task={task}
-            cwd={cwd}
-            onOpenFile={(file) =>
-              onOpenFile(file).catch((err: unknown) => setError(`Couldn't open the report: ${message(err)}`))
-            }
-          />
-        )}
-
-        {task && task.state !== "draft" && task.contract && task.triage && (
-          <ContractView key={task.id} task={task} contract={task.contract} triage={task.triage} />
-        )}
-      </div>
-
-      {task && form && busy !== "draft" && (
-        <footer className="plan-footer">
-          <span className="muted" title="Model spend on drafting and triage, an estimate">
-            {usd(task.costUsd)} spent
-          </span>
-          <span className="grow" />
-          {task.state === "draft" ? (
-            <>
-              {blocker && !stale && <span className="muted">{blocker}</span>}
-              <button type="button" className="secondary" onClick={() => void discard(task)}>
-                Discard
-              </button>
-              {stale ? (
-                <button
-                  type="button"
-                  disabled={busy !== null}
-                  onClick={() =>
-                    void step("retriage", task.id, () =>
-                      request("task.retriage", { cwd, id: task.id, contract: tidyContract(form) }),
-                    )
-                  }
-                >
-                  {busy === "retriage" && <Loader2 size={14} className="spin" />}
-                  Run triage again
-                </button>
+            {thread.map((e) =>
+              e.kind === "reply" ? (
+                <div key={`r-${e.at}`} className="msg user">
+                  <p>{e.text}</p>
+                </div>
               ) : (
+                <DraftBlock
+                  key={e.sessionId}
+                  items={stepItems[e.sessionId] ?? []}
+                  live={drafting && e === lastDraft}
+                  cwd={cwd}
+                />
+              ),
+            )}
+            {drafting && !lastDraft && (
+              <div className="draft-block live">
+                <Loader2 size={14} className="spin" aria-hidden /> Claude is reading the project to draft the contract
+                (read-only). <Elapsed />
+              </div>
+            )}
+            {drafting && (
+              <div className="thread-row">
                 <button
                   type="button"
-                  disabled={busy !== null || blocker !== null}
-                  onClick={() => void approve(form, tier === "S" && !task.parent, task.id)}
+                  className="secondary small"
+                  onClick={() => void request("task.cancel", { cwd, id: task.id })}
                 >
-                  {busy === "approve" || busy === "run" ? <Loader2 size={14} className="spin" /> : null}
-                  {/* A sub-task runs from its XL task, never on approval. */}
-                  {tier === "S" && !task.parent ? "Approve and run" : "Approve contract and tier"}
+                  Stop drafting
                 </button>
-              )}
-            </>
-          ) : task.state === "running" ? (
-            <>
-              <span className="muted">
-                Run {usd(task.run?.costUsd ?? 0)}
-                {isXl(task) ? ` · $${task.triage?.budgetUsd} per sub-task` : ` of $${task.triage?.budgetUsd}`}
-              </span>
-              <button type="button" className="danger" onClick={() => void stop(task)}>
-                <Square size={14} />
-                Stop
-              </button>
-            </>
-          ) : (
-            <>
-              {canAcceptRisk(task) && (
-                <button
-                  type="button"
-                  className="secondary"
-                  disabled={busy !== null}
-                  onClick={() => {
-                    setAcceptReason("");
-                    setAccepting(true);
-                  }}
-                >
-                  {busy === "accept" && <Loader2 size={14} className="spin" />}
-                  Accept risk…
-                </button>
-              )}
-              {/* Once split, an XL task's contract is what its sub-tasks were made from: it stays. */}
-              {!(isXl(task) && task.subtasks?.length) && (
-                <button
-                  type="button"
-                  className="secondary"
-                  disabled={busy !== null}
-                  onClick={() => void step("revise", task.id, () => request("task.revise", { cwd, id: task.id }))}
-                >
-                  Revise
-                </button>
-              )}
-              {task.state === "interrupted" ? (
-                <button
-                  type="button"
-                  disabled={busy !== null}
-                  onClick={() => void step("resume", task.id, () => request("task.resume", { cwd, id: task.id }))}
-                >
-                  <Play size={14} />
-                  Resume
-                </button>
-              ) : canContinue(task) ? (
-                <button type="button" disabled={busy !== null} onClick={() => void continueRun(task.id)}>
-                  {busy === "continue" ? <Loader2 size={14} className="spin" /> : <Play size={14} />}
-                  Continue
-                </button>
-              ) : isXl(task) && task.state === "ready" && !task.subtasks?.length ? (
-                <>
+              </div>
+            )}
+
+            {!drafting && task.state === "draft" && !task.contract && (
+              <section className="card thread-card">
+                <p>The contract isn't drafted yet.</p>
+                <div className="card-footer">
                   <div className="task-model">
                     <Select
                       value={modelAlias}
                       onChange={setModelAlias}
                       options={modelChoices(undefined, modelAlias)}
-                      label="Model for the split"
+                      label="Model for the draft"
                     />
                   </div>
-                  <button type="button" disabled={busy !== null} onClick={() => void split(task.id)}>
-                    {busy === "split" && <Loader2 size={14} className="spin" />}
-                    Split into sub-tasks
+                  <span className="grow" />
+                  <button type="button" className="secondary" onClick={() => void discard(task)}>
+                    Discard
                   </button>
-                </>
-              ) : isXl(task) && task.state !== "ready" ? null : (
-                <>
-                  <ProjectWorkflowNote cwd={cwd} tier={task.triage?.chosen} />
-                  <RunButton
-                    label={task.run ? "Run again" : "Run"}
-                    blocker={
-                      task.parent
-                        ? childRunBlocker(task, parentTask)
-                        : runBlocker(
-                            task,
-                            (task.subtasks ?? []).flatMap((id) => (children[id] ? [children[id]] : [])),
-                          )
-                    }
-                    busy={busy}
-                    runMode={runMode}
-                    onRunMode={setRunMode}
-                    onRun={() => void runTask(task.id)}
-                  />
-                </>
+                  <button type="button" onClick={() => void draft(task.id)}>
+                    Draft contract
+                  </button>
+                </div>
+              </section>
+            )}
+
+            {!drafting && task.state === "draft" && edited && triage && form && (
+              <>
+                <ContractCard
+                  request={task.request}
+                  contract={edited}
+                  gates={task.availableGates}
+                  editing={editing}
+                  onEdit={setEditing}
+                  onChange={setEdited}
+                />
+                <TriageCard
+                  triage={triage}
+                  stale={stale}
+                  tier={tier}
+                  onTier={(t) => {
+                    setTier(t);
+                    setBudget(String(t === triage.chosen ? triage.budgetUsd : DEFAULT_BUDGET_USD[t]));
+                  }}
+                  reason={reason}
+                  onReason={setReason}
+                  budget={budget}
+                  onBudget={setBudget}
+                  {...(task.parent ? { tiers: TIERS.filter((t) => t !== "XL") } : {})}
+                />
+                <div className="thread-actions">
+                  {blocker && !stale && <span className="muted">{blocker}</span>}
+                  <span className="grow" />
+                  <button type="button" className="secondary" onClick={() => void discard(task)}>
+                    Discard
+                  </button>
+                  {stale ? (
+                    <button
+                      type="button"
+                      disabled={busy !== null}
+                      onClick={() =>
+                        void step("retriage", task.id, () =>
+                          request("task.retriage", { cwd, id: task.id, contract: tidyContract(form) }),
+                        )
+                      }
+                    >
+                      {busy === "retriage" && <Loader2 size={14} className="spin" />}
+                      Run triage again
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      disabled={busy !== null || blocker !== null}
+                      onClick={() => void approve(form, tier === "S" && !task.parent, task.id)}
+                    >
+                      {busy === "approve" || busy === "run" ? <Loader2 size={14} className="spin" /> : null}
+                      {/* A sub-task runs from its XL task, never on approval. */}
+                      {tier === "S" && !task.parent ? "Approve and run" : "Approve contract and tier"}
+                    </button>
+                  )}
+                </div>
+              </>
+            )}
+
+            {task.state !== "draft" && task.contract && task.triage && (
+              <ContractView key={task.id} task={task} contract={task.contract} triage={task.triage} />
+            )}
+
+            {busy === "split" && (
+              <section className="card task-drafting" aria-live="polite">
+                <Loader2 size={18} className="spin" aria-hidden />
+                <div className="grow">
+                  <strong>Claude is reading the project to split the task into sub-tasks.</strong>
+                  <p className="muted">
+                    Read-only: it can't change files. Each sub-task gets its own contract and tier. <Elapsed />
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  className="secondary"
+                  onClick={() => void request("task.cancel", { cwd, id: task.id })}
+                >
+                  Cancel
+                </button>
+              </section>
+            )}
+
+            {task.run && task.state !== "draft" && task.state !== "ready" && (
+              <RunView
+                task={task}
+                cwd={cwd}
+                items={stepItems}
+                onLoaded={(sessionId, items) => setStepItems((all) => ({ ...all, [sessionId]: items }))}
+                onOpenTask={(id) => void open(id)}
+              />
+            )}
+
+            {task.worktree && !task.parent && task.state !== "running" && (
+              <ResultCard task={task} cwd={cwd} confirm={confirm} onChanged={(t) => show(t)} onError={setError} />
+            )}
+
+            {task.worktree &&
+              !task.worktree.removed &&
+              !task.parent &&
+              (task.state === "done" || task.state === "accepted") && (
+                <DeployCard task={task} cwd={cwd} onChanged={() => void open(task.id)} />
               )}
+
+            {task.subtasks?.length ? (
+              <SubtasksCard
+                task={task}
+                cwd={cwd}
+                subtasks={task.subtasks.flatMap((id) => (children[id] ? [children[id]] : []))}
+                busy={busy}
+                onOpen={(id) => void open(id)}
+                onApproveAll={() => void approveAll(task.id)}
+                onSplitAgain={() => void split(task.id)}
+              />
+            ) : null}
+
+            {task.run && task.state !== "draft" && task.state !== "ready" && task.state !== "running" && (
+              <EvidenceCard
+                task={task}
+                cwd={cwd}
+                onOpenFile={(file) =>
+                  onOpenFile(file).catch((err: unknown) => setError(`Couldn't open the report: ${message(err)}`))
+                }
+              />
+            )}
+            <div ref={bottom} />
+          </div>
+        </div>
+
+        {task.state === "draft" ? (
+          <TaskComposer
+            disabled={busy !== null || !task.contract}
+            busy={drafting}
+            modelAlias={modelAlias}
+            onModel={setModelAlias}
+            onSend={(text) => void reply(text)}
+          />
+        ) : (
+          <footer className="plan-footer">
+            {task.state === "running" ? (
+              <>
+                <span className="muted">
+                  Run {usd(task.run?.costUsd ?? 0)}
+                  {isXl(task) ? ` · $${task.triage?.budgetUsd} per sub-task` : ` of $${task.triage?.budgetUsd}`}
+                </span>
+                <span className="grow" />
+                <button type="button" className="danger" onClick={() => void stop(task)}>
+                  <Square size={14} />
+                  Stop
+                </button>
+              </>
+            ) : (
+              <>
+                <span className="grow" />
+                {canAcceptRisk(task) && (
+                  <button
+                    type="button"
+                    className="secondary"
+                    disabled={busy !== null}
+                    onClick={() => {
+                      setAcceptReason("");
+                      setAccepting(true);
+                    }}
+                  >
+                    {busy === "accept" && <Loader2 size={14} className="spin" />}
+                    Accept risk…
+                  </button>
+                )}
+                {/* Once split, an XL task's contract is what its sub-tasks were made from: it stays. */}
+                {!(isXl(task) && task.subtasks?.length) && (
+                  <button
+                    type="button"
+                    className="secondary"
+                    disabled={busy !== null}
+                    onClick={() => void step("revise", task.id, () => request("task.revise", { cwd, id: task.id }))}
+                  >
+                    Revise
+                  </button>
+                )}
+                {task.state === "interrupted" ? (
+                  <button
+                    type="button"
+                    disabled={busy !== null}
+                    onClick={() => void step("resume", task.id, () => request("task.resume", { cwd, id: task.id }))}
+                  >
+                    <Play size={14} />
+                    Resume
+                  </button>
+                ) : canContinue(task) ? (
+                  <button type="button" disabled={busy !== null} onClick={() => void continueRun(task.id)}>
+                    {busy === "continue" ? <Loader2 size={14} className="spin" /> : <Play size={14} />}
+                    Continue
+                  </button>
+                ) : isXl(task) && task.state === "ready" && !task.subtasks?.length ? (
+                  <>
+                    <div className="task-model">
+                      <Select
+                        value={modelAlias}
+                        onChange={setModelAlias}
+                        options={modelChoices(undefined, modelAlias)}
+                        label="Model for the split"
+                      />
+                    </div>
+                    <button type="button" disabled={busy !== null} onClick={() => void split(task.id)}>
+                      {busy === "split" && <Loader2 size={14} className="spin" />}
+                      Split into sub-tasks
+                    </button>
+                  </>
+                ) : isXl(task) && task.state !== "ready" ? null : (
+                  <>
+                    <ProjectWorkflowNote cwd={cwd} tier={task.triage?.chosen} />
+                    <RunButton
+                      label={task.run ? "Run again" : "Run"}
+                      blocker={
+                        task.parent
+                          ? childRunBlocker(task, parentTask)
+                          : runBlocker(
+                              task,
+                              (task.subtasks ?? []).flatMap((id) => (children[id] ? [children[id]] : [])),
+                            )
+                      }
+                      busy={busy}
+                      runMode={runMode}
+                      onRunMode={setRunMode}
+                      onRun={() => void runTask(task.id)}
+                    />
+                  </>
+                )}
+              </>
+            )}
+          </footer>
+        )}
+      </div>
+
+      {sideOpen && (
+        <aside className="task-side" aria-label="Task">
+          <TaskFacts task={task} cwd={cwd} onOpenTask={(id) => void open(id)} />
+        </aside>
+      )}
+
+      <Modal
+        open={accepting}
+        onOpenChange={setAccepting}
+        title="Accept the risk?"
+        description={
+          task.state === "unverified"
+            ? "No gate ran, so nothing proved the task."
+            : "The latest gate runs didn't all pass, so the task isn't proved."
+        }
+        actions={
+          <>
+            <button type="button" className="secondary" onClick={() => setAccepting(false)}>
+              Cancel
+            </button>
+            <button
+              type="button"
+              disabled={!acceptReason.trim() || busy !== null}
+              onClick={() => void acceptRisk(task.id)}
+            >
+              Accept with risk
+            </button>
+          </>
+        }
+      >
+        <p>
+          The task ends as <strong>Accepted with risk</strong>, not Done. Your reason goes into the evidence report.
+          Nothing in the working tree changes.
+        </p>
+        <Field label="Why is it acceptable?">
+          <textarea
+            rows={3}
+            value={acceptReason}
+            onChange={(e) => setAcceptReason(e.target.value)}
+            placeholder="e.g. The failing test is a known bug, tracked separately."
+            maxLength={2000}
+          />
+        </Field>
+      </Modal>
+    </div>
+  );
+}
+
+/** One drafting in the thread: what it read, live while it runs, then folded to a line. */
+function DraftBlock({ items, live, cwd }: { items: Item[]; live: boolean; cwd: string }) {
+  const tools = items.filter((i) => i.kind === "tool").length;
+  return (
+    <details className={`draft-block${live ? " live" : ""}`} open={live}>
+      <summary>
+        {live ? <Loader2 size={14} className="spin" aria-hidden /> : <CircleCheck size={14} aria-hidden />}
+        {live ? "Drafting the contract (read-only)" : "Drafted the contract"}
+        <span className="muted">
+          {" "}
+          · {tools} {tools === 1 ? "tool call" : "tool calls"}
+        </span>
+      </summary>
+      <TranscriptView cwd={cwd} items={items} onOpenFile={() => undefined} />
+    </details>
+  );
+}
+
+/**
+ * The draft contract as a card (UX-13): read as a document, edited in place with "Edit". A reply in the composer
+ * drafts it again instead.
+ */
+function ContractCard({
+  request,
+  contract,
+  gates,
+  editing,
+  onEdit,
+  onChange,
+}: {
+  request: string;
+  contract: TaskContract;
+  gates: Task["availableGates"];
+  editing: boolean;
+  onEdit: (on: boolean) => void;
+  onChange: (c: TaskContract) => void;
+}) {
+  const lists: [string, string[]][] = [
+    ["Constraints", contract.constraints],
+    ["Out of scope", contract.outOfScope],
+    ["Risks", contract.risks],
+    ["Open questions", contract.openQuestions],
+  ];
+  return (
+    <section className="card thread-card contract-card">
+      <div className="card-title">
+        <ClipboardList size={16} aria-hidden />
+        <h2>Contract</h2>
+        <span className="muted">draft</span>
+        <span className="grow" />
+        <button type="button" className="ghost small" onClick={() => onEdit(!editing)}>
+          {editing ? "Done editing" : "Edit"}
+        </button>
+      </div>
+      {editing ? (
+        <ContractForm request={request} contract={contract} gates={gates} onChange={onChange} />
+      ) : (
+        <>
+          <p className="contract-objective">{contract.objective || <span className="muted">No objective yet.</span>}</p>
+          <h3 className="contract-heading">Done when</h3>
+          <ul className="contract-criteria">
+            {contract.acceptanceCriteria.map((c) => (
+              <li key={c.id} className="contract-criterion">
+                <span>{c.text}</span>
+                <span className="badge">{checkLabel(c.check)}</span>
+              </li>
+            ))}
+          </ul>
+          {lists
+            .filter(([, items]) => items.length > 0)
+            .map(([label, items]) => (
+              <div key={label}>
+                <h3 className="contract-heading">{label}</h3>
+                <ul className="contract-list">
+                  {items.map((x) => (
+                    <li key={x} className="contract-item">
+                      {x}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+          {contract.affectedAreas.length > 0 && (
+            <>
+              <h3 className="contract-heading">Affected areas</h3>
+              <p className="contract-areas">
+                {contract.affectedAreas.map((a) => (
+                  <code key={a}>{a}</code>
+                ))}
+              </p>
             </>
           )}
-        </footer>
+          <p className="muted contract-hint">Reply below to change it, or edit it here.</p>
+        </>
       )}
-      {task && (
-        <Modal
-          open={accepting}
-          onOpenChange={setAccepting}
-          title="Accept the risk?"
-          description={
-            task.state === "unverified"
-              ? "No gate ran, so nothing proved the task."
-              : "The latest gate runs didn't all pass, so the task isn't proved."
+    </section>
+  );
+}
+
+/** The task's facts for the right panel: state, tier, budget, spend, worktree and overlapping tasks. */
+function TaskFacts({ task, cwd, onOpenTask }: { task: Task; cwd: string; onOpenTask: (id: string) => void }) {
+  const { label } = task.state === "draft" ? { label: task.contract ? "Draft" : "New" } : stateLabel(task.state);
+  return (
+    <div className="task-facts-panel">
+      <h2>Task</h2>
+      <dl className="task-facts">
+        <dt>State</dt>
+        <dd>{label}</dd>
+        <dt>Tier</dt>
+        <dd>{task.triage ? `${task.triage.chosen}: ${TIER_HELP[task.triage.chosen]}` : "after drafting"}</dd>
+        {task.triage && (
+          <>
+            <dt>Budget</dt>
+            <dd>
+              ${task.triage.budgetUsd}
+              {task.triage.chosen === "XL" ? " per sub-task" : ""}
+            </dd>
+          </>
+        )}
+        <dt>Spent</dt>
+        <dd>{usd(task.costUsd)}</dd>
+        {task.worktree && (
+          <>
+            <dt>Branch</dt>
+            <dd>
+              <code>{task.worktree.branch}</code>
+              {task.worktree.removed ? " (worktree removed)" : ""}
+            </dd>
+          </>
+        )}
+        <dt>Saved in</dt>
+        <dd>
+          <code>.agentchainer/tasks/{task.id}/</code>
+        </dd>
+      </dl>
+      <Overlaps task={task} cwd={cwd} onOpenTask={onOpenTask} />
+    </div>
+  );
+}
+
+/** The task thread's composer: while it's a draft, a reply drafts the contract again with it (UX-13). */
+function TaskComposer({
+  disabled,
+  busy,
+  modelAlias,
+  onModel,
+  onSend,
+}: {
+  disabled: boolean;
+  busy: boolean;
+  modelAlias: string;
+  onModel: (alias: string) => void;
+  onSend: (text: string) => void;
+}) {
+  const [text, setText] = useState("");
+  const send = () => {
+    const t = text.trim();
+    if (!t || disabled) return;
+    setText("");
+    onSend(t);
+  };
+  return (
+    <div className="composer task-composer">
+      <div className="composer-box" data-mode="plan">
+        <textarea
+          rows={2}
+          value={text}
+          aria-label="Reply to the contract"
+          placeholder={
+            busy
+              ? "Claude is drafting…"
+              : "Reply to change the contract, e.g. “leave applyDiscount alone” or “add a test for an empty cart”"
           }
-          actions={
-            <>
-              <button type="button" className="secondary" onClick={() => setAccepting(false)}>
-                Cancel
-              </button>
-              <button
-                type="button"
-                disabled={!acceptReason.trim() || busy !== null}
-                onClick={() => void acceptRisk(task.id)}
-              >
-                Accept with risk
-              </button>
-            </>
-          }
-        >
-          <p>
-            The task ends as <strong>Accepted with risk</strong>, not Done. Your reason goes into the evidence report.
-            Nothing in the working tree changes.
-          </p>
-          <Field label="Why is it acceptable?">
-            <textarea
-              rows={3}
-              value={acceptReason}
-              onChange={(e) => setAcceptReason(e.target.value)}
-              placeholder="e.g. The failing test is a known bug, tracked separately."
-              maxLength={2000}
-            />
-          </Field>
-        </Modal>
-      )}
+          disabled={disabled}
+          onChange={(e) => setText(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && !e.shiftKey) {
+              e.preventDefault();
+              send();
+            }
+          }}
+        />
+        <div className="composer-toolbar">
+          <Select
+            compact
+            label="Model for the draft"
+            value={modelAlias}
+            options={modelChoices(undefined, modelAlias)}
+            onChange={onModel}
+          />
+          <span className="grow" />
+          <span className="composer-hint">Enter redrafts the contract with your reply</span>
+          <button
+            type="button"
+            className="icon round"
+            disabled={disabled || !text.trim()}
+            onClick={send}
+            aria-label="Send the reply"
+          >
+            <ArrowUp size={16} />
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
@@ -762,7 +1014,7 @@ function Quote({ text }: { text: string }) {
   );
 }
 
-function TaskList({
+export function TaskList({
   tasks,
   onOpen,
   onDiscard,

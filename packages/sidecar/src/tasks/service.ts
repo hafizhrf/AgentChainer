@@ -13,6 +13,7 @@ import {
   type Tier,
   type Triage,
 } from "@agentchainer/protocol";
+import type { SDKMessage } from "@anthropic-ai/claude-agent-sdk";
 import { AC_DIR } from "../ac-dir.ts";
 import { findTool, toolsDir } from "../bootstrap/tools.ts";
 import { listDeploys } from "../deploy/service.ts";
@@ -98,11 +99,19 @@ function requireDraft(task: Task): void {
   if (task.state !== "draft") throw invalid("The contract is approved. Revise it to make changes.");
 }
 
-export function newTask(root: string, request: string): Task {
+/** A new draft task; `context` is the chat it's made from (UX-13), which drafting reads. */
+export function newTask(root: string, request: string, context?: string): Task {
   const text = request.trim();
   if (!text) throw invalid("Describe the task first.");
-  return createTask(root, text, availableGates(detectWorkspace(root), root));
+  const task = createTask(root, text, availableGates(detectWorkspace(root), root));
+  if (!context?.trim()) return task;
+  const withContext: Task = { ...task, chatContext: context.trim() };
+  saveTask(root, withContext);
+  return withContext;
 }
+
+/** Drafting's messages, so the thread shows what it reads (UX-13). */
+export type DraftListener = (m: SDKMessage) => void;
 
 async function triage(
   root: string,
@@ -130,15 +139,31 @@ async function triage(
   return { triage: triageRecord(found, model), costUsd: model.costUsd };
 }
 
-/** Drafts the contract from the request, then triages the draft. The spend is recorded even when drafting fails. */
-export async function draftTask(root: string, id: string, claude: Claude, model?: string): Promise<Task> {
+/**
+ * Drafts the contract from the request (and the chat it came from), then triages the draft. With `feedback`, it drafts
+ * again from the current contract and the person's reply (UX-13). The spend is recorded even when drafting fails.
+ */
+export async function draftTask(
+  root: string,
+  id: string,
+  claude: Claude,
+  model?: string,
+  listen?: DraftListener,
+  feedback?: string,
+): Promise<Task> {
   const task = loadTask(root, id);
   requireDraft(task);
+  if (feedback !== undefined && !task.contract) throw invalid("Draft the contract first.");
   return cancellable(id, async (controller) => {
     const profile = detectWorkspace(root);
     const draft = await draftContract(claude.sdk, claude.claudePath, root, task.request, profile, {
       ...(model ? { model } : {}),
       abortController: controller,
+      extra: {
+        ...(task.chatContext ? { context: task.chatContext } : {}),
+        ...(feedback !== undefined && task.contract ? { current: task.contract, feedback } : {}),
+      },
+      ...(listen ? { onMessage: listen } : {}),
     });
     const drafted: Task = {
       ...task,

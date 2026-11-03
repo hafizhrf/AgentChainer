@@ -699,6 +699,8 @@ export const TaskSchema = z.object({
   id: TaskIdSchema,
   /** What the user asked for, verbatim. */
   request: z.string(),
+  /** The chat a task was made from (UX-13, "Make this a task"): its last messages, which drafting reads. */
+  chatContext: z.string().max(12_000).optional(),
   state: z.enum(TASK_STATES),
   createdAt: z.string(),
   updatedAt: z.string(),
@@ -1414,12 +1416,27 @@ export const methodSchemas = {
   "git.draftMessage": { params: WorkspaceRef, result: z.object({ message: z.string() }) },
 
   /* Tasks (M3-02, M3-03). Files in `.agentchainer/tasks/<id>/`, kept out of git. */
-  "task.create": { params: WorkspaceRef.extend({ request: z.string().min(1).max(20_000) }), result: TaskSchema },
+  "task.create": {
+    params: WorkspaceRef.extend({
+      request: z.string().min(1).max(20_000),
+      /** The chat it's made from (UX-13): its last messages, for drafting. */
+      context: z.string().max(12_000).optional(),
+    }),
+    result: TaskSchema,
+  },
   /**
    * A read-only Claude session drafts the contract from the request and the repo, then triage runs on the draft
    * (signals and a haiku classification). Writes nothing but the task's own files. Costs model calls (`costUsd`).
    */
   "task.draft": { params: TaskRef.extend({ model: z.string().optional() }), result: TaskSchema },
+  /**
+   * Drafts the contract again with the person's reply (UX-13): the current contract and the feedback go to the same
+   * read-only drafting, then triage runs again. Its events stream like `task.draft`'s.
+   */
+  "task.redraft": {
+    params: TaskRef.extend({ feedback: z.string().min(1).max(4000), model: z.string().optional() }),
+    result: TaskSchema,
+  },
   /** Saves the user's edits to a draft contract and triages it again. */
   "task.retriage": { params: TaskRef.extend({ contract: TaskContractSchema }), result: TaskSchema },
   /**

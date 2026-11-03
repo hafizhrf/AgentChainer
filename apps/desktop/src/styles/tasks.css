@@ -1095,3 +1095,222 @@ fieldset.workflow-fix > legend {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+/* ---------- A task as a thread (UX-13) ---------- */
+
+.task-thread {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  background: var(--bg);
+}
+
+.task-thread[hidden] {
+  display: flex;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.task-thread-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.task-loading {
+  margin: auto;
+}
+
+.task-thread-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 52px;
+  padding: var(--space-2) var(--space-3) var(--space-2) var(--space-4);
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.task-thread-title {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.task-thread-title > h1 {
+  margin: 0;
+  overflow: hidden;
+  font-size: var(--text-md);
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.task-thread-title > .muted {
+  font-size: var(--text-xs);
+}
+
+.task-thread-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.thread {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: var(--space-5) var(--space-6) var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.thread > .msg.user {
+  align-self: flex-end;
+  max-width: 85%;
+}
+
+.thread > .msg.user > p {
+  margin: 0;
+}
+
+.task-request-msg > .chip {
+  display: inline-block;
+  margin-bottom: var(--space-1);
+}
+
+.draft-block {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  font-size: var(--text-sm);
+}
+
+.draft-block.live {
+  border-color: var(--mode-plan);
+}
+
+.draft-block > summary {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  cursor: pointer;
+}
+
+.draft-block > .transcript-items,
+.draft-block > div {
+  padding: 0 var(--space-3) var(--space-2);
+}
+
+div.draft-block.live {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+}
+
+.thread-row {
+  display: flex;
+  justify-content: flex-start;
+}
+
+.thread-card {
+  margin: 0;
+}
+
+.contract-objective {
+  margin: 0 0 var(--space-2);
+  font-size: var(--text-md);
+  line-height: 1.5;
+}
+
+.contract-heading {
+  margin: var(--space-3) 0 var(--space-1);
+  color: var(--muted);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.contract-criteria,
+.contract-list {
+  margin: 0;
+  padding-left: var(--space-5);
+}
+
+.contract-criterion {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: 2px 0;
+}
+
+.contract-item {
+  padding: 1px 0;
+}
+
+.contract-areas {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-2);
+  margin: 0;
+}
+
+.contract-hint {
+  margin: var(--space-3) 0 0;
+  font-size: var(--text-xs);
+}
+
+.thread-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1) 0 var(--space-3);
+  font-size: var(--text-sm);
+}
+
+.task-composer {
+  padding-top: var(--space-2);
+}
+
+.task-side {
+  width: 320px;
+  flex: none;
+  overflow-y: auto;
+  border-left: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.task-facts-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  font-size: var(--text-sm);
+}
+
+.task-facts-panel > h2 {
+  margin: 0;
+  font-size: var(--text-md);
+}
+
+/* The composer's Chat | Task switch (UX-13). */
+.kind-switch {
+  margin: 0 var(--space-2) 0 0;
+  padding: 0;
+  border: none;
+}
+
+.composer-box.task-kind {
+  border-color: var(--mode-plan);
+}
+
+.nav-kind {
+  flex: none;
+  margin-right: 4px;
+  vertical-align: -2px;
+}

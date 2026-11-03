@@ -2,6 +2,7 @@ import { existsSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { PROTOCOL_VERSION, RpcErrorCode, type Task } from "@agentchainer/protocol";
+import type { SDKMessage } from "@anthropic-ai/claude-agent-sdk";
 import pkg from "../package.json" with { type: "json" };
 import { deleteAgent, listAgents, saveAgent } from "./agents.ts";
 import { applyActions, type Cli, listRuns, rollback } from "./bootstrap/apply.ts";
@@ -47,6 +48,7 @@ import {
   removeMcpServer,
   uninstallPlugin,
 } from "./installer.ts";
+import { normalize } from "./normalize.ts";
 import { listRules, removeRule } from "./permissions.ts";
 import { log, notify, RpcFailure, serve } from "./rpc.ts";
 import { loadSdk } from "./sdk-loader.ts";
@@ -156,6 +158,18 @@ function sessionHost({ sdk, claudePath }: Claude): SessionHost {
 }
 
 const taskUpdated = (cwd: string) => (task: Task) => notify("task.updated", { cwd, task });
+
+/**
+ * Drafting's messages as agent events tagged with the task's "draft" step (UX-13), so its thread shows what drafting
+ * reads. Each drafting is its own session id: a redraft starts a new block.
+ */
+function draftEvents(cwd: string, id: string) {
+  const sessionId = `draft-${id}-${Date.now()}`;
+  const task = { id, cwd, stepId: "draft", label: "Drafting the contract", role: "planner" };
+  return (m: SDKMessage) => {
+    for (const event of normalize(m)) notify("agent.event", { sessionId, event, task });
+  };
+}
 
 function rejectIfOpen(sessionId: string, action: string): void {
   if (sessions.has(sessionId)) {
@@ -527,14 +541,19 @@ serve(
       return { message: await draftMessage(sdk, claudePath, cwd) };
     },
 
-    "task.create": ({ cwd, request }) => {
+    "task.create": ({ cwd, request, context }) => {
       requireFolder(cwd);
-      return newTask(cwd, request);
+      return newTask(cwd, request, context);
     },
 
     "task.draft": async ({ cwd, id, model }) => {
       requireFolder(cwd);
-      return draftTask(cwd, id, await claude(), model);
+      return draftTask(cwd, id, await claude(), model, draftEvents(cwd, id));
+    },
+
+    "task.redraft": async ({ cwd, id, model, feedback }) => {
+      requireFolder(cwd);
+      return draftTask(cwd, id, await claude(), model, draftEvents(cwd, id), feedback);
     },
 
     "task.retriage": async ({ cwd, id, contract }) => {

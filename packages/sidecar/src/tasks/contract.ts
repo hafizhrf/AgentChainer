@@ -6,6 +6,7 @@ import {
   type TaskContract,
   type WorkspaceProfile,
 } from "@agentchainer/protocol";
+import type { SDKMessage } from "@anthropic-ai/claude-agent-sdk";
 import { generatorHook } from "../bootstrap/generate.ts";
 import { guarded } from "../bootstrap/workspace-guard.ts";
 import type { AgentSdkModule } from "../sdk-loader.ts";
@@ -85,8 +86,31 @@ export function workspaceLines(profile: WorkspaceProfile, gates: GateKind[]): st
   ];
 }
 
-export function draftPrompt(request: string, profile: WorkspaceProfile, gates: GateKind[]): string {
-  return [`Request: ${request}`, "", ...workspaceLines(profile, gates)].join("\n");
+/** What else drafting reads (UX-13): the chat a task came from, and, when redrafting, the contract and the reply. */
+export type DraftExtra = { context?: string; current?: TaskContract; feedback?: string };
+
+export function draftPrompt(
+  request: string,
+  profile: WorkspaceProfile,
+  gates: GateKind[],
+  extra: DraftExtra = {},
+): string {
+  return [
+    `Request: ${request}`,
+    ...(extra.context
+      ? ["", "The chat this task comes from (its last messages; the request above is what to do):", extra.context]
+      : []),
+    ...(extra.current
+      ? [
+          "",
+          "The current draft of the contract, which the person replied to:",
+          JSON.stringify({ ...extra.current, task: undefined, approvedAt: undefined }),
+        ]
+      : []),
+    ...(extra.feedback ? ["", `The person's reply: ${extra.feedback}`, "Draft the contract again, following it."] : []),
+    "",
+    ...workspaceLines(profile, gates),
+  ].join("\n");
 }
 
 const MAX = { criteria: 30, list: 30, areas: 50, questions: 20, line: 2000, area: 500, objective: 4000 };
@@ -152,7 +176,15 @@ export function normalizeContract(request: string, draft: unknown, gates: GateKi
   };
 }
 
-export type DraftOptions = { model?: string; maxBudgetUsd?: number; abortController?: AbortController };
+export type DraftOptions = {
+  model?: string;
+  maxBudgetUsd?: number;
+  abortController?: AbortController;
+  /** Context, or the reply to redraft from (UX-13). */
+  extra?: DraftExtra;
+  /** Each SDK message, so drafting can be shown as it reads the project (UX-13). */
+  onMessage?: (m: SDKMessage) => void;
+};
 
 /** Drafts the contract. The cost is returned with the result or the error, so a failed draft is still accounted. */
 export async function draftContract(
@@ -167,7 +199,7 @@ export async function draftContract(
   let costUsd = 0;
   const { result } = await guarded(root, async () => {
     const q = sdk.query({
-      prompt: draftPrompt(request, profile, gates),
+      prompt: draftPrompt(request, profile, gates, opts.extra),
       options: {
         cwd: root,
         pathToClaudeCodeExecutable: claudePath,
@@ -187,6 +219,7 @@ export async function draftContract(
       },
     });
     for await (const m of q) {
+      opts.onMessage?.(m);
       if (m.type !== "result") continue;
       costUsd += m.total_cost_usd;
       if (m.subtype !== "success") return { contract: null, error: `Drafting stopped: ${m.subtype}.` };

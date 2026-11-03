@@ -40,6 +40,7 @@ export function HomeView({
   openIds,
   onOpenStored,
   confirm,
+  children,
 }: {
   env: EnvCheck | null;
   checking: boolean;
@@ -61,6 +62,8 @@ export function HomeView({
   openIds: Set<string>;
   onOpenStored: (session: SessionInfo) => void;
   confirm: Confirm;
+  /** More of the folder's work below its sessions: its tasks (UX-13). */
+  children?: ReactNode;
 }) {
   const workspace = cwd.trim();
   const blocked = !env?.ready
@@ -125,6 +128,7 @@ export function HomeView({
         {connected && workspace && (
           <SessionList cwd={workspace} openIds={openIds} onOpen={onOpenStored} confirm={confirm} />
         )}
+        {children}
       </div>
     </div>
   );

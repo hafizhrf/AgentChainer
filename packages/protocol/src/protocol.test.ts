@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
 import {
   AgentEventSchema,
+  agentProblems,
   CriterionCheckSchema,
   methodSchemas,
   PERMISSION_MODES,
@@ -96,5 +97,27 @@ describe("schema/protocol.schema.json", () => {
   it("is up to date (run: pnpm --filter @agentchainer/protocol export-schema)", () => {
     const committed = readFileSync(new URL("../schema/protocol.schema.json", import.meta.url), "utf8");
     assert.equal(committed, schemaFileText());
+  });
+});
+
+describe("agentProblems (M8-04)", () => {
+  const ok = { name: "reviewer", description: "Reviews", prompt: "You review.", tools: "Read, Grep, mcp__github__*" };
+
+  it("passes a valid agent, with known tools and MCP entries", () => {
+    assert.deepEqual(agentProblems(ok), []);
+    assert.deepEqual(agentProblems({ ...ok, tools: "mcp__db, mcp__db__query", model: "claude-opus-5-5" }), []);
+    assert.deepEqual(agentProblems({ ...ok, tools: undefined, model: "inherit" }), []);
+  });
+
+  it("names every problem: name, taken name, empty fields, model, unknown and repeated tools", () => {
+    assert.deepEqual(
+      agentProblems(
+        { name: "Bad Name", description: " ", prompt: "", tools: "Read, Fly, mcp__, Read", model: "gpt-4" },
+        [],
+      ).map((p) => p.split(":")[0]),
+      ["Name", "Description", "Prompt", "Model", "Tools", "Tools"],
+    );
+    assert.match(agentProblems(ok, ["reviewer"])[0] ?? "", /already exists/);
+    assert.match(agentProblems({ ...ok, tools: "Fly, Swim" }).join(), /Fly, Swim aren't a known tool/);
   });
 });

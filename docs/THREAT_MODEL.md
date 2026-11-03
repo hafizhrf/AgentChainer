@@ -106,9 +106,35 @@ the session's live background tasks (M4-07).
 - `agents.save` and `agents.delete` write only `.claude/agents/<name>.md`. The name is checked against
   `[a-z0-9-]` before it becomes a path, and the write goes through `insideRoot`.
 - Each change is a recorded run, so it can be rolled back like a setup step.
-- `agents.list` also reads the user's `~/.claude/agents/*.md` (or `CLAUDE_CONFIG_DIR`). It reads them only, and shows
-  the agents' own text. The agents' prompts are instructions to Claude, which a malicious repository can supply (T-02);
-  listing them doesn't run them.
+- `agents.list` also reads the user's `~/.claude/agents/*.md` (or `CLAUDE_CONFIG_DIR`). It shows the agents' own
+  text. The agents' prompts are instructions to Claude, which a malicious repository can supply (T-02); listing them
+  doesn't run them.
+
+**Agent profiles (M8-04):**
+- **User-scope writes:** `agents.save` and `agents.delete` with `scope: "user"` write only
+  `~/.claude/agents/<name>.md` (or `CLAUDE_CONFIG_DIR`).
+  - The name is checked before it becomes a path.
+  - The write goes through a temporary file, then a rename.
+  - It's the person's click, after a confirm. It isn't a workspace run, so History can't roll it back, and the UI
+    says so.
+- **Checks before saving:** every save, in both scopes, runs `agentProblems` first:
+  - only known built-in tools, and MCP entries of the form `mcp__server[__tool|__*]`;
+  - a known model alias or a `claude-…` id;
+  - non-empty fields within size.
+- **Running a profile narrows a session; it never widens it:**
+  - only its built-in tools are available (the SDK's `tools`);
+  - a profile that names no MCP server gets none (`mcp__*` disallowed);
+  - approvals, the guard hook and the permission mode still apply;
+  - a read-only Team worker keeps only the profile's read tools and the read-only hook.
+- **Limits:**
+  - A profile that names some MCP entries keeps every MCP server the session has: the app can't list which servers
+    the CLI loads before it starts, so the allowlist covers built-in tools exactly and MCP servers only as all or
+    none.
+  - A Team chat with a profile keeps its MCP tools, the app's own among them.
+- **Workflow roles stay shipped:** task workflows still name only the 6 shipped `ac-*` roles; a profile can't stand in
+  for one (T-03).
+- **`agents.templates`** returns the shipped roles and 4 bundled starters, as data the form fills in from; nothing is
+  written until the person saves.
 
 **Background work (M4-07):**
 - Interactive sessions let the CLI run subagents and shells in the background. They outlive the turn that started

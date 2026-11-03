@@ -1680,6 +1680,18 @@ first.
     - closing the supervisor ended both workers.
 - [ ] **M8-04** An agent profiles manager: create from a template, edit, clone and delete, validated before saving,
       with per-profile tool allowlists. From CAO's profile editor; builds on M3-05's roles and UX-10's Plugins page.
+      → design: [agent-profiles.md](design/agent-profiles.md) (owner decisions, 2026-11-03).
+  - Sidecar (PR 1):
+    - `agentProblems` checks;
+    - `agents.templates`;
+    - user-scope saves;
+    - profiles running chats (`session.start {profile}`) and Team workers, with only their tools.
+  - Evidence: unit tests, and the live `profile` scenario on haiku, 3 of 3 passed. It checked that:
+    - an unknown tool is refused;
+    - a chat ran as a read-only profile with its prompt and model, and Write was "No such tool available";
+    - a Team worker ran as the profile.
+  - UI (PR 2): templates, clone, scope, the tool picker, live checks, and the start screen's profile picker. The box is
+    ticked then.
 - [ ] **M8-05** Scheduled flows: run a task template on a schedule (e.g. a nightly dependency bump), locally, with a
       budget cap and an evidence report per run. From CAO's flows.
 - [ ] **M8-06** Lessons from outcomes: suggest CLAUDE.md additions from finished tasks' evidence, each one approved

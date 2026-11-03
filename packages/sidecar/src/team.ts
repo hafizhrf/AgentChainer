@@ -1,5 +1,6 @@
 import type { AgentEvent, Effort, PermissionRequest, SessionOpened } from "@agentchainer/protocol";
 import { z } from "zod";
+import { type Profile, profileOptions } from "./profiles.ts";
 import type { AgentSdkModule } from "./sdk-loader.ts";
 import { APP_TOOLS, Session, type TurnResult } from "./session.ts";
 
@@ -41,7 +42,8 @@ export type Member = {
   close(): Promise<void>;
 };
 
-export type WorkerSpec = { name: string; access: Access; maxBudgetUsd: number };
+/** `profile`: an agent profile the worker runs as (M8-04). */
+export type WorkerSpec = { name: string; access: Access; maxBudgetUsd: number; profile?: Profile };
 
 /** How a Team opens workers and reaches its supervisor's transcript. */
 export type TeamHost = {
@@ -85,10 +87,19 @@ export class Team {
 
   readonly capUsd: number;
   private readonly host: TeamHost;
+  /** Loads an agent profile by name (M8-04); throws when there's none, or it has problems. */
+  private readonly findProfile: (name: string) => Profile;
 
-  constructor(capUsd: number, host: TeamHost) {
+  constructor(
+    capUsd: number,
+    host: TeamHost,
+    findProfile: (name: string) => Profile = (name) => {
+      throw new Error(`There is no agent profile named ${name}.`);
+    },
+  ) {
     this.capUsd = capUsd;
     this.host = host;
+    this.findProfile = findProfile;
   }
 
   /** The supervisor's session exists only once the Team's tools do, so it's attached after. */
@@ -105,7 +116,7 @@ export class Team {
 
   /** Starts a worker (or reuses an idle one) on `prompt`. Resolves at once, or with its answer when `wait`. */
   async assign(
-    args: { name: string; prompt: string; access?: Access; budgetUsd?: number; worker?: string },
+    args: { name: string; prompt: string; access?: Access; budgetUsd?: number; worker?: string; profile?: string },
     wait: boolean,
   ): Promise<{ workerId: string } | Handoff> {
     if (this.stopped) throw new TeamError("The team's budget is spent, so no more work can be handed out.");
@@ -121,12 +132,20 @@ export class Team {
       const left = this.capUsd - this.spentUsd;
       if (left < MIN_WORKER_BUDGET_USD) throw new TeamError("Too little of the team's budget is left for a worker.");
       const access = args.access ?? "read";
+      let profile: Profile | undefined;
+      if (args.profile) {
+        try {
+          profile = this.findProfile(args.profile);
+        } catch (err) {
+          throw new TeamError(err instanceof Error ? err.message : String(err));
+        }
+      }
       const maxBudgetUsd = args.budgetUsd ? Math.min(args.budgetUsd, left) : left;
       const name = args.name.trim() || "worker";
       // Set before `open` returns, since its handlers may only run later but must find it.
       let worker: Worker | undefined;
       const member = this.host.open(
-        { name, access, maxBudgetUsd },
+        { name, access, maxBudgetUsd, ...(profile ? { profile } : {}) },
         {
           turnEnded: (r) => worker && this.workerTurnEnded(worker, r),
           ended: () => worker && this.workerEnded(worker),
@@ -250,13 +269,24 @@ const assignShape = {
   access: z.enum(["read", "write"]).optional().describe('"read" (default): Read, Grep and Glob only.'),
   budgetUsd: z.number().positive().optional().describe("A cap for this worker, within the team's budget."),
   worker: z.string().optional().describe("An idle worker's id to give this to, instead of starting a new one."),
+  profile: z
+    .string()
+    .optional()
+    .describe("An agent profile for a new worker: its instructions, model and tools (listed in the instructions)."),
 };
 
+/** The supervisor's instructions, with the agent profiles a worker can run as (M8-04). */
+export function teamInstructions(profiles: { name: string; description: string }[]): string {
+  if (profiles.length === 0) return TEAM_INSTRUCTIONS;
+  const list = profiles.map((p) => `- ${p.name}: ${p.description.split("\n")[0]}`).join("\n");
+  return `${TEAM_INSTRUCTIONS}\n\nAgent profiles a worker can run as (\`profile\`), each with its own instructions and tools:\n${list}`;
+}
+
 /** The supervisor's tools, as the app's in-process MCP server (`mcp__agentchainer__*`). */
-export function teamTools(sdk: AgentSdkModule, team: Team) {
+export function teamTools(sdk: AgentSdkModule, team: Team, profiles: { name: string; description: string }[] = []) {
   return sdk.createSdkMcpServer({
     name: APP_TOOLS,
-    instructions: TEAM_INSTRUCTIONS,
+    instructions: teamInstructions(profiles),
     alwaysLoad: true,
     tools: [
       sdk.tool(
@@ -324,12 +354,18 @@ export function sessionWorkers(
   wire: WorkerWiring,
 ): TeamHost["open"] {
   return (spec, on) => {
+    const readOnly = spec.access === "read";
+    // A profile's instructions come first, then how to report to the supervisor (M8-04).
+    const own = spec.profile ? profileOptions(spec.profile, { readOnly }) : null;
     const worker: Session = new Session(
       sdk,
       {
         ...base,
-        readOnly: spec.access === "read",
-        appendSystemPrompt: WORKER_PROMPT,
+        ...(own?.model ? { model: own.model } : {}),
+        ...(own?.tools ? { tools: own.tools } : {}),
+        ...(own?.disallowedTools ? { disallowedTools: own.disallowedTools } : {}),
+        readOnly,
+        appendSystemPrompt: own ? `${own.appendSystemPrompt}\n\n${WORKER_PROMPT}` : WORKER_PROMPT,
         maxBudgetUsd: spec.maxBudgetUsd,
       },
       {
@@ -345,7 +381,14 @@ export function sessionWorkers(
     );
     worker.parentId = parentId();
     wire.register(worker);
-    wire.opened({ sessionId: worker.id, parentId: parentId(), cwd: base.cwd, name: spec.name, access: spec.access });
+    wire.opened({
+      sessionId: worker.id,
+      parentId: parentId(),
+      cwd: base.cwd,
+      name: spec.name,
+      access: spec.access,
+      ...(spec.profile ? { profile: spec.profile.name } : {}),
+    });
     return {
       id: worker.id,
       get idle() {

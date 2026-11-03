@@ -399,6 +399,10 @@
           },
           "team": {
             "type": "boolean"
+          },
+          "profile": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9-]{0,63}$"
           }
         },
         "required": [
@@ -1046,6 +1050,13 @@
               },
               "auto": {
                 "type": "boolean"
+              },
+              "scope": {
+                "type": "string",
+                "enum": [
+                  "project",
+                  "user"
+                ]
               }
             },
             "required": [
@@ -1075,9 +1086,6 @@
             "type": "string"
           }
         },
-        "required": [
-          "runId"
-        ],
         "additionalProperties": false
       }
     },
@@ -1093,6 +1101,13 @@
           "name": {
             "type": "string",
             "pattern": "^[a-z0-9][a-z0-9-]{0,63}$"
+          },
+          "scope": {
+            "type": "string",
+            "enum": [
+              "project",
+              "user"
+            ]
           }
         },
         "required": [
@@ -1109,8 +1124,64 @@
             "type": "string"
           }
         },
+        "additionalProperties": false
+      }
+    },
+    "agents.templates": {
+      "params": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "result": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "templates": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "source": {
+                  "type": "string",
+                  "enum": [
+                    "role",
+                    "starter"
+                  ]
+                },
+                "name": {
+                  "type": "string"
+                },
+                "description": {
+                  "type": "string"
+                },
+                "tools": {
+                  "type": "string"
+                },
+                "model": {
+                  "type": "string"
+                },
+                "prompt": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "source",
+                "name",
+                "description",
+                "prompt"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
         "required": [
-          "runId"
+          "templates"
         ],
         "additionalProperties": false
       }
@@ -32569,6 +32640,9 @@
             "read",
             "write"
           ]
+        },
+        "profile": {
+          "type": "string"
         }
       },
       "required": [

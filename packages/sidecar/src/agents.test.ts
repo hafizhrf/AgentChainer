@@ -22,6 +22,8 @@ const put = (root: string, rel: string, text: string) => {
   writeFileSync(file, text);
 };
 const read = (root: string, rel: string) => readFileSync(path.join(root, ...rel.split("/")), "utf8");
+/** A config folder no test writes to: project saves never touch it. */
+const CFG = path.join(tmpdir(), "ac-agents-unused-config");
 
 const reviewer = [
   "---",
@@ -78,15 +80,15 @@ describe("the agent library (M4-06)", () => {
     const input = { name: "planner", description: "Plans work", prompt: "You plan.", auto: true };
     // Runs are listed by time, so each change gets its own.
     const at = (s: number) => new Date(Date.UTC(2026, 10, 1, 9, 0, s));
-    const created = saveAgent(root, input, "v1", undefined, at(1));
+    const created = saveAgent(root, CFG, input, "v1", undefined, at(1)) ?? "";
     assert.match(read(root, ".claude/agents/planner.md"), /description: Plans work\. Use proactively\./);
-    assert.throws(() => saveAgent(root, input, "v1"), /already exists/);
+    assert.throws(() => saveAgent(root, CFG, input, "v1"), /already exists/);
 
-    const renamed = saveAgent(root, { ...input, name: "architect", auto: false }, "v1", "planner", at(2));
+    const renamed = saveAgent(root, CFG, { ...input, name: "architect", auto: false }, "v1", "planner", at(2)) ?? "";
     assert.equal(existsSync(path.join(root, ".claude/agents/planner.md")), false);
     assert.match(read(root, ".claude/agents/architect.md"), /description: Plans work\n/);
 
-    const deleted = deleteAgent(root, "architect", "v1", at(3));
+    const deleted = deleteAgent(root, CFG, "architect", "project", "v1", at(3)) ?? "";
     assert.equal(existsSync(path.join(root, ".claude/agents/architect.md")), false);
     assert.deepEqual(
       listRuns(root).map((r) => r.actions.map((a) => a.title)),
@@ -109,9 +111,44 @@ describe("the agent library (M4-06)", () => {
     const root = tmp();
     put(root, ".claude/agents/reviewer.md", reviewer);
     const input = { name: "reviewer", description: "D", prompt: "P", auto: false };
-    saveAgent(root, { ...input, name: "other" }, "v1");
-    assert.throws(() => saveAgent(root, input, "v1", "other"), /already exists/);
-    assert.throws(() => saveAgent(root, { ...input, name: "x" }, "v1", "missing"), /no project agent named missing/);
-    assert.throws(() => deleteAgent(root, "missing", "v1"), /no project agent named missing/);
+    saveAgent(root, CFG, { ...input, name: "other" }, "v1");
+    assert.throws(() => saveAgent(root, CFG, input, "v1", "other"), /already exists/);
+    assert.throws(
+      () => saveAgent(root, CFG, { ...input, name: "x" }, "v1", "missing"),
+      /no project agent named missing/,
+    );
+    assert.throws(() => deleteAgent(root, CFG, "missing", "project", "v1"), /no project agent named missing/);
+  });
+});
+
+describe("agent profiles (M8-04)", () => {
+  const input = { name: "explainer", description: "Explains code", prompt: "You explain.", auto: false };
+
+  it("saves, renames and deletes a user agent in the CLI's config folder, with no run", () => {
+    const root = tmp();
+    const cfg = tmp();
+    assert.equal(saveAgent(root, cfg, { ...input, scope: "user", tools: "Read, Grep" }, "v1"), undefined);
+    assert.match(read(cfg, "agents/explainer.md"), /tools: Read, Grep/);
+    assert.throws(() => saveAgent(root, cfg, { ...input, scope: "user" }, "v1"), /already exists/);
+    saveAgent(root, cfg, { ...input, name: "guide", scope: "user" }, "v1", "explainer");
+    assert.equal(existsSync(path.join(cfg, "agents", "explainer.md")), false);
+    const listed = listAgents(root, cfg).find((a) => a.name === "guide");
+    assert.equal(listed?.scope, "user");
+    assert.equal(deleteAgent(root, cfg, "guide", "user", "v1"), undefined);
+    assert.equal(existsSync(path.join(cfg, "agents", "guide.md")), false);
+    assert.throws(() => deleteAgent(root, cfg, "guide", "user", "v1"), /no user agent named guide/);
+    assert.deepEqual(listRuns(root), [], "nothing in the workspace's History");
+  });
+
+  it("refuses an agent with problems, in either scope, before writing anything", () => {
+    const root = tmp();
+    const cfg = tmp();
+    assert.throws(
+      () => saveAgent(root, cfg, { ...input, tools: "Read, Teleport", model: "gpt-4" }, "v1"),
+      /Model: gpt-4 isn't .*Tools: Teleport isn't a known tool/,
+    );
+    assert.throws(() => saveAgent(root, cfg, { ...input, scope: "user", tools: "Read, Read" }, "v1"), /listed twice/);
+    assert.equal(existsSync(path.join(root, ".claude")), false);
+    assert.equal(existsSync(path.join(cfg, "agents")), false);
   });
 });

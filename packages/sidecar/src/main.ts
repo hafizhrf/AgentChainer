@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { folderProblems, PROTOCOL_VERSION, RpcErrorCode, type Task } from "@agentchainer/protocol";
 import type { SDKMessage } from "@anthropic-ai/claude-agent-sdk";
 import pkg from "../package.json" with { type: "json" };
+import { agentTemplates } from "./agent-templates.ts";
 import { deleteAgent, listAgents, saveAgent } from "./agents.ts";
 import { applyActions, type Cli, listRuns, rollback } from "./bootstrap/apply.ts";
 import { autoApplicable } from "./bootstrap/auto-apply.ts";
@@ -50,9 +51,10 @@ import {
 } from "./installer.ts";
 import { normalize } from "./normalize.ts";
 import { listRules, removeRule } from "./permissions.ts";
+import { CHAT_TOOLS, loadProfile, type ProfileOptions, profileOptions, profileSummaries } from "./profiles.ts";
 import { log, notify, RpcFailure, serve } from "./rpc.ts";
 import { type AgentSdkModule, loadSdk } from "./sdk-loader.ts";
-import { Session } from "./session.ts";
+import { ASK_FIRST, Session } from "./session.ts";
 import { replayEvents, retention, toSessionInfo } from "./stored-sessions.ts";
 import { generateWorkflow } from "./tasks/generate-workflow.ts";
 import { computeMetrics, loadAllTasks } from "./tasks/metrics.ts";
@@ -124,10 +126,15 @@ function requireSession(sessionId: string): Session {
  * of each before its first event.
  */
 function newTeam(sdk: AgentSdkModule, capUsd: number, parentId: () => string, base: WorkerBase): Team {
-  const team: Team = new Team(capUsd, {
-    emit: (event) => notify("agent.event", { sessionId: parentId(), event }),
-    open: (spec, on) => open(spec, on),
-  });
+  const team: Team = new Team(
+    capUsd,
+    {
+      emit: (event) => notify("agent.event", { sessionId: parentId(), event }),
+      open: (spec, on) => open(spec, on),
+    },
+    // A worker may run as one of the workspace's or the user's agent profiles (M8-04).
+    (name) => loadProfile(base.cwd, claudeConfigDir(), name),
+  );
   const open = sessionWorkers(sdk, base, parentId, {
     register: (s) => sessions.set(s.id, s),
     unregister: (s) => {
@@ -141,7 +148,9 @@ function newTeam(sdk: AgentSdkModule, capUsd: number, parentId: () => string, ba
   return team;
 }
 
-/** The user's own CLI for plugin installs (spike S6), or null when it isn't found. */
+/** The CLI's config folder, where the user's own agents live (`~/.claude`, or `CLAUDE_CONFIG_DIR`). */
+const claudeConfigDir = () => process.env.CLAUDE_CONFIG_DIR || join(homedir(), ".claude");
+
 /** Generators whose proposals include GitHub workflows, checked with actionlint (M2-24). */
 const WORKFLOW_GENERATORS = new Set(["generate-ci", "smoke-test"]);
 
@@ -259,6 +268,7 @@ serve(
       resume,
       folders,
       team,
+      profile: profileName,
     }) => {
       // A Team chat (M8-03) runs workers on the person's budget, so it needs a cap for them all.
       if (team && !maxBudgetUsd) {
@@ -277,6 +287,20 @@ serve(
       if (resume && sessions.has(resume)) {
         throw new RpcFailure(RpcErrorCode.sessionOpen, "This session is already open in another tab.");
       }
+      // An agent profile (M8-04): its instructions come before the chat's own, and only its tools are there. A Team
+      // chat keeps its MCP tools, the app's own among them.
+      let own: ProfileOptions | null = null;
+      if (profileName) {
+        try {
+          own = profileOptions(loadProfile(cwd, claudeConfigDir(), profileName), {
+            extraTools: CHAT_TOOLS,
+            keepMcp: team === true,
+          });
+        } catch (err) {
+          throw new RpcFailure(RpcErrorCode.invalidParams, err instanceof Error ? err.message : String(err));
+        }
+      }
+      const chatModel = model || own?.model;
       // First run of the packaged app downloads and verifies the SDK here (a few seconds).
       const { sdk } = await prepareSdk();
       const crew =
@@ -284,7 +308,7 @@ serve(
           ? newTeam(sdk, maxBudgetUsd, () => session.id, {
               cwd,
               claudePath,
-              ...(model ? { model } : {}),
+              ...(chatModel ? { model: chatModel } : {}),
               ...(effort ? { effort } : {}),
               ...(folders?.length ? { additionalDirectories: folders } : {}),
             })
@@ -294,7 +318,10 @@ serve(
         {
           cwd,
           claudePath,
-          ...(model ? { model } : {}),
+          ...(chatModel ? { model: chatModel } : {}),
+          ...(own ? { appendSystemPrompt: `${own.appendSystemPrompt}\n\n${ASK_FIRST}` } : {}),
+          ...(own?.tools ? { tools: own.tools } : {}),
+          ...(own?.disallowedTools ? { disallowedTools: own.disallowedTools } : {}),
           ...(permissionMode ? { permissionMode } : {}),
           ...(effort ? { effort } : {}),
           ...(maxBudgetUsd ? { maxBudgetUsd } : {}),
@@ -304,7 +331,7 @@ serve(
           // Interactive sessions show their background tasks and stop them one by one (M4-07).
           background: true,
           interactive: true,
-          ...(crew ? { appTools: teamTools(sdk, crew) } : {}),
+          ...(crew ? { appTools: teamTools(sdk, crew, profileSummaries(cwd, claudeConfigDir())) } : {}),
         },
         {
           emit: (event) => notify("agent.event", { sessionId: session.id, event }),
@@ -421,19 +448,22 @@ serve(
 
     "agents.list": ({ cwd }) => {
       requireFolder(cwd);
-      // The CLI's config folder, where the user's own agents live (read-only here).
-      return { agents: listAgents(cwd, process.env.CLAUDE_CONFIG_DIR || join(homedir(), ".claude")) };
+      return { agents: listAgents(cwd, claudeConfigDir()) };
     },
 
     "agents.save": ({ cwd, agent, previousName }) => {
       requireFolder(cwd);
-      return { runId: saveAgent(cwd, agent, catalog.version, previousName) };
+      const runId = saveAgent(cwd, claudeConfigDir(), agent, catalog.version, previousName);
+      return runId ? { runId } : {};
     },
 
-    "agents.delete": ({ cwd, name }) => {
+    "agents.delete": ({ cwd, name, scope }) => {
       requireFolder(cwd);
-      return { runId: deleteAgent(cwd, name, catalog.version) };
+      const runId = deleteAgent(cwd, claudeConfigDir(), name, scope ?? "project", catalog.version);
+      return runId ? { runId } : {};
     },
+
+    "agents.templates": () => ({ templates: agentTemplates() }),
 
     "permissions.remove": ({ cwd, behavior, rule, scope }) => {
       removeRule(cwd, behavior, rule, scope ?? "workspace");

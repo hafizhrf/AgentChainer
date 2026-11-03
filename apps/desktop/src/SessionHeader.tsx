@@ -1,4 +1,4 @@
-import { ChartGantt, Folder, GitBranch, MessageSquare, Network, PanelRight, SquareTerminal } from "lucide-react";
+import { Bot, ChartGantt, Folder, GitBranch, MessageSquare, Network, PanelRight, SquareTerminal } from "lucide-react";
 import { useState } from "react";
 
 import { folderName, type Tab } from "./tabs.ts";
@@ -80,6 +80,12 @@ export function SessionHeader({
               +{tab.folders.length} {tab.folders.length === 1 ? "folder" : "folders"}
             </span>
           ) : null}
+          {tab.profile && (
+            <span className="chip" title="The agent profile this session runs as: its instructions, model and tools">
+              <Bot size={11} aria-hidden />
+              {tab.profile}
+            </span>
+          )}
           {branch && (
             <>
               <GitBranch size={12} aria-hidden />

@@ -346,6 +346,22 @@ export function sessionWorkers(
     worker.parentId = parentId();
     wire.register(worker);
     wire.opened({ sessionId: worker.id, parentId: parentId(), cwd: base.cwd, name: spec.name, access: spec.access });
-    return worker;
+    return {
+      id: worker.id,
+      get idle() {
+        return worker.idle;
+      },
+      get costUsd() {
+        return worker.costUsd;
+      },
+      // The supervisor's words show in the worker's tab as the message that started its turn.
+      send: (text) => {
+        const messageId = worker.send(text);
+        wire.event(worker.id, { type: "user.message", messageId, text });
+        return messageId;
+      },
+      inject: (text) => worker.inject(text),
+      close: () => worker.close(),
+    };
   };
 }

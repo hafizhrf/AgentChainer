@@ -251,6 +251,11 @@
   background: var(--accent-soft);
 }
 
+/* A Team chat's worker, under its supervisor (M8-03). */
+.nav-row.child {
+  margin-left: var(--space-4);
+}
+
 .nav-main {
   flex: 1;
   min-width: 0;

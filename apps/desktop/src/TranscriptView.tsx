@@ -14,12 +14,14 @@ import {
   Search,
   Square,
   SquareTerminal,
+  Users,
   Wrench,
   X,
 } from "lucide-react";
 import { createContext, memo, useCallback, useContext, useMemo, useRef, useState } from "react";
 import { diffStat, editDiffs, InlineDiff } from "./InlineDiff.tsx";
 import { Markdown } from "./Markdown.tsx";
+import { teamTool } from "./team.ts";
 import {
   type AgentItem,
   type AgentStatus,
@@ -170,6 +172,20 @@ const ItemView = memo(function ItemView({
       );
     case "notice":
       return <div className="notice">{item.text}</div>;
+    case "worker":
+      return (
+        <div className={`msg worker-report${item.isError ? " failed" : ""}`}>
+          <div className="worker-report-head">
+            <Users size={14} aria-hidden />
+            <span>
+              Report from worker <strong>{item.name}</strong>
+            </span>
+            {item.isError && <span className="badge danger">stopped</span>}
+          </div>
+          <Markdown text={item.text} />
+          <div className="msg-meta">{item.at !== undefined && <MsgTime at={item.at} />}</div>
+        </div>
+      );
     case "divider":
       return (
         <div className="transcript-divider">
@@ -186,7 +202,10 @@ const ItemView = memo(function ItemView({
 /** "Read ×3 · Bash · Edit": the tools of a group, in first-use order. */
 function toolCounts(tools: ToolItem[]): string {
   const counts = new Map<string, number>();
-  for (const t of tools) counts.set(t.name, (counts.get(t.name) ?? 0) + 1);
+  for (const t of tools) {
+    const name = teamTool(t.name, t.input)?.label ?? t.name;
+    counts.set(name, (counts.get(name) ?? 0) + 1);
+  }
   return [...counts].map(([name, n]) => (n > 1 ? `${name} ×${n}` : name)).join(" · ");
 }
 
@@ -233,12 +252,15 @@ const ToolView = memo(function ToolView({ tool, onOpenFile }: { tool: ToolItem; 
   const file = (tool.input as { file_path?: unknown } | null)?.file_path;
   const diffs = editDiffs(tool.name, tool.input);
   const { added, removed } = diffs ? diffStat(diffs) : { added: 0, removed: 0 };
+  // A Team chat's tools (M8-03) read as what they do to which worker.
+  const team = teamTool(tool.name, tool.input);
   return (
     <details className={`tool ${tool.status}`} open={blocked}>
       <summary>
-        <ToolIcon name={tool.name} />
-        <span className="tool-name">{tool.name}</span>
-        <code className="tool-arg">{toolSummary(tool.input, cwd)}</code>
+        {team ? <Users size={14} className="tool-icon" aria-hidden /> : <ToolIcon name={tool.name} />}
+        <span className="tool-name">{team?.label ?? tool.name}</span>
+        <code className="tool-arg">{team ? team.detail : toolSummary(tool.input, cwd)}</code>
+        {team?.access && <span className={`badge${team.access === "write" ? " risk-medium" : ""}`}>{team.access}</span>}
         {diffs && (
           <span className="diffstat">
             <span className="add">+{added}</span> <span className="del">−{removed}</span>

@@ -1,7 +1,7 @@
 import { type Effort, type Image, PERMISSION_MODES, type PermissionMode } from "@agentchainer/protocol";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { open } from "@tauri-apps/plugin-dialog";
-import { ArrowUp, ListPlus, Paperclip, Pencil, Play, SendHorizontal, Square, X } from "lucide-react";
+import { ArrowUp, ListPlus, Paperclip, Pencil, Play, SendHorizontal, Square, Users, X } from "lucide-react";
 import { type ClipboardEvent, type KeyboardEvent, useEffect, useMemo, useRef, useState } from "react";
 import { HelpPopup, PickerPopup, type PopupKind, UsagePopup } from "./ComposerPopup.tsx";
 import {
@@ -16,7 +16,8 @@ import {
 import { fuzzyFilter, tokenAt } from "./fuzzy.ts";
 import { ModeHelp } from "./ModeHelp.tsx";
 import { EFFORT_OPTIONS, MODE_HELP, MODE_NAMES, modelChoices, modeOptions } from "./options.ts";
-import { asMode, type Tab } from "./tabs.ts";
+import { asMode, isFresh, type Tab } from "./tabs.ts";
+import { teamSpend } from "./team.ts";
 import { Select } from "./ui/Select.tsx";
 
 /** An image pasted into the composer: base64 data for the API and a data URL for the thumbnail. */
@@ -45,6 +46,7 @@ export function Composer({
   seed,
   onSend,
   onTask,
+  onTeam,
   onCommand,
   onInterrupt,
   onResume,
@@ -62,6 +64,8 @@ export function Composer({
   onSend: (text: string, images: Attachment[]) => void;
   /** Makes a task of the text (UX-13); without it (the Tasks preview off), the composer is chat only. */
   onTask?: (text: string) => void;
+  /** Starts the chat over as a Team chat, or as a plain one again (M8-03). */
+  onTeam: (on: boolean) => void;
   onCommand: (name: AppCommand, arg: string) => void;
   onInterrupt: () => void;
   onResume: () => void;
@@ -522,7 +526,25 @@ export function Composer({
           >
             <Paperclip size={14} />
           </button>
+          {/* A Team chat (M8-03) is chosen before the first message; a worker's tab can't be one. */}
+          {!tab.parentId && isFresh(tab) && (
+            <button
+              type="button"
+              className="secondary small team-toggle"
+              aria-pressed={tab.team !== undefined}
+              title={
+                tab.team
+                  ? "A Team chat: Claude can start worker sessions, each in its own tab. Click to make it a plain chat."
+                  : "Let Claude start worker sessions that work in parallel, each in its own tab, under one budget cap"
+              }
+              onClick={() => onTeam(tab.team === undefined)}
+            >
+              <Users size={14} />
+              Team
+            </button>
+          )}
           <span className="grow" />
+          {tab.team && <span className={`team-spend${tab.team.stopped ? " stopped" : ""}`}>{teamSpend(tab.team)}</span>}
           {tab.context && !tab.ended && (
             <ContextRing
               percentage={tab.context.percentage}

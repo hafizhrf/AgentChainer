@@ -67,6 +67,8 @@ export type Item =
   /** The main agent's visible thinking, collapsed by default (M1-10). */
   | ThinkingItem
   | { kind: "notice"; id: number; text: string; at?: number }
+  /** A Team chat's worker reported back (M8-03); the supervisor got it as its next message. */
+  | { kind: "worker"; id: number; workerId: string; name: string; text: string; isError: boolean; at?: number }
   /** Where earlier messages were summarized to free the context window (UX-12). */
   | { kind: "divider"; id: number; text: string }
   | ToolItem
@@ -119,6 +121,20 @@ export function applyEvent(items: Item[], e: AgentEvent, now?: number): Item[] {
           text: e.text,
           messageId: e.messageId,
           ...(e.imageCount ? { imageCount: e.imageCount } : {}),
+          ...(now !== undefined ? { at: now } : {}),
+        },
+      ];
+
+    case "worker.message":
+      return [
+        ...closeAssistant(items),
+        {
+          kind: "worker",
+          id: nextId(),
+          workerId: e.workerId,
+          name: e.name,
+          text: e.text,
+          isError: e.isError,
           ...(now !== undefined ? { at: now } : {}),
         },
       ];

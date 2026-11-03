@@ -94,17 +94,19 @@ splits into parallel parts, the person wants agents they can watch and talk to, 
 ```
 
 - **Team toggle:**
-  - The composer of a chat that hasn't started has a **Team** toggle. Turning it on fills in the budget cap with the
-    Autonomous default, and the cap is required.
+  - The composer of a chat nothing was sent to has a **Team** toggle. Turning it on starts the chat over as a Team
+    chat, since the tools come with the session's start.
+  - The cap is Settings' budget cap, or $2 when none is set.
   - Once the chat starts, a Team chip shows the shared spend against the cap.
 - **Worker tabs:**
   - They open on `session.opened`, without taking focus, nested under the supervisor in the sidebar, with an access
     badge.
   - A write worker's approvals show in its own tab, and the sidebar and fleet show it waiting.
-- **Cards in the supervisor's transcript:**
-  - Calls to `assign`, `handoff` and `send_message` render as a worker card: name, access, live status, cost, and
-    Open.
-  - `worker.message` renders as the worker's report.
+- **The supervisor's transcript:**
+  - Calls to the Team tools read as what they do ("Assign worker", "Hand off to worker", …), with the worker's name,
+    the assignment and a `read`/`write` badge.
+  - The worker's live status and cost are in its sidebar row and the fleet view.
+  - `worker.message` renders as a card with the worker's report.
 - **The fleet view:** a row shows "worker of <supervisor>".
 
 ## 5. Security

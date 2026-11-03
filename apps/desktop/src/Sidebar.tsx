@@ -4,6 +4,7 @@ import type { WorkspaceDef } from "./settings.ts";
 import { folderName, type Tab } from "./tabs.ts";
 import { stateLabel } from "./tasks/run.ts";
 import { type TaskTab, taskKey } from "./tasks/taskTabs.ts";
+import { nestedTabs } from "./team.ts";
 import { ActionMenu } from "./ui/ActionMenu.tsx";
 import { IconButton } from "./ui/IconButton.tsx";
 import { menuShortcut } from "./useMenuCommands.ts";
@@ -99,8 +100,11 @@ export function Sidebar({
             <p className="sidebar-empty">Open chats show up here.</p>
           ) : (
             <ul className="nav-list">
-              {tabs.map((t) => (
-                <li key={t.sessionId} className={`nav-row${t.sessionId === active ? " active" : ""}`}>
+              {nestedTabs(tabs).map(({ tab: t, child }) => (
+                <li
+                  key={t.sessionId}
+                  className={`nav-row${child ? " child" : ""}${t.sessionId === active ? " active" : ""}`}
+                >
                   <button
                     type="button"
                     className="nav-main"
@@ -109,7 +113,10 @@ export function Sidebar({
                     onClick={() => onSelect(t.sessionId)}
                   >
                     <span className="nav-title">{t.title}</span>
-                    <span className="nav-sub">{folderName(t.cwd)}</span>
+                    <span className="nav-sub">
+                      {child ? `Worker · ${t.access === "write" ? "can edit" : "read only"}` : folderName(t.cwd)}
+                      {t.team ? " · Team" : ""}
+                    </span>
                   </button>
                   <SessionStatus tab={t} />
                   <ActionMenu

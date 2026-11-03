@@ -61,8 +61,14 @@ export function FleetView({
     working: items.filter((i) => i.status === "working").length,
     ended: items.filter((i) => i.status === "ended").length,
   };
+  const tabTitle = (id: string) => tabs.find((t) => t.sessionId === id)?.title;
   const title = (i: FleetItem) =>
-    i.task ? `${i.task.title ?? i.task.id}` : (tabs.find((t) => t.sessionId === i.sessionId)?.title ?? "Chat");
+    i.task
+      ? `${i.task.title ?? i.task.id}`
+      : i.parentId
+        ? // A Team chat's worker (M8-03).
+          `${tabTitle(i.sessionId) ?? "Worker"} · worker of ${tabTitle(i.parentId) ?? "a Team chat"}`
+        : (tabTitle(i.sessionId) ?? "Chat");
   const open = (i: FleetItem) =>
     i.task ? onOpenTask(workspaceOf(i.task.cwd), i.task.id, i.task.title ?? "Task") : onOpenChat(i.sessionId);
 

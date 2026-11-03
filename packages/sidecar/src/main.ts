@@ -159,6 +159,7 @@ function sessionHost({ sdk, claudePath }: Claude): SessionHost {
     unregister: (id) => sessions.delete(id),
     event: (sessionId, event, task) => notify("agent.event", { sessionId, event, task }),
     permission: (sessionId, request, task) => notify("permission.request", { sessionId, ...request, task }),
+    status: (item) => notify("fleet.changed", { item }),
   };
 }
 
@@ -253,6 +254,7 @@ serve(
         {
           emit: (event) => notify("agent.event", { sessionId: session.id, event }),
           askPermission: (request) => notify("permission.request", { sessionId: session.id, ...request }),
+          statusChanged: (item) => notify("fleet.changed", { item }),
           onEnd: () => {
             if (sessions.get(session.id) === session) sessions.delete(session.id);
           },
@@ -261,6 +263,8 @@ serve(
       sessions.set(session.id, session);
       return { sessionId: session.id };
     },
+
+    "fleet.list": () => ({ items: [...sessions.values()].map((s) => s.fleetItem) }),
 
     "session.send": ({ sessionId, text, images }) => ({
       ok: true,

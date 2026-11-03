@@ -369,7 +369,8 @@ export class Orchestrator {
   }
 
   private tag(stepId: string, label: string, role?: string): StepTag {
-    return { id: this.task.id, stepId, label, ...(role ? { role } : {}) };
+    const title = (this.task.title ?? this.task.request).slice(0, 80);
+    return { id: this.task.id, stepId, label, title, ...(role ? { role } : {}) };
   }
 
   /** The latest session of a template step (where its fixes go). */

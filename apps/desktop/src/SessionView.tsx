@@ -128,7 +128,8 @@ export function SessionView({
   const planSwitch = tab.planSwitch && tab.mode === "plan" ? tab.planSwitch : null;
   // Until the first message, the composer sits mid-screen with starters below; the children of `.chat` keep their
   // positions either way, so the composer never remounts and keeps its draft.
-  const fresh = isFresh(tab);
+  // The composer and what goes with it belong to the Chat view; the graph and the timeline get the whole column.
+  const fresh = isFresh(tab) && view === "chat";
   const split = useDefaultLayout({
     id: "agentchainer.session",
     panelIds: rightOpen ? ["center", "right"] : ["center"],
@@ -281,31 +282,33 @@ export function SessionView({
                       </button>
                     )}
                   </div>
-                  {fresh ? (
-                    <div className="fresh-heading">
-                      <h2>What should Claude work on?</h2>
-                      <p className="muted">Describe a task, or start from one of these.</p>
-                    </div>
-                  ) : null}
-                  {planSwitch && (
-                    <div className="plan-switch" role="status">
-                      <ClipboardList size={14} aria-hidden />
-                      <span className="grow">
-                        Claude switched to {MODE_NAMES.plan} to ask before changing anything.
-                      </span>
-                      <button
-                        type="button"
-                        className="secondary small"
-                        onClick={() => onModeChange(planSwitch.previous)}
-                      >
-                        Back to {MODE_NAMES[planSwitch.previous]}
-                      </button>
-                    </div>
-                  )}
-                  {questions.map((q) => (
-                    <QuestionCard key={q.requestId} request={q} onAnswer={(a) => onAnswer(q, a)} />
-                  ))}
-                  {todos && todos.length > 0 && <TodoPanel todos={todos} />}
+                  <div className="chat-dock" hidden={view !== "chat"}>
+                    {fresh ? (
+                      <div className="fresh-heading">
+                        <h2>What should Claude work on?</h2>
+                        <p className="muted">Describe a task, or start from one of these.</p>
+                      </div>
+                    ) : null}
+                    {planSwitch && (
+                      <div className="plan-switch" role="status">
+                        <ClipboardList size={14} aria-hidden />
+                        <span className="grow">
+                          Claude switched to {MODE_NAMES.plan} to ask before changing anything.
+                        </span>
+                        <button
+                          type="button"
+                          className="secondary small"
+                          onClick={() => onModeChange(planSwitch.previous)}
+                        >
+                          Back to {MODE_NAMES[planSwitch.previous]}
+                        </button>
+                      </div>
+                    )}
+                    {questions.map((q) => (
+                      <QuestionCard key={q.requestId} request={q} onAnswer={(a) => onAnswer(q, a)} />
+                    ))}
+                    {todos && todos.length > 0 && <TodoPanel todos={todos} />}
+                  </div>
                   {tab.background.length > 0 && (
                     <BackgroundTasks
                       tasks={tab.background}
@@ -316,25 +319,27 @@ export function SessionView({
                       }}
                     />
                   )}
-                  <Composer
-                    tab={tab}
-                    active={!hidden}
-                    files={paths}
-                    seed={seed}
-                    onSend={(text, images) => {
-                      jumpToLatest();
-                      onSend(text, images);
-                    }}
-                    onCommand={onCommand}
-                    {...(onTask ? { onTask } : {})}
-                    onInterrupt={onInterrupt}
-                    onResume={onResume}
-                    onModeChange={onModeChange}
-                    onModelChange={onModelChange}
-                    onEffortChange={onEffortChange}
-                  />
-                  {fresh ? <StarterChips onPick={(text) => setSeed({ text })} /> : null}
-                  {fresh ? <div className="fresh-spacer" /> : null}
+                  <div className="chat-dock" hidden={view !== "chat"}>
+                    <Composer
+                      tab={tab}
+                      active={!hidden && view === "chat"}
+                      files={paths}
+                      seed={seed}
+                      onSend={(text, images) => {
+                        jumpToLatest();
+                        onSend(text, images);
+                      }}
+                      onCommand={onCommand}
+                      {...(onTask ? { onTask } : {})}
+                      onInterrupt={onInterrupt}
+                      onResume={onResume}
+                      onModeChange={onModeChange}
+                      onModelChange={onModelChange}
+                      onEffortChange={onEffortChange}
+                    />
+                    {fresh ? <StarterChips onPick={(text) => setSeed({ text })} /> : null}
+                    {fresh ? <div className="fresh-spacer" /> : null}
+                  </div>
                 </div>
               </Panel>
               {terminalOpen && <Separator className="resize-handle" />}

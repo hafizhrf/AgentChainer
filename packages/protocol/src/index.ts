@@ -1139,6 +1139,11 @@ export const methodSchemas = {
   },
   /** Liveness check used by the UI's health ping (M1-01). */
   "system.ping": { params: Empty, result: Ok },
+  /**
+   * Every live session across workspaces, for the fleet view (M8-02): chats and task steps, with their status. Changes
+   * then arrive as `fleet.changed`.
+   */
+  "fleet.list": { params: Empty, result: z.object({ items: z.array(z.lazy(() => FleetItemSchema)) }) },
   /** Readiness of the user's machine (spike S5). Never includes account identity (email, org). */
   "env.check": { params: Empty, result: EnvCheckSchema },
   /**
@@ -1735,8 +1740,28 @@ export const TaskTagSchema = z.object({
   stepId: z.string(),
   label: z.string(),
   role: z.string().optional(),
+  /** The task's short title, for lists across tasks such as the fleet view (M8-02). */
+  title: z.string().optional(),
 });
 export type TaskTag = z.infer<typeof TaskTagSchema>;
+
+/**
+ * One live session in the fleet view (M8-02, docs/design/workspaces-and-fleet.md §4): a chat, or a task step's session
+ * (`task` set). The status is the sidecar's own, so the fleet and the sidebar agree.
+ */
+export const FleetItemSchema = z.object({
+  sessionId: z.string(),
+  cwd: z.string(),
+  status: z.enum(["working", "waiting", "idle", "ended"]),
+  /** Approvals and questions waiting for the person. */
+  waiting: z.number().int(),
+  costUsd: z.number(),
+  startedAt: z.string(),
+  /** When the status last changed. */
+  since: z.string(),
+  task: TaskTagSchema.optional(),
+});
+export type FleetItem = z.infer<typeof FleetItemSchema>;
 
 export const PermissionRequestSchema = z.object({
   sessionId: z.string(),
@@ -1773,6 +1798,8 @@ export const notificationSchemas = {
   "permission.request": PermissionRequestSchema,
   /** A task's run changed: a step started or ended, gates ran, or the run ended (M3-06). */
   "task.updated": z.object({ cwd: z.string(), task: TaskSchema }),
+  /** A session's fleet status changed (M8-02): working, waiting for the person, idle or ended. */
+  "fleet.changed": z.object({ item: FleetItemSchema }),
 } as const;
 
 export type NotificationName = keyof typeof notificationSchemas;

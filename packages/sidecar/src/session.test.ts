@@ -412,3 +412,65 @@ describe("Session.inject (UX-13)", () => {
     s.close();
   });
 });
+
+describe("a session's fleet status (M8-02)", () => {
+  it("goes idle, working, waiting for an approval, working, idle, then ended, and reports each change", async () => {
+    let release: () => void = () => undefined;
+    let options: Record<string, unknown> = {};
+    const sdk = {
+      query: ({ prompt, options: o }: { prompt: AsyncIterable<unknown>; options: Record<string, unknown> }) => {
+        options = o;
+        const messages = (async function* () {
+          for await (const _ of prompt) {
+            await new Promise<void>((r) => (release = r));
+            yield {
+              type: "result",
+              subtype: "success",
+              result: "ok",
+              duration_ms: 1,
+              num_turns: 1,
+              is_error: false,
+              total_cost_usd: 0.04,
+            };
+            return;
+          }
+        })();
+        return Object.assign(messages, { close: () => undefined, interrupt: async () => undefined });
+      },
+    } as unknown as AgentSdkModule;
+    const seen: string[] = [];
+    const s = new Session(
+      sdk,
+      { cwd: "/w", claudePath: "claude" },
+      {
+        ...callbacks(),
+        statusChanged: (item) => void seen.push(item.status),
+      },
+    );
+    assert.equal(s.fleetItem.status, "idle");
+    const turn = s.turn("go");
+    const canUseTool = options.canUseTool as (n: string, i: unknown, c: Record<string, unknown>) => Promise<unknown>;
+    void canUseTool(
+      "Bash",
+      { command: "ls" },
+      { requestId: "r1", toolUseID: "t1", signal: new AbortController().signal },
+    );
+    assert.deepEqual([s.fleetItem.status, s.fleetItem.waiting], ["waiting", 1]);
+    s.respond("r1", { allow: true });
+    // Let the stand-in CLI take the message before the turn ends.
+    await new Promise((r) => setTimeout(r, 5));
+    release();
+    await turn;
+    await new Promise((r) => setTimeout(r, 5));
+    assert.deepEqual([s.fleetItem.status, s.fleetItem.costUsd], ["ended", 0.04]);
+    assert.deepEqual(seen, ["working", "waiting", "working", "idle", "ended"]);
+  });
+
+  it("carries a task step's tag", () => {
+    const { sdk } = fakeSdk([]);
+    const s = new Session(sdk, { cwd: "/w", claudePath: "claude" }, callbacks());
+    s.tag = { id: "2026-11-03-0000abcd", cwd: "/w", stepId: "implement", label: "Implement", title: "Fix total" };
+    assert.equal(s.fleetItem.task?.title, "Fix total");
+    s.close();
+  });
+});

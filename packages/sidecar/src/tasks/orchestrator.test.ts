@@ -234,6 +234,7 @@ describe("orchestrator", () => {
       id: done.id,
       stepId: "implement",
       label: "Implement",
+      title: "Add a counter",
       role: "implementer",
     });
     assert.equal(Math.round((done.run?.costUsd ?? 0) * 100), 10);

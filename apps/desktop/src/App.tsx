@@ -3,6 +3,7 @@ import {
   EFFORTS,
   type Effort,
   type EnvCheck,
+  type FleetItem,
   type Methods,
   PERMISSION_MODES,
   type PermissionMode,
@@ -24,6 +25,7 @@ import { CommandPalette, type PaletteCommand } from "./CommandPalette.tsx";
 import type { Attachment } from "./Composer.tsx";
 import { APP_COMMANDS, type AppCommand, chatContext, effortFromArg, modeFromArg, modelFromArg } from "./commands.ts";
 import { useConfirm } from "./Dialog.tsx";
+import { FleetView } from "./FleetView.tsx";
 import { joinPath } from "./files.ts";
 import { HomeView, pickFolder } from "./HomeView.tsx";
 import { MODE_NAMES, modelChoices, rememberModels, THEMES } from "./options.ts";
@@ -31,7 +33,7 @@ import { type PermissionAnswer, PermissionDialog } from "./PermissionDialog.tsx"
 import { PANEL_TAB_LABEL, PANEL_TABS, type PanelTab, parseHidden, serializeHidden, toggleHidden } from "./panelTabs.ts";
 import { SessionView } from "./SessionView.tsx";
 import { SettingsDialog } from "./SettingsDialog.tsx";
-import { Sidebar } from "./Sidebar.tsx";
+import { FLEET, Sidebar } from "./Sidebar.tsx";
 import { quitApp, readSelftestConfig, runSelftest, type SelftestConfig } from "./selftest.ts";
 import { loadSettings, type Settings, saveSettings, withRecent } from "./settings.ts";
 import type { SetupView } from "./setup/SetupPage.tsx";
@@ -121,6 +123,8 @@ export function App() {
   const stepTotals = useRef(new Map<string, number>());
   /** Tasks open as tabs (UX-13), beside the sessions; the active one is `task:<id>` in `active`. */
   const [taskTabs, setTaskTabs] = useState<TaskTab[]>([]);
+  /** Every live session's fleet status, by session id (M8-02); ended ones stay until cleared or the app restarts. */
+  const [fleet, setFleet] = useState<Record<string, FleetItem>>({});
   /** For each open task thread, the tasks whose approvals it shows as cards (the task and its sub-tasks). */
   const [shownTasks, setShownTasks] = useState<Record<string, string[]>>({});
   /** Self-test screenshots only: the right panel's tab. */
@@ -239,6 +243,11 @@ export function App() {
         .catch(() => undefined);
     });
     const offEvents = subscribe((n) => {
+      if (n.method === "fleet.changed") {
+        const { item } = n.params;
+        setFleet((f) => ({ ...f, [item.sessionId]: item }));
+        return;
+      }
       if (n.method === "permission.request") {
         // A task step's session has no tab: its approvals queue up and show over whatever page is open.
         const { task } = n.params;
@@ -292,6 +301,11 @@ export function App() {
     }
     setHello(h);
     alive.current = true;
+    // The fleet as the runtime has it now; changes arrive as `fleet.changed`.
+    void request("fleet.list", {}).then(
+      ({ items }) => setFleet((f) => ({ ...f, ...Object.fromEntries(items.map((i) => [i.sessionId, i])) })),
+      () => undefined,
+    );
     return recheck();
   }
 
@@ -860,6 +874,7 @@ export function App() {
       cmds.push({ group, id, title, run, ...extra });
 
     add("Session", "new-session", "New session", () => show(null), { shortcut: menuShortcut("new-session") });
+    add("Session", "fleet", "Fleet: everything running", () => show(FLEET));
     if (settings?.tasksPreview === true)
       add("Session", "new-task", "New task (preview)", newTask, { shortcut: menuShortcut("new-task") });
     add("Session", "open-folder", "Open folder…", () => void openFolder(), { shortcut: menuShortcut("open-folder") });
@@ -988,6 +1003,7 @@ export function App() {
                 active={setup ? null : active}
                 taskTabs={taskTabs}
                 onCloseTask={closeTaskTab}
+                fleet={Object.values(fleet)}
                 waitingTasks={new Set(taskApprovals.flatMap((p) => (p.task ? [p.task.id] : [])))}
                 recent={settings?.recentWorkspaces ?? []}
                 ready={env ? env.ready : null}
@@ -1012,6 +1028,24 @@ export function App() {
                 </div>
               )}
               <div className="main-body">
+                {active === FLEET && !setup && (
+                  <FleetView
+                    items={Object.values(fleet)}
+                    tabs={tabs}
+                    onOpenChat={(id) => show(id)}
+                    onOpenTask={(dir, id, title) => openTask(dir, id, { title })}
+                    onStop={(item) =>
+                      void (
+                        item.task
+                          ? request("task.cancel", { cwd: item.task.cwd, id: item.task.id })
+                          : request("session.interrupt", { sessionId: item.sessionId })
+                      ).catch((err: unknown) => setRuntimeNotice(`Couldn't stop it: ${err}`))
+                    }
+                    onClearEnded={() =>
+                      setFleet((f) => Object.fromEntries(Object.entries(f).filter(([, i]) => i.status !== "ended")))
+                    }
+                  />
+                )}
                 {active === null && !setup && (
                   <HomeView
                     env={env}

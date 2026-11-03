@@ -1,10 +1,14 @@
-import { CircleAlert, CircleCheck, ClipboardList, Folder, Loader2, Plus, Settings } from "lucide-react";
+import type { FleetItem } from "@agentchainer/protocol";
+import { CircleAlert, CircleCheck, ClipboardList, Folder, Loader2, Plus, Radar, Settings } from "lucide-react";
 import { folderName, type Tab } from "./tabs.ts";
 import { stateLabel } from "./tasks/run.ts";
 import { type TaskTab, taskKey } from "./tasks/taskTabs.ts";
 import { ActionMenu } from "./ui/ActionMenu.tsx";
 import { IconButton } from "./ui/IconButton.tsx";
 import { menuShortcut } from "./useMenuCommands.ts";
+
+/** The `active` key of the fleet view (M8-02). */
+export const FLEET = "fleet";
 
 /**
  * The left column (UX-03): New, the open chats and tasks with their status (UX-13), recent workspaces, and at the
@@ -15,6 +19,7 @@ export function Sidebar({
   taskTabs,
   waitingTasks,
   onCloseTask,
+  fleet,
   active,
   recent,
   ready,
@@ -30,6 +35,8 @@ export function Sidebar({
   /** Tasks with a step waiting for an approval. */
   waitingTasks: ReadonlySet<string>;
   onCloseTask: (id: string) => void;
+  /** Every live session, for the Fleet entry's counts (M8-02). */
+  fleet: FleetItem[];
   /** The active session, or a task's `task:<id>`; null while Home is shown. */
   active: string | null;
   recent: string[];
@@ -56,6 +63,26 @@ export function Sidebar({
           <Plus size={16} />
           New
           <kbd>{menuShortcut("new-session")}</kbd>
+        </button>
+        <button
+          type="button"
+          className={`fleet-entry${active === FLEET ? " current" : ""}`}
+          aria-current={active === FLEET ? "page" : undefined}
+          onClick={() => onSelect(FLEET)}
+        >
+          <Radar size={15} aria-hidden />
+          Fleet
+          <span className="grow" />
+          {fleet.some((i) => i.status === "waiting") && (
+            <span className="fleet-count waiting" title="Waiting for you">
+              {fleet.filter((i) => i.status === "waiting").length} waiting
+            </span>
+          )}
+          {fleet.some((i) => i.status === "working") && (
+            <span className="fleet-count" title="Working">
+              {fleet.filter((i) => i.status === "working").length} working
+            </span>
+          )}
         </button>
       </div>
 

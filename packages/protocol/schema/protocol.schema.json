@@ -82,6 +82,102 @@
         "additionalProperties": false
       }
     },
+    "fleet.list": {
+      "params": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "result": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "sessionId": {
+                  "type": "string"
+                },
+                "cwd": {
+                  "type": "string"
+                },
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "working",
+                    "waiting",
+                    "idle",
+                    "ended"
+                  ]
+                },
+                "waiting": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                "costUsd": {
+                  "type": "number"
+                },
+                "startedAt": {
+                  "type": "string"
+                },
+                "since": {
+                  "type": "string"
+                },
+                "task": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "pattern": "^\\d{4}-\\d{2}-\\d{2}-[0-9a-f]{8}$"
+                    },
+                    "cwd": {
+                      "type": "string"
+                    },
+                    "stepId": {
+                      "type": "string"
+                    },
+                    "label": {
+                      "type": "string"
+                    },
+                    "role": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "cwd",
+                    "stepId",
+                    "label"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "required": [
+                "sessionId",
+                "cwd",
+                "status",
+                "waiting",
+                "costUsd",
+                "startedAt",
+                "since"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "additionalProperties": false
+      }
+    },
     "env.check": {
       "params": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -28974,6 +29070,9 @@
             },
             "role": {
               "type": "string"
+            },
+            "title": {
+              "type": "string"
             }
           },
           "required": [
@@ -29015,6 +29114,9 @@
               "type": "string"
             },
             "role": {
+              "type": "string"
+            },
+            "title": {
               "type": "string"
             }
           },
@@ -30202,6 +30304,91 @@
       "required": [
         "cwd",
         "task"
+      ],
+      "additionalProperties": false
+    },
+    "fleet.changed": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "item": {
+          "type": "object",
+          "properties": {
+            "sessionId": {
+              "type": "string"
+            },
+            "cwd": {
+              "type": "string"
+            },
+            "status": {
+              "type": "string",
+              "enum": [
+                "working",
+                "waiting",
+                "idle",
+                "ended"
+              ]
+            },
+            "waiting": {
+              "type": "integer",
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991
+            },
+            "costUsd": {
+              "type": "number"
+            },
+            "startedAt": {
+              "type": "string"
+            },
+            "since": {
+              "type": "string"
+            },
+            "task": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "pattern": "^\\d{4}-\\d{2}-\\d{2}-[0-9a-f]{8}$"
+                },
+                "cwd": {
+                  "type": "string"
+                },
+                "stepId": {
+                  "type": "string"
+                },
+                "label": {
+                  "type": "string"
+                },
+                "role": {
+                  "type": "string"
+                },
+                "title": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "cwd",
+                "stepId",
+                "label"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "sessionId",
+            "cwd",
+            "status",
+            "waiting",
+            "costUsd",
+            "startedAt",
+            "since"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "item"
       ],
       "additionalProperties": false
     }

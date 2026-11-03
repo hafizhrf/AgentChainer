@@ -1268,3 +1268,12 @@
 .question-review button.link {
   justify-self: start;
 }
+
+/* The Chat view's composer and cards: still mounted in the graph and the timeline (drafts survive), but not shown. */
+.chat-dock {
+  display: contents;
+}
+
+.chat-dock[hidden] {
+  display: none;
+}

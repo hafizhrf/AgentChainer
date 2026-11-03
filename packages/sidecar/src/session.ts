@@ -6,10 +6,12 @@ import type {
   AgentEvent,
   AlwaysScope,
   Effort,
+  FleetItem,
   Image,
   PermissionMode,
   PermissionRequest,
   RewindResult,
+  TaskTag,
 } from "@agentchainer/protocol";
 // Types only: the SDK itself is loaded at runtime by sdk-loader.ts (node_modules in dev, verified download when packaged).
 import type {
@@ -120,6 +122,8 @@ type SessionCallbacks = {
   onEnd: () => void;
   /** The user answered a permission request: a task's run records it for its evidence (M3-09). */
   answered?: (request: { toolName: string; input: Record<string, unknown> }, answer: PermissionAnswer) => void;
+  /** The fleet status changed (M8-02): working, waiting, idle or ended. */
+  statusChanged?: (item: FleetItem) => void;
 };
 
 /**
@@ -147,12 +151,20 @@ export class Session {
   private proc: ChildProcess | null = null;
   private closing: Promise<void> | null = null;
   private readonly interactive: boolean;
+  private readonly cwd: string;
+  private readonly startedAt = new Date().toISOString();
+  private status: FleetItem["status"] = "idle";
+  private statusSince = this.startedAt;
+  private ended = false;
+  /** A task step's tag, set by the task's runner, so the fleet view says whose step it is (M8-02). */
+  tag: TaskTag | undefined;
   /** The command list goes out once, at the start; later changes arrive as `commands_changed`. */
   private commandsSent = false;
 
   constructor(sdk: AgentSdkModule, options: SessionOptions, callbacks: SessionCallbacks) {
     this.callbacks = callbacks;
     this.interactive = options.interactive === true;
+    this.cwd = options.cwd;
     this.id = options.resume ?? randomUUID();
     const append = options.appendSystemPrompt ?? (this.interactive ? ASK_FIRST : undefined);
     this.q = sdk.query({
@@ -209,8 +221,10 @@ export class Session {
             }
             const always = ctx.suppressAlwaysAllowRule ? [] : alwaysUpdates(ctx.suggestions);
             this.pendingPermissions.set(ctx.requestId, { resolve, toolName, input, always });
+            this.touch();
             ctx.signal.addEventListener("abort", () => {
               this.pendingPermissions.delete(ctx.requestId);
+              this.touch();
               resolve({ behavior: "deny", message: "Request was cancelled." });
             });
             this.callbacks.askPermission({
@@ -251,6 +265,7 @@ export class Session {
         ]
       : text;
     this.input.push({ type: "user", message: { role: "user", content }, parent_tool_use_id: null, uuid });
+    this.touch();
     return uuid;
   }
 
@@ -325,6 +340,7 @@ export class Session {
     const pending = this.pendingPermissions.get(requestId);
     if (!pending) return false;
     this.pendingPermissions.delete(requestId);
+    this.touch();
     pending.resolve(permissionResult(pending, answer));
     this.callbacks.answered?.({ toolName: pending.toolName, input: pending.input }, answer);
     return true;
@@ -395,6 +411,35 @@ export class Session {
     }
   }
 
+  /** What the fleet view shows of this session (M8-02). */
+  get fleetItem(): FleetItem {
+    return {
+      sessionId: this.id,
+      cwd: this.cwd,
+      status: this.status,
+      waiting: this.pendingPermissions.size,
+      costUsd: this.totalCostUsd,
+      startedAt: this.startedAt,
+      since: this.statusSince,
+      ...(this.tag ? { task: this.tag } : {}),
+    };
+  }
+
+  /** Works out the fleet status again, and reports a change. Waiting for the person comes before working. */
+  private touch(): void {
+    const next: FleetItem["status"] = this.ended
+      ? "ended"
+      : this.pendingPermissions.size > 0
+        ? "waiting"
+        : this.busy || this.background.size > 0
+          ? "working"
+          : "idle";
+    if (next === this.status) return;
+    this.status = next;
+    this.statusSince = new Date().toISOString();
+    this.callbacks.statusChanged?.(this.fleetItem);
+  }
+
   /** A turn runs: one the user started, or one the CLI started after background work. */
   private get busy(): boolean {
     return this.openTurns + this.autoTurns > 0;
@@ -434,11 +479,14 @@ export class Session {
           });
         }
         for (const event of normalize(message)) this.callbacks.emit(event);
+        if (message.type === "result" || message.type === "system") this.touch();
         if (message.type === "result" && this.interactive) void this.sendContextUsage();
       }
     } catch (err) {
       this.callbacks.emit({ type: "error", message: err instanceof Error ? err.message : String(err) });
     } finally {
+      this.ended = true;
+      this.touch();
       for (const w of this.waiters.splice(0)) w.reject(new Error("The session ended before its turn finished."));
       this.callbacks.onEnd();
     }

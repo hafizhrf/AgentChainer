@@ -1550,9 +1550,15 @@ first.
     worktree.
   - **(verify)** whether project settings, hooks and CLAUDE.md load from the added folders.
   - Open: where the definition lives (the app's database, or a file like VS Code's `.code-workspace`).
-- [ ] **M8-02** A fleet view: every running session and task step across workspaces, with live status (working,
+- [x] **M8-02** A fleet view: every running session and task step across workspaces, with live status (working,
       waiting for approval, idle, done), cost, and one click to open it. From CAO's dashboard and status badges; it
       extends M4's agent tree.
+      Note: built (design §4, step 1). Sessions track their own fleet status (working, waiting for the person, idle,
+      ended) and report it (`fleet.list`, `fleet.changed`); the Fleet page groups chats and task steps by workspace,
+      the ones waiting first, with time in status, cost, Answer or Open, and Stop; the sidebar's Fleet entry counts
+      what's waiting and working. Checked in the app: a chat waiting for an approval in one workspace and a task step
+      waiting in another at once; Answer opened the task's thread at its approval card; Stop moved the chat to idle
+      and ended the task. Not built: listing a row's subagents (the session's graph has them).
 - [ ] **M8-03** Supervisor and worker sessions: a supervisor session hands work to worker sessions (assign, hand
       off, send a message, an inbox) through an in-app MCP server, under the app's approvals and budgets. From CAO's
       supervisor/worker model; it goes beyond XL's fixed split (M3-07).

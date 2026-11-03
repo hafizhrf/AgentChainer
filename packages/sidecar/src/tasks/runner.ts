@@ -6,6 +6,7 @@ import {
   type Described,
   describeRequest,
   displayPath,
+  type FleetItem,
   type GuardBlock,
   type PermissionRequest,
   type Task,
@@ -30,6 +31,8 @@ export type SessionHost = {
   unregister(sessionId: string): void;
   event(sessionId: string, event: AgentEvent, task: TaskTag): void;
   permission(sessionId: string, request: Omit<PermissionRequest, "sessionId" | "task">, task: TaskTag): void;
+  /** A step's session changed its fleet status (M8-02). */
+  status?(item: FleetItem): void;
 };
 
 const MAX_NEW_FILE_CHARS = 20_000;
@@ -235,6 +238,7 @@ export function sessionRunner(
           const tag = tags.get(session.id);
           if (tag) host.permission(session.id, request, tag);
         },
+        statusChanged: (item) => host.status?.(item),
         onEnd: () => {
           open.delete(session);
           host.unregister(session.id);
@@ -271,6 +275,7 @@ export function sessionRunner(
     async start(step, prompt, budgetUsd, tag) {
       const session = openSession(step, budgetUsd);
       tags.set(session.id, { ...tag, cwd: root });
+      session.tag = { ...tag, cwd: root };
       if (step.access === "write") live.set(step.id, session);
       const out = await turn(session, prompt, step.access === "write");
       if (step.access === "read") void session.close();
@@ -284,6 +289,7 @@ export function sessionRunner(
         live.set(step.id, session);
       }
       tags.set(session.id, { ...tag, cwd: root });
+      session.tag = { ...tag, cwd: root };
       return turn(session, prompt, true);
     },
     async gates(kinds, round) {

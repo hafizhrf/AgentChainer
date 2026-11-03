@@ -472,3 +472,154 @@
   align-items: center;
   gap: var(--space-1);
 }
+
+/* ---------- The fleet view (M8-02) ---------- */
+
+.fleet-entry {
+  width: 100%;
+  min-height: 32px;
+  justify-content: flex-start;
+  gap: var(--space-2);
+  margin-top: var(--space-1);
+  padding: 0 var(--space-2);
+  border: none;
+  background: transparent;
+  color: var(--fg);
+  font-weight: 500;
+}
+
+.fleet-entry:hover,
+.fleet-entry.current {
+  background: var(--surface-3);
+}
+
+.fleet-count {
+  padding: 0 6px;
+  border-radius: var(--radius-full);
+  background: var(--surface-3);
+  color: var(--muted);
+  font-size: var(--text-xs);
+}
+
+.fleet-count.waiting {
+  background: var(--warn-bg);
+  color: var(--warn);
+  font-weight: 600;
+}
+
+.fleet {
+  position: absolute;
+  inset: 0;
+  overflow-y: auto;
+  padding: var(--space-5) var(--space-6);
+}
+
+.fleet-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  max-width: 1080px;
+  margin: 0 auto var(--space-4);
+}
+
+.fleet-header > h1 {
+  margin: 0;
+  font-size: var(--text-xl);
+}
+
+.fleet-empty {
+  max-width: 1080px;
+  margin: var(--space-6) auto;
+}
+
+.fleet-group {
+  max-width: 1080px;
+  margin: 0 auto var(--space-4);
+}
+
+.fleet-group > h2 {
+  margin: 0 0 var(--space-1);
+  color: var(--muted);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.fleet-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
+.fleet-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 44px;
+  padding: 0 var(--space-3);
+  font-size: var(--text-sm);
+}
+
+.fleet-row + .fleet-row {
+  border-top: 1px solid var(--border);
+}
+
+.fleet-row.waiting {
+  background: var(--warn-bg);
+}
+
+.fleet-row.ended {
+  opacity: 0.7;
+}
+
+.fleet-main {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  justify-content: flex-start;
+  gap: var(--space-2);
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--fg);
+  font-weight: 500;
+  text-align: left;
+}
+
+.fleet-title,
+.fleet-step {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fleet-step {
+  font-weight: 400;
+}
+
+.fleet-status {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 4px;
+  min-width: 128px;
+}
+
+.fleet-status.waiting {
+  color: var(--warn);
+  font-weight: 600;
+}
+
+.fleet-status.working {
+  color: var(--mode-plan);
+}
+
+.fleet-time,
+.fleet-cost {
+  flex: none;
+  font-variant-numeric: tabular-nums;
+}

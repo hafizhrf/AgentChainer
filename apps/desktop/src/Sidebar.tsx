@@ -1,5 +1,6 @@
 import type { FleetItem } from "@agentchainer/protocol";
-import { CircleAlert, CircleCheck, ClipboardList, Folder, Loader2, Plus, Radar, Settings } from "lucide-react";
+import { CircleAlert, CircleCheck, ClipboardList, Folder, Folders, Loader2, Plus, Radar, Settings } from "lucide-react";
+import type { WorkspaceDef } from "./settings.ts";
 import { folderName, type Tab } from "./tabs.ts";
 import { stateLabel } from "./tasks/run.ts";
 import { type TaskTab, taskKey } from "./tasks/taskTabs.ts";
@@ -28,6 +29,8 @@ export function Sidebar({
   onSelect,
   onClose,
   onOpenWorkspace,
+  workspaces,
+  onOpenWorkspaceDef,
   onSettings,
 }: {
   tabs: Tab[];
@@ -48,6 +51,9 @@ export function Sidebar({
   onSelect: (sessionId: string) => void;
   onClose: (sessionId: string) => void;
   onOpenWorkspace: (dir: string) => void;
+  /** Named multi-folder workspaces (M8-01). */
+  workspaces: WorkspaceDef[];
+  onOpenWorkspaceDef: (def: WorkspaceDef) => void;
   onSettings: () => void;
 }) {
   return (
@@ -162,6 +168,31 @@ export function Sidebar({
                   </li>
                 );
               })}
+            </ul>
+          </section>
+        )}
+
+        {workspaces.length > 0 && (
+          <section>
+            <h2 className="sidebar-heading">Workspaces</h2>
+            <ul className="nav-list">
+              {workspaces.map((w) => (
+                <li key={w.id} className="nav-row">
+                  <button
+                    type="button"
+                    className="nav-main workspace"
+                    title={[w.primary, ...w.folders].join("\n")}
+                    onClick={() => onOpenWorkspaceDef(w)}
+                  >
+                    <Folders size={14} aria-hidden />
+                    <span className="nav-title">{w.name}</span>
+                    <span className="grow" />
+                    <span className="nav-status ended" title={`${w.folders.length + 1} folders`}>
+                      {w.folders.length + 1}
+                    </span>
+                  </button>
+                </li>
+              ))}
             </ul>
           </section>
         )}

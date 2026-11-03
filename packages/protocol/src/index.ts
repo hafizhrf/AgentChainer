@@ -1171,6 +1171,11 @@ export const methodSchemas = {
       /** Stream summaries of Claude's thinking (adaptive thinking, summarized display); off, they arrive empty (M1-10). */
       showThinking: z.boolean().optional(),
       resume: SessionIdSchema.optional(),
+      /**
+       * A multi-folder workspace's other folders (M8-01): absolute paths the session may read and change besides
+       * `cwd` (the SDK's `additionalDirectories`). Checked like the New workspace dialog checks them.
+       */
+      folders: z.array(z.string().min(1).max(4096)).max(16).optional(),
     }),
     result: z.object({ sessionId: SessionIdSchema }),
   },
@@ -1828,3 +1833,4 @@ export {
   type Risk,
   type RiskLevel,
 } from "./approval.ts";
+export { folderKey, folderProblems } from "./folders.ts";

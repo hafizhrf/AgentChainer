@@ -4,6 +4,7 @@ import {
   type Effort,
   type EnvCheck,
   type FleetItem,
+  folderKey,
   type Methods,
   PERMISSION_MODES,
   type PermissionMode,
@@ -35,7 +36,7 @@ import { SessionView } from "./SessionView.tsx";
 import { SettingsDialog } from "./SettingsDialog.tsx";
 import { FLEET, Sidebar } from "./Sidebar.tsx";
 import { quitApp, readSelftestConfig, runSelftest, type SelftestConfig } from "./selftest.ts";
-import { loadSettings, type Settings, saveSettings, withRecent } from "./settings.ts";
+import { loadSettings, type Settings, saveSettings, type WorkspaceDef, withRecent } from "./settings.ts";
 import type { SetupView } from "./setup/SetupPage.tsx";
 import { connect, isRpcError, onExit, onReady, request, requestWithTimeout, subscribe } from "./sidecar.ts";
 import {
@@ -58,6 +59,7 @@ import { UpdateDialog } from "./UpdateDialog.tsx";
 import { IconButton } from "./ui/IconButton.tsx";
 import { layoutStorage, usePersistentFlag, usePersistentValue } from "./ui/layoutStorage.ts";
 import { menuShortcut, useMenuCommands } from "./useMenuCommands.ts";
+import { WorkspaceDialog, WorkspacesCard } from "./WorkspaceDialog.tsx";
 
 // The setup page shares the file-type icon set with the workspace panel; both load on first use.
 const REPO = "https://github.com/hafizhrf/AgentChainer";
@@ -123,6 +125,10 @@ export function App() {
   const stepTotals = useRef(new Map<string, number>());
   /** Tasks open as tabs (UX-13), beside the sessions; the active one is `task:<id>` in `active`. */
   const [taskTabs, setTaskTabs] = useState<TaskTab[]>([]);
+  /** The named workspace picked on Home (M8-01); it applies while Home's folder is its primary folder. */
+  const [wsId, setWsId] = useState<string | null>(null);
+  /** The New or Edit workspace dialog. */
+  const [wsDialog, setWsDialog] = useState<WorkspaceDef | "new" | null>(null);
   /** Every live session's fleet status, by session id (M8-02); ended ones stay until cleared or the app restarts. */
   const [fleet, setFleet] = useState<Record<string, FleetItem>>({});
   /** For each open task thread, the tasks whose approvals it shows as cards (the task and its sub-tasks). */
@@ -432,7 +438,12 @@ export function App() {
     }
   }
 
-  async function startSession(dir: string, modelAlias: string, mode: PermissionMode): Promise<string | null> {
+  async function startSession(
+    dir: string,
+    modelAlias: string,
+    mode: PermissionMode,
+    folders: string[] = [],
+  ): Promise<string | null> {
     try {
       const { effort, budgetUsd, showThinking } = sessionOptions(mode);
       // Before the session starts, so what's applied (plugins, settings) is there from its first turn.
@@ -444,11 +455,13 @@ export function App() {
         ...(effort ? { effort } : {}),
         ...(budgetUsd ? { maxBudgetUsd: budgetUsd } : {}),
         showThinking,
+        ...(folders.length ? { folders } : {}),
       });
-      const items = [notice(`Session started in ${folderName(dir)}`), ...applied.map(notice)];
+      const also = folders.length ? `, with ${folders.map(folderName).join(", ")}` : "";
+      const items = [notice(`Session started in ${folderName(dir)}${also}`), ...applied.map(notice)];
       setTabs((ts) => [
         ...ts,
-        newTab(sessionId, dir, { title: NEW_TITLE, mode, items, modelAlias, effort, budgetUsd }),
+        newTab(sessionId, dir, { title: NEW_TITLE, mode, items, modelAlias, effort, budgetUsd, folders }),
       ]);
       setActive(sessionId);
       setRuntimeNotice(null);
@@ -466,6 +479,8 @@ export function App() {
     try {
       const { effort, budgetUsd, showThinking } = sessionOptions(mode);
       const { events, times } = await request("session.history", { cwd: dir, sessionId });
+      // A chat of a multi-folder workspace resumes across the same folders (M8-01).
+      const folders = tabs.find((t) => t.sessionId === sessionId)?.folders ?? [];
       await request("session.start", {
         cwd: dir,
         resume: sessionId,
@@ -474,6 +489,7 @@ export function App() {
         ...(effort ? { effort } : {}),
         ...(budgetUsd ? { maxBudgetUsd: budgetUsd } : {}),
         showThinking,
+        ...(folders.length ? { folders } : {}),
       });
       const items = closeAssistant(
         // Stored times rebuild the agents' timing for the graph and the timeline (M4-08).
@@ -482,7 +498,16 @@ export function App() {
           [notice(`Resumed “${title}” in ${folderName(dir)}`)],
         ),
       );
-      const tab = newTab(sessionId, dir, { title, mode, items, resumed: true, modelAlias, effort, budgetUsd });
+      const tab = newTab(sessionId, dir, {
+        title,
+        mode,
+        items,
+        resumed: true,
+        modelAlias,
+        effort,
+        budgetUsd,
+        folders,
+      });
       setTabs((ts) => (ts.some((t) => t.sessionId === sessionId) ? updateTab(ts, sessionId, () => tab) : [...ts, tab]));
       setActive(sessionId);
       await rememberWorkspace(dir);
@@ -584,7 +609,7 @@ export function App() {
     const id = t.sessionId;
     switch (name) {
       case "clear":
-        void startSession(t.cwd, t.modelAlias, t.mode);
+        void startSession(t.cwd, t.modelAlias, t.mode, t.folders);
         return;
       case "fork":
         void forkTab(id);
@@ -810,7 +835,40 @@ export function App() {
 
   function openWorkspace(dir: string) {
     setCwd(dir);
+    setWsId(null);
     show(null);
+  }
+
+  /** A named multi-folder workspace (M8-01): Home in its primary folder, and New reaches its other folders too. */
+  function openWorkspaceDef(def: WorkspaceDef) {
+    setCwd(def.primary);
+    setWsId(def.id);
+    show(null);
+  }
+
+  async function saveWorkspaceDef(def: WorkspaceDef) {
+    if (!settings) return;
+    try {
+      const others = settings.workspaces.filter((w) => w.id !== def.id);
+      setSettings(await saveSettings({ ...settings, workspaces: [def, ...others] }));
+      setWsDialog(null);
+      openWorkspaceDef(def);
+    } catch (err) {
+      setRuntimeNotice(`Couldn't save the workspace: ${err}`);
+    }
+  }
+
+  async function deleteWorkspaceDef(def: WorkspaceDef) {
+    if (!settings) return;
+    const ok = await confirm({
+      title: `Remove the ${def.name} workspace?`,
+      body: <p>Only the list goes: the folders and their files stay as they are.</p>,
+      confirmLabel: "Remove",
+      danger: true,
+    });
+    if (!ok) return;
+    setSettings(await saveSettings({ ...settings, workspaces: settings.workspaces.filter((w) => w.id !== def.id) }));
+    if (wsId === def.id) setWsId(null);
   }
 
   async function openFolder() {
@@ -836,7 +894,8 @@ export function App() {
     const t = tabs.find((x) => x.sessionId === active) ?? taskTabs.find((x) => taskKey(x.id) === active);
     const dir = t?.cwd ?? cwd.trim();
     if (!dir) return show(null);
-    const id = await startSession(dir, model, mode);
+    const folders = t && "sessionId" in t ? t.folders : t ? [] : homeDef?.folders;
+    const id = await startSession(dir, model, mode, folders ?? []);
     if (id) patchTab(id, (x) => ({ ...x, kind: "task" }));
   }
 
@@ -865,6 +924,10 @@ export function App() {
   const threaded = new Set(taskTabs.flatMap((t) => shownTasks[t.id] ?? [t.id]));
   const stepApproval = permission ? undefined : taskApprovals.find((p) => !p.task || !threaded.has(p.task.id));
   const workspace = cwd.trim();
+  // The named workspace picked on Home, while Home's folder is still its primary folder.
+  const homeDef =
+    settings?.workspaces.find((w) => w.id === wsId && workspace && folderKey(w.primary) === folderKey(workspace)) ??
+    null;
 
   /** Everything the command palette offers (UX-07), built from the same actions as the menu and the views. */
   function paletteCommands(): PaletteCommand[] {
@@ -1012,6 +1075,8 @@ export function App() {
                 onSelect={show}
                 onClose={closeTab}
                 onOpenWorkspace={openWorkspace}
+                workspaces={settings?.workspaces ?? []}
+                onOpenWorkspaceDef={openWorkspaceDef}
                 onSettings={() => setSettingsOpen(true)}
               />
             </Panel>
@@ -1061,12 +1126,22 @@ export function App() {
                     mode={mode}
                     onModeChange={setMode}
                     canAutonomous={settings?.budgetUsd != null}
-                    onStart={() => void startSession(workspace, model, mode)}
+                    onStart={() => void startSession(workspace, model, mode, homeDef?.folders ?? [])}
                     onOpenSetup={() => setSetup({ cwd: workspace, model, back: null })}
                     openIds={new Set(tabs.filter((t) => !t.ended).map((t) => t.sessionId))}
                     onOpenStored={openStored}
                     confirm={confirm}
                   >
+                    {settings && (
+                      <WorkspacesCard
+                        workspaces={settings.workspaces}
+                        selected={homeDef}
+                        onPick={openWorkspaceDef}
+                        onNew={() => setWsDialog("new")}
+                        onEdit={setWsDialog}
+                        onDelete={(def) => void deleteWorkspaceDef(def)}
+                      />
+                    )}
                     {settings?.tasksPreview === true && hello !== null && workspace && (
                       <HomeTasks cwd={workspace} onOpen={(id, title) => openTask(workspace, id, { title })} />
                     )}
@@ -1165,6 +1240,14 @@ export function App() {
             canAutonomous={false}
             onAnswer={(reply) => void answerTaskStep(stepApproval, reply)}
             onStopTask={() => void stopTaskStep(stepApproval)}
+          />
+        )}
+        {wsDialog && (
+          <WorkspaceDialog
+            initial={wsDialog === "new" ? null : wsDialog}
+            homeDir={hello?.homeDir ?? null}
+            onSave={(def) => void saveWorkspaceDef(def)}
+            onClose={() => setWsDialog(null)}
           />
         )}
         {settingsOpen && settings && (

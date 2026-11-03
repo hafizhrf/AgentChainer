@@ -1548,8 +1548,16 @@ first.
   - Readiness, the setup plan and git work per folder, and the guard allows all the workspace's folders.
   - Tasks name the folder in their affected areas; XL sub-tasks can target different folders, each in its own
     worktree.
-  - **(verify)** whether project settings, hooks and CLAUDE.md load from the added folders.
-  - Open: where the definition lives (the app's database, or a file like VS Code's `.code-workspace`).
+  - Checked live on CLI 2.1.314: project settings, hooks and CLAUDE.md load only from the primary folder, not from
+    the added ones.
+  - The definition lives in the app's settings (owner decision, 2026-11-03).
+  - Progress (design §10, steps 2 and 3, PR pending):
+    - workspaces are saved in settings, from a New workspace dialog;
+    - Home and the sidebar list them, and a session started from one gets `session.start {folders}`;
+    - `additionalDirectories` is passed, and the guard allows recursive deletes inside any of the folders;
+    - the sidecar refuses a relative path, a drive, the home folder, a repeat or a nested folder;
+    - a resumed chat keeps its folders.
+    Steps 4 (per-folder features) and 5 (tasks across folders) are still to come.
 - [x] **M8-02** A fleet view: every running session and task step across workspaces, with live status (working,
       waiting for approval, idle, done), cost, and one click to open it. From CAO's dashboard and status badges; it
       extends M4's agent tree.

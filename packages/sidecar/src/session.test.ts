@@ -474,3 +474,31 @@ describe("a session's fleet status (M8-02)", () => {
     s.close();
   });
 });
+
+describe("a session across a workspace's folders (M8-01)", () => {
+  it("passes the other folders to the CLI, and lets the guard allow deletes in them", async () => {
+    const { sdk, options } = fakeSdk([]);
+    const s = new Session(
+      sdk,
+      { cwd: "/work/app", claudePath: "claude", additionalDirectories: ["/work/api"] },
+      callbacks(),
+    );
+    assert.deepEqual(options().additionalDirectories, ["/work/api"]);
+    const hook = (options().hooks as { PreToolUse: { hooks: ((i: unknown) => Promise<unknown>)[] }[] }).PreToolUse[0]
+      ?.hooks[0];
+    const decide = async (command: string) =>
+      (
+        (await hook?.({
+          hook_event_name: "PreToolUse",
+          tool_name: "Bash",
+          tool_input: { command },
+          cwd: "/work/app",
+        })) as {
+          hookSpecificOutput?: { permissionDecision: string };
+        }
+      )?.hookSpecificOutput?.permissionDecision ?? "allow";
+    assert.equal(await decide("rm -rf /work/api/dist"), "allow");
+    assert.equal(await decide("rm -rf /work/elsewhere"), "deny");
+    s.close();
+  });
+});

@@ -20,7 +20,12 @@ export type Settings = {
   /** Show "New task" (M3 contract and triage) before tasks can run; null means off. */
   tasksPreview: boolean | null;
   recentWorkspaces: string[];
+  /** Named multi-folder workspaces (M8-01), as the New workspace dialog saved them. */
+  workspaces: WorkspaceDef[];
 };
+
+/** A named set of folders (M8-01): sessions run in `primary` and also reach `folders`. Mirrors `settings.rs`. */
+export type WorkspaceDef = { id: string; name: string; primary: string; folders: string[] };
 
 export const loadSettings = () => invoke<Settings>("settings_get");
 

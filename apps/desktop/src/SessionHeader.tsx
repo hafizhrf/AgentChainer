@@ -75,6 +75,11 @@ export function SessionHeader({
         <span className="session-meta" title={tab.cwd}>
           <Folder size={12} aria-hidden />
           {folderName(tab.cwd)}
+          {tab.folders?.length ? (
+            <span className="chip" title={tab.folders.join("\n")}>
+              +{tab.folders.length} {tab.folders.length === 1 ? "folder" : "folders"}
+            </span>
+          ) : null}
           {branch && (
             <>
               <GitBranch size={12} aria-hidden />

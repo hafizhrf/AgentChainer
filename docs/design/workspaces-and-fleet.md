@@ -122,11 +122,13 @@
   - The sidecar passes `cwd: primary` and `additionalDirectories: folders`.
   - `SessionOptions` gains `additionalDirectories`.
   - A resumed or forked session gets the workspace's current folders.
-- **(verify)** what the CLI loads from an added directory: its `CLAUDE.md`, `.claude/settings.json`, hooks, skills
-  and `.mcp.json`. The Claude Code docs describe an environment opt-in for loading `CLAUDE.md` from added directories
-  **(verify)**. The first build step checks this with a live session and records the result here.
-  - Until it's known, the app says that the primary folder's project settings apply.
-  - It never sets a CLI environment option silently; one that's needed is documented and shown.
+- **What the CLI loads from an added directory**, checked live on CLI 2.1.314 (haiku, a session in `app` with `api`
+  added, each with its own CLAUDE.md naming a codeword): only the primary folder's CLAUDE.md loaded. An edit in the
+  added folder went through the normal approval and was applied. The app says that only the primary folder's
+  CLAUDE.md, project settings, hooks and skills apply.
+  - The Claude Code docs describe an environment opt-in for loading `CLAUDE.md` from added directories
+    **(verify)**. The app doesn't set it: it never sets a CLI environment option silently, and one that's needed is
+    documented and shown.
 - **Permission requests already carry a `blockedPath`** (`index.ts`, `PermissionRequest`). A request for a path outside
   every folder of the workspace shows which path it was, as today.
 
@@ -261,5 +263,4 @@ They're used as ideas only; no code is copied.
 5. The fleet view doesn't keep finished items after a restart; Sessions and Tasks keep those.
 6. The chat and task overhaul ([chat-and-tasks.md](chat-and-tasks.md)) comes before the fleet view.
 
-**Still open:**
-- What the CLI loads from added folders (§5.2, **(verify)**), settled in step 3.
+**Still open:** nothing for M8-01 and M8-02. What the CLI loads from added folders was settled in step 3 (§5.2).

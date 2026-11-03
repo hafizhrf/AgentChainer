@@ -30,6 +30,20 @@ describe("tabs", () => {
     assert.equal(tab.cost.lastUsd, null);
   });
 
+  it("drops the approvals a finished turn left waiting, as after a Stop", () => {
+    const waiting = { sessionId: "s1", requestId: "r1", toolName: "Bash", input: {} } as Tab["permissions"][number];
+    const tab = tabEvent(
+      { ...newTab("s1", "/repo", { title: "t", mode: "default" }), permissions: [waiting] },
+      done(0),
+    );
+    assert.deepEqual(tab.permissions, []);
+  });
+
+  it("keeps a multi-folder workspace's other folders on the tab (M8-01)", () => {
+    assert.deepEqual(newTab("s1", "/w/app", { title: "t", mode: "default", folders: ["/w/api"] }).folders, ["/w/api"]);
+    assert.equal(newTab("s1", "/w/app", { title: "t", mode: "default", folders: [] }).folders, undefined);
+  });
+
   it("routes events to the tab with the matching session id", () => {
     const tabs: Tab[] = [
       newTab("a", "/one", { title: "A", mode: "default" }),

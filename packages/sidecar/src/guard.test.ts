@@ -150,3 +150,18 @@ describe("checkToolCall", () => {
     assert.equal(checkToolCall("Bash", null, cwd, home), null);
   });
 });
+
+describe("a multi-folder workspace's guard (M8-01)", () => {
+  it("allows a recursive delete in any of the workspace's folders, and nowhere else", () => {
+    const home = "/home/me";
+    const roots = ["/work/api"];
+    assert.equal(checkBash("rm -rf dist", "/work/app", home, roots), null);
+    assert.equal(checkBash("rm -rf /work/api/dist", "/work/app", home, roots), null);
+    assert.match(checkBash("rm -rf /work/other", "/work/app", home, roots) ?? "", /outside the workspace/);
+    assert.match(
+      checkBash("rm -rf /work/api/dist", "/work/app", home) ?? "",
+      /outside the workspace/,
+      "not without it",
+    );
+  });
+});

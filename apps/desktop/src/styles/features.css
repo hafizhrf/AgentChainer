@@ -73,3 +73,47 @@
 .markdown a {
   color: var(--accent);
 }
+
+/* The New workspace dialog's folder list (M8-01): the primary folder first, then the others. */
+.ws-folders {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-2);
+}
+
+.ws-folders ul {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ws-folders li {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.ws-folder-name {
+  flex-shrink: 0;
+  font-weight: 500;
+}
+
+.ws-folder-path {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--text-xs);
+}
+
+.ws-problems {
+  margin: 0;
+  padding-left: var(--space-5);
+}

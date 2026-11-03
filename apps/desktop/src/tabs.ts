@@ -16,6 +16,8 @@ import { applyEvent, type Item } from "./transcript.ts";
 export type Tab = {
   sessionId: string;
   cwd: string;
+  /** A multi-folder workspace's other folders the session also reaches (M8-01). */
+  folders?: string[];
   title: string;
   /** The model the CLI reports (full id), and the alias picked in the UI ("" = default). */
   model?: string;
@@ -86,11 +88,13 @@ export function newTab(
     modelAlias?: string;
     effort?: Effort | null;
     budgetUsd?: number | null;
+    folders?: string[];
   },
 ): Tab {
   return {
     sessionId,
     cwd,
+    ...(options.folders?.length ? { folders: options.folders } : {}),
     title: options.title,
     modelAlias: options.modelAlias ?? "",
     effort: options.effort ?? null,
@@ -158,6 +162,8 @@ export function tabEvent(tab: Tab, e: AgentEvent, now?: number): Tab {
       return {
         ...tab,
         running: false,
+        // A finished turn takes its approvals with it: after a Stop, the pending ones can't be answered any more.
+        permissions: [],
         lastSubtype: e.subtype,
         items: applyEvent(tab.items, e, now),
         waits: closeWaits(tab.waits, now),

@@ -21,7 +21,7 @@ AgentChainer never signs you in, and never reads or stores your credentials ([AD
 
 | What | Where | What's in it |
 |---|---|---|
-| Settings | `settings.json` in Settings | Default model, mode, effort and editor; spend cap; theme; the Claude CLI path, if you set one; your recent folders. |
+| Settings | `settings.json` in Settings | Default model, mode, effort and editor; spend cap; theme; the Claude CLI path, if you set one; your recent folders; the multi-folder workspaces you named, with their folders' paths. |
 | Cost history | `agentchainer.db` in Data | Per turn: session id, folder, time, cost and token counts. No prompts or replies. |
 | Agent SDK | `sdk/` in Data | The pinned Claude Agent SDK, downloaded and verified on first run. |
 | Tools | `tools/` in Data | Pinned tool binaries that setup installs, such as gitleaks. |

@@ -29,9 +29,16 @@ const FILE_TOOLS: Record<string, string> = {
   NotebookEdit: "notebook_path",
 };
 
-export function checkToolCall(toolName: string, input: unknown, cwd: string, home = homedir()): string | null {
+/** `roots`: a multi-folder workspace's other folders (M8-01), where a recursive delete is as allowed as in `cwd`. */
+export function checkToolCall(
+  toolName: string,
+  input: unknown,
+  cwd: string,
+  home = homedir(),
+  roots: string[] = [],
+): string | null {
   const args = (input && typeof input === "object" ? input : {}) as Record<string, unknown>;
-  if (toolName === "Bash" && typeof args.command === "string") return checkBash(args.command, cwd, home);
+  if (toolName === "Bash" && typeof args.command === "string") return checkBash(args.command, cwd, home, roots);
   const pathKey = FILE_TOOLS[toolName];
   const path = pathKey ? args[pathKey] : undefined;
   if (typeof path === "string" && isSecretPath(resolve(cwd, expandHome(path, home)), home)) {
@@ -40,7 +47,7 @@ export function checkToolCall(toolName: string, input: unknown, cwd: string, hom
   return null;
 }
 
-export function checkBash(command: string, cwd: string, home = homedir()): string | null {
+export function checkBash(command: string, cwd: string, home = homedir(), roots: string[] = []): string | null {
   if (/(^|[;&|(]\s*)sudo\b/.test(command)) {
     return "sudo needs a password prompt the app can't show. Run it yourself in a terminal if it's intended.";
   }
@@ -91,7 +98,7 @@ export function checkBash(command: string, cwd: string, home = homedir()): strin
   }
   for (const target of recursiveRmTargets(command)) {
     const abs = resolve(cwd, expandHome(target, home));
-    if (target === "/" || target === "/*" || abs === home || !isInside(abs, cwd)) {
+    if (target === "/" || target === "/*" || abs === home || ![cwd, ...roots].some((root) => isInside(abs, root))) {
       return `Recursive delete outside the workspace (${target}) is blocked.`;
     }
   }

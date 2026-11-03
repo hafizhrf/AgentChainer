@@ -93,7 +93,7 @@ Planned surface (v0.1):
 | request | `env.check` | Return CLI path, version, auth state (no secrets) |
 | request | `sdk.prepare` | Make the Agent SDK ready: node_modules (dev), or download + verify + cache (packaged) |
 | request | `debug.log` | Dev only: write a UI line to the sidecar log (self-test metrics) |
-| request | `session.start` | Start or resume a session `{cwd, model?, permissionMode?, resume?}` → `{sessionId}`. Planned: effort, profile, budgetUsd |
+| request | `session.start` | Start or resume a session `{cwd, model?, permissionMode?, resume?, folders?}` → `{sessionId}`. `folders` are a multi-folder workspace's other folders (M8-01), passed as `additionalDirectories` after the same checks as the New workspace dialog. Planned: effort, profile, budgetUsd |
 | request | `session.send` | Push a user message into the streaming input `{sessionId, text}` → `{messageId}`. Planned: @files, images |
 | request | `session.interrupt` | Interrupt the running turn |
 | request | `session.stopAgent` | Stop one subagent by its task id; the turn goes on (M4-05) |

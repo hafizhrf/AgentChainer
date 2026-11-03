@@ -1094,6 +1094,12 @@ for the desktop shell, start screen and session view to be cleaned up (UX-02, UX
 - [ ] **UX-14** A live and AI-made workflow canvas (§6). A Flow tab shows the run's workflow with each step's live
       status, hand-offs and fix rounds; Generate with AI drafts project workflows; M/L/XL tasks may get their own
       flow, approved with the contract.
+      Note: step 4 (the live flow) is built: a task's right panel has Task | Flow tabs; Flow draws the run's workflow
+      (`task.workflow`) on the canvas with each step's state from the run's timeline (waiting, running, done, failed,
+      stopped, not run; an icon and a word), its turns and cost, and the fix rounds used on each fix edge; clicking a
+      step opens it in the thread. An XL task draws its sub-tasks in rows by what they wait for; clicking one opens it.
+      Checked in the app with haiku: a finished run's flow, a jump to its Implement step, and a new run drawn live
+      (Implement running, Gates waiting, then both done). Step 5 (AI-made flows) is next.
 
 ### Exit criteria
 

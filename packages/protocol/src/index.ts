@@ -1467,6 +1467,14 @@ export const methodSchemas = {
     result: TaskSchema,
   },
   /**
+   * The workflow a task's Flow tab draws (UX-14): its run's, or before a run, its tier's now. Null before triage.
+   * The workflow's own shape, as in its YAML.
+   */
+  "task.workflow": {
+    params: TaskRef,
+    result: z.object({ workflow: z.record(z.string(), z.unknown()), source: z.enum(["app", "project"]) }).nullable(),
+  },
+  /**
    * The person's message to a running task's current step (UX-13): it goes into the turn that's running, as in a chat.
    * Refused when no step is working.
    */

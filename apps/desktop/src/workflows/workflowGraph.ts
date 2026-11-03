@@ -11,6 +11,8 @@ export type StepKind = "agent" | "gates" | "group" | "member" | "split" | "subta
 export type WorkflowNode = {
   id: string;
   path: Path;
+  /** The step's `id` in the workflow, which a run's timeline names (UX-14); unset for groups and XL's boxes. */
+  stepId?: string;
   kind: StepKind;
   label: string;
   detail: string;
@@ -20,10 +22,19 @@ export type WorkflowNode = {
   height: number;
 };
 
-export type WorkflowEdge = { id: string; source: string; target: string; kind: "next" | "fix"; label?: string };
+export type WorkflowEdge = {
+  id: string;
+  source: string;
+  target: string;
+  kind: "next" | "fix";
+  label?: string;
+  /** A fix edge's round limit, and the step it sends work back to. */
+  maxRounds?: number;
+  targetStep?: string;
+};
 
 export const STEP_W = 240;
-export const STEP_H = 64;
+export const STEP_H = 76;
 const GAP_Y = 48;
 const GAP_X = 16;
 /** Room around a group's members for its own label. */
@@ -53,8 +64,19 @@ export function workflowGraph(data: Obj | null): { nodes: WorkflowNode[]; edges:
   const next = (from: string[], to: string[]) => {
     for (const s of from) for (const t of to) edges.push({ id: `${s}->${t}`, source: s, target: t, kind: "next" });
   };
-  const box = (path: Path, kind: StepKind, label: string, detail: string, x: number, y: number) => {
-    const node = { id: keyOf(path), path, kind, label, detail, x, y, width: STEP_W, height: STEP_H };
+  const box = (path: Path, kind: StepKind, label: string, detail: string, x: number, y: number, stepId?: unknown) => {
+    const node: WorkflowNode = {
+      id: keyOf(path),
+      path,
+      kind,
+      label,
+      detail,
+      x,
+      y,
+      width: STEP_W,
+      height: STEP_H,
+      ...(typeof stepId === "string" ? { stepId } : {}),
+    };
     nodes.push(node);
     return node;
   };
@@ -108,6 +130,7 @@ export function workflowGraph(data: Obj | null): { nodes: WorkflowNode[]; edges:
           agentDetail(m),
           left + j * (STEP_W + GAP_X),
           y + GROUP_HEAD,
+          m.id,
         );
         if (typeof m.id === "string") byId.set(m.id, node.id);
         return node.id;
@@ -125,6 +148,7 @@ export function workflowGraph(data: Obj | null): { nodes: WorkflowNode[]; edges:
       gates ? list(s.gates).map(String).join(", ") : agentDetail(s),
       0,
       y,
+      s.id,
     );
     if (typeof s.id === "string") byId.set(s.id, node.id);
     const fix = obj(s.fix);
@@ -136,7 +160,15 @@ export function workflowGraph(data: Obj | null): { nodes: WorkflowNode[]; edges:
   for (const f of fixes) {
     const target = byId.get(f.step);
     if (!target) continue;
-    edges.push({ id: `${f.from}~fix`, source: f.from, target, kind: "fix", label: `fix ×${f.rounds ?? "?"}` });
+    edges.push({
+      id: `${f.from}~fix`,
+      source: f.from,
+      target,
+      kind: "fix",
+      label: `fix ×${f.rounds ?? "?"}`,
+      ...(typeof f.rounds === "number" ? { maxRounds: f.rounds } : {}),
+      targetStep: f.step,
+    });
   }
   return { nodes, edges };
 }

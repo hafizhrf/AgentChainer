@@ -328,6 +328,27 @@ function runXlWorkflow(root: string, task: Task): XlWorkflow {
   return library.xl;
 }
 
+/**
+ * The workflow a task's Flow tab draws (UX-14): the one its run started with, or, before any run, the one its tier
+ * would run now (the project's when it has one). Null before triage.
+ */
+export function taskWorkflow(
+  root: string,
+  id: string,
+): { workflow: Workflow | XlWorkflow; source: "app" | "project" } | null {
+  const task = loadTask(root, id);
+  if (task.run) {
+    const source = task.run.workflow.source === "project" ? "project" : "app";
+    return { workflow: task.triage?.chosen === "XL" ? runXlWorkflow(root, task) : runWorkflow(root, task), source };
+  }
+  const tier = task.triage?.chosen;
+  if (!tier) return null;
+  const eff = workflowsOf(root);
+  const workflow = tier === "XL" ? eff.library.xl : eff.library.workflows[tier];
+  if (!workflow) return null;
+  return { workflow, source: eff.origins[workflow.id] ? "project" : "app" };
+}
+
 /** Runs in progress in this sidecar, by task id: a tier's workflow, or an XL run. */
 const runs = new Map<string, { cancel: () => void; message?: (text: string) => boolean; readonly current: Task }>();
 /** Each run's promise, until it has fully ended: its sessions closed after its end was saved. */

@@ -1,9 +1,10 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { after, describe, it } from "node:test";
+import { fileURLToPath } from "node:url";
 import { RpcErrorCode } from "@agentchainer/protocol";
 import { copyFixture, removeFixtureCopies } from "../detect/fixture-copy.ts";
 import type { Gh, GhResult } from "../github.ts";
@@ -38,6 +39,7 @@ import {
   startTask,
   taskBranch,
   taskEvidence,
+  taskWorkflow,
 } from "./service.ts";
 import { listTasks, loadTask, saveTask, writeTaskFile } from "./store.ts";
 import { addWorktree, branchOf, worktreePath } from "./worktree.ts";
@@ -748,5 +750,34 @@ function approvedXl(task: ReturnType<typeof newTask>): ReturnType<typeof newTask
 describe("messages to a running task (UX-13)", () => {
   it("refuses a message for a task that isn't running", () => {
     assert.throws(() => messageRun("t-20261103-00000000", "hi"), /isn't running/);
+  });
+});
+
+describe("a task's flow (UX-14)", () => {
+  it("draws nothing before triage, then its tier's workflow: the app's, or the project's", () => {
+    const root = copyFixture("sample-app");
+    const created = newTask(root, "Fix total()");
+    assert.equal(taskWorkflow(root, created.id), null);
+    const triaged = {
+      ...created,
+      triage: {
+        signals: [],
+        floor: "S" as const,
+        model: null,
+        proposed: "S" as const,
+        chosen: "S" as const,
+        budgetUsd: 1,
+        at: "2026-11-03T00:00:00.000Z",
+      },
+    };
+    saveTask(root, triaged);
+    const app = taskWorkflow(root, created.id);
+    assert.deepEqual([app?.source, app?.workflow.id], ["app", "tier-s"]);
+    mkdirSync(join(root, ".agentchainer", "workflows"), { recursive: true });
+    copyFileSync(
+      fileURLToPath(new URL("../../../../catalog/workflows/s.yaml", import.meta.url)),
+      join(root, ".agentchainer", "workflows", "s.yaml"),
+    );
+    assert.equal(taskWorkflow(root, created.id)?.source, "project");
   });
 });

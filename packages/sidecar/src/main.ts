@@ -97,6 +97,7 @@ import {
   splitTask,
   startTask,
   taskEvidence,
+  taskWorkflow,
   workflowsOf,
   writeEvidence,
 } from "./tasks/service.ts";
@@ -550,6 +551,11 @@ serve(
     "task.draft": async ({ cwd, id, model }) => {
       requireFolder(cwd);
       return draftTask(cwd, id, await claude(), model, draftEvents(cwd, id));
+    },
+
+    "task.workflow": ({ cwd, id }) => {
+      requireFolder(cwd);
+      return taskWorkflow(cwd, id);
     },
 
     "task.message": ({ cwd, id, text }) => {

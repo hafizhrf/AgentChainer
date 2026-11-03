@@ -58,6 +58,8 @@ export type SessionOptions = {
    * them one by one. A task's steps leave it off, so their work is done when the turn ends.
    */
   background?: boolean;
+  /** A multi-folder workspace's other folders (M8-01): the SDK's `additionalDirectories`, and roots for the guard. */
+  additionalDirectories?: string[];
   /**
    * A chat in a tab (UX-12): it lists the session's slash commands, reports how full the context window is after each
    * turn, may switch itself to plan mode, and is asked to ask the person rather than guess.
@@ -84,19 +86,24 @@ export type TurnResult = {
   costUsd: number;
 };
 
-/** Runs the hard denylist on every tool call, including ones `canUseTool` never sees (ARCHITECTURE §6). */
-const guardHook: HookCallback = async (input) => {
-  if (input.hook_event_name !== "PreToolUse") return {};
-  const reason = checkToolCall(input.tool_name, input.tool_input, input.cwd);
-  if (!reason) return {};
-  return {
-    hookSpecificOutput: {
-      hookEventName: "PreToolUse",
-      permissionDecision: "deny",
-      permissionDecisionReason: `Blocked by AgentChainer guard: ${reason}`,
-    },
+/**
+ * Runs the hard denylist on every tool call, including ones `canUseTool` never sees (ARCHITECTURE §6). `roots` are a
+ * multi-folder workspace's other folders (M8-01): the hook's own `cwd` is the primary folder only.
+ */
+const guardHookFor =
+  (roots: string[]): HookCallback =>
+  async (input) => {
+    if (input.hook_event_name !== "PreToolUse") return {};
+    const reason = checkToolCall(input.tool_name, input.tool_input, input.cwd, undefined, roots);
+    if (!reason) return {};
+    return {
+      hookSpecificOutput: {
+        hookEventName: "PreToolUse",
+        permissionDecision: "deny",
+        permissionDecisionReason: `Blocked by AgentChainer guard: ${reason}`,
+      },
+    };
   };
-};
 
 /** The user's answer to a permission request (M1-17), see `permission.respond`. */
 export type PermissionAnswer = {
@@ -187,6 +194,7 @@ export class Session {
         // Backs up files before Edit/Write so they can be rewound (M1-23).
         enableFileCheckpointing: true,
         ...(options.model ? { model: options.model } : {}),
+        ...(options.additionalDirectories?.length ? { additionalDirectories: options.additionalDirectories } : {}),
         // The app shows a Stop per background task, so an interrupt stops the turn only (sdk.d.ts).
         ...(options.background ? { env: { [ALLOW_BACKGROUND]: "1" }, perTaskStopAffordance: true } : {}),
         pathToClaudeCodeExecutable: options.claudePath,
@@ -206,7 +214,17 @@ export class Session {
         includePartialMessages: true,
         forwardSubagentText: true,
         permissionMode: options.permissionMode ?? "default",
-        hooks: { PreToolUse: [{ hooks: [options.readOnly ? readOnlyHook(options.cwd, "This step") : guardHook] }] },
+        hooks: {
+          PreToolUse: [
+            {
+              hooks: [
+                options.readOnly
+                  ? readOnlyHook(options.cwd, "This step")
+                  : guardHookFor(options.additionalDirectories ?? []),
+              ],
+            },
+          ],
+        },
         canUseTool: (toolName, input, ctx) =>
           new Promise<PermissionResult>((resolve) => {
             // A chat may switch itself to plan mode (UX-12): that only narrows what it can do, so nobody is asked.

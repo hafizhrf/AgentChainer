@@ -7,6 +7,19 @@ use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Manager};
 
 pub const MAX_RECENT_WORKSPACES: usize = 8;
+/// Named multi-folder workspaces kept (M8-01); far more than anyone keeps.
+pub const MAX_WORKSPACES: usize = 32;
+
+/// A named set of folders (M8-01): sessions run in `primary` and also reach `folders`. Absolute paths on this computer,
+/// so it lives here rather than in a repository.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", default)]
+pub struct WorkspaceDef {
+    pub id: String,
+    pub name: String,
+    pub primary: String,
+    pub folders: Vec<String>,
+}
 
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", default)]
@@ -33,6 +46,8 @@ pub struct Settings {
     pub tasks_preview: Option<bool>,
     /// Most recent first.
     pub recent_workspaces: Vec<String>,
+    /// Named multi-folder workspaces (M8-01), as the New workspace dialog saved them.
+    pub workspaces: Vec<WorkspaceDef>,
 }
 
 impl Settings {
@@ -56,6 +71,37 @@ impl Settings {
         }
         seen.truncate(MAX_RECENT_WORKSPACES);
         self.recent_workspaces = seen;
+        let mut ids: Vec<String> = Vec::new();
+        self.workspaces = std::mem::take(&mut self.workspaces)
+            .into_iter()
+            .filter_map(|w| {
+                let id = w.id.trim().to_string();
+                let name = w.name.trim().to_string();
+                let primary = w.primary.trim().to_string();
+                if id.is_empty() || name.is_empty() || primary.is_empty() || ids.contains(&id) {
+                    return None;
+                }
+                ids.push(id.clone());
+                let mut folders: Vec<String> = Vec::new();
+                for dir in w.folders {
+                    let dir = dir.trim().to_string();
+                    let key = dir_key(&dir, cfg!(windows));
+                    if !dir.is_empty()
+                        && key != dir_key(&primary, cfg!(windows))
+                        && !folders.iter().any(|f| dir_key(f, cfg!(windows)) == key)
+                    {
+                        folders.push(dir);
+                    }
+                }
+                Some(WorkspaceDef {
+                    id,
+                    name,
+                    primary,
+                    folders,
+                })
+            })
+            .collect();
+        self.workspaces.truncate(MAX_WORKSPACES);
         self
     }
 }
@@ -123,6 +169,7 @@ mod tests {
                 .map(|i| format!("/p/{}", i % 10))
                 .chain([" ".into()])
                 .collect(),
+            workspaces: Vec::new(),
         }
         .normalized();
         assert_eq!(s.claude_path, None);
@@ -172,5 +219,37 @@ mod tests {
             .normalized();
             assert_eq!(s.theme, None, "{theme}");
         }
+    }
+
+    #[test]
+    fn keeps_named_workspaces_tidy() {
+        let ws = |id: &str, name: &str, primary: &str, folders: &[&str]| WorkspaceDef {
+            id: id.into(),
+            name: name.into(),
+            primary: primary.into(),
+            folders: folders.iter().map(|f| f.to_string()).collect(),
+        };
+        let s = Settings {
+            workspaces: vec![
+                ws(
+                    " a ",
+                    " Shop ",
+                    "/w/app",
+                    &["/w/api", " /w/api ", "", "/w/app"],
+                ),
+                ws("a", "Duplicate id", "/w/x", &[]),
+                ws("b", "  ", "/w/y", &[]),
+                ws("c", "No primary", " ", &[]),
+            ],
+            ..Default::default()
+        }
+        .normalized();
+        assert_eq!(s.workspaces, vec![ws("a", "Shop", "/w/app", &["/w/api"])]);
+    }
+
+    #[test]
+    fn reads_settings_without_workspaces() {
+        let s: Settings = serde_json::from_str(r#"{"recentWorkspaces":["/w/app"]}"#).unwrap();
+        assert!(s.workspaces.is_empty());
     }
 }

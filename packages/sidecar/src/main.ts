@@ -1,7 +1,7 @@
 import { existsSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
-import { PROTOCOL_VERSION, RpcErrorCode, type Task } from "@agentchainer/protocol";
+import { folderProblems, PROTOCOL_VERSION, RpcErrorCode, type Task } from "@agentchainer/protocol";
 import type { SDKMessage } from "@anthropic-ai/claude-agent-sdk";
 import pkg from "../package.json" with { type: "json" };
 import { deleteAgent, listAgents, saveAgent } from "./agents.ts";
@@ -226,7 +226,13 @@ serve(
       return { ok: true };
     },
 
-    "session.start": async ({ cwd, model, permissionMode, effort, maxBudgetUsd, showThinking, resume }) => {
+    "session.start": async ({ cwd, model, permissionMode, effort, maxBudgetUsd, showThinking, resume, folders }) => {
+      // A multi-folder workspace's other folders (M8-01): the same rules as the New workspace dialog, and they exist.
+      if (folders?.length) {
+        const problems = folderProblems([cwd, ...folders], homedir());
+        if (problems.length) throw new RpcFailure(RpcErrorCode.invalidParams, problems.join(" "));
+        for (const dir of folders) requireFolder(dir);
+      }
       const claudePath = findClaude();
       if (!claudePath) {
         throw new RpcFailure(RpcErrorCode.claudeNotFound, "Claude Code CLI not found. See docs/guides/AUTH_SETUP.md.");
@@ -247,6 +253,7 @@ serve(
           ...(maxBudgetUsd ? { maxBudgetUsd } : {}),
           ...(showThinking ? { showThinking } : {}),
           ...(resume ? { resume } : {}),
+          ...(folders?.length ? { additionalDirectories: folders } : {}),
           // Interactive sessions show their background tasks and stop them one by one (M4-07).
           background: true,
           interactive: true,

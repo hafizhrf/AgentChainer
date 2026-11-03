@@ -4079,6 +4079,15 @@
           "context": {
             "type": "string",
             "maxLength": 12000
+          },
+          "folders": {
+            "maxItems": 16,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 4096
+            }
           }
         },
         "required": [
@@ -4640,6 +4649,9 @@
                           "items": {
                             "type": "string"
                           }
+                        },
+                        "folder": {
+                          "type": "string"
                         }
                       },
                       "required": [
@@ -4727,6 +4739,9 @@
                           "items": {
                             "type": "string"
                           }
+                        },
+                        "folder": {
+                          "type": "string"
                         }
                       },
                       "required": [
@@ -5030,6 +5045,59 @@
               "untracked"
             ],
             "additionalProperties": false
+          },
+          "folders": {
+            "maxItems": 16,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "path": {
+                  "type": "string"
+                },
+                "worktree": {
+                  "type": "object",
+                  "properties": {
+                    "path": {
+                      "type": "string"
+                    },
+                    "branch": {
+                      "type": "string"
+                    },
+                    "base": {
+                      "type": "string"
+                    },
+                    "from": {
+                      "type": "string"
+                    },
+                    "untracked": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "removed": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "path",
+                    "branch",
+                    "base",
+                    "untracked"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "required": [
+                "name",
+                "path"
+              ],
+              "additionalProperties": false
+            }
           },
           "subtasks": {
             "type": "array",
@@ -5779,6 +5847,9 @@
                           "items": {
                             "type": "string"
                           }
+                        },
+                        "folder": {
+                          "type": "string"
                         }
                       },
                       "required": [
@@ -5866,6 +5937,9 @@
                           "items": {
                             "type": "string"
                           }
+                        },
+                        "folder": {
+                          "type": "string"
                         }
                       },
                       "required": [
@@ -6169,6 +6243,59 @@
               "untracked"
             ],
             "additionalProperties": false
+          },
+          "folders": {
+            "maxItems": 16,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "path": {
+                  "type": "string"
+                },
+                "worktree": {
+                  "type": "object",
+                  "properties": {
+                    "path": {
+                      "type": "string"
+                    },
+                    "branch": {
+                      "type": "string"
+                    },
+                    "base": {
+                      "type": "string"
+                    },
+                    "from": {
+                      "type": "string"
+                    },
+                    "untracked": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "removed": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "path",
+                    "branch",
+                    "base",
+                    "untracked"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "required": [
+                "name",
+                "path"
+              ],
+              "additionalProperties": false
+            }
           },
           "subtasks": {
             "type": "array",
@@ -6924,6 +7051,9 @@
                           "items": {
                             "type": "string"
                           }
+                        },
+                        "folder": {
+                          "type": "string"
                         }
                       },
                       "required": [
@@ -7011,6 +7141,9 @@
                           "items": {
                             "type": "string"
                           }
+                        },
+                        "folder": {
+                          "type": "string"
                         }
                       },
                       "required": [
@@ -7314,6 +7447,59 @@
               "untracked"
             ],
             "additionalProperties": false
+          },
+          "folders": {
+            "maxItems": 16,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "path": {
+                  "type": "string"
+                },
+                "worktree": {
+                  "type": "object",
+                  "properties": {
+                    "path": {
+                      "type": "string"
+                    },
+                    "branch": {
+                      "type": "string"
+                    },
+                    "base": {
+                      "type": "string"
+                    },
+                    "from": {
+                      "type": "string"
+                    },
+                    "untracked": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "removed": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "path",
+                    "branch",
+                    "base",
+                    "untracked"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "required": [
+                "name",
+                "path"
+              ],
+              "additionalProperties": false
+            }
           },
           "subtasks": {
             "type": "array",
@@ -8172,6 +8358,9 @@
                           "items": {
                             "type": "string"
                           }
+                        },
+                        "folder": {
+                          "type": "string"
                         }
                       },
                       "required": [
@@ -8259,6 +8448,9 @@
                           "items": {
                             "type": "string"
                           }
+                        },
+                        "folder": {
+                          "type": "string"
                         }
                       },
                       "required": [
@@ -8562,6 +8754,59 @@
               "untracked"
             ],
             "additionalProperties": false
+          },
+          "folders": {
+            "maxItems": 16,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "path": {
+                  "type": "string"
+                },
+                "worktree": {
+                  "type": "object",
+                  "properties": {
+                    "path": {
+                      "type": "string"
+                    },
+                    "branch": {
+                      "type": "string"
+                    },
+                    "base": {
+                      "type": "string"
+                    },
+                    "from": {
+                      "type": "string"
+                    },
+                    "untracked": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "removed": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "path",
+                    "branch",
+                    "base",
+                    "untracked"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "required": [
+                "name",
+                "path"
+              ],
+              "additionalProperties": false
+            }
           },
           "subtasks": {
             "type": "array",
@@ -9446,6 +9691,9 @@
                           "items": {
                             "type": "string"
                           }
+                        },
+                        "folder": {
+                          "type": "string"
                         }
                       },
                       "required": [
@@ -9533,6 +9781,9 @@
                           "items": {
                             "type": "string"
                           }
+                        },
+                        "folder": {
+                          "type": "string"
                         }
                       },
                       "required": [
@@ -9836,6 +10087,59 @@
               "untracked"
             ],
             "additionalProperties": false
+          },
+          "folders": {
+            "maxItems": 16,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "path": {
+                  "type": "string"
+                },
+                "worktree": {
+                  "type": "object",
+                  "properties": {
+                    "path": {
+                      "type": "string"
+                    },
+                    "branch": {
+                      "type": "string"
+                    },
+                    "base": {
+                      "type": "string"
+                    },
+                    "from": {
+                      "type": "string"
+                    },
+                    "untracked": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "removed": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "path",
+                    "branch",
+                    "base",
+                    "untracked"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "required": [
+                "name",
+                "path"
+              ],
+              "additionalProperties": false
+            }
           },
           "subtasks": {
             "type": "array",
@@ -10582,6 +10886,9 @@
                           "items": {
                             "type": "string"
                           }
+                        },
+                        "folder": {
+                          "type": "string"
                         }
                       },
                       "required": [
@@ -10669,6 +10976,9 @@
                           "items": {
                             "type": "string"
                           }
+                        },
+                        "folder": {
+                          "type": "string"
                         }
                       },
                       "required": [
@@ -10972,6 +11282,59 @@
               "untracked"
             ],
             "additionalProperties": false
+          },
+          "folders": {
+            "maxItems": 16,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "path": {
+                  "type": "string"
+                },
+                "worktree": {
+                  "type": "object",
+                  "properties": {
+                    "path": {
+                      "type": "string"
+                    },
+                    "branch": {
+                      "type": "string"
+                    },
+                    "base": {
+                      "type": "string"
+                    },
+                    "from": {
+                      "type": "string"
+                    },
+                    "untracked": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "removed": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "path",
+                    "branch",
+                    "base",
+                    "untracked"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "required": [
+                "name",
+                "path"
+              ],
+              "additionalProperties": false
+            }
           },
           "subtasks": {
             "type": "array",
@@ -11730,6 +12093,9 @@
                           "items": {
                             "type": "string"
                           }
+                        },
+                        "folder": {
+                          "type": "string"
                         }
                       },
                       "required": [
@@ -11817,6 +12183,9 @@
                           "items": {
                             "type": "string"
                           }
+                        },
+                        "folder": {
+                          "type": "string"
                         }
                       },
                       "required": [
@@ -12120,6 +12489,59 @@
               "untracked"
             ],
             "additionalProperties": false
+          },
+          "folders": {
+            "maxItems": 16,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "path": {
+                  "type": "string"
+                },
+                "worktree": {
+                  "type": "object",
+                  "properties": {
+                    "path": {
+                      "type": "string"
+                    },
+                    "branch": {
+                      "type": "string"
+                    },
+                    "base": {
+                      "type": "string"
+                    },
+                    "from": {
+                      "type": "string"
+                    },
+                    "untracked": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "removed": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "path",
+                    "branch",
+                    "base",
+                    "untracked"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "required": [
+                "name",
+                "path"
+              ],
+              "additionalProperties": false
+            }
           },
           "subtasks": {
             "type": "array",
@@ -12869,6 +13291,9 @@
                           "items": {
                             "type": "string"
                           }
+                        },
+                        "folder": {
+                          "type": "string"
                         }
                       },
                       "required": [
@@ -12956,6 +13381,9 @@
                           "items": {
                             "type": "string"
                           }
+                        },
+                        "folder": {
+                          "type": "string"
                         }
                       },
                       "required": [
@@ -13259,6 +13687,59 @@
               "untracked"
             ],
             "additionalProperties": false
+          },
+          "folders": {
+            "maxItems": 16,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "path": {
+                  "type": "string"
+                },
+                "worktree": {
+                  "type": "object",
+                  "properties": {
+                    "path": {
+                      "type": "string"
+                    },
+                    "branch": {
+                      "type": "string"
+                    },
+                    "base": {
+                      "type": "string"
+                    },
+                    "from": {
+                      "type": "string"
+                    },
+                    "untracked": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "removed": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "path",
+                    "branch",
+                    "base",
+                    "untracked"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "required": [
+                "name",
+                "path"
+              ],
+              "additionalProperties": false
+            }
           },
           "subtasks": {
             "type": "array",
@@ -14005,6 +14486,9 @@
                           "items": {
                             "type": "string"
                           }
+                        },
+                        "folder": {
+                          "type": "string"
                         }
                       },
                       "required": [
@@ -14092,6 +14576,9 @@
                           "items": {
                             "type": "string"
                           }
+                        },
+                        "folder": {
+                          "type": "string"
                         }
                       },
                       "required": [
@@ -14395,6 +14882,59 @@
               "untracked"
             ],
             "additionalProperties": false
+          },
+          "folders": {
+            "maxItems": 16,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "path": {
+                  "type": "string"
+                },
+                "worktree": {
+                  "type": "object",
+                  "properties": {
+                    "path": {
+                      "type": "string"
+                    },
+                    "branch": {
+                      "type": "string"
+                    },
+                    "base": {
+                      "type": "string"
+                    },
+                    "from": {
+                      "type": "string"
+                    },
+                    "untracked": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "removed": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "path",
+                    "branch",
+                    "base",
+                    "untracked"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "required": [
+                "name",
+                "path"
+              ],
+              "additionalProperties": false
+            }
           },
           "subtasks": {
             "type": "array",
@@ -15235,6 +15775,9 @@
                           "items": {
                             "type": "string"
                           }
+                        },
+                        "folder": {
+                          "type": "string"
                         }
                       },
                       "required": [
@@ -15322,6 +15865,9 @@
                           "items": {
                             "type": "string"
                           }
+                        },
+                        "folder": {
+                          "type": "string"
                         }
                       },
                       "required": [
@@ -15625,6 +16171,59 @@
               "untracked"
             ],
             "additionalProperties": false
+          },
+          "folders": {
+            "maxItems": 16,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "path": {
+                  "type": "string"
+                },
+                "worktree": {
+                  "type": "object",
+                  "properties": {
+                    "path": {
+                      "type": "string"
+                    },
+                    "branch": {
+                      "type": "string"
+                    },
+                    "base": {
+                      "type": "string"
+                    },
+                    "from": {
+                      "type": "string"
+                    },
+                    "untracked": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "removed": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "path",
+                    "branch",
+                    "base",
+                    "untracked"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "required": [
+                "name",
+                "path"
+              ],
+              "additionalProperties": false
+            }
           },
           "subtasks": {
             "type": "array",
@@ -16377,6 +16976,9 @@
                           "items": {
                             "type": "string"
                           }
+                        },
+                        "folder": {
+                          "type": "string"
                         }
                       },
                       "required": [
@@ -16464,6 +17066,9 @@
                           "items": {
                             "type": "string"
                           }
+                        },
+                        "folder": {
+                          "type": "string"
                         }
                       },
                       "required": [
@@ -16767,6 +17372,59 @@
               "untracked"
             ],
             "additionalProperties": false
+          },
+          "folders": {
+            "maxItems": 16,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "path": {
+                  "type": "string"
+                },
+                "worktree": {
+                  "type": "object",
+                  "properties": {
+                    "path": {
+                      "type": "string"
+                    },
+                    "branch": {
+                      "type": "string"
+                    },
+                    "base": {
+                      "type": "string"
+                    },
+                    "from": {
+                      "type": "string"
+                    },
+                    "untracked": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "removed": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "path",
+                    "branch",
+                    "base",
+                    "untracked"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "required": [
+                "name",
+                "path"
+              ],
+              "additionalProperties": false
+            }
           },
           "subtasks": {
             "type": "array",
@@ -17554,6 +18212,9 @@
                           "items": {
                             "type": "string"
                           }
+                        },
+                        "folder": {
+                          "type": "string"
                         }
                       },
                       "required": [
@@ -17641,6 +18302,9 @@
                           "items": {
                             "type": "string"
                           }
+                        },
+                        "folder": {
+                          "type": "string"
                         }
                       },
                       "required": [
@@ -17944,6 +18608,59 @@
               "untracked"
             ],
             "additionalProperties": false
+          },
+          "folders": {
+            "maxItems": 16,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "path": {
+                  "type": "string"
+                },
+                "worktree": {
+                  "type": "object",
+                  "properties": {
+                    "path": {
+                      "type": "string"
+                    },
+                    "branch": {
+                      "type": "string"
+                    },
+                    "base": {
+                      "type": "string"
+                    },
+                    "from": {
+                      "type": "string"
+                    },
+                    "untracked": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "removed": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "path",
+                    "branch",
+                    "base",
+                    "untracked"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "required": [
+                "name",
+                "path"
+              ],
+              "additionalProperties": false
+            }
           },
           "subtasks": {
             "type": "array",
@@ -18690,6 +19407,9 @@
                           "items": {
                             "type": "string"
                           }
+                        },
+                        "folder": {
+                          "type": "string"
                         }
                       },
                       "required": [
@@ -18777,6 +19497,9 @@
                           "items": {
                             "type": "string"
                           }
+                        },
+                        "folder": {
+                          "type": "string"
                         }
                       },
                       "required": [
@@ -19080,6 +19803,59 @@
               "untracked"
             ],
             "additionalProperties": false
+          },
+          "folders": {
+            "maxItems": 16,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "path": {
+                  "type": "string"
+                },
+                "worktree": {
+                  "type": "object",
+                  "properties": {
+                    "path": {
+                      "type": "string"
+                    },
+                    "branch": {
+                      "type": "string"
+                    },
+                    "base": {
+                      "type": "string"
+                    },
+                    "from": {
+                      "type": "string"
+                    },
+                    "untracked": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "removed": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "path",
+                    "branch",
+                    "base",
+                    "untracked"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "required": [
+                "name",
+                "path"
+              ],
+              "additionalProperties": false
+            }
           },
           "subtasks": {
             "type": "array",
@@ -19826,6 +20602,9 @@
                           "items": {
                             "type": "string"
                           }
+                        },
+                        "folder": {
+                          "type": "string"
                         }
                       },
                       "required": [
@@ -19913,6 +20692,9 @@
                           "items": {
                             "type": "string"
                           }
+                        },
+                        "folder": {
+                          "type": "string"
                         }
                       },
                       "required": [
@@ -20216,6 +20998,59 @@
               "untracked"
             ],
             "additionalProperties": false
+          },
+          "folders": {
+            "maxItems": 16,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "path": {
+                  "type": "string"
+                },
+                "worktree": {
+                  "type": "object",
+                  "properties": {
+                    "path": {
+                      "type": "string"
+                    },
+                    "branch": {
+                      "type": "string"
+                    },
+                    "base": {
+                      "type": "string"
+                    },
+                    "from": {
+                      "type": "string"
+                    },
+                    "untracked": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "removed": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "path",
+                    "branch",
+                    "base",
+                    "untracked"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "required": [
+                "name",
+                "path"
+              ],
+              "additionalProperties": false
+            }
           },
           "subtasks": {
             "type": "array",
@@ -21174,6 +22009,9 @@
                           "items": {
                             "type": "string"
                           }
+                        },
+                        "folder": {
+                          "type": "string"
                         }
                       },
                       "required": [
@@ -21261,6 +22099,9 @@
                           "items": {
                             "type": "string"
                           }
+                        },
+                        "folder": {
+                          "type": "string"
                         }
                       },
                       "required": [
@@ -21564,6 +22405,59 @@
               "untracked"
             ],
             "additionalProperties": false
+          },
+          "folders": {
+            "maxItems": 16,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "path": {
+                  "type": "string"
+                },
+                "worktree": {
+                  "type": "object",
+                  "properties": {
+                    "path": {
+                      "type": "string"
+                    },
+                    "branch": {
+                      "type": "string"
+                    },
+                    "base": {
+                      "type": "string"
+                    },
+                    "from": {
+                      "type": "string"
+                    },
+                    "untracked": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "removed": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "path",
+                    "branch",
+                    "base",
+                    "untracked"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "required": [
+                "name",
+                "path"
+              ],
+              "additionalProperties": false
+            }
           },
           "subtasks": {
             "type": "array",
@@ -22434,6 +23328,9 @@
                           "items": {
                             "type": "string"
                           }
+                        },
+                        "folder": {
+                          "type": "string"
                         }
                       },
                       "required": [
@@ -22521,6 +23418,9 @@
                           "items": {
                             "type": "string"
                           }
+                        },
+                        "folder": {
+                          "type": "string"
                         }
                       },
                       "required": [
@@ -22824,6 +23724,59 @@
               "untracked"
             ],
             "additionalProperties": false
+          },
+          "folders": {
+            "maxItems": 16,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "path": {
+                  "type": "string"
+                },
+                "worktree": {
+                  "type": "object",
+                  "properties": {
+                    "path": {
+                      "type": "string"
+                    },
+                    "branch": {
+                      "type": "string"
+                    },
+                    "base": {
+                      "type": "string"
+                    },
+                    "from": {
+                      "type": "string"
+                    },
+                    "untracked": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "removed": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "path",
+                    "branch",
+                    "base",
+                    "untracked"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "required": [
+                "name",
+                "path"
+              ],
+              "additionalProperties": false
+            }
           },
           "subtasks": {
             "type": "array",
@@ -23672,6 +24625,9 @@
                           "items": {
                             "type": "string"
                           }
+                        },
+                        "folder": {
+                          "type": "string"
                         }
                       },
                       "required": [
@@ -23759,6 +24715,9 @@
                           "items": {
                             "type": "string"
                           }
+                        },
+                        "folder": {
+                          "type": "string"
                         }
                       },
                       "required": [
@@ -24062,6 +25021,59 @@
               "untracked"
             ],
             "additionalProperties": false
+          },
+          "folders": {
+            "maxItems": 16,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "path": {
+                  "type": "string"
+                },
+                "worktree": {
+                  "type": "object",
+                  "properties": {
+                    "path": {
+                      "type": "string"
+                    },
+                    "branch": {
+                      "type": "string"
+                    },
+                    "base": {
+                      "type": "string"
+                    },
+                    "from": {
+                      "type": "string"
+                    },
+                    "untracked": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "removed": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "path",
+                    "branch",
+                    "base",
+                    "untracked"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "required": [
+                "name",
+                "path"
+              ],
+              "additionalProperties": false
+            }
           },
           "subtasks": {
             "type": "array",
@@ -24827,6 +25839,9 @@
                           "items": {
                             "type": "string"
                           }
+                        },
+                        "folder": {
+                          "type": "string"
                         }
                       },
                       "required": [
@@ -24914,6 +25929,9 @@
                           "items": {
                             "type": "string"
                           }
+                        },
+                        "folder": {
+                          "type": "string"
                         }
                       },
                       "required": [
@@ -25217,6 +26235,59 @@
               "untracked"
             ],
             "additionalProperties": false
+          },
+          "folders": {
+            "maxItems": 16,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "path": {
+                  "type": "string"
+                },
+                "worktree": {
+                  "type": "object",
+                  "properties": {
+                    "path": {
+                      "type": "string"
+                    },
+                    "branch": {
+                      "type": "string"
+                    },
+                    "base": {
+                      "type": "string"
+                    },
+                    "from": {
+                      "type": "string"
+                    },
+                    "untracked": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "removed": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "path",
+                    "branch",
+                    "base",
+                    "untracked"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "required": [
+                "name",
+                "path"
+              ],
+              "additionalProperties": false
+            }
           },
           "subtasks": {
             "type": "array",
@@ -27784,6 +28855,9 @@
                           "items": {
                             "type": "string"
                           }
+                        },
+                        "folder": {
+                          "type": "string"
                         }
                       },
                       "required": [
@@ -27871,6 +28945,9 @@
                           "items": {
                             "type": "string"
                           }
+                        },
+                        "folder": {
+                          "type": "string"
                         }
                       },
                       "required": [
@@ -28174,6 +29251,59 @@
               "untracked"
             ],
             "additionalProperties": false
+          },
+          "folders": {
+            "maxItems": 16,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "path": {
+                  "type": "string"
+                },
+                "worktree": {
+                  "type": "object",
+                  "properties": {
+                    "path": {
+                      "type": "string"
+                    },
+                    "branch": {
+                      "type": "string"
+                    },
+                    "base": {
+                      "type": "string"
+                    },
+                    "from": {
+                      "type": "string"
+                    },
+                    "untracked": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "removed": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "path",
+                    "branch",
+                    "base",
+                    "untracked"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "required": [
+                "name",
+                "path"
+              ],
+              "additionalProperties": false
+            }
           },
           "subtasks": {
             "type": "array",
@@ -29747,6 +30877,9 @@
                             "items": {
                               "type": "string"
                             }
+                          },
+                          "folder": {
+                            "type": "string"
                           }
                         },
                         "required": [
@@ -29834,6 +30967,9 @@
                             "items": {
                               "type": "string"
                             }
+                          },
+                          "folder": {
+                            "type": "string"
                           }
                         },
                         "required": [
@@ -30137,6 +31273,59 @@
                 "untracked"
               ],
               "additionalProperties": false
+            },
+            "folders": {
+              "maxItems": 16,
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "path": {
+                    "type": "string"
+                  },
+                  "worktree": {
+                    "type": "object",
+                    "properties": {
+                      "path": {
+                        "type": "string"
+                      },
+                      "branch": {
+                        "type": "string"
+                      },
+                      "base": {
+                        "type": "string"
+                      },
+                      "from": {
+                        "type": "string"
+                      },
+                      "untracked": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      },
+                      "removed": {
+                        "type": "boolean"
+                      }
+                    },
+                    "required": [
+                      "path",
+                      "branch",
+                      "base",
+                      "untracked"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "required": [
+                  "name",
+                  "path"
+                ],
+                "additionalProperties": false
+              }
             },
             "subtasks": {
               "type": "array",

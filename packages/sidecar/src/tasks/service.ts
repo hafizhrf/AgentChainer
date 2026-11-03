@@ -40,6 +40,7 @@ import type { AgentSdkModule } from "../sdk-loader.ts";
 import { git, listFiles, repoOf } from "../workspace.ts";
 import { availableGates, draftContract, normalizeContract } from "./contract.ts";
 import { buildEvidence, type FileChange, renderEvidence, type SecretsScan, sectionLines } from "./evidence.ts";
+import { branchFolders, folderDirs, folderFileStats, removeFolderWorktrees, taskFolders } from "./folders.ts";
 import { generateWorkflow } from "./generate-workflow.ts";
 import shipped from "./library.json" with { type: "json" };
 import { LibrarySchema, type Workflow, WorkflowSchema, type XlWorkflow, XlWorkflowSchema } from "./library.ts";
@@ -108,15 +109,22 @@ function requireDraft(task: Task): void {
   if (task.state !== "draft") throw invalid("The contract is approved. Revise it to make changes.");
 }
 
-/** A new draft task; `context` is the chat it's made from (UX-13), which drafting reads. */
-export function newTask(root: string, request: string, context?: string): Task {
+/**
+ * A new draft task; `context` is the chat it's made from (UX-13), which drafting reads, and `folders` a multi-folder
+ * workspace's other folders (M8-01), which it works across.
+ */
+export function newTask(root: string, request: string, context?: string, folders: string[] = []): Task {
   const text = request.trim();
   if (!text) throw invalid("Describe the task first.");
   const task = createTask(root, text, availableGates(detectWorkspace(root), root));
-  if (!context?.trim()) return task;
-  const withContext: Task = { ...task, chatContext: context.trim() };
-  saveTask(root, withContext);
-  return withContext;
+  if (!context?.trim() && !folders.length) return task;
+  const extra: Task = {
+    ...task,
+    ...(context?.trim() ? { chatContext: context.trim() } : {}),
+    ...(folders.length ? { folders: taskFolders(root, folders) } : {}),
+  };
+  saveTask(root, extra);
+  return extra;
 }
 
 /** Drafting's messages, so the thread shows what it reads (UX-13). */
@@ -171,6 +179,7 @@ export async function draftTask(
       extra: {
         ...(task.chatContext ? { context: task.chatContext } : {}),
         ...(feedback !== undefined && task.contract ? { current: task.contract, feedback } : {}),
+        ...(task.folders?.length ? { folders: task.folders.map(({ name, path }) => ({ name, path })) } : {}),
       },
       ...(listen ? { onMessage: listen } : {}),
     });
@@ -463,6 +472,7 @@ export function deleteTaskSafe(root: string, id: string): void {
   if (children.some((c) => runs.has(c.id))) throw invalid("A sub-task is running. Stop the task first.");
   for (const t of [...children, task]) {
     if (t.worktree && !t.worktree.removed) removeWorktree(root, t.worktree.path);
+    removeFolderWorktrees(t);
     if (t !== task) deleteTask(root, t.id);
   }
   deleteTask(root, id);
@@ -507,10 +517,23 @@ function orchestratorFor(
   const workflow = runWorkflow(root, task);
   // The runner reports approvals and guard blocks as they happen; they go into the run's records.
   let orchestrator: Orchestrator | undefined;
-  const runner = sessionRunner(codeRootOf(root, task), task, library, host, {
-    approval: (record) => orchestrator?.recordApproval(record),
-    guardBlock: (block) => orchestrator?.recordGuardBlock(block),
-  });
+  const others = folderDirs(task).map(({ name, dir, folder }) => ({
+    name,
+    dir,
+    base: folder.worktree?.base ?? null,
+    untracked: folder.worktree?.untracked ?? [],
+  }));
+  const runner = sessionRunner(
+    codeRootOf(root, task),
+    task,
+    library,
+    host,
+    {
+      approval: (record) => orchestrator?.recordApproval(record),
+      guardBlock: (block) => orchestrator?.recordGuardBlock(block),
+    },
+    others,
+  );
   orchestrator = new Orchestrator(task, {
     workflow,
     runner,
@@ -534,14 +557,24 @@ function orchestratorFor(
  */
 async function readyBranch(root: string, task: Task, signal: AbortSignal): Promise<{ ok: boolean; note: string }> {
   const wt = task.worktree;
-  if (!wt) return { ok: true, note: "" };
-  const run = await setupWorktree(codeRootIn(root, wt.path), signal);
-  const notes = [
-    wt.branch,
-    ...(run ? [setupNote(run)] : []),
-    ...(hasTrackedChanges(root) ? ["your uncommitted changes in the workspace aren't on this branch"] : []),
-  ];
-  return { ok: !run || (run.exitCode === 0 && !run.timedOut), note: notes.join("; ") };
+  // A multi-folder task's other worktrees are set up too, each with its own folder's install command (M8-01).
+  const others = folderDirs(task).filter((f) => f.folder.worktree && !f.folder.worktree.removed);
+  if (!wt && !others.length) return { ok: true, note: "" };
+  let ok = true;
+  const notes: string[] = [];
+  if (wt) {
+    const run = await setupWorktree(codeRootIn(root, wt.path), signal);
+    ok = !run || (run.exitCode === 0 && !run.timedOut);
+    notes.push(wt.branch, ...(run ? [setupNote(run)] : []));
+    if (hasTrackedChanges(root)) notes.push("your uncommitted changes in the workspace aren't on this branch");
+  }
+  for (const o of others) {
+    const run = await setupWorktree(o.dir, signal);
+    if (run && (run.exitCode !== 0 || run.timedOut)) ok = false;
+    notes.push(`${o.name}: ${o.folder.worktree?.branch}${run ? `, ${setupNote(run)}` : ""}`);
+    if (hasTrackedChanges(o.folder.path)) notes.push(`your uncommitted changes in ${o.name} aren't on its branch`);
+  }
+  return { ok, note: notes.join("; ") };
 }
 
 /**
@@ -624,8 +657,10 @@ export function startTask(
   const own = flowOf(task);
   const workflow = own ?? eff.library.workflows[task.triage.chosen];
   if (!workflow) throw invalid(`${task.triage.chosen} tasks have no workflow in this version of the app.`);
-  // A sub-task runs in the worktree its XL task made; any other task gets its own.
-  const branched = task.parent ? { task, fresh: false } : taskBranch(root, task);
+  // A sub-task runs in the worktree its XL task made; any other task gets its own, in each of its folders (M8-01).
+  const primary = task.parent ? { task, fresh: false } : taskBranch(root, task);
+  const folders = task.parent ? { task: primary.task, fresh: [] } : branchFolders(primary.task);
+  const branched = { task: folders.task, fresh: primary.fresh || folders.fresh.length > 0 };
   const wt = branched.task.worktree;
   // Changes count from where the worktree branched, whichever run this is.
   const base = wt ? { base: wt.base, untrackedAtStart: wt.untracked } : startBase(root);
@@ -659,7 +694,9 @@ export function resumeTask(root: string, id: string, host: SessionHost, notify: 
   const running: Task = { ...task, state: "running" };
   // A run cut off while its branch was being set up sets it up again.
   const unready =
-    !!task.worktree && !task.parent && task.run.steps.some((s) => s.kind === "setup" && s.status !== "done");
+    (!!task.worktree || folderDirs(task).some((f) => f.folder.worktree)) &&
+    !task.parent &&
+    task.run.steps.some((s) => s.kind === "setup" && s.status !== "done");
   void launch(root, running, host, notify, true, unready);
   notify(running);
   return running;
@@ -922,6 +959,21 @@ export function mergeResult(
     throw invalid("Merge once the run is Done, or accept its risk first.");
   }
   if (hasTrackedChanges(root)) throw invalid("Commit or stash your changes first: the merge would mix with them.");
+  // A multi-folder task merges into each of its folders' current branches too (M8-01), the primary folder last.
+  const others = (task.folders ?? []).filter((f) => f.worktree && !f.worktree.removed);
+  for (const f of others) {
+    if (hasTrackedChanges(f.path)) throw invalid(`Commit or stash your changes in ${f.name} first.`);
+  }
+  for (const f of others) {
+    const wt = f.worktree;
+    if (!wt) continue;
+    commitIn(codeRootIn(f.path, wt.path), task, wt.untracked);
+    const r = merge(f.path, wt.branch);
+    if (!r.merged) {
+      const conflicts = r.conflicts.map((c) => `${f.name}:${c}`);
+      return { merged: false, conflicts, into: branches(f.path).current ?? "HEAD" };
+    }
+  }
   commitResult(root, task);
   const into = branches(root).current ?? "HEAD";
   const r = merge(root, task.worktree.branch);
@@ -937,11 +989,17 @@ export function mergeResult(
 function commitResult(root: string, task: Task, title?: string): void {
   const wt = task.worktree;
   if (!wt || wt.removed || !existsSync(wt.path)) return;
+  commitIn(codeRootIn(root, wt.path), task, wt.untracked, title);
+}
+
+/** Commits a task's changes in one of its code folders (the primary worktree, or another folder's: M8-01). */
+function commitIn(code: string, task: Task, untrackedBefore: string[], title?: string): void {
+  if (!existsSync(code)) return;
   const objective = task.contract?.objective || task.request;
   const subject = title ?? shortTitle(objective);
   const message = `${subject}\n\n${subject === objective ? "" : `${objective}\n\n`}AgentChainer task ${task.id}`;
   try {
-    commitAll(codeRootIn(root, wt.path), message, wt.untracked);
+    commitAll(code, message, untrackedBefore);
   } catch (err) {
     throw invalid(`Committing the task's changes failed: ${err instanceof Error ? err.message : String(err)}`);
   }
@@ -987,6 +1045,16 @@ export function cleanupTask(root: string, id: string, deleteBranches: boolean): 
     if (deleteBranches) deleteBranch(root, wt.branch);
     saveTask(root, { ...loadTask(root, t.id), worktree: { ...wt, removed: true } });
   }
+  // The other folders' worktrees (M8-01), the same way.
+  const current = loadTask(root, id);
+  for (const { folder, dir } of folderDirs(current)) {
+    const wt = folder.worktree;
+    if (!wt || wt.removed) continue;
+    if (!deleteBranches) commitIn(dir, current, wt.untracked);
+  }
+  const cleaned = removeFolderWorktrees(current);
+  if (deleteBranches) for (const f of current.folders ?? []) if (f.worktree) deleteBranch(f.path, f.worktree.branch);
+  saveTask(root, cleaned);
 }
 
 /* ---------- Pull requests (M5-02) ---------- */
@@ -1050,7 +1118,12 @@ export function prBody(root: string, task: Task): string {
       ]
     : [];
   const evidence = taskEvidence(root, task.id).markdown.replace(/^# .*\n+/, "");
-  const footer = ["", "---", `Opened from AgentChainer task \`${task.id}\`.`];
+  // A PR holds the primary folder's repository; the other folders' branches aren't pushed yet (M8-01).
+  const others = (task.folders ?? []).filter((f) => f.worktree).map((f) => `\`${f.name}\` (${f.worktree?.branch})`);
+  const elsewhere = others.length
+    ? ["", `> This PR has only this repository's changes. The task's branches in ${others.join(", ")} aren't pushed.`]
+    : [];
+  const footer = [...elsewhere, "", "---", `Opened from AgentChainer task \`${task.id}\`.`];
   let body = [...contract, "## Evidence", "", evidence.trim(), ...footer].join("\n");
   if (body.length > MAX_PR_BODY) {
     body = `${body.slice(0, MAX_PR_BODY)}\n\n…the report goes on in \`.agentchainer/tasks/${task.id}/evidence.md\`.${footer.join("\n")}`;
@@ -1558,12 +1631,31 @@ export function scanSecrets(root: string, files: FileChange[]): SecretsScan {
   return { ran: true, scanned: targets.length, flagged };
 }
 
+/** The secrets scan across a multi-folder task's folders (M8-01): each in its own code folder, named `folder:path`. */
+function scanSecretsAcross(code: string, own: FileChange[], task: Task): SecretsScan {
+  const first = scanSecrets(code, own);
+  if (!first.ran) return first;
+  let { scanned } = first;
+  const flagged = [...first.flagged];
+  for (const { name, dir, folder } of folderDirs(task)) {
+    const wt = folder.worktree;
+    if (!wt) continue;
+    const r = scanSecrets(dir, fileStats(dir, wt.base, wt.untracked));
+    if (!r.ran) return r;
+    scanned += r.scanned;
+    flagged.push(...r.flagged.map((f) => `${name}:${f}`));
+  }
+  return { ran: true, scanned, flagged };
+}
+
 /** Builds the evidence from the task's records and writes `evidence.json` and `evidence.md` in its folder. */
 export function writeEvidence(root: string, task: Task, now = new Date()): { markdown: string; path: string } {
   if (!task.run) throw invalid("The task hasn't run yet.");
   // XL tasks and sub-tasks changed their worktree, where the files their setup installed don't count.
   const code = codeRootOf(root, task);
-  const files = fileStats(code, task.run.base, task.worktree?.untracked ?? task.run.untrackedAtStart);
+  const own = fileStats(code, task.run.base, task.worktree?.untracked ?? task.run.untrackedAtStart);
+  // A multi-folder task's other folders' changes, named `folder:path` (M8-01).
+  const files = [...own, ...folderFileStats(task)];
   const children = subtasksOf(root, task);
   const reviewText = readTaskFile(root, task.id, "review.json");
   let review = null;
@@ -1577,7 +1669,7 @@ export function writeEvidence(root: string, task: Task, now = new Date()): { mar
     files,
     summary: children.length ? subtaskSummaries(root, children) : readTaskFile(root, task.id, "summary.md"),
     review,
-    secrets: scanSecrets(code, files),
+    secrets: scanSecretsAcross(code, own, task),
     deploys: listDeploys(root, task.id),
     subtasks: children.map((c) => ({
       number: (c.parent?.index ?? 0) + 1,

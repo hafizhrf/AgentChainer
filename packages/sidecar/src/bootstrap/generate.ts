@@ -126,7 +126,7 @@ export function allowedCommands(profile: WorkspaceProfile): string[] {
 }
 
 /** The PreToolUse hook of a generator session: it sees every tool call, including ones the mode pre-approves. */
-export function generatorHook(root: string, allowed: string[]): HookCallback {
+export function generatorHook(root: string, allowed: string[], also: string[] = []): HookCallback {
   return async (input) => {
     if (input.hook_event_name !== "PreToolUse") return {};
     const deny = (reason: string) => ({
@@ -152,7 +152,8 @@ export function generatorHook(root: string, allowed: string[]): HookCallback {
       const target = args.file_path ?? args.path;
       if (typeof target === "string" && target) {
         const resolved = path.resolve(root, target);
-        if (path.relative(root, resolved).startsWith(".."))
+        // A multi-folder workspace's other folders (M8-01) are read like the primary one.
+        if ([root, ...also].every((dir) => path.relative(dir, resolved).startsWith("..")))
           return deny("Generators can only read inside the workspace.");
       }
       return {};

@@ -146,6 +146,26 @@ describe("evidence", () => {
     );
   });
 
+  it("matches another folder's files, named with or without the folder (M8-01)", () => {
+    const summary = "## Changes\n- `api:routes.js`: adds ready()\n- routes.test.js: tests it\n- README.md: mentions it";
+    const e = buildEvidence({
+      task: task(),
+      files: [
+        { path: "README.md", status: "modified", added: 1, removed: 0 },
+        { path: "api:routes.js", status: "modified", added: 3, removed: 0 },
+        { path: "api:routes.test.js", status: "modified", added: 2, removed: 0 },
+      ],
+      summary,
+      review: null,
+      secrets: { ran: false, why: "gitleaks isn't installed" },
+      now: new Date("2026-11-03T02:00:00.000Z"),
+    });
+    assert.deepEqual(
+      e.files.map((f) => f.purpose),
+      ["mentions it", "adds ready()", "tests it"],
+    );
+  });
+
   it("gives each changed file its purpose, or says it has none", () => {
     const e = evidence();
     assert.deepEqual(

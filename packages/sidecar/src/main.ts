@@ -557,9 +557,15 @@ serve(
       return { message: await draftMessage(sdk, claudePath, cwd) };
     },
 
-    "task.create": ({ cwd, request, context }) => {
+    "task.create": ({ cwd, request, context, folders }) => {
       requireFolder(cwd);
-      return newTask(cwd, request, context);
+      // A multi-folder workspace's other folders (M8-01), checked like a session's.
+      if (folders?.length) {
+        const problems = folderProblems([cwd, ...folders], homedir());
+        if (problems.length) throw new RpcFailure(RpcErrorCode.invalidParams, problems.join(" "));
+        for (const dir of folders) requireFolder(dir);
+      }
+      return newTask(cwd, request, context, folders);
     },
 
     "task.draft": async ({ cwd, id, model }) => {

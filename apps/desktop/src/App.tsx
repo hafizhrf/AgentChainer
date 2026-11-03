@@ -827,6 +827,8 @@ export function App() {
         cwd: t.cwd,
         request: text,
         ...(context ? { context } : {}),
+        // A chat across a workspace's folders makes a task across them (M8-01).
+        ...(t.folders?.length ? { folders: t.folders } : {}),
       });
       if (isFresh(t)) closeTab(t.sessionId);
       openTask(t.cwd, created.id, { autoDraft: true, model: t.modelAlias, title: text.slice(0, 60) });

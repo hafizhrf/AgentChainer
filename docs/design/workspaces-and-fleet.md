@@ -241,7 +241,9 @@ They're used as ideas only; no code is copied.
 3. **Sessions across folders:** `additionalDirectories`, the multi-root guard, and the live check of what loads from
    added folders.
 4. **Per-folder features:** the folder switcher in the right panel and in Workspace settings, and readiness per folder.
-5. **Tasks across folders:** worktrees, gates, evidence, XL and PRs → M8-01.
+5. **Tasks across folders,** in two PRs:
+   - 5a: worktrees, steps across them, gates, evidence, merge and cleanup;
+   - 5b: XL sub-tasks per folder and one PR per repository → M8-01.
 
 ## 11. Alternatives considered
 

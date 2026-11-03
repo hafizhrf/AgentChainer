@@ -154,13 +154,17 @@ const HAND_OFF_FILES = new Set([
 ]);
 
 export function readTaskFile(root: string, id: string, name: string): string | null {
-  if (!HAND_OFF_FILES.has(name)) throw new Error(`Not a task file: ${name}`);
+  if (!isTaskFile(name)) throw new Error(`Not a task file: ${name}`);
   const file = path.join(taskDir(root, id), name);
   return existsSync(file) ? readFileSync(file, "utf8") : null;
 }
 
+/** A run's own evidence report, kept when the next run starts (M8-05). */
+const RUN_EVIDENCE = /^evidence-\d{1,4}\.(md|json)$/;
+const isTaskFile = (name: string) => HAND_OFF_FILES.has(name) || RUN_EVIDENCE.test(name);
+
 export function writeTaskFile(root: string, id: string, name: string, text: string): void {
-  if (!HAND_OFF_FILES.has(name)) throw new Error(`Not a task file: ${name}`);
+  if (!isTaskFile(name)) throw new Error(`Not a task file: ${name}`);
   const dir = taskDir(root, id);
   requireRealDir(root, dir);
   writeFileSync(path.join(dir, name), text);

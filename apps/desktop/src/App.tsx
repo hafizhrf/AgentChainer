@@ -279,6 +279,8 @@ export function App() {
         if (task.state !== "running") setTaskApprovals((q) => q.filter((p) => p.task?.id !== task.id));
         return;
       }
+      // Scheduled flows (M8-05): their list and notifications come with the Schedules UI.
+      if (n.method === "schedule.changed" || n.method === "schedule.deleted") return;
       // A Team chat's worker (M8-03): its tab opens beside the supervisor's without taking focus, before its events.
       if (n.method === "session.opened") {
         const { sessionId, parentId, cwd: dir, name, access, profile: workerProfile } = n.params;

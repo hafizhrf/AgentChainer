@@ -580,6 +580,47 @@ export type Triage = z.infer<typeof TriageSchema>;
 /** `<date>-<8 hex>`, e.g. 2026-10-30-1a2b3c4d. Checked before it becomes part of a path. */
 export const TaskIdSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}-[0-9a-f]{8}$/);
 
+/** When a schedule runs (M8-05), in local time: presets only, so it always reads as a sentence. */
+const ClockSchema = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "A time like 02:30.");
+export const CadenceSchema = z.discriminatedUnion("kind", [
+  z.object({ kind: z.literal("hourly"), every: z.number().int().min(1).max(24) }),
+  z.object({ kind: z.literal("daily"), at: ClockSchema }),
+  z.object({
+    kind: z.literal("weekly"),
+    /** 0 is Sunday, as `Date.getDay()`. */
+    days: z.array(z.number().int().min(0).max(6)).min(1).max(7),
+    at: ClockSchema,
+  }),
+]);
+export type Cadence = z.infer<typeof CadenceSchema>;
+
+/**
+ * A scheduled flow (M8-05, docs/design/scheduled-flows.md): one approved task run again on a cadence, while the app
+ * is open. Kept in the workspace's `.agentchainer/schedules.json`, which git ignores.
+ */
+export const ScheduleSchema = z.object({
+  id: z.string().regex(/^[a-z0-9-]{1,64}$/),
+  cwd: z.string(),
+  taskId: TaskIdSchema,
+  /** The task's title when it was scheduled, for lists. */
+  title: z.string(),
+  cadence: CadenceSchema,
+  enabled: z.boolean(),
+  createdAt: z.string(),
+  /** When it runs next; past it, the next check runs it once (a run missed while the app was closed). */
+  nextAt: z.string(),
+  lastRun: z
+    .object({
+      at: z.string(),
+      state: z.enum(["started", "skipped", "failed-to-start"]),
+      /** It ran more than a couple of minutes after its time: the app was closed, or the computer asleep. */
+      late: z.boolean(),
+      reason: z.string().optional(),
+    })
+    .optional(),
+});
+export type Schedule = z.infer<typeof ScheduleSchema>;
+
 /**
  * `draft` until the user approves the contract and the tier, then `ready`. A run (M3-06) ends `done` (every gate's
  * latest run passed after the last change), `failed`, `unverified` (no gates to run), or `cancelled`. `interrupted`
@@ -705,6 +746,8 @@ export const TaskRunSchema = z.object({
   costUsd: z.number(),
   /** Why the run ended, in a sentence. */
   outcome: z.string().optional(),
+  /** A schedule started it (M8-05), not a person. */
+  trigger: z.literal("schedule").optional(),
 });
 export type TaskRun = z.infer<typeof TaskRunSchema>;
 
@@ -722,6 +765,9 @@ export const RunSummarySchema = z.object({
   fixRounds: z.number().int(),
   startedAt: z.string(),
   endedAt: z.string().optional(),
+  trigger: z.literal("schedule").optional(),
+  /** That run's own evidence report, in the task's folder (M8-05): `evidence-<n>.md`. */
+  evidence: z.string().optional(),
 });
 export type RunSummary = z.infer<typeof RunSummarySchema>;
 
@@ -1394,6 +1440,35 @@ export const methodSchemas = {
     params: z.object({ cwd: z.string().min(1), name: AgentNameSchema, scope: AgentScopeSchema.optional() }),
     result: z.object({ runId: z.string().optional() }),
   },
+  /**
+   * Scheduled flows (M8-05). `schedule.watch` names the workspaces whose schedules run while the app is open; the UI
+   * sends it after every handshake, so a restarted sidecar runs them again. `cwd` omitted: every watched workspace.
+   */
+  "schedule.list": {
+    params: z.object({ cwd: z.string().min(1).optional() }),
+    result: z.object({ schedules: z.array(ScheduleSchema) }),
+  },
+  "schedule.save": {
+    params: z.object({
+      cwd: z.string().min(1),
+      /** Omitted for a new schedule. */
+      id: z.string().optional(),
+      taskId: TaskIdSchema,
+      cadence: CadenceSchema,
+      enabled: z.boolean(),
+    }),
+    result: z.object({ schedule: ScheduleSchema }),
+  },
+  "schedule.delete": { params: z.object({ cwd: z.string().min(1), id: z.string() }), result: Ok },
+  /** Runs it now, as its time would; its next time stays as it was. */
+  "schedule.runNow": {
+    params: z.object({ cwd: z.string().min(1), id: z.string() }),
+    result: z.object({ schedule: ScheduleSchema }),
+  },
+  "schedule.watch": {
+    params: z.object({ cwds: z.array(z.string().min(1)).max(200) }),
+    result: z.object({ schedules: z.array(ScheduleSchema) }),
+  },
   /** Starting points for a new agent (M8-04): the shipped task roles and a few starters. */
   "agents.templates": { params: Empty, result: z.object({ templates: z.array(AgentTemplateSchema) }) },
   "permissions.remove": {
@@ -1876,6 +1951,8 @@ export const TaskTagSchema = z.object({
   role: z.string().optional(),
   /** The task's short title, for lists across tasks such as the fleet view (M8-02). */
   title: z.string().optional(),
+  /** A step of a run a schedule started (M8-05): nobody may be watching, so the UI notifies on its approvals. */
+  scheduled: z.boolean().optional(),
 });
 export type TaskTag = z.infer<typeof TaskTagSchema>;
 
@@ -1954,6 +2031,10 @@ export const notificationSchemas = {
   "task.updated": z.object({ cwd: z.string(), task: TaskSchema }),
   /** A session's fleet status changed (M8-02): working, waiting for the person, idle or ended. */
   "fleet.changed": z.object({ item: FleetItemSchema }),
+  /** A schedule was saved, ran or was skipped (M8-05). */
+  "schedule.changed": z.object({ schedule: ScheduleSchema }),
+  /** A schedule was deleted. */
+  "schedule.deleted": z.object({ cwd: z.string(), id: z.string() }),
   /** The sidecar opened a session on its own: a Team chat's worker (M8-03). */
   "session.opened": SessionOpenedSchema,
 } as const;

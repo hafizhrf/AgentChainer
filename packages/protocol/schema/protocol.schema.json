@@ -148,6 +148,9 @@
                     },
                     "title": {
                       "type": "string"
+                    },
+                    "scheduled": {
+                      "type": "boolean"
                     }
                   },
                   "required": [
@@ -1124,6 +1127,786 @@
             "type": "string"
           }
         },
+        "additionalProperties": false
+      }
+    },
+    "schedule.list": {
+      "params": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "cwd": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "additionalProperties": false
+      },
+      "result": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "schedules": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "pattern": "^[a-z0-9-]{1,64}$"
+                },
+                "cwd": {
+                  "type": "string"
+                },
+                "taskId": {
+                  "type": "string",
+                  "pattern": "^\\d{4}-\\d{2}-\\d{2}-[0-9a-f]{8}$"
+                },
+                "title": {
+                  "type": "string"
+                },
+                "cadence": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "kind": {
+                          "type": "string",
+                          "const": "hourly"
+                        },
+                        "every": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 24
+                        }
+                      },
+                      "required": [
+                        "kind",
+                        "every"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "kind": {
+                          "type": "string",
+                          "const": "daily"
+                        },
+                        "at": {
+                          "type": "string",
+                          "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
+                        }
+                      },
+                      "required": [
+                        "kind",
+                        "at"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "kind": {
+                          "type": "string",
+                          "const": "weekly"
+                        },
+                        "days": {
+                          "minItems": 1,
+                          "maxItems": 7,
+                          "type": "array",
+                          "items": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 6
+                          }
+                        },
+                        "at": {
+                          "type": "string",
+                          "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
+                        }
+                      },
+                      "required": [
+                        "kind",
+                        "days",
+                        "at"
+                      ],
+                      "additionalProperties": false
+                    }
+                  ]
+                },
+                "enabled": {
+                  "type": "boolean"
+                },
+                "createdAt": {
+                  "type": "string"
+                },
+                "nextAt": {
+                  "type": "string"
+                },
+                "lastRun": {
+                  "type": "object",
+                  "properties": {
+                    "at": {
+                      "type": "string"
+                    },
+                    "state": {
+                      "type": "string",
+                      "enum": [
+                        "started",
+                        "skipped",
+                        "failed-to-start"
+                      ]
+                    },
+                    "late": {
+                      "type": "boolean"
+                    },
+                    "reason": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "at",
+                    "state",
+                    "late"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "required": [
+                "id",
+                "cwd",
+                "taskId",
+                "title",
+                "cadence",
+                "enabled",
+                "createdAt",
+                "nextAt"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "schedules"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "schedule.save": {
+      "params": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "cwd": {
+            "type": "string",
+            "minLength": 1
+          },
+          "id": {
+            "type": "string"
+          },
+          "taskId": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}-[0-9a-f]{8}$"
+          },
+          "cadence": {
+            "oneOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "const": "hourly"
+                  },
+                  "every": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 24
+                  }
+                },
+                "required": [
+                  "kind",
+                  "every"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "const": "daily"
+                  },
+                  "at": {
+                    "type": "string",
+                    "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
+                  }
+                },
+                "required": [
+                  "kind",
+                  "at"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "const": "weekly"
+                  },
+                  "days": {
+                    "minItems": 1,
+                    "maxItems": 7,
+                    "type": "array",
+                    "items": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 6
+                    }
+                  },
+                  "at": {
+                    "type": "string",
+                    "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
+                  }
+                },
+                "required": [
+                  "kind",
+                  "days",
+                  "at"
+                ],
+                "additionalProperties": false
+              }
+            ]
+          },
+          "enabled": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "cwd",
+          "taskId",
+          "cadence",
+          "enabled"
+        ],
+        "additionalProperties": false
+      },
+      "result": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "schedule": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "pattern": "^[a-z0-9-]{1,64}$"
+              },
+              "cwd": {
+                "type": "string"
+              },
+              "taskId": {
+                "type": "string",
+                "pattern": "^\\d{4}-\\d{2}-\\d{2}-[0-9a-f]{8}$"
+              },
+              "title": {
+                "type": "string"
+              },
+              "cadence": {
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "kind": {
+                        "type": "string",
+                        "const": "hourly"
+                      },
+                      "every": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 24
+                      }
+                    },
+                    "required": [
+                      "kind",
+                      "every"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "kind": {
+                        "type": "string",
+                        "const": "daily"
+                      },
+                      "at": {
+                        "type": "string",
+                        "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
+                      }
+                    },
+                    "required": [
+                      "kind",
+                      "at"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "kind": {
+                        "type": "string",
+                        "const": "weekly"
+                      },
+                      "days": {
+                        "minItems": 1,
+                        "maxItems": 7,
+                        "type": "array",
+                        "items": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 6
+                        }
+                      },
+                      "at": {
+                        "type": "string",
+                        "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
+                      }
+                    },
+                    "required": [
+                      "kind",
+                      "days",
+                      "at"
+                    ],
+                    "additionalProperties": false
+                  }
+                ]
+              },
+              "enabled": {
+                "type": "boolean"
+              },
+              "createdAt": {
+                "type": "string"
+              },
+              "nextAt": {
+                "type": "string"
+              },
+              "lastRun": {
+                "type": "object",
+                "properties": {
+                  "at": {
+                    "type": "string"
+                  },
+                  "state": {
+                    "type": "string",
+                    "enum": [
+                      "started",
+                      "skipped",
+                      "failed-to-start"
+                    ]
+                  },
+                  "late": {
+                    "type": "boolean"
+                  },
+                  "reason": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "at",
+                  "state",
+                  "late"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "id",
+              "cwd",
+              "taskId",
+              "title",
+              "cadence",
+              "enabled",
+              "createdAt",
+              "nextAt"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "schedule"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "schedule.delete": {
+      "params": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "cwd": {
+            "type": "string",
+            "minLength": 1
+          },
+          "id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "cwd",
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "result": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "const": true
+          }
+        },
+        "required": [
+          "ok"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "schedule.runNow": {
+      "params": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "cwd": {
+            "type": "string",
+            "minLength": 1
+          },
+          "id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "cwd",
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "result": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "schedule": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "pattern": "^[a-z0-9-]{1,64}$"
+              },
+              "cwd": {
+                "type": "string"
+              },
+              "taskId": {
+                "type": "string",
+                "pattern": "^\\d{4}-\\d{2}-\\d{2}-[0-9a-f]{8}$"
+              },
+              "title": {
+                "type": "string"
+              },
+              "cadence": {
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "kind": {
+                        "type": "string",
+                        "const": "hourly"
+                      },
+                      "every": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 24
+                      }
+                    },
+                    "required": [
+                      "kind",
+                      "every"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "kind": {
+                        "type": "string",
+                        "const": "daily"
+                      },
+                      "at": {
+                        "type": "string",
+                        "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
+                      }
+                    },
+                    "required": [
+                      "kind",
+                      "at"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "kind": {
+                        "type": "string",
+                        "const": "weekly"
+                      },
+                      "days": {
+                        "minItems": 1,
+                        "maxItems": 7,
+                        "type": "array",
+                        "items": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 6
+                        }
+                      },
+                      "at": {
+                        "type": "string",
+                        "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
+                      }
+                    },
+                    "required": [
+                      "kind",
+                      "days",
+                      "at"
+                    ],
+                    "additionalProperties": false
+                  }
+                ]
+              },
+              "enabled": {
+                "type": "boolean"
+              },
+              "createdAt": {
+                "type": "string"
+              },
+              "nextAt": {
+                "type": "string"
+              },
+              "lastRun": {
+                "type": "object",
+                "properties": {
+                  "at": {
+                    "type": "string"
+                  },
+                  "state": {
+                    "type": "string",
+                    "enum": [
+                      "started",
+                      "skipped",
+                      "failed-to-start"
+                    ]
+                  },
+                  "late": {
+                    "type": "boolean"
+                  },
+                  "reason": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "at",
+                  "state",
+                  "late"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "id",
+              "cwd",
+              "taskId",
+              "title",
+              "cadence",
+              "enabled",
+              "createdAt",
+              "nextAt"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "schedule"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "schedule.watch": {
+      "params": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "cwds": {
+            "maxItems": 200,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        "required": [
+          "cwds"
+        ],
+        "additionalProperties": false
+      },
+      "result": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "schedules": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "pattern": "^[a-z0-9-]{1,64}$"
+                },
+                "cwd": {
+                  "type": "string"
+                },
+                "taskId": {
+                  "type": "string",
+                  "pattern": "^\\d{4}-\\d{2}-\\d{2}-[0-9a-f]{8}$"
+                },
+                "title": {
+                  "type": "string"
+                },
+                "cadence": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "kind": {
+                          "type": "string",
+                          "const": "hourly"
+                        },
+                        "every": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 24
+                        }
+                      },
+                      "required": [
+                        "kind",
+                        "every"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "kind": {
+                          "type": "string",
+                          "const": "daily"
+                        },
+                        "at": {
+                          "type": "string",
+                          "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
+                        }
+                      },
+                      "required": [
+                        "kind",
+                        "at"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "kind": {
+                          "type": "string",
+                          "const": "weekly"
+                        },
+                        "days": {
+                          "minItems": 1,
+                          "maxItems": 7,
+                          "type": "array",
+                          "items": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 6
+                          }
+                        },
+                        "at": {
+                          "type": "string",
+                          "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
+                        }
+                      },
+                      "required": [
+                        "kind",
+                        "days",
+                        "at"
+                      ],
+                      "additionalProperties": false
+                    }
+                  ]
+                },
+                "enabled": {
+                  "type": "boolean"
+                },
+                "createdAt": {
+                  "type": "string"
+                },
+                "nextAt": {
+                  "type": "string"
+                },
+                "lastRun": {
+                  "type": "object",
+                  "properties": {
+                    "at": {
+                      "type": "string"
+                    },
+                    "state": {
+                      "type": "string",
+                      "enum": [
+                        "started",
+                        "skipped",
+                        "failed-to-start"
+                      ]
+                    },
+                    "late": {
+                      "type": "boolean"
+                    },
+                    "reason": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "at",
+                    "state",
+                    "late"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "required": [
+                "id",
+                "cwd",
+                "taskId",
+                "title",
+                "cadence",
+                "enabled",
+                "createdAt",
+                "nextAt"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "schedules"
+        ],
         "additionalProperties": false
       }
     },
@@ -4999,6 +5782,10 @@
                   },
                   "outcome": {
                     "type": "string"
+                  },
+                  "trigger": {
+                    "type": "string",
+                    "const": "schedule"
                   }
                 },
                 "required": [
@@ -5100,6 +5887,13 @@
                   "type": "string"
                 },
                 "endedAt": {
+                  "type": "string"
+                },
+                "trigger": {
+                  "type": "string",
+                  "const": "schedule"
+                },
+                "evidence": {
                   "type": "string"
                 }
               },
@@ -6239,6 +7033,10 @@
                   },
                   "outcome": {
                     "type": "string"
+                  },
+                  "trigger": {
+                    "type": "string",
+                    "const": "schedule"
                   }
                 },
                 "required": [
@@ -6340,6 +7138,13 @@
                   "type": "string"
                 },
                 "endedAt": {
+                  "type": "string"
+                },
+                "trigger": {
+                  "type": "string",
+                  "const": "schedule"
+                },
+                "evidence": {
                   "type": "string"
                 }
               },
@@ -7485,6 +8290,10 @@
                   },
                   "outcome": {
                     "type": "string"
+                  },
+                  "trigger": {
+                    "type": "string",
+                    "const": "schedule"
                   }
                 },
                 "required": [
@@ -7586,6 +8395,13 @@
                   "type": "string"
                 },
                 "endedAt": {
+                  "type": "string"
+                },
+                "trigger": {
+                  "type": "string",
+                  "const": "schedule"
+                },
+                "evidence": {
                   "type": "string"
                 }
               },
@@ -8834,6 +9650,10 @@
                   },
                   "outcome": {
                     "type": "string"
+                  },
+                  "trigger": {
+                    "type": "string",
+                    "const": "schedule"
                   }
                 },
                 "required": [
@@ -8935,6 +9755,13 @@
                   "type": "string"
                 },
                 "endedAt": {
+                  "type": "string"
+                },
+                "trigger": {
+                  "type": "string",
+                  "const": "schedule"
+                },
+                "evidence": {
                   "type": "string"
                 }
               },
@@ -10209,6 +11036,10 @@
                   },
                   "outcome": {
                     "type": "string"
+                  },
+                  "trigger": {
+                    "type": "string",
+                    "const": "schedule"
                   }
                 },
                 "required": [
@@ -10310,6 +11141,13 @@
                   "type": "string"
                 },
                 "endedAt": {
+                  "type": "string"
+                },
+                "trigger": {
+                  "type": "string",
+                  "const": "schedule"
+                },
+                "evidence": {
                   "type": "string"
                 }
               },
@@ -11446,6 +12284,10 @@
                   },
                   "outcome": {
                     "type": "string"
+                  },
+                  "trigger": {
+                    "type": "string",
+                    "const": "schedule"
                   }
                 },
                 "required": [
@@ -11547,6 +12389,13 @@
                   "type": "string"
                 },
                 "endedAt": {
+                  "type": "string"
+                },
+                "trigger": {
+                  "type": "string",
+                  "const": "schedule"
+                },
+                "evidence": {
                   "type": "string"
                 }
               },
@@ -12695,6 +13544,10 @@
                   },
                   "outcome": {
                     "type": "string"
+                  },
+                  "trigger": {
+                    "type": "string",
+                    "const": "schedule"
                   }
                 },
                 "required": [
@@ -12796,6 +13649,13 @@
                   "type": "string"
                 },
                 "endedAt": {
+                  "type": "string"
+                },
+                "trigger": {
+                  "type": "string",
+                  "const": "schedule"
+                },
+                "evidence": {
                   "type": "string"
                 }
               },
@@ -13935,6 +14795,10 @@
                   },
                   "outcome": {
                     "type": "string"
+                  },
+                  "trigger": {
+                    "type": "string",
+                    "const": "schedule"
                   }
                 },
                 "required": [
@@ -14036,6 +14900,13 @@
                   "type": "string"
                 },
                 "endedAt": {
+                  "type": "string"
+                },
+                "trigger": {
+                  "type": "string",
+                  "const": "schedule"
+                },
+                "evidence": {
                   "type": "string"
                 }
               },
@@ -15172,6 +16043,10 @@
                   },
                   "outcome": {
                     "type": "string"
+                  },
+                  "trigger": {
+                    "type": "string",
+                    "const": "schedule"
                   }
                 },
                 "required": [
@@ -15273,6 +16148,13 @@
                   "type": "string"
                 },
                 "endedAt": {
+                  "type": "string"
+                },
+                "trigger": {
+                  "type": "string",
+                  "const": "schedule"
+                },
+                "evidence": {
                   "type": "string"
                 }
               },
@@ -16503,6 +17385,10 @@
                   },
                   "outcome": {
                     "type": "string"
+                  },
+                  "trigger": {
+                    "type": "string",
+                    "const": "schedule"
                   }
                 },
                 "required": [
@@ -16604,6 +17490,13 @@
                   "type": "string"
                 },
                 "endedAt": {
+                  "type": "string"
+                },
+                "trigger": {
+                  "type": "string",
+                  "const": "schedule"
+                },
+                "evidence": {
                   "type": "string"
                 }
               },
@@ -17746,6 +18639,10 @@
                   },
                   "outcome": {
                     "type": "string"
+                  },
+                  "trigger": {
+                    "type": "string",
+                    "const": "schedule"
                   }
                 },
                 "required": [
@@ -17847,6 +18744,13 @@
                   "type": "string"
                 },
                 "endedAt": {
+                  "type": "string"
+                },
+                "trigger": {
+                  "type": "string",
+                  "const": "schedule"
+                },
+                "evidence": {
                   "type": "string"
                 }
               },
@@ -19024,6 +19928,10 @@
                   },
                   "outcome": {
                     "type": "string"
+                  },
+                  "trigger": {
+                    "type": "string",
+                    "const": "schedule"
                   }
                 },
                 "required": [
@@ -19125,6 +20033,13 @@
                   "type": "string"
                 },
                 "endedAt": {
+                  "type": "string"
+                },
+                "trigger": {
+                  "type": "string",
+                  "const": "schedule"
+                },
+                "evidence": {
                   "type": "string"
                 }
               },
@@ -20261,6 +21176,10 @@
                   },
                   "outcome": {
                     "type": "string"
+                  },
+                  "trigger": {
+                    "type": "string",
+                    "const": "schedule"
                   }
                 },
                 "required": [
@@ -20362,6 +21281,13 @@
                   "type": "string"
                 },
                 "endedAt": {
+                  "type": "string"
+                },
+                "trigger": {
+                  "type": "string",
+                  "const": "schedule"
+                },
+                "evidence": {
                   "type": "string"
                 }
               },
@@ -21498,6 +22424,10 @@
                   },
                   "outcome": {
                     "type": "string"
+                  },
+                  "trigger": {
+                    "type": "string",
+                    "const": "schedule"
                   }
                 },
                 "required": [
@@ -21599,6 +22529,13 @@
                   "type": "string"
                 },
                 "endedAt": {
+                  "type": "string"
+                },
+                "trigger": {
+                  "type": "string",
+                  "const": "schedule"
+                },
+                "evidence": {
                   "type": "string"
                 }
               },
@@ -22947,6 +23884,10 @@
                   },
                   "outcome": {
                     "type": "string"
+                  },
+                  "trigger": {
+                    "type": "string",
+                    "const": "schedule"
                   }
                 },
                 "required": [
@@ -23048,6 +23989,13 @@
                   "type": "string"
                 },
                 "endedAt": {
+                  "type": "string"
+                },
+                "trigger": {
+                  "type": "string",
+                  "const": "schedule"
+                },
+                "evidence": {
                   "type": "string"
                 }
               },
@@ -24308,6 +25256,10 @@
                   },
                   "outcome": {
                     "type": "string"
+                  },
+                  "trigger": {
+                    "type": "string",
+                    "const": "schedule"
                   }
                 },
                 "required": [
@@ -24409,6 +25361,13 @@
                   "type": "string"
                 },
                 "endedAt": {
+                  "type": "string"
+                },
+                "trigger": {
+                  "type": "string",
+                  "const": "schedule"
+                },
+                "evidence": {
                   "type": "string"
                 }
               },
@@ -25647,6 +26606,10 @@
                   },
                   "outcome": {
                     "type": "string"
+                  },
+                  "trigger": {
+                    "type": "string",
+                    "const": "schedule"
                   }
                 },
                 "required": [
@@ -25748,6 +26711,13 @@
                   "type": "string"
                 },
                 "endedAt": {
+                  "type": "string"
+                },
+                "trigger": {
+                  "type": "string",
+                  "const": "schedule"
+                },
+                "evidence": {
                   "type": "string"
                 }
               },
@@ -26903,6 +27873,10 @@
                   },
                   "outcome": {
                     "type": "string"
+                  },
+                  "trigger": {
+                    "type": "string",
+                    "const": "schedule"
                   }
                 },
                 "required": [
@@ -27004,6 +27978,13 @@
                   "type": "string"
                 },
                 "endedAt": {
+                  "type": "string"
+                },
+                "trigger": {
+                  "type": "string",
+                  "const": "schedule"
+                },
+                "evidence": {
                   "type": "string"
                 }
               },
@@ -29961,6 +30942,10 @@
                   },
                   "outcome": {
                     "type": "string"
+                  },
+                  "trigger": {
+                    "type": "string",
+                    "const": "schedule"
                   }
                 },
                 "required": [
@@ -30062,6 +31047,13 @@
                   "type": "string"
                 },
                 "endedAt": {
+                  "type": "string"
+                },
+                "trigger": {
+                  "type": "string",
+                  "const": "schedule"
+                },
+                "evidence": {
                   "type": "string"
                 }
               },
@@ -31195,6 +32187,9 @@
             },
             "title": {
               "type": "string"
+            },
+            "scheduled": {
+              "type": "boolean"
             }
           },
           "required": [
@@ -31240,6 +32235,9 @@
             },
             "title": {
               "type": "string"
+            },
+            "scheduled": {
+              "type": "boolean"
             }
           },
           "required": [
@@ -32079,6 +33077,10 @@
                     },
                     "outcome": {
                       "type": "string"
+                    },
+                    "trigger": {
+                      "type": "string",
+                      "const": "schedule"
                     }
                   },
                   "required": [
@@ -32180,6 +33182,13 @@
                     "type": "string"
                   },
                   "endedAt": {
+                    "type": "string"
+                  },
+                  "trigger": {
+                    "type": "string",
+                    "const": "schedule"
+                  },
+                  "evidence": {
                     "type": "string"
                   }
                 },
@@ -32587,6 +33596,9 @@
                 },
                 "title": {
                   "type": "string"
+                },
+                "scheduled": {
+                  "type": "boolean"
                 }
               },
               "required": [
@@ -32615,6 +33627,170 @@
       },
       "required": [
         "item"
+      ],
+      "additionalProperties": false
+    },
+    "schedule.changed": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "schedule": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "pattern": "^[a-z0-9-]{1,64}$"
+            },
+            "cwd": {
+              "type": "string"
+            },
+            "taskId": {
+              "type": "string",
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}-[0-9a-f]{8}$"
+            },
+            "title": {
+              "type": "string"
+            },
+            "cadence": {
+              "oneOf": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "kind": {
+                      "type": "string",
+                      "const": "hourly"
+                    },
+                    "every": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 24
+                    }
+                  },
+                  "required": [
+                    "kind",
+                    "every"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "kind": {
+                      "type": "string",
+                      "const": "daily"
+                    },
+                    "at": {
+                      "type": "string",
+                      "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
+                    }
+                  },
+                  "required": [
+                    "kind",
+                    "at"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "kind": {
+                      "type": "string",
+                      "const": "weekly"
+                    },
+                    "days": {
+                      "minItems": 1,
+                      "maxItems": 7,
+                      "type": "array",
+                      "items": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 6
+                      }
+                    },
+                    "at": {
+                      "type": "string",
+                      "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
+                    }
+                  },
+                  "required": [
+                    "kind",
+                    "days",
+                    "at"
+                  ],
+                  "additionalProperties": false
+                }
+              ]
+            },
+            "enabled": {
+              "type": "boolean"
+            },
+            "createdAt": {
+              "type": "string"
+            },
+            "nextAt": {
+              "type": "string"
+            },
+            "lastRun": {
+              "type": "object",
+              "properties": {
+                "at": {
+                  "type": "string"
+                },
+                "state": {
+                  "type": "string",
+                  "enum": [
+                    "started",
+                    "skipped",
+                    "failed-to-start"
+                  ]
+                },
+                "late": {
+                  "type": "boolean"
+                },
+                "reason": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "at",
+                "state",
+                "late"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "id",
+            "cwd",
+            "taskId",
+            "title",
+            "cadence",
+            "enabled",
+            "createdAt",
+            "nextAt"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "schedule"
+      ],
+      "additionalProperties": false
+    },
+    "schedule.deleted": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "cwd": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "cwd",
+        "id"
       ],
       "additionalProperties": false
     },

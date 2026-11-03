@@ -1730,6 +1730,17 @@ first.
       removed.
 - [ ] **M8-05** Scheduled flows: run a task template on a schedule (e.g. a nightly dependency bump), locally, with a
       budget cap and an evidence report per run. From CAO's flows.
+      → design: [scheduled-flows.md](design/scheduled-flows.md) (owner decisions, 2026-11-03).
+  - Sidecar (PR 1):
+    - schedules in `.agentchainer/schedules.json`, checked once a minute;
+    - one catch-up for a missed time;
+    - runs in `acceptEdits` with the last run's model, tagged `scheduled`;
+    - every run keeps `evidence-<n>.md`.
+  - Evidence: unit tests, and the live `schedule` scenario on haiku, 3 of 3 passed:
+    - an unknown task is refused;
+    - a scheduled run started at its minute with the same model, and the next time moved a day on;
+    - both runs kept their own report.
+  - UI (PR 2): Schedule… on a task, Fleet → Scheduled, and OS notifications. The box is ticked then.
 - [ ] **M8-06** Lessons from outcomes: suggest CLAUDE.md additions from finished tasks' evidence, each one approved
       by the user (opt-in). From CAO's memory and self-learning loop.
 - **Not adopted from CAO:**

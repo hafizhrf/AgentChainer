@@ -48,6 +48,14 @@ export function nestedTabs(tabs: Tab[]): { tab: Tab; child: boolean }[] {
 export const usd = (n: number) =>
   n.toLocaleString("en-US", { style: "currency", currency: "USD", minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
+/** "$0.42", "$2", "$1.5K", "$10M": a Team's spend and cap where space is short. */
+export function usdShort(n: number): string {
+  const trim = (v: number) => (Number.isInteger(v) ? String(v) : v.toFixed(1).replace(/\.0$/, ""));
+  if (n >= 1_000_000) return `$${trim(n / 1_000_000)}M`;
+  if (n >= 1_000) return `$${trim(n / 1_000)}K`;
+  return Number.isInteger(n) ? `$${n}` : `$${n.toFixed(2)}`;
+}
+
 /** "Team · $0.42 of $2.00", or that the cap stopped it. */
 export function teamSpend(team: NonNullable<Tab["team"]>): string {
   return team.stopped

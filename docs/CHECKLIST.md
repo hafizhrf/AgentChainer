@@ -1166,6 +1166,14 @@ for the desktop shell, start screen and session view to be cleaned up (UX-02, UX
 
 ### Exit criteria
 
+- [ ] **UX-17** A tidy workflow canvas. Owner feedback, 2026-11-03, with a screenshot of a task's Flow tab: "tampilannya
+      masih kurang rapih".
+  - The fix-loop labels ("fix round 0 of 2", "fix round 0 of 1") overlap each other and sit on the edges.
+  - The dashed loop edges leave the nodes on their left side and run outside the column.
+  - The nodes' subtitles are cut off ("format, lint, typecheck, test, build, sm…").
+  - The zoom controls are heavy bordered boxes, unlike the app's other controls.
+  - Wanted: loop edges that route cleanly beside the column with readable labels that never overlap; full subtitles,
+    wrapping or with a tooltip; quiet controls. Checked in both themes, on the editor and on a task's live Flow tab.
 - [ ] **UX-E1** All M1/M2 screens use the design system, in light and dark themes.
 - [ ] **UX-E2** Usability test participants complete the M1 exit scenarios without help.
 

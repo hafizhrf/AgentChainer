@@ -11,6 +11,7 @@ import {
   type PermissionRequest,
   PROTOCOL_VERSION,
   RpcErrorCode,
+  type Schedule,
   type SessionInfo,
   type Task,
 } from "@agentchainer/protocol";
@@ -26,7 +27,7 @@ import { CommandPalette, type PaletteCommand } from "./CommandPalette.tsx";
 import type { Attachment } from "./Composer.tsx";
 import { APP_COMMANDS, type AppCommand, chatContext, effortFromArg, modeFromArg, modelFromArg } from "./commands.ts";
 import { useConfirm } from "./Dialog.tsx";
-import { FleetView } from "./FleetView.tsx";
+import { FleetView, type ScheduleAction } from "./FleetView.tsx";
 import { joinPath } from "./files.ts";
 import { HomeView, pickFolder } from "./HomeView.tsx";
 import { MODE_NAMES, modelChoices, rememberModels, THEMES } from "./options.ts";
@@ -35,6 +36,7 @@ import { PANEL_TAB_LABEL, PANEL_TABS, type PanelTab, parseHidden, serializeHidde
 import { SessionView } from "./SessionView.tsx";
 import { SettingsDialog } from "./SettingsDialog.tsx";
 import { FLEET, Sidebar } from "./Sidebar.tsx";
+import { notify as notifyOs, scheduledRunEnded } from "./schedules.ts";
 import { quitApp, readSelftestConfig, runSelftest, type SelftestConfig } from "./selftest.ts";
 import { loadSettings, type Settings, saveSettings, type WorkspaceDef, withRecent } from "./settings.ts";
 import type { SetupView } from "./setup/SetupPage.tsx";
@@ -53,6 +55,7 @@ import {
   updateTab,
 } from "./tabs.ts";
 import { HomeTasks } from "./tasks/HomeTasks.tsx";
+import { ScheduleDialog, type ScheduleTarget } from "./tasks/ScheduleDialog.tsx";
 import { type TaskTab, taskKey } from "./tasks/taskTabs.ts";
 import { TEAM_CAP_USD, usd } from "./team.ts";
 import { asTheme } from "./theme.ts";
@@ -137,6 +140,30 @@ export function App() {
   const [wsDialog, setWsDialog] = useState<WorkspaceDef | "new" | null>(null);
   /** Every live session's fleet status, by session id (M8-02); ended ones stay until cleared or the app restarts. */
   const [fleet, setFleet] = useState<Record<string, FleetItem>>({});
+  /** Scheduled flows (M8-05), by `cwd|id`, and the one being edited. */
+  const [schedules, setSchedules] = useState<Record<string, Schedule>>({});
+  const [scheduleTarget, setScheduleTarget] = useState<ScheduleTarget | null>(null);
+  /** Each task's last state seen, so a scheduled run's end is told once (M8-05). */
+  const taskStates = useRef(new Map<string, Task["state"]>());
+  // The workspaces whose schedules run while the app is open: the recent ones and the named ones' primaries. Sent
+  // again whenever the runtime (re)starts or the list changes, so a restarted sidecar runs them again (M8-05).
+  const watchKey = [
+    ...new Set([
+      ...(settings?.recentWorkspaces ?? []),
+      ...(settings?.workspaces ?? []).map((w) => w.primary),
+      // A workspace with a schedule stays watched even if it drops out of the recent list.
+      ...Object.values(schedules).map((s) => s.cwd),
+    ]),
+  ]
+    .sort()
+    .join("\n");
+  useEffect(() => {
+    if (!hello) return;
+    request("schedule.watch", { cwds: watchKey ? watchKey.split("\n") : [] }).then(
+      ({ schedules: list }) => setSchedules(Object.fromEntries(list.map((s) => [`${s.cwd}|${s.id}`, s]))),
+      () => undefined,
+    );
+  }, [hello, watchKey]);
   /** For each open task thread, the tasks whose approvals it shows as cards (the task and its sub-tasks). */
   const [shownTasks, setShownTasks] = useState<Record<string, string[]>>({});
   /** Self-test screenshots only: the right panel's tab. */
@@ -266,6 +293,13 @@ export function App() {
       if (n.method === "permission.request") {
         // A task step's session has no tab: its approvals queue up and show over whatever page is open.
         const { task } = n.params;
+        // Nobody may be watching a scheduled run (M8-05): its approvals are told as OS notifications.
+        if (task?.scheduled) {
+          void notifyOs(
+            `${task.title ?? "A scheduled task"} needs you`,
+            `A scheduled run waits for your approval: ${n.params.toolName}.`,
+          );
+        }
         if (task && !tabsRef.current.some((t) => t.sessionId === n.params.sessionId)) {
           setTaskApprovals((q) => [...q, n.params]);
           return;
@@ -277,10 +311,21 @@ export function App() {
         // A run that ended cancels its steps' pending approvals.
         const { task } = n.params;
         if (task.state !== "running") setTaskApprovals((q) => q.filter((p) => p.task?.id !== task.id));
+        const ended = scheduledRunEnded(taskStates.current.get(task.id), task);
+        if (ended) void notifyOs(ended.title, ended.body);
+        taskStates.current.set(task.id, task.state);
         return;
       }
-      // Scheduled flows (M8-05): their list and notifications come with the Schedules UI.
-      if (n.method === "schedule.changed" || n.method === "schedule.deleted") return;
+      if (n.method === "schedule.changed") {
+        const { schedule } = n.params;
+        setSchedules((all) => ({ ...all, [`${schedule.cwd}|${schedule.id}`]: schedule }));
+        return;
+      }
+      if (n.method === "schedule.deleted") {
+        const key = `${n.params.cwd}|${n.params.id}`;
+        setSchedules((all) => Object.fromEntries(Object.entries(all).filter(([k]) => k !== key)));
+        return;
+      }
       // A Team chat's worker (M8-03): its tab opens beside the supervisor's without taking focus, before its events.
       if (n.method === "session.opened") {
         const { sessionId, parentId, cwd: dir, name, access, profile: workerProfile } = n.params;
@@ -822,6 +867,44 @@ export function App() {
     setTabs((ts) => ts.filter((x) => x.sessionId !== t.sessionId));
   }
 
+  /** A Fleet row's action on a schedule (M8-05). */
+  async function scheduleAction(action: ScheduleAction, s: Schedule) {
+    try {
+      if (action === "edit") {
+        const task = await request("task.get", { cwd: s.cwd, id: s.taskId });
+        setScheduleTarget({
+          cwd: s.cwd,
+          taskId: s.taskId,
+          title: s.title,
+          budgetUsd: task.triage?.budgetUsd ?? null,
+          ...(task.run?.model ? { model: task.run.model } : {}),
+          schedule: s,
+        });
+      } else if (action === "toggle") {
+        await request("schedule.save", {
+          cwd: s.cwd,
+          id: s.id,
+          taskId: s.taskId,
+          cadence: s.cadence,
+          enabled: !s.enabled,
+        });
+      } else if (action === "run") {
+        await request("schedule.runNow", { cwd: s.cwd, id: s.id });
+      } else if (
+        await confirm({
+          title: `Delete the schedule of “${s.title}”?`,
+          body: <p>The task stays; it just won't run on its own any more.</p>,
+          confirmLabel: "Delete schedule",
+          danger: true,
+        })
+      ) {
+        await request("schedule.delete", { cwd: s.cwd, id: s.id });
+      }
+    } catch (err) {
+      setRuntimeNotice(`The schedule: ${err}`);
+    }
+  }
+
   function closeTab(sessionId: string) {
     const tab = tabs.find((t) => t.sessionId === sessionId);
     if (tab && !tab.ended) void request("session.close", { sessionId }).catch(() => undefined);
@@ -1195,6 +1278,8 @@ export function App() {
                     onClearEnded={() =>
                       setFleet((f) => Object.fromEntries(Object.entries(f).filter(([, i]) => i.status !== "ended")))
                     }
+                    schedules={Object.values(schedules)}
+                    onSchedule={(action, s) => void scheduleAction(action, s)}
                   />
                 )}
                 {active === null && !setup && (
@@ -1316,6 +1401,15 @@ export function App() {
                         approvals={taskApprovals}
                         onAnswerApproval={(req, reply) => void answerTaskStep(req, reply)}
                         onStopFromApproval={(req) => void stopTaskStep(req)}
+                        onSchedule={(task) =>
+                          setScheduleTarget({
+                            cwd: t.cwd,
+                            taskId: task.id,
+                            title: task.title ?? task.request,
+                            budgetUsd: task.triage?.budgetUsd ?? null,
+                            ...(task.run?.model ? { model: task.run.model } : {}),
+                          })
+                        }
                         onOpenFile={(file) =>
                           invoke("open_in_editor", { file, line: null, editor: settings?.editor ?? "system" })
                         }
@@ -1367,6 +1461,17 @@ export function App() {
           />
         )}
         {updatesOpen && <UpdateDialog appVersion={appVersion} onClose={() => setUpdatesOpen(false)} />}
+        {scheduleTarget && (
+          <ScheduleDialog
+            target={scheduleTarget}
+            onClose={() => setScheduleTarget(null)}
+            onSaved={(s) => {
+              setSchedules((all) => ({ ...all, [`${s.cwd}|${s.id}`]: s }));
+              // Remembered, so its schedules are watched again after a restart.
+              void rememberWorkspace(s.cwd);
+            }}
+          />
+        )}
         <CommandPalette
           open={paletteOpen}
           onOpenChange={setPaletteOpen}

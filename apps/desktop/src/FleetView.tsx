@@ -1,17 +1,22 @@
-import type { FleetItem } from "@agentchainer/protocol";
+import { cadenceText, type FleetItem, type Schedule } from "@agentchainer/protocol";
 import {
+  CalendarClock,
   CircleCheck,
   CircleMinus,
   ClipboardList,
   LoaderCircle,
   MessageSquare,
+  Pencil,
   Radar,
   ShieldQuestion,
   Square,
+  Trash2,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { ago, fleetGroups, FLEET_STATUS as STATUS, workspaceOf } from "./fleet.ts";
+import { lastRunText, whenText } from "./schedules.ts";
 import { folderName, type Tab } from "./tabs.ts";
+import { IconButton } from "./ui/IconButton.tsx";
 
 function StatusMark({ status }: { status: FleetItem["status"] }) {
   const Icon =
@@ -38,17 +43,22 @@ function StatusMark({ status }: { status: FleetItem["status"] }) {
 export function FleetView({
   items,
   tabs,
+  schedules = [],
   onOpenChat,
   onOpenTask,
   onStop,
   onClearEnded,
+  onSchedule,
 }: {
   items: FleetItem[];
   tabs: Tab[];
+  /** Every schedule in the watched workspaces (M8-05). */
+  schedules?: Schedule[];
   onOpenChat: (sessionId: string) => void;
   onOpenTask: (cwd: string, id: string, title: string) => void;
   onStop: (item: FleetItem) => void;
   onClearEnded: () => void;
+  onSchedule?: (action: ScheduleAction, schedule: Schedule) => void;
 }) {
   const [now, setNow] = useState(Date.now());
   useEffect(() => {
@@ -142,6 +152,58 @@ export function FleetView({
           </section>
         ))
       )}
+      {schedules.length > 0 && (
+        <section className="fleet-group fleet-schedules" aria-label="Scheduled">
+          <h2>Scheduled</h2>
+          <p className="muted fleet-note">
+            Runs only while AgentChainer is open; a time missed while it was closed runs once.
+          </p>
+          <ul className="fleet-list">
+            {[...schedules]
+              .sort((a, b) => a.nextAt.localeCompare(b.nextAt))
+              .map((s) => (
+                <li key={`${s.cwd}|${s.id}`} className={`fleet-row${s.enabled ? "" : " ended"}`}>
+                  <CalendarClock size={14} aria-label="Schedule" />
+                  <button
+                    type="button"
+                    className="fleet-main"
+                    onClick={() => onOpenTask(workspaceOf(s.cwd), s.taskId, s.title)}
+                    title="Open the task"
+                  >
+                    <span className="fleet-title">{s.title}</span>
+                    <span className="muted fleet-step">
+                      {folderName(s.cwd)} · {cadenceText(s.cadence)} ·{" "}
+                      {s.enabled ? `next ${whenText(new Date(s.nextAt), new Date(now))}` : "off"}
+                    </span>
+                  </button>
+                  <span className={`muted fleet-time${s.lastRun?.state === "failed-to-start" ? " warn" : ""}`}>
+                    {lastRunText(s, new Date(now))}
+                  </span>
+                  <label className="check" title={s.enabled ? "Turn this schedule off" : "Turn this schedule on"}>
+                    <input
+                      type="checkbox"
+                      checked={s.enabled}
+                      onChange={() => onSchedule?.("toggle", s)}
+                      aria-label={`${s.title}: schedule on`}
+                    />
+                    <span className="sr-only">On</span>
+                  </label>
+                  <button type="button" className="secondary small" onClick={() => onSchedule?.("run", s)}>
+                    Run now
+                  </button>
+                  <IconButton label={`Edit the schedule of ${s.title}`} onClick={() => onSchedule?.("edit", s)}>
+                    <Pencil size={13} />
+                  </IconButton>
+                  <IconButton label={`Delete the schedule of ${s.title}`} onClick={() => onSchedule?.("delete", s)}>
+                    <Trash2 size={13} />
+                  </IconButton>
+                </li>
+              ))}
+          </ul>
+        </section>
+      )}
     </div>
   );
 }
+
+export type ScheduleAction = "toggle" | "run" | "edit" | "delete";

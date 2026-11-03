@@ -1505,3 +1505,58 @@ div.draft-block.live {
 .flow-text {
   margin: 0;
 }
+
+/* ---------- Scheduled flows (M8-05) ---------- */
+
+.schedule-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.schedule-form > .segmented {
+  align-self: flex-start;
+}
+
+.schedule-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--space-4);
+}
+
+.schedule-days {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+fieldset.schedule-days > legend {
+  margin-bottom: var(--space-1);
+  padding: 0;
+}
+
+.schedule-days .chip[aria-pressed="true"] {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--fg);
+}
+
+.schedule-facts {
+  margin: 0;
+  padding-left: var(--space-4);
+  color: var(--muted);
+  font-size: var(--text-sm);
+}
+
+.fleet-note {
+  margin: 0 0 var(--space-2);
+  font-size: var(--text-sm);
+}
+
+.fleet-time.warn {
+  color: var(--warn);
+}

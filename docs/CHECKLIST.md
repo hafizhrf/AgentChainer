@@ -1728,7 +1728,7 @@ first.
       asked to write;
     - both test agents were deleted through the UI, with the scope's wording in the confirm, and the empty user folder
       removed.
-- [ ] **M8-05** Scheduled flows: run a task template on a schedule (e.g. a nightly dependency bump), locally, with a
+- [x] **M8-05** Scheduled flows: run a task template on a schedule (e.g. a nightly dependency bump), locally, with a
       budget cap and an evidence report per run. From CAO's flows.
       → design: [scheduled-flows.md](design/scheduled-flows.md) (owner decisions, 2026-11-03).
   - Sidecar (PR 1):
@@ -1740,7 +1740,21 @@ first.
     - an unknown task is refused;
     - a scheduled run started at its minute with the same model, and the next time moved a day on;
     - both runs kept their own report.
-  - UI (PR 2): Schedule… on a task, Fleet → Scheduled, and OS notifications. The box is ticked then.
+  - UI (PR 2):
+    - **Schedule…** on an approved S/M/L task: presets, the next three times, the run's budget and model, and what a
+      run may do on its own.
+    - **Fleet → Scheduled:** every schedule, with its cadence, next and last run, an on/off toggle, Run now, Edit and
+      Delete.
+    - **OS notifications** through `tauri-plugin-notification` 2.7.0, asked for on the first save: a scheduled run
+      needs an approval, or it ended.
+    - A workspace with a schedule is remembered, so it stays watched after a restart.
+  - Checked in the app over CDP (Windows, dark and light), on a sample-app task that had run on haiku:
+    - It was scheduled daily at the next minute and fired at 22:56. The Fleet showed the step working, then the row
+      showed "Ran today 22:56 · next tomorrow 22:56".
+    - The run waited on a Bash approval ("Waiting for you", with notifications granted). Once it was allowed, the run
+      ended and `evidence-3.md` was written.
+    - Toggle off, Run now (then stopped), Edit and Delete all worked.
+    - The recent workspaces were restored afterwards.
 - [ ] **M8-06** Lessons from outcomes: suggest CLAUDE.md additions from finished tasks' evidence, each one approved
       by the user (opt-in). From CAO's memory and self-learning loop.
 - **Not adopted from CAO:**

@@ -71,6 +71,9 @@ as data, never run as markup or script. That is threat T-01.
 - `clipboard-manager:allow-read-text`, for the title bar's Edit → Paste only: the clipboard's text is read when the
   person picks Paste, and inserted where they were typing. Nothing writes to the clipboard through it, and nothing
   reads it otherwise.
+- `notification:allow-is-permission-granted`, `allow-request-permission` and `allow-notify` (M8-05): OS notifications
+  that a scheduled run needs an approval or ended. Permission is asked when the first schedule is saved. A
+  notification carries the task's title, the tool's name or the run's outcome and cost, and nothing from files.
 
 Nothing else. In particular, there is no file-system or shell plugin.
 

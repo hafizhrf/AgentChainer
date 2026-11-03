@@ -727,6 +727,8 @@ export const TaskFolderSchema = z.object({
   name: z.string(),
   path: z.string(),
   worktree: TaskWorktreeSchema.optional(),
+  /** The draft PR made from this folder's branch in its own repository, with the task's main PR (M8-01). */
+  pr: z.object({ number: z.number().int(), url: z.string(), base: z.string(), head: z.string() }).optional(),
 });
 export type TaskFolder = z.infer<typeof TaskFolderSchema>;
 

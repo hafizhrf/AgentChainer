@@ -5090,6 +5090,32 @@
                     "untracked"
                   ],
                   "additionalProperties": false
+                },
+                "pr": {
+                  "type": "object",
+                  "properties": {
+                    "number": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "url": {
+                      "type": "string"
+                    },
+                    "base": {
+                      "type": "string"
+                    },
+                    "head": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "number",
+                    "url",
+                    "base",
+                    "head"
+                  ],
+                  "additionalProperties": false
                 }
               },
               "required": [
@@ -6286,6 +6312,32 @@
                     "branch",
                     "base",
                     "untracked"
+                  ],
+                  "additionalProperties": false
+                },
+                "pr": {
+                  "type": "object",
+                  "properties": {
+                    "number": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "url": {
+                      "type": "string"
+                    },
+                    "base": {
+                      "type": "string"
+                    },
+                    "head": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "number",
+                    "url",
+                    "base",
+                    "head"
                   ],
                   "additionalProperties": false
                 }
@@ -7490,6 +7542,32 @@
                     "branch",
                     "base",
                     "untracked"
+                  ],
+                  "additionalProperties": false
+                },
+                "pr": {
+                  "type": "object",
+                  "properties": {
+                    "number": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "url": {
+                      "type": "string"
+                    },
+                    "base": {
+                      "type": "string"
+                    },
+                    "head": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "number",
+                    "url",
+                    "base",
+                    "head"
                   ],
                   "additionalProperties": false
                 }
@@ -8797,6 +8875,32 @@
                     "branch",
                     "base",
                     "untracked"
+                  ],
+                  "additionalProperties": false
+                },
+                "pr": {
+                  "type": "object",
+                  "properties": {
+                    "number": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "url": {
+                      "type": "string"
+                    },
+                    "base": {
+                      "type": "string"
+                    },
+                    "head": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "number",
+                    "url",
+                    "base",
+                    "head"
                   ],
                   "additionalProperties": false
                 }
@@ -10132,6 +10236,32 @@
                     "untracked"
                   ],
                   "additionalProperties": false
+                },
+                "pr": {
+                  "type": "object",
+                  "properties": {
+                    "number": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "url": {
+                      "type": "string"
+                    },
+                    "base": {
+                      "type": "string"
+                    },
+                    "head": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "number",
+                    "url",
+                    "base",
+                    "head"
+                  ],
+                  "additionalProperties": false
                 }
               },
               "required": [
@@ -11325,6 +11455,32 @@
                     "branch",
                     "base",
                     "untracked"
+                  ],
+                  "additionalProperties": false
+                },
+                "pr": {
+                  "type": "object",
+                  "properties": {
+                    "number": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "url": {
+                      "type": "string"
+                    },
+                    "base": {
+                      "type": "string"
+                    },
+                    "head": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "number",
+                    "url",
+                    "base",
+                    "head"
                   ],
                   "additionalProperties": false
                 }
@@ -12534,6 +12690,32 @@
                     "untracked"
                   ],
                   "additionalProperties": false
+                },
+                "pr": {
+                  "type": "object",
+                  "properties": {
+                    "number": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "url": {
+                      "type": "string"
+                    },
+                    "base": {
+                      "type": "string"
+                    },
+                    "head": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "number",
+                    "url",
+                    "base",
+                    "head"
+                  ],
+                  "additionalProperties": false
                 }
               },
               "required": [
@@ -13732,6 +13914,32 @@
                     "untracked"
                   ],
                   "additionalProperties": false
+                },
+                "pr": {
+                  "type": "object",
+                  "properties": {
+                    "number": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "url": {
+                      "type": "string"
+                    },
+                    "base": {
+                      "type": "string"
+                    },
+                    "head": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "number",
+                    "url",
+                    "base",
+                    "head"
+                  ],
+                  "additionalProperties": false
                 }
               },
               "required": [
@@ -14925,6 +15133,32 @@
                     "branch",
                     "base",
                     "untracked"
+                  ],
+                  "additionalProperties": false
+                },
+                "pr": {
+                  "type": "object",
+                  "properties": {
+                    "number": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "url": {
+                      "type": "string"
+                    },
+                    "base": {
+                      "type": "string"
+                    },
+                    "head": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "number",
+                    "url",
+                    "base",
+                    "head"
                   ],
                   "additionalProperties": false
                 }
@@ -16216,6 +16450,32 @@
                     "untracked"
                   ],
                   "additionalProperties": false
+                },
+                "pr": {
+                  "type": "object",
+                  "properties": {
+                    "number": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "url": {
+                      "type": "string"
+                    },
+                    "base": {
+                      "type": "string"
+                    },
+                    "head": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "number",
+                    "url",
+                    "base",
+                    "head"
+                  ],
+                  "additionalProperties": false
                 }
               },
               "required": [
@@ -17415,6 +17675,32 @@
                     "branch",
                     "base",
                     "untracked"
+                  ],
+                  "additionalProperties": false
+                },
+                "pr": {
+                  "type": "object",
+                  "properties": {
+                    "number": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "url": {
+                      "type": "string"
+                    },
+                    "base": {
+                      "type": "string"
+                    },
+                    "head": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "number",
+                    "url",
+                    "base",
+                    "head"
                   ],
                   "additionalProperties": false
                 }
@@ -18653,6 +18939,32 @@
                     "untracked"
                   ],
                   "additionalProperties": false
+                },
+                "pr": {
+                  "type": "object",
+                  "properties": {
+                    "number": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "url": {
+                      "type": "string"
+                    },
+                    "base": {
+                      "type": "string"
+                    },
+                    "head": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "number",
+                    "url",
+                    "base",
+                    "head"
+                  ],
+                  "additionalProperties": false
                 }
               },
               "required": [
@@ -19848,6 +20160,32 @@
                     "untracked"
                   ],
                   "additionalProperties": false
+                },
+                "pr": {
+                  "type": "object",
+                  "properties": {
+                    "number": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "url": {
+                      "type": "string"
+                    },
+                    "base": {
+                      "type": "string"
+                    },
+                    "head": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "number",
+                    "url",
+                    "base",
+                    "head"
+                  ],
+                  "additionalProperties": false
                 }
               },
               "required": [
@@ -21041,6 +21379,32 @@
                     "branch",
                     "base",
                     "untracked"
+                  ],
+                  "additionalProperties": false
+                },
+                "pr": {
+                  "type": "object",
+                  "properties": {
+                    "number": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "url": {
+                      "type": "string"
+                    },
+                    "base": {
+                      "type": "string"
+                    },
+                    "head": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "number",
+                    "url",
+                    "base",
+                    "head"
                   ],
                   "additionalProperties": false
                 }
@@ -22450,6 +22814,32 @@
                     "untracked"
                   ],
                   "additionalProperties": false
+                },
+                "pr": {
+                  "type": "object",
+                  "properties": {
+                    "number": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "url": {
+                      "type": "string"
+                    },
+                    "base": {
+                      "type": "string"
+                    },
+                    "head": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "number",
+                    "url",
+                    "base",
+                    "head"
+                  ],
+                  "additionalProperties": false
                 }
               },
               "required": [
@@ -23769,6 +24159,32 @@
                     "untracked"
                   ],
                   "additionalProperties": false
+                },
+                "pr": {
+                  "type": "object",
+                  "properties": {
+                    "number": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "url": {
+                      "type": "string"
+                    },
+                    "base": {
+                      "type": "string"
+                    },
+                    "head": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "number",
+                    "url",
+                    "base",
+                    "head"
+                  ],
+                  "additionalProperties": false
                 }
               },
               "required": [
@@ -25066,6 +25482,32 @@
                     "untracked"
                   ],
                   "additionalProperties": false
+                },
+                "pr": {
+                  "type": "object",
+                  "properties": {
+                    "number": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "url": {
+                      "type": "string"
+                    },
+                    "base": {
+                      "type": "string"
+                    },
+                    "head": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "number",
+                    "url",
+                    "base",
+                    "head"
+                  ],
+                  "additionalProperties": false
                 }
               },
               "required": [
@@ -26278,6 +26720,32 @@
                     "branch",
                     "base",
                     "untracked"
+                  ],
+                  "additionalProperties": false
+                },
+                "pr": {
+                  "type": "object",
+                  "properties": {
+                    "number": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "url": {
+                      "type": "string"
+                    },
+                    "base": {
+                      "type": "string"
+                    },
+                    "head": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "number",
+                    "url",
+                    "base",
+                    "head"
                   ],
                   "additionalProperties": false
                 }
@@ -29296,6 +29764,32 @@
                     "untracked"
                   ],
                   "additionalProperties": false
+                },
+                "pr": {
+                  "type": "object",
+                  "properties": {
+                    "number": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "url": {
+                      "type": "string"
+                    },
+                    "base": {
+                      "type": "string"
+                    },
+                    "head": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "number",
+                    "url",
+                    "base",
+                    "head"
+                  ],
+                  "additionalProperties": false
                 }
               },
               "required": [
@@ -31316,6 +31810,32 @@
                       "branch",
                       "base",
                       "untracked"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "pr": {
+                    "type": "object",
+                    "properties": {
+                      "number": {
+                        "type": "integer",
+                        "minimum": -9007199254740991,
+                        "maximum": 9007199254740991
+                      },
+                      "url": {
+                        "type": "string"
+                      },
+                      "base": {
+                        "type": "string"
+                      },
+                      "head": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "number",
+                      "url",
+                      "base",
+                      "head"
                     ],
                     "additionalProperties": false
                   }

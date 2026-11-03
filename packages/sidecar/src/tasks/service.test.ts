@@ -10,6 +10,7 @@ import { copyFixture, removeFixtureCopies } from "../detect/fixture-copy.ts";
 import type { Gh, GhResult } from "../github.ts";
 import type { AgentSdkModule } from "../sdk-loader.ts";
 import { normalizeContract } from "./contract.ts";
+import { branchFolders } from "./folders.ts";
 import shipped from "./library.json" with { type: "json" };
 import { LibrarySchema } from "./library.ts";
 import { newRun } from "./orchestrator.ts";
@@ -816,5 +817,106 @@ describe("a task's flow (UX-14)", () => {
     assert.equal(taskWorkflow(root, created.id)?.source, "task");
     assert.equal(dropFlow(root, created.id).flow, undefined);
     assert.equal(taskWorkflow(root, created.id)?.source, "app");
+  });
+});
+
+describe("a multi-folder task's pull requests (M8-01)", () => {
+  const git = (cwd: string, ...args: string[]) =>
+    execFileSync("git", ["-c", "user.name=t", "-c", "user.email=t@example.invalid", ...args], {
+      cwd,
+      encoding: "utf8",
+    });
+  /** A repository whose GitHub origin pushes to a local bare one. */
+  const origin = (dir: string, repo: string) => {
+    git(dir, "config", "user.name", "t");
+    git(dir, "config", "user.email", "t@example.invalid");
+    const bare = mkdtempSync(join(tmpdir(), "ac-origin-"));
+    git(bare, "init", "-q", "--bare");
+    const url = `https://github.com/acme/${repo}.git`;
+    git(dir, "remote", "add", "origin", url);
+    git(dir, "config", `url.${bare}.pushInsteadOf`, url);
+    return bare;
+  };
+
+  it("opens a PR in each repository the task changed, the main one linking the others, and they link back", async () => {
+    const root = copyFixture("sample-app");
+    origin(root, "app");
+    const api = copyFixture("sample-app");
+    const apiBare = origin(api, "api");
+    // A `gh` stand-in that keeps PRs per repository.
+    const prs = new Map<string, { number: number; url: string; base: string; body: string; cwd: string }>();
+    const gh: Gh = async (args, cwd) => {
+      const out = (stdout: string, status = 0): GhResult => ({ status, stdout, stderr: "" });
+      const repo = cwd === api ? "api" : "app";
+      const flag = (name: string) => args[args.indexOf(name) + 1] ?? "";
+      if (args[0] === "--version") return out("gh version 2.103.3 (2026-10-26)\n");
+      if (args[0] === "auth") return out("");
+      if (args[0] === "pr" && args[1] === "view") {
+        const found = [...prs].find(
+          ([k, p]) => k === `${repo}|${args[2]}` || (p.cwd === cwd && String(p.number) === args[2]),
+        );
+        if (!found) return out("", 1);
+        const [key, p] = found;
+        const head = key.split("|")[1] ?? "";
+        return out(
+          JSON.stringify({
+            number: p.number,
+            url: p.url,
+            isDraft: true,
+            headRefOid: git(cwd, "rev-parse", head).trim(),
+            baseRefName: p.base,
+            headRefName: head,
+            state: "OPEN",
+          }),
+        );
+      }
+      if (args[0] === "pr" && args[1] === "create") {
+        const number = prs.size + 1;
+        prs.set(`${repo}|${flag("--head")}`, {
+          number,
+          url: `https://github.com/acme/${repo}/pull/${number}`,
+          base: flag("--base"),
+          body: readFileSync(flag("--body-file"), "utf8"),
+          cwd,
+        });
+        return out("");
+      }
+      if (args[0] === "pr" && args[1] === "edit") {
+        const p = [...prs.values()].find((x) => x.cwd === cwd && String(x.number) === args[2]);
+        if (p) p.body = readFileSync(flag("--body-file"), "utf8");
+        return out(p ? "" : "no", p ? 0 : 1);
+      }
+      return out("", 1);
+    };
+
+    const approved = approvedXl(newTask(root, "Coupons", undefined, [api]));
+    if (!approved.triage) throw new Error("no triage");
+    const primary = taskBranch(root, { ...approved, triage: { ...approved.triage, chosen: "M" } }).task;
+    const { task } = branchFolders(primary);
+    const wt = task.worktree;
+    const apiWt = task.folders?.[0]?.worktree;
+    if (!wt || !apiWt) throw new Error("no worktrees");
+    const workflow = LibrarySchema.parse(shipped).workflows.M;
+    if (!workflow) throw new Error("no M workflow");
+    saveTask(root, {
+      ...task,
+      state: "done",
+      run: newRun(workflow, { permissionMode: "default", base: wt.base, untrackedAtStart: wt.untracked }, new Date()),
+    });
+    writeFileSync(join(wt.path, "coupon.js"), "export const coupon = 1;\n");
+    writeFileSync(join(apiWt.path, "coupons-api.js"), "export const route = 1;\n");
+
+    const preview = await prPreview(root, task.id, gh);
+    assert.ok(preview.body.includes("get their own PRs, linked here"), "the preview says the api change gets a PR");
+    assert.equal(prs.size, 0, "a preview opens nothing");
+    const t = await createTaskPr(root, task.id, { title: "Add coupons", draft: true }, gh);
+    assert.equal(git(apiBare, "show", `${apiWt.branch}:coupons-api.js`), "export const route = 1;\n", "api pushed");
+    const apiPr = prs.get(`api|${apiWt.branch}`);
+    const mainPr = prs.get(`app|${wt.branch}`);
+    assert.ok(apiPr && mainPr);
+    assert.deepEqual(t.folders?.[0]?.pr, { number: apiPr.number, url: apiPr.url, base: "main", head: apiWt.branch });
+    assert.ok(mainPr.body.includes("## The task's other pull requests"), mainPr.body);
+    assert.ok(mainPr.body.includes(`- \`${t.folders?.[0]?.name}\`: ${apiPr.url}`), "the main PR links the other");
+    assert.ok(apiPr.body.includes(`main PR: ${mainPr.url}`), "the other PR links back");
   });
 });

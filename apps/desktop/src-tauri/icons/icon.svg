@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <!--
+    AgentChainer's app icon (UX-16): three nodes linked into a check mark. Each node is an agent, each link a
+    hand-off, and the chain they make is a check: work passed along and verified. The same path as BrandMark.tsx, in
+    the dark theme's accent on its surface, on a tile with the macOS icon grid's margin. Regenerate every size by running
+    `tauri icon src-tauri/icons/icon.svg` in apps/desktop (see docs/CHECKLIST.md, UX-16).
+  -->
+  <title>AgentChainer</title>
+  <rect x="100" y="100" width="824" height="824" rx="185" fill="#1c201e"/>
+  <g transform="translate(232 232) scale(23.333)" fill="#7fb89a">
+    <path d="M4.5 12.5 10 18 19.5 6" fill="none" stroke="#7fb89a" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+    <circle cx="4.5" cy="12.5" r="2.6"/>
+    <circle cx="10" cy="18" r="2.6"/>
+    <circle cx="19.5" cy="6" r="2.6"/>
+  </g>
+</svg>

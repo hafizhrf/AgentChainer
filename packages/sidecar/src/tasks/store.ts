@@ -147,6 +147,8 @@ const HAND_OFF_FILES = new Set([
   "evidence.json",
   "evidence.md",
   "pr-body.md",
+  // A multi-folder task's PR body in another repository (M8-01), written for one folder at a time.
+  "pr-body-other.md",
   // The project workflow a run started with (M6-04), so editing the file doesn't change a run under way.
   "workflow.json",
 ]);

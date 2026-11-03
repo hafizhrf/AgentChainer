@@ -9,6 +9,7 @@ import {
   RpcErrorCode,
   type Task,
   type TaskContract,
+  type TaskFolder,
   type TaskRun,
   type TaskSummary,
   type Tier,
@@ -34,7 +35,7 @@ import {
   prChecks,
   prState,
 } from "../github.ts";
-import { RpcFailure } from "../rpc.ts";
+import { log, RpcFailure } from "../rpc.ts";
 import { runAsync } from "../run-async.ts";
 import type { AgentSdkModule } from "../sdk-loader.ts";
 import { git, listFiles, repoOf } from "../workspace.ts";
@@ -1118,11 +1119,23 @@ export function prBody(root: string, task: Task): string {
       ]
     : [];
   const evidence = taskEvidence(root, task.id).markdown.replace(/^# .*\n+/, "");
-  // A PR holds the primary folder's repository; the other folders' branches aren't pushed yet (M8-01).
-  const others = (task.folders ?? []).filter((f) => f.worktree).map((f) => `\`${f.name}\` (${f.worktree?.branch})`);
-  const elsewhere = others.length
-    ? ["", `> This PR has only this repository's changes. The task's branches in ${others.join(", ")} aren't pushed.`]
-    : [];
+  // The task's PRs in its other folders' repositories (M8-01), and the branches that have none.
+  const linked = (task.folders ?? []).flatMap((f) => (f.pr ? [`- \`${f.name}\`: ${f.pr.url}`] : []));
+  // Before Create PR (the preview), a changed folder has no PR yet: it gets one, linked here, when this one is opened.
+  const pending = folderDirs(task).filter(
+    ({ folder, dir }) =>
+      folder.worktree && !folder.pr && changedPaths(dir, folder.worktree.base, folder.worktree.untracked).length > 0,
+  );
+  const pendingNames = pending.map((f) => `\`${f.name}\``);
+  const elsewhere = [
+    ...(linked.length ? ["", "## The task's other pull requests", "", ...linked] : []),
+    ...(pendingNames.length
+      ? [
+          "",
+          `> The task's changes in ${pendingNames.join(", ")} get their own PRs, linked here, when this one is opened.`,
+        ]
+      : []),
+  ];
   const footer = [...elsewhere, "", "---", `Opened from AgentChainer task \`${task.id}\`.`];
   let body = [...contract, "## Evidence", "", evidence.trim(), ...footer].join("\n");
   if (body.length > MAX_PR_BODY) {
@@ -1171,23 +1184,62 @@ export async function createTaskPr(
   if (git(["rev-list", "--count", `${base}..${head}`], root).stdout.trim() === "0") {
     throw invalid(`${head} has no commits that ${base} doesn't have: there is nothing to propose.`);
   }
+  // A multi-folder task's other repositories get their own PRs (M8-01). Every check runs before anything is pushed.
+  const others = await otherRepos(task, gh);
   // Nothing leaves the machine before the changed files were scanned for secrets (T-08).
   const code = codeRootIn(root, task.worktree.path);
-  const changed = git(["diff", "--name-only", "--no-renames", `${base}...${head}`, "--", "."], code)
-    .stdout.split("\n")
-    .filter((f) => f && existsSync(path.join(code, ...f.split("/"))))
-    .map((f): FileChange => ({ path: f, status: "modified", added: null, removed: null }));
-  const scan = await scanSecretsAsync(code, changed);
-  if (scan.ran && scan.flagged.length) {
-    throw invalid(`gitleaks flagged possible secrets in ${scan.flagged.join(", ")}. Remove them before pushing.`);
+  await requireNoSecrets(code, base, head, "");
+  for (const o of others) await requireNoSecrets(o.code, o.base, o.head, `${o.folder.name}:`);
+  const made: NonNullable<TaskFolder["pr"]>[] = [];
+  for (const o of others) {
+    await pushBranch(o.folder.path, o.head, ghCredentialConfig(o.folder.path) ?? []);
+    let view = await findPr(gh, o.folder.path, o.head);
+    if (!view) {
+      const name = "pr-body-other.md";
+      writeTaskFile(root, id, name, otherPrBody(task, o.folder.name, null));
+      const bodyFile = path.join(root, AC_DIR, "tasks", id, name);
+      view = await createPr(gh, o.folder.path, {
+        base: o.base,
+        head: o.head,
+        title: opts.title,
+        bodyFile,
+        draft: true,
+      });
+    }
+    made.push({ number: view.number, url: view.url, base: view.baseRefName, head: view.headRefName });
   }
+  const withFolders: Task = {
+    ...task,
+    ...(task.folders
+      ? {
+          folders: task.folders.map((f) => {
+            const i = others.findIndex((o) => o.folder.name === f.name);
+            const pr = made[i];
+            return pr ? { ...f, pr } : f;
+          }),
+        }
+      : {}),
+  };
+  if (others.length) saveTask(root, { ...loadTask(root, id), folders: withFolders.folders });
   await pushBranch(root, head, ghCredentialConfig(root) ?? []);
   const existing = await findPr(gh, root, head);
   let pr = existing;
   if (!pr) {
-    writeTaskFile(root, id, "pr-body.md", prBody(root, task));
+    writeTaskFile(root, id, "pr-body.md", prBody(root, withFolders));
     const bodyFile = path.join(root, AC_DIR, "tasks", id, "pr-body.md");
     pr = await createPr(gh, root, { base, head, title: opts.title, bodyFile, draft: opts.draft });
+  }
+  // The other PRs link back to the main one, now that it exists.
+  for (const [i, o] of others.entries()) {
+    const other = made[i];
+    if (!other) continue;
+    const name = "pr-body-other.md";
+    writeTaskFile(root, id, name, otherPrBody(task, o.folder.name, pr.url));
+    const r = await gh(
+      ["pr", "edit", String(other.number), "--body-file", path.join(root, AC_DIR, "tasks", id, name)],
+      o.folder.path,
+    );
+    if (r.status !== 0) log(`Couldn't link ${other.url} to ${pr.url}: ${(r.stderr || r.stdout).trim()}`);
   }
   const runReview = task.run?.steps.some((st) => st.step === "review" && st.status === "done")
     ? storedReview(root, id)
@@ -1211,6 +1263,65 @@ export async function createTaskPr(
   };
   saveTask(root, next);
   return present(next);
+}
+
+/** A multi-folder task's other repository with commits to propose (M8-01). */
+type OtherRepo = { folder: TaskFolder; code: string; base: string; head: string };
+
+/**
+ * The other folders whose branch has commits its base lacks, after committing what the run left; each must be on
+ * GitHub with `gh` signed in, or nothing is pushed.
+ */
+async function otherRepos(task: Task, gh: Gh): Promise<OtherRepo[]> {
+  const out: OtherRepo[] = [];
+  for (const { folder, dir } of folderDirs(task)) {
+    const wt = folder.worktree;
+    if (!wt || wt.removed || !existsSync(wt.path)) continue;
+    commitIn(dir, task, wt.untracked);
+    const base = wt.from ?? (git(["symbolic-ref", "--short", "-q", "HEAD"], folder.path).stdout.trim() || null);
+    if (!base) throw invalid(`${folder.name} isn't on a branch, so its PR has no base. Check one out there first.`);
+    if (git(["rev-list", "--count", `${base}..${wt.branch}`], folder.path).stdout.trim() === "0") continue;
+    const status = await githubStatus(folder.path, gh);
+    if (status.state !== "ready") {
+      throw invalid(
+        status.state === "no-remote"
+          ? `${folder.name} has changes, but its repository has no origin remote on GitHub.`
+          : `gh can't open a PR for ${folder.name} (${status.state}).`,
+      );
+    }
+    out.push({ folder, code: dir, base, head: wt.branch });
+  }
+  return out;
+}
+
+/** Refuses to push a branch whose changed files gitleaks flags (T-08); `prefix` names another folder's files. */
+async function requireNoSecrets(code: string, base: string, head: string, prefix: string): Promise<void> {
+  const changed = git(["diff", "--name-only", "--no-renames", `${base}...${head}`, "--", "."], code)
+    .stdout.split("\n")
+    .filter((f) => f && existsSync(path.join(code, ...f.split("/"))))
+    .map((f): FileChange => ({ path: f, status: "modified", added: null, removed: null }));
+  const scan = await scanSecretsAsync(code, changed);
+  if (scan.ran && scan.flagged.length) {
+    const files = scan.flagged.map((f) => `${prefix}${f}`).join(", ");
+    throw invalid(`gitleaks flagged possible secrets in ${files}. Remove them before pushing.`);
+  }
+}
+
+/** The body of a task's PR in another folder's repository: what the task is, and where its main PR and evidence are. */
+export function otherPrBody(task: Task, folder: string, mainUrl: string | null): string {
+  const objective = task.contract?.objective || task.request;
+  return [
+    `Part of a change across several repositories, made by AgentChainer task \`${task.id}\`.`,
+    "",
+    `**Objective:** ${objective}`,
+    "",
+    mainUrl
+      ? `The contract and the evidence for every repository are in the main PR: ${mainUrl}`
+      : "The contract and the evidence are in the task's main PR.",
+    "",
+    "---",
+    `Opened from AgentChainer task \`${task.id}\` (folder \`${folder}\`).`,
+  ].join("\n");
 }
 
 /* ---------- CI status and Fix CI (M5-03) ---------- */

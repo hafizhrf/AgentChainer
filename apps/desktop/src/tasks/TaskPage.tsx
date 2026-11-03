@@ -33,7 +33,7 @@ import {
   Square,
   X,
 } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useRef, useState } from "react";
 import { type Confirm, Modal } from "../Dialog.tsx";
 import { Markdown } from "../Markdown.tsx";
 import { MODE_NAMES, modelChoices, modeOptions } from "../options.ts";
@@ -2059,6 +2059,18 @@ function ResultCard({
             "None"
           )}
         </dd>
+        {(task.folders ?? []).map((f) =>
+          f.pr ? (
+            <Fragment key={f.name}>
+              <dt>In {f.name}</dt>
+              <dd>
+                <button type="button" className="link" onClick={() => void openUrl(f.pr?.url ?? "")}>
+                  #{f.pr.number} into {f.pr.base} (draft)
+                </button>
+              </dd>
+            </Fragment>
+          ) : null,
+        )}
       </dl>
       {task.pr && <PrChecks task={task} cwd={cwd} onChanged={onChanged} />}
       {task.pr && <MergeGates task={task} cwd={cwd} onChanged={onChanged} />}

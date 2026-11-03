@@ -1595,7 +1595,15 @@ first.
     - both worktrees were set up, and `npm test` passed in `.` and `api`;
     - the api checkout was untouched until Merge, which went into both folders' `main`;
     - cleanup removed both worktrees.
-    Step 5b (XL sub-tasks per folder, one PR per repository) is still to come.
+  - Step 5b, PRs:
+    - Create PR opens a draft PR in each other repository the task changed, then the main one;
+    - every repository's GitHub state, commits and gitleaks scan are checked before anything is pushed;
+    - the main PR lists the others, and each links back to it (`gh pr edit`);
+    - the task records each folder's PR, and its page lists them;
+    - the preview says which folders get their own PRs.
+    Tested with a stand-in `gh` and local bare origins (`service.test.ts`). Not checked on real GitHub, which needs a
+    second throwaway repository.
+    XL sub-tasks per folder are still to come.
 - [x] **M8-02** A fleet view: every running session and task step across workspaces, with live status (working,
       waiting for approval, idle, done), cost, and one click to open it. From CAO's dashboard and status badges; it
       extends M4's agent tree.

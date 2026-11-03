@@ -63,7 +63,12 @@ as data, never run as markup or script. That is threat T-01.
 - `core:event:default`;
 - opener: `allow-open-url` plus the default http(s) and mailto URLs;
 - dialog: `allow-open` and `allow-save`;
-- `updater:default`, and `process:allow-restart`.
+- `updater:default`, and `process:allow-restart`;
+- for the window's own title bar on Windows and Linux (UX-15): `core:window` `allow-start-dragging`,
+  `allow-internal-toggle-maximize`, `allow-minimize`, `allow-toggle-maximize`, `allow-is-maximized` and `allow-close`;
+- `clipboard-manager:allow-read-text`, for the title bar's Edit → Paste only: the clipboard's text is read when the
+  person picks Paste, and inserted where they were typing. Nothing writes to the clipboard through it, and nothing
+  reads it otherwise.
 
 Nothing else. In particular, there is no file-system or shell plugin.
 
@@ -79,6 +84,7 @@ Nothing else. In particular, there is no file-system or shell plugin.
 | `diagnostics_export` | Path | Only a `.json` file in an existing folder, chosen in a save dialog. |
 | `settings_set` | Settings | Normalized on save. Typed fields only. |
 | `update_prepare` | — | Stops the runtime and terminals before an update installs. |
+| `menu_select` | A menu item id | Runs the same item as the native menu (UX-15): an id the UI handles is sent back as a `menu` event, a Help id opens its fixed page, anything else is ignored. |
 
 **Sidecar methods that touch the file system or run commands:**
 - the `workspace.*`, `git.*`, `bootstrap.*`, `task.*` and `agents.*` families;

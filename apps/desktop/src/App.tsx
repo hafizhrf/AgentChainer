@@ -39,6 +39,7 @@ import { quitApp, readSelftestConfig, runSelftest, type SelftestConfig } from ".
 import { loadSettings, type Settings, saveSettings, type WorkspaceDef, withRecent } from "./settings.ts";
 import type { SetupView } from "./setup/SetupPage.tsx";
 import { connect, isRpcError, onExit, onReady, request, requestWithTimeout, subscribe } from "./sidecar.ts";
+import { TitleBar } from "./TitleBar.tsx";
 import {
   asMode,
   closeWaits,
@@ -58,7 +59,7 @@ import { applyEvent, closeAssistant, type Item, nextId, setMessageId } from "./t
 import { UpdateDialog } from "./UpdateDialog.tsx";
 import { IconButton } from "./ui/IconButton.tsx";
 import { layoutStorage, usePersistentFlag, usePersistentValue } from "./ui/layoutStorage.ts";
-import { menuShortcut, useMenuCommands } from "./useMenuCommands.ts";
+import { type MenuCommand, menuShortcut, useMenuCommands } from "./useMenuCommands.ts";
 import { WorkspaceDialog, WorkspacesCard } from "./WorkspaceDialog.tsx";
 
 // The setup page shares the file-type icon set with the workspace panel; both load on first use.
@@ -906,7 +907,7 @@ export function App() {
   const toggleTerminal = (sessionId: string) =>
     setTerminals((open) => withToggled(open, sessionId, !open.has(sessionId)));
 
-  useMenuCommands({
+  const menuHandlers: Record<MenuCommand, () => void> = {
     "new-session": () => show(null),
     "new-task": newTask,
     "open-folder": () => void openFolder(),
@@ -918,7 +919,8 @@ export function App() {
     "export-diagnostics": () => void exportFromMenu(),
     "check-updates": () => setUpdatesOpen(true),
     "command-palette": () => setPaletteOpen(true),
-  });
+  };
+  useMenuCommands(menuHandlers);
 
   const activeTab = tabs.find((t) => t.sessionId === active);
   // Claude's questions are cards in the thread (UX-12), not this dialog.
@@ -1056,6 +1058,14 @@ export function App() {
   return (
     <Tooltip.Provider delayDuration={400}>
       <div className="app">
+        <TitleBar
+          title={titleOf(activeTab?.cwd ?? taskTabs.find((t) => taskKey(t.id) === active)?.cwd ?? workspace)}
+          tasks={settings?.tasksPreview === true}
+          sidebarOpen={sidebarOpen}
+          rightOpen={rightOpen}
+          terminalOpen={activeTab ? terminals.has(activeTab.sessionId) : null}
+          onCommand={(c) => menuHandlers[c]()}
+        />
         <Group
           orientation="horizontal"
           className="shell"
@@ -1299,4 +1309,9 @@ function withToggled(open: Set<string>, id: string, on: boolean): Set<string> {
   if (on) next.add(id);
   else next.delete(id);
   return next;
+}
+
+/** What the title bar's search field names: the open workspace's folder, or the app. */
+function titleOf(dir: string): string {
+  return dir ? `${folderName(dir)} — AgentChainer` : "AgentChainer";
 }

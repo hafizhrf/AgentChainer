@@ -1,5 +1,7 @@
-//! The native app menu (UX-07). Help links open in the browser from here; every other item reaches the UI as a
-//! `menu` event carrying the item id, and the UI runs the matching action (`src/useMenuCommands.ts`).
+//! The app menu (UX-07). On macOS it's the native menu bar; on Windows and Linux the UI draws it in its own title bar
+//! (UX-15) and sends the picked item here with `menu_select`. Either way, help links open in the browser from here,
+//! and every other item reaches the UI as a `menu` event carrying the item id, for the matching action
+//! (`src/useMenuCommands.ts`).
 
 #[cfg(target_os = "macos")]
 use tauri::menu::AboutMetadata;
@@ -49,8 +51,9 @@ fn item<R: Runtime>(
     .build(app)
 }
 
-/// Builds the menu bar. On macOS, Settings and Quit live in the app menu; elsewhere they go in File. There's no
-/// predefined "Close Window" item: ⌘W closes the session instead.
+/// Builds the native menu bar, used on macOS only (UX-15). There's no predefined "Close Window" item: ⌘W closes the
+/// session instead.
+#[cfg_attr(not(target_os = "macos"), allow(dead_code))]
 pub fn build<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
     let settings = item(app, "settings", "Settings…", Some("CmdOrCtrl+Comma"))?;
     let new_session = item(app, "new-session", "New Session", Some("CmdOrCtrl+N"))?;
@@ -157,8 +160,13 @@ pub fn build<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
     menu.build()
 }
 
+#[cfg_attr(not(target_os = "macos"), allow(dead_code))]
 pub fn on_event<R: Runtime>(app: &AppHandle<R>, event: MenuEvent) {
-    let id = event.id().as_ref();
+    select(app, event.id().as_ref());
+}
+
+/// Runs a menu item by id, from the native menu or the UI's title bar; ids outside the menu are ignored.
+pub fn select<R: Runtime>(app: &AppHandle<R>, id: &str) {
     if let Some(url) = help_url(id) {
         if let Err(e) = app.opener().open_url(&url, None::<&str>) {
             applog::warn("menu", &format!("couldn't open {url}: {e}"));

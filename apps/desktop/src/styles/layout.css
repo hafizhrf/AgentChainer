@@ -6,12 +6,137 @@
 .app {
   height: 100vh;
   overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ---------- The title bar (UX-15) ---------- */
+
+/* One row like an IDE's: the mark and the menus, the search field in the middle, the toggles, the window buttons. */
+.titlebar {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  height: 36px;
+  padding-left: var(--space-2);
+  border-bottom: 1px solid var(--border);
+  background: var(--surface-2);
+  user-select: none;
+}
+
+/* macOS draws the traffic lights over the bar's left end. */
+.titlebar.mac {
+  padding-left: 80px;
+  padding-right: var(--space-2);
+}
+
+.titlebar-mark {
+  display: inline-flex;
+  padding: 0 var(--space-2) 0 var(--space-1);
+  color: var(--accent);
+}
+
+.titlebar-menus {
+  display: flex;
+}
+
+.titlebar-menu {
+  height: 26px;
+  padding: 0 var(--space-2);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--fg);
+  font-size: var(--text-sm);
+  font-weight: 400;
+}
+
+.titlebar-menu:hover,
+.titlebar-menu[data-state="open"],
+.titlebar-menu:focus-visible {
+  background: var(--surface-3);
+  outline: none;
+}
+
+.titlebar-search {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: min(420px, 40vw);
+  height: 24px;
+  padding: 0 var(--space-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--muted);
+  font-size: var(--text-sm);
+  font-weight: 400;
+}
+
+.titlebar-search:hover {
+  border-color: var(--border-strong);
+}
+
+.titlebar-search-text {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.titlebar-toggles {
+  display: flex;
+  gap: 2px;
+  padding-right: var(--space-1);
+}
+
+.titlebar-window {
+  display: flex;
+  align-self: stretch;
+}
+
+.titlebar-window button {
+  width: 46px;
+  height: 100%;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--fg);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.titlebar-window button:hover {
+  background: var(--surface-3);
+}
+
+.titlebar-window button.close:hover {
+  background: #c42b1c;
+  color: #fff;
+}
+
+.menu-shortcut {
+  margin-left: auto;
+  padding-left: var(--space-5);
+  color: var(--muted);
+  font-size: var(--text-xs);
 }
 
 .shell,
 .session-split,
 .center-split {
   height: 100%;
+}
+
+/* Under the title bar (UX-15), the shell takes the rest of the window. */
+.app > .shell {
+  flex: 1;
+  min-height: 0;
+  height: auto;
 }
 
 /* Resize handles: a 1px line with a wider invisible grab area. */

@@ -217,6 +217,12 @@ fn quit_app(app: AppHandle) {
     app.exit(0);
 }
 
+/// A menu item picked in the UI's own title bar (UX-15, Windows and Linux): the same as the native menu's.
+#[tauri::command]
+fn menu_select(app: AppHandle, id: String) {
+    menu::select(&app, &id);
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let app = tauri::Builder::default()
@@ -224,8 +230,12 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
-        .menu(menu::build)
-        .on_menu_event(menu::on_event)
+        // Edit → Paste in the title bar's menu (UX-15) reads the clipboard's text; nothing else uses it.
+        .plugin(tauri_plugin_clipboard_manager::init());
+    // The native menu bar on macOS only; Windows and Linux get the UI's title bar with its menus (UX-15).
+    #[cfg(target_os = "macos")]
+    let app = app.menu(menu::build).on_menu_event(menu::on_event);
+    let app = app
         .setup(|app| {
             if let Ok(dir) = app.path().app_log_dir() {
                 applog::init(&dir);
@@ -258,6 +268,7 @@ pub fn run() {
             open_terminal,
             selftest_config,
             quit_app,
+            menu_select,
             workspace_watch,
             workspace_unwatch,
             open_in_editor,

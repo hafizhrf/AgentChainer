@@ -20,9 +20,9 @@ tauri-build = { version = "2", features = [] }
 [dependencies]
 tauri = { version = "2", features = [] }
 tauri-plugin-opener = "2"
-tauri-plugin-dialog = "=2.8.3"
+tauri-plugin-dialog = "=2.8.4"
 # Updates from signed GitHub Releases (R1-04); process relaunches after installing one.
-tauri-plugin-updater = "=2.14.0"
+tauri-plugin-updater = "=2.14.1"
 tauri-plugin-process = "=2.4.0"
 tauri-plugin-clipboard-manager = "=2.5.0"
 serde = { version = "1", features = ["derive"] }
@@ -30,5 +30,5 @@ serde_json = "1"
 regex = "1"
 # rusqlite 0.41.x, notify 8.2.1: younger than our two-week minimum release age.
 rusqlite = { version = "=0.40.2", features = ["bundled"] }
-notify = "=8.2.0"
+notify = "=8.2.1"
 portable-pty = "=0.9.0"

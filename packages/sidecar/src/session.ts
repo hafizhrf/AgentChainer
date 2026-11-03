@@ -20,7 +20,7 @@ import type {
   SDKUserMessage,
 } from "@anthropic-ai/claude-agent-sdk";
 import { checkToolCall, READ_TOOLS, readOnlyHook } from "./guard.ts";
-import { normalize } from "./normalize.ts";
+import { command, normalize } from "./normalize.ts";
 import { alwaysUpdates, describeUpdates, retarget } from "./permissions.ts";
 import { log } from "./rpc.ts";
 import { type AgentSdkModule, ALLOW_BACKGROUND } from "./sdk-loader.ts";
@@ -56,7 +56,20 @@ export type SessionOptions = {
    * them one by one. A task's steps leave it off, so their work is done when the turn ends.
    */
   background?: boolean;
+  /**
+   * A chat in a tab (UX-12): it lists the session's slash commands, reports how full the context window is after each
+   * turn, may switch itself to plan mode, and is asked to ask the person rather than guess.
+   */
+  interactive?: boolean;
 };
+
+/**
+ * Added to an interactive session's system prompt (UX-12): like the CLI, the agent asks before acting on an ambiguous
+ * request, through plan mode and its question tool, which the app shows as a question card.
+ */
+export const ASK_FIRST =
+  "When a request is ambiguous or needs a decision from the user, don't guess: call EnterPlanMode, then ask with " +
+  "AskUserQuestion (2-4 options per question), and plan from the answers.";
 
 /** How a turn ended, for code that drives a session itself (a task's steps). */
 export type TurnResult = {
@@ -133,10 +146,15 @@ export class Session {
   /** The CLI process, so that closing can wait for it to exit (and let go of the session's folder). */
   private proc: ChildProcess | null = null;
   private closing: Promise<void> | null = null;
+  private readonly interactive: boolean;
+  /** The command list goes out once, at the start; later changes arrive as `commands_changed`. */
+  private commandsSent = false;
 
   constructor(sdk: AgentSdkModule, options: SessionOptions, callbacks: SessionCallbacks) {
     this.callbacks = callbacks;
+    this.interactive = options.interactive === true;
     this.id = options.resume ?? randomUUID();
+    const append = options.appendSystemPrompt ?? (this.interactive ? ASK_FIRST : undefined);
     this.q = sdk.query({
       prompt: this.input,
       options: {
@@ -146,15 +164,7 @@ export class Session {
         // A read-only task step is isolated instead, like the generators.
         settingSources: options.readOnly ? [] : ["user", "project", "local"],
         ...(options.readOnly ? { tools: READ_TOOLS } : {}),
-        ...(options.appendSystemPrompt
-          ? {
-              systemPrompt: {
-                type: "preset" as const,
-                preset: "claude_code" as const,
-                append: options.appendSystemPrompt,
-              },
-            }
-          : {}),
+        ...(append ? { systemPrompt: { type: "preset" as const, preset: "claude_code" as const, append } } : {}),
         ...(options.maxTurns ? { maxTurns: options.maxTurns } : {}),
         ...(options.outputFormat ? { outputFormat: options.outputFormat } : {}),
         ...(options.effort ? { effort: options.effort } : {}),
@@ -187,6 +197,16 @@ export class Session {
         hooks: { PreToolUse: [{ hooks: [options.readOnly ? readOnlyHook(options.cwd, "This step") : guardHook] }] },
         canUseTool: (toolName, input, ctx) =>
           new Promise<PermissionResult>((resolve) => {
+            // A chat may switch itself to plan mode (UX-12): that only narrows what it can do, so nobody is asked.
+            // Leaving plan mode still goes through ExitPlanMode's review.
+            if (this.interactive && toolName === "EnterPlanMode") {
+              resolve({
+                behavior: "allow",
+                updatedInput: input,
+                updatedPermissions: [{ type: "setMode", mode: "plan", destination: "session" }],
+              });
+              return;
+            }
             const always = ctx.suppressAlwaysAllowRule ? [] : alwaysUpdates(ctx.suggestions);
             this.pendingPermissions.set(ctx.requestId, { resolve, toolName, input, always });
             ctx.signal.addEventListener("abort", () => {
@@ -210,6 +230,8 @@ export class Session {
       },
     });
     void this.pump();
+    // The list is there before the first message, so `/` works in a new chat; init would only come with the first turn.
+    if (this.interactive) void this.sendCommands();
   }
 
   /** Returns the message's uuid, which `rewind()` takes. Images go before the text, as the API recommends. */
@@ -309,6 +331,32 @@ export class Session {
     return exited;
   }
 
+  /** The session's slash commands with their descriptions, for the composer's `/` menu. */
+  private async sendCommands(): Promise<void> {
+    try {
+      const commands = await this.q.supportedCommands();
+      this.commandsSent = true;
+      this.callbacks.emit({ type: "commands.changed", commands: commands.map(command) });
+    } catch (err) {
+      log(`supportedCommands failed: ${err instanceof Error ? err.message : String(err)}`);
+    }
+  }
+
+  /** How full the context window is; a failure only leaves the meter as it was. */
+  private async sendContextUsage(): Promise<void> {
+    try {
+      const u = await this.q.getContextUsage({ detail: "summary" });
+      this.callbacks.emit({
+        type: "context.usage",
+        percentage: u.percentage,
+        totalTokens: u.totalTokens,
+        maxTokens: u.maxTokens,
+      });
+    } catch (err) {
+      log(`getContextUsage failed: ${err instanceof Error ? err.message : String(err)}`);
+    }
+  }
+
   /** A turn runs: one the user started, or one the CLI started after background work. */
   private get busy(): boolean {
     return this.openTurns + this.autoTurns > 0;
@@ -323,6 +371,10 @@ export class Session {
         if (message.type === "system" && message.subtype === "init" && !this.busy) {
           this.autoTurns++;
           this.callbacks.emit({ type: "turn.started", reason: "background" });
+        }
+        // Asked again at the first init if asking at the start failed.
+        if (message.type === "system" && message.subtype === "init" && this.interactive && !this.commandsSent) {
+          void this.sendCommands();
         }
         if (message.type === "system" && message.subtype === "background_tasks_changed") {
           this.background = new Set(message.tasks.map((t) => t.task_id));
@@ -344,6 +396,7 @@ export class Session {
           });
         }
         for (const event of normalize(message)) this.callbacks.emit(event);
+        if (message.type === "result" && this.interactive) void this.sendContextUsage();
       }
     } catch (err) {
       this.callbacks.emit({ type: "error", message: err instanceof Error ? err.message : String(err) });

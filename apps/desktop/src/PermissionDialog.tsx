@@ -5,6 +5,7 @@ import { Modal } from "./Dialog.tsx";
 import { editDiffs, InlineDiff } from "./InlineDiff.tsx";
 import { Markdown } from "./Markdown.tsx";
 import { MODE_HELP, modeOptions } from "./options.ts";
+import { QuestionCard } from "./QuestionCard.tsx";
 import { asMode } from "./tabs.ts";
 import { Field } from "./ui/Field.tsx";
 import { Select } from "./ui/Select.tsx";
@@ -36,6 +37,14 @@ export function PermissionDialog({
   /** A task step's approval: the dialog covers the page's Stop, so it offers its own. */
   onStopTask?: () => void;
 }) {
+  // A task step's questions have no thread yet: they show in the dialog (UX-12).
+  if (request.toolName === "AskUserQuestion") {
+    return (
+      <Modal open onOpenChange={() => undefined} dismissible={false} size="lg" title="Claude asks">
+        <QuestionCard request={request} onAnswer={onAnswer} />
+      </Modal>
+    );
+  }
   return request.toolName === "ExitPlanMode" ? (
     <PlanReview request={request} canAutonomous={canAutonomous} onAnswer={onAnswer} />
   ) : (

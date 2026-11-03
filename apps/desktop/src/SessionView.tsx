@@ -1,15 +1,20 @@
-import type { Effort, PermissionMode } from "@agentchainer/protocol";
-import { ArrowDown, Loader2 } from "lucide-react";
+import type { Effort, PermissionMode, PermissionRequest } from "@agentchainer/protocol";
+import { ArrowDown, ClipboardList, Loader2 } from "lucide-react";
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { Group, Panel, Separator, useDefaultLayout, usePanelRef } from "react-resizable-panels";
 import { type Attachment, Composer } from "./Composer.tsx";
+import type { AppCommand } from "./commands.ts";
+import { latestTodos } from "./commands.ts";
 import type { Confirm } from "./Dialog.tsx";
 import { AgentDrawer } from "./graph/AgentDrawer.tsx";
 import { BackgroundTasks } from "./graph/BackgroundTasks.tsx";
 import { SessionTimeline } from "./graph/SessionTimeline.tsx";
 import { MODE_NAMES } from "./options.ts";
+import type { PermissionAnswer } from "./PermissionDialog.tsx";
 import type { PanelTab } from "./panelTabs.ts";
+import { QuestionCard } from "./QuestionCard.tsx";
 import { SessionHeader, type SessionMode } from "./SessionHeader.tsx";
+import { TodoPanel } from "./TodoPanel.tsx";
 import { TranscriptView } from "./TranscriptView.tsx";
 import { budgetWarning, type Cost, isFresh, type Tab } from "./tabs.ts";
 import { findAgent } from "./transcript.ts";
@@ -41,6 +46,8 @@ export function SessionView({
   onToggleRight,
   onToggleTerminal,
   onSend,
+  onCommand,
+  onAnswer,
   onInterrupt,
   onStopAgent,
   onModeChange,
@@ -66,6 +73,10 @@ export function SessionView({
   onToggleRight: () => void;
   onToggleTerminal: () => void;
   onSend: (text: string, images: Attachment[]) => void;
+  /** An app slash command typed in the composer (UX-12). */
+  onCommand: (name: AppCommand, arg: string) => void;
+  /** Answers a request shown in the thread: Claude's questions (UX-12). */
+  onAnswer: (request: PermissionRequest, answer: PermissionAnswer) => void;
   onInterrupt: () => void;
   /** Stops one subagent by its task id (M4-05). */
   onStopAgent: (taskId: string) => Promise<void>;
@@ -109,6 +120,9 @@ export function SessionView({
   const { refresh } = workspace;
   const paths = useMemo(() => workspace.files?.files.map((f) => f.path) ?? [], [workspace.files]);
   const warning = budgetWarning(tab);
+  const questions = tab.permissions.filter((p) => p.toolName === "AskUserQuestion");
+  const todos = useMemo(() => latestTodos(tab.items), [tab.items]);
+  const planSwitch = tab.planSwitch && tab.mode === "plan" ? tab.planSwitch : null;
   // Until the first message, the composer sits mid-screen with starters below; the children of `.chat` keep their
   // positions either way, so the composer never remounts and keeps its draft.
   const fresh = isFresh(tab);
@@ -270,6 +284,25 @@ export function SessionView({
                       <p className="muted">Describe a task, or start from one of these.</p>
                     </div>
                   ) : null}
+                  {planSwitch && (
+                    <div className="plan-switch" role="status">
+                      <ClipboardList size={14} aria-hidden />
+                      <span className="grow">
+                        Claude switched to {MODE_NAMES.plan} to ask before changing anything.
+                      </span>
+                      <button
+                        type="button"
+                        className="secondary small"
+                        onClick={() => onModeChange(planSwitch.previous)}
+                      >
+                        Back to {MODE_NAMES[planSwitch.previous]}
+                      </button>
+                    </div>
+                  )}
+                  {questions.map((q) => (
+                    <QuestionCard key={q.requestId} request={q} onAnswer={(a) => onAnswer(q, a)} />
+                  ))}
+                  {todos && todos.length > 0 && <TodoPanel todos={todos} />}
                   {tab.background.length > 0 && (
                     <BackgroundTasks
                       tasks={tab.background}
@@ -282,12 +315,14 @@ export function SessionView({
                   )}
                   <Composer
                     tab={tab}
+                    active={!hidden}
                     files={paths}
                     seed={seed}
                     onSend={(text, images) => {
                       jumpToLatest();
                       onSend(text, images);
                     }}
+                    onCommand={onCommand}
                     onInterrupt={onInterrupt}
                     onResume={onResume}
                     onModeChange={onModeChange}
@@ -311,6 +346,14 @@ export function SessionView({
               <span>{tab.model ?? "…"}</span>
               <span>{MODE_NAMES[tab.mode]}</span>
               <span className="grow" />
+              {tab.context && (
+                <span
+                  className={tab.context.percentage >= 80 ? "context-meter warn" : "context-meter"}
+                  title={`${tab.context.totalTokens.toLocaleString()} of ${tab.context.maxTokens.toLocaleString()} tokens in the context window${tab.context.percentage >= 80 ? "; /compact summarizes earlier messages" : ""}`}
+                >
+                  context {Math.round(tab.context.percentage)}%
+                </span>
+              )}
               <span>{costLabel(tab.cost)}</span>
             </footer>
           </div>

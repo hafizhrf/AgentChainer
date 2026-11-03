@@ -67,6 +67,8 @@ export type Item =
   /** The main agent's visible thinking, collapsed by default (M1-10). */
   | ThinkingItem
   | { kind: "notice"; id: number; text: string; at?: number }
+  /** Where earlier messages were summarized to free the context window (UX-12). */
+  | { kind: "divider"; id: number; text: string }
   | ToolItem
   | AgentItem;
 
@@ -95,6 +97,16 @@ export function applyEvent(items: Item[], e: AgentEvent, now?: number): Item[] {
       return [
         ...closeAssistant(items),
         { kind, id: nextId(), text: e.text, open: true, ...(now !== undefined ? { at: now } : {}) },
+      ];
+    }
+
+    case "context.compacted": {
+      const k = (n: number) => `${Math.round(n / 1000)}k`;
+      const how = e.trigger === "auto" ? "automatically" : "by /compact";
+      const size = e.postTokens !== undefined ? ` (${k(e.preTokens)} → ${k(e.postTokens)} tokens)` : "";
+      return [
+        ...closeAssistant(items),
+        { kind: "divider", id: nextId(), text: `Earlier messages summarized ${how}${size}` },
       ];
     }
 

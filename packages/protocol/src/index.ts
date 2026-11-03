@@ -918,6 +918,15 @@ const WorkspaceRef = z.object({ cwd: z.string().min(1) });
 const WorkspacePath = WorkspaceRef.extend({ path: z.string().min(1) });
 const TaskRef = WorkspaceRef.extend({ id: TaskIdSchema });
 
+/** A slash command or skill the session offers (UX-12): the SDK's `supportedCommands()` and its later pushes. */
+export const SlashCommandSchema = z.object({
+  name: z.string(),
+  description: z.string(),
+  argumentHint: z.string(),
+  aliases: z.array(z.string()).optional(),
+});
+export type SlashCommand = z.infer<typeof SlashCommandSchema>;
+
 /** Normalized agent activity, independent of raw SDK message shapes (ARCHITECTURE §5.2). */
 export const AgentEventSchema = z.discriminatedUnion("type", [
   z.object({
@@ -1064,6 +1073,22 @@ export const AgentEventSchema = z.discriminatedUnion("type", [
         cacheCreationTokens: z.number(),
       })
       .optional(),
+  }),
+  /** The full list of commands, replacing the last one (UX-12): after init, and when skills appear mid-session. */
+  z.object({ type: z.literal("commands.changed"), commands: z.array(SlashCommandSchema) }),
+  /** How full the context window is, after each turn (UX-12). */
+  z.object({
+    type: z.literal("context.usage"),
+    percentage: z.number(),
+    totalTokens: z.number(),
+    maxTokens: z.number(),
+  }),
+  /** Earlier messages were summarized to free the context window, by `/compact` or automatically (UX-12). */
+  z.object({
+    type: z.literal("context.compacted"),
+    trigger: z.enum(["manual", "auto"]),
+    preTokens: z.number(),
+    postTokens: z.number().optional(),
   }),
   z.object({ type: z.literal("error"), message: z.string() }),
 ]);

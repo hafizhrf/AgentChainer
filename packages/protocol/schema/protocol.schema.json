@@ -1635,6 +1635,102 @@
                   "properties": {
                     "type": {
                       "type": "string",
+                      "const": "commands.changed"
+                    },
+                    "commands": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "name": {
+                            "type": "string"
+                          },
+                          "description": {
+                            "type": "string"
+                          },
+                          "argumentHint": {
+                            "type": "string"
+                          },
+                          "aliases": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          }
+                        },
+                        "required": [
+                          "name",
+                          "description",
+                          "argumentHint"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "commands"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "const": "context.usage"
+                    },
+                    "percentage": {
+                      "type": "number"
+                    },
+                    "totalTokens": {
+                      "type": "number"
+                    },
+                    "maxTokens": {
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "percentage",
+                    "totalTokens",
+                    "maxTokens"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "const": "context.compacted"
+                    },
+                    "trigger": {
+                      "type": "string",
+                      "enum": [
+                        "manual",
+                        "auto"
+                      ]
+                    },
+                    "preTokens": {
+                      "type": "number"
+                    },
+                    "postTokens": {
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "trigger",
+                    "preTokens"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string",
                       "const": "error"
                     },
                     "message": {
@@ -24335,6 +24431,102 @@
                 "totalCostUsd",
                 "durationMs",
                 "numTurns"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "const": "commands.changed"
+                },
+                "commands": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "name": {
+                        "type": "string"
+                      },
+                      "description": {
+                        "type": "string"
+                      },
+                      "argumentHint": {
+                        "type": "string"
+                      },
+                      "aliases": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "required": [
+                      "name",
+                      "description",
+                      "argumentHint"
+                    ],
+                    "additionalProperties": false
+                  }
+                }
+              },
+              "required": [
+                "type",
+                "commands"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "const": "context.usage"
+                },
+                "percentage": {
+                  "type": "number"
+                },
+                "totalTokens": {
+                  "type": "number"
+                },
+                "maxTokens": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "type",
+                "percentage",
+                "totalTokens",
+                "maxTokens"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "const": "context.compacted"
+                },
+                "trigger": {
+                  "type": "string",
+                  "enum": [
+                    "manual",
+                    "auto"
+                  ]
+                },
+                "preTokens": {
+                  "type": "number"
+                },
+                "postTokens": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "type",
+                "trigger",
+                "preTokens"
               ],
               "additionalProperties": false
             },

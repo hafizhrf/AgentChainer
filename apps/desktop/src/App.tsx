@@ -21,6 +21,7 @@ import { Group, Panel, Separator, useDefaultLayout } from "react-resizable-panel
 import { applyTheme } from "./appearance.ts";
 import { CommandPalette, type PaletteCommand } from "./CommandPalette.tsx";
 import type { Attachment } from "./Composer.tsx";
+import { APP_COMMANDS, type AppCommand, effortFromArg, modeFromArg, modelFromArg } from "./commands.ts";
 import { useConfirm } from "./Dialog.tsx";
 import { joinPath } from "./files.ts";
 import { HomeView, pickFolder } from "./HomeView.tsx";
@@ -498,10 +499,13 @@ export function App() {
       addNotice(sessionId, "Autonomous needs a budget cap: set one in Settings, then start or resume the session.");
       return;
     }
+    // Shown at once, so Shift+Tab pressed quickly walks on from the mode just picked; put back if the switch fails.
+    const before = tabs.find((t) => t.sessionId === sessionId)?.mode;
+    patchTab(sessionId, (t) => ({ ...t, mode, ...(mode !== "plan" ? { planSwitch: null } : {}) }));
     try {
       await request("session.setMode", { sessionId, mode });
-      patchTab(sessionId, (t) => ({ ...t, mode }));
     } catch (err) {
+      if (before) patchTab(sessionId, (t) => ({ ...t, mode: before }));
       addNotice(sessionId, String(err));
     }
   }
@@ -529,12 +533,67 @@ export function App() {
     patchTab(req.sessionId, (t) => ({
       ...permissionAnswered(t, req.requestId, Date.now()),
       // An approved plan runs in the mode the user picked (M1-16).
-      ...(reply.allow && reply.mode && req.toolName === "ExitPlanMode" ? { mode: reply.mode } : {}),
+      ...(reply.allow && reply.mode && req.toolName === "ExitPlanMode" ? { mode: reply.mode, planSwitch: null } : {}),
     }));
     try {
       await request("permission.respond", { sessionId: req.sessionId, requestId: req.requestId, ...reply });
     } catch (err) {
       addNotice(req.sessionId, String(err));
+    }
+  }
+
+  /** The app's own slash commands (UX-12); anything else typed after `/` went to Claude. */
+  function runCommand(t: Tab, name: AppCommand, arg: string) {
+    const id = t.sessionId;
+    switch (name) {
+      case "clear":
+        void startSession(t.cwd, t.modelAlias, t.mode);
+        return;
+      case "fork":
+        void forkTab(id);
+        return;
+      case "model": {
+        const m = arg ? modelFromArg(arg) : null;
+        if (m === null) {
+          addNotice(id, `Model: ${t.model ?? "default"}. Switch with /model haiku, sonnet, opus or default.`);
+        } else void changeModel(id, m);
+        return;
+      }
+      case "mode": {
+        const m = arg ? modeFromArg(arg) : null;
+        if (m === null) {
+          addNotice(
+            id,
+            `Mode: ${MODE_NAMES[t.mode]}. Switch with /mode safe, standard, plan or autonomous, or Shift+Tab.`,
+          );
+        } else void changeMode(id, m);
+        return;
+      }
+      case "effort": {
+        const e = arg ? effortFromArg(arg) : undefined;
+        if (e === undefined)
+          addNotice(id, `Effort: ${t.effort ?? "default"}. Switch with /effort ${EFFORTS.join(", ")} or default.`);
+        else void changeEffort(id, e);
+        return;
+      }
+      case "cost": {
+        const spent =
+          t.cost.totalUsd === null ? "not known yet for a resumed session" : `≈$${t.cost.totalUsd.toFixed(4)}`;
+        const ctx = t.context
+          ? `; context ${Math.round(t.context.percentage)}% (${t.context.totalTokens.toLocaleString()} of ${t.context.maxTokens.toLocaleString()} tokens)`
+          : "";
+        addNotice(
+          id,
+          `This chat has spent ${spent}${t.budgetUsd !== null ? ` of a $${t.budgetUsd.toFixed(2)} cap` : ""}${ctx}. Estimates.`,
+        );
+        return;
+      }
+      case "help":
+        addNotice(
+          id,
+          `App commands: ${APP_COMMANDS.map((c) => `/${c.name}`).join(", ")}. Other / commands go to Claude, e.g. /compact.`,
+        );
+        return;
     }
   }
 
@@ -715,7 +774,8 @@ export function App() {
   });
 
   const activeTab = tabs.find((t) => t.sessionId === active);
-  const permission = activeTab?.permissions[0];
+  // Claude's questions are cards in the thread (UX-12), not this dialog.
+  const permission = activeTab?.permissions.find((p) => p.toolName !== "AskUserQuestion");
   // A task step's approval shows when the active session has none waiting.
   const stepApproval = permission ? undefined : taskApprovals[0];
   const workspace = cwd.trim();
@@ -913,6 +973,8 @@ export function App() {
                     onToggleRight={() => setRightOpen((v) => !v)}
                     onToggleTerminal={() => toggleTerminal(t.sessionId)}
                     onSend={(text, images) => void sendText(t.sessionId, text, images)}
+                    onCommand={(name, arg) => runCommand(t, name, arg)}
+                    onAnswer={(req, reply) => void answer(req, reply)}
                     onInterrupt={() => void request("session.interrupt", { sessionId: t.sessionId })}
                     onStopAgent={async (taskId) => {
                       await request("session.stopAgent", { sessionId: t.sessionId, taskId });

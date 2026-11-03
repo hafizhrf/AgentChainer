@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import type { AgentEvent } from "@agentchainer/protocol";
 import type { AgentSdkModule } from "./sdk-loader.ts";
-import { Session } from "./session.ts";
+import { ASK_FIRST, Session } from "./session.ts";
 
 /**
  * A stand-in SDK: `query()` answers every user message with a scripted `result`, as the CLI does at the end of a turn.
@@ -227,5 +227,111 @@ describe("Session.close", () => {
   it("resolves at once when no process was started", async () => {
     const { sdk } = fakeSdk([]);
     await new Session(sdk, { cwd: "/w", claudePath: "claude" }, callbacks()).close();
+  });
+});
+
+describe("an interactive session (UX-12)", () => {
+  /** One turn: init, then a result; the query also answers the command and context questions. */
+  function chatSdk() {
+    let options: Record<string, unknown> = {};
+    const sdk = {
+      query: ({ prompt, options: o }: { prompt: AsyncIterable<unknown>; options: Record<string, unknown> }) => {
+        options = o;
+        const messages = (async function* () {
+          for await (const _ of prompt) {
+            yield {
+              type: "system",
+              subtype: "init",
+              session_id: "s",
+              model: "m",
+              cwd: "/w",
+              permissionMode: "default",
+            };
+            yield {
+              type: "result",
+              subtype: "success",
+              duration_ms: 5,
+              num_turns: 1,
+              is_error: false,
+              total_cost_usd: 0,
+            };
+            return;
+          }
+        })();
+        return Object.assign(messages, {
+          close: () => undefined,
+          interrupt: async () => undefined,
+          supportedCommands: async () => [
+            { name: "compact", description: "Summarize the conversation", argumentHint: "<instructions>", aliases: [] },
+          ],
+          getContextUsage: async () => ({ percentage: 23, totalTokens: 46_000, maxTokens: 200_000 }),
+        });
+      },
+    } as unknown as AgentSdkModule;
+    return { sdk, options: () => options };
+  }
+
+  it("sends its commands once, the context use after each turn, and asks the agent to ask first", async () => {
+    const { sdk, options } = chatSdk();
+    const events: AgentEvent[] = [];
+    const s = new Session(sdk, { cwd: "/w", claudePath: "claude", interactive: true }, callbacks(events));
+    assert.deepEqual(options().systemPrompt, { type: "preset", preset: "claude_code", append: ASK_FIRST });
+    await s.turn("hi");
+    await new Promise((r) => setTimeout(r, 10));
+    assert.deepEqual(
+      events.filter((e) => e.type === "commands.changed" || e.type === "context.usage"),
+      [
+        {
+          type: "commands.changed",
+          commands: [{ name: "compact", description: "Summarize the conversation", argumentHint: "<instructions>" }],
+        },
+        { type: "context.usage", percentage: 23, totalTokens: 46_000, maxTokens: 200_000 },
+      ],
+    );
+    s.close();
+  });
+
+  it("switches itself to plan mode without asking; other tools still ask", async () => {
+    const { sdk, options } = chatSdk();
+    const asked: string[] = [];
+    const s = new Session(
+      sdk,
+      { cwd: "/w", claudePath: "claude", interactive: true },
+      { ...callbacks(), askPermission: (r) => void asked.push(r.toolName) },
+    );
+    const canUseTool = options().canUseTool as (
+      name: string,
+      input: unknown,
+      ctx: Record<string, unknown>,
+    ) => Promise<Record<string, unknown>>;
+    const ctx = (id: string) => ({
+      requestId: id,
+      toolUseID: id,
+      signal: new AbortController().signal,
+      suggestions: [],
+    });
+    assert.deepEqual(await canUseTool("EnterPlanMode", {}, ctx("1")), {
+      behavior: "allow",
+      updatedInput: {},
+      updatedPermissions: [{ type: "setMode", mode: "plan", destination: "session" }],
+    });
+    void canUseTool("Bash", { command: "ls" }, ctx("2"));
+    assert.deepEqual(asked, ["Bash"]);
+    s.close();
+  });
+
+  it("leaves a task step's prompt and plan-mode approvals alone", async () => {
+    const { sdk, options } = chatSdk();
+    const asked: string[] = [];
+    const s = new Session(
+      sdk,
+      { cwd: "/w", claudePath: "claude", appendSystemPrompt: "You implement." },
+      { ...callbacks(), askPermission: (r) => void asked.push(r.toolName) },
+    );
+    assert.deepEqual(options().systemPrompt, { type: "preset", preset: "claude_code", append: "You implement." });
+    const canUseTool = options().canUseTool as (n: string, i: unknown, c: Record<string, unknown>) => Promise<unknown>;
+    void canUseTool("EnterPlanMode", {}, { requestId: "1", toolUseID: "1", signal: new AbortController().signal });
+    assert.deepEqual(asked, ["EnterPlanMode"]);
+    s.close();
   });
 });

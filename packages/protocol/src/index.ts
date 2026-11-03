@@ -766,6 +766,8 @@ export const TaskSchema = z.object({
   worktree: TaskWorktreeSchema.optional(),
   /** A multi-folder workspace's other folders (M8-01), each with its worktree once a run made one. */
   folders: z.array(TaskFolderSchema).max(16).optional(),
+  /** The other folder an XL sub-task works in (M8-01), with its worktree in that folder's repository. */
+  folder: z.object({ name: z.string(), path: z.string() }).optional(),
   /** An XL task's sub-tasks, in the split's order. */
   subtasks: z.array(TaskIdSchema).optional(),
   /** Where the user merged the task's branch. */

@@ -1562,7 +1562,7 @@ reference only: no code is copied, and each one gets a plan before it's built.
 sketched). Owner decisions (2026-11-03): workspace definitions live in the app's settings; the fleet view is built
 first.
 
-- [ ] **M8-01** Multi-folder workspaces (F9): a workspace is a named set of folders, e.g. an app repo and its API
+- [x] **M8-01** Multi-folder workspaces (F9): a workspace is a named set of folders, e.g. an app repo and its API
       repo.
   - Sessions run in the primary folder and add the others with the SDK's `additionalDirectories` (the CLI's
     `--add-dir`; in the installed SDK's types).
@@ -1603,7 +1603,17 @@ first.
     - the preview says which folders get their own PRs.
     Tested with a stand-in `gh` and local bare origins (`service.test.ts`). Not checked on real GitHub, which needs a
     second throwaway repository.
-    XL sub-tasks per folder are still to come.
+  - Step 5b, XL:
+    - the split knows the folders and gives each sub-task one (`Task.folder`);
+    - the XL task branches in every folder (all must be in git) and sets them all up;
+    - a sub-task branches from the task's branch in its own folder's repository and merges back there;
+    - the baseline and integration gates run in every folder.
+    Checked live with haiku (≈$0.036) on two scratch repos:
+    - the split put "Add ready() to api routes" in `api` and the client helper in the main folder;
+    - both sub-tasks ran and merged, and the integration gates passed in `.` and `api`;
+    - the evidence lists `api:routes.js`;
+    - Merge went into both folders' `main`, and cleanup left one worktree in each.
+    Evidence: #91, #92, #93, #94 and this step's PR.
 - [x] **M8-02** A fleet view: every running session and task step across workspaces, with live status (working,
       waiting for approval, idle, done), cost, and one click to open it. From CAO's dashboard and status badges; it
       extends M4's agent tree.

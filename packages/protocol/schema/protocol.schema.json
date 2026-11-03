@@ -5125,6 +5125,22 @@
               "additionalProperties": false
             }
           },
+          "folder": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "path": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "name",
+              "path"
+            ],
+            "additionalProperties": false
+          },
           "subtasks": {
             "type": "array",
             "items": {
@@ -6348,6 +6364,22 @@
               ],
               "additionalProperties": false
             }
+          },
+          "folder": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "path": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "name",
+              "path"
+            ],
+            "additionalProperties": false
           },
           "subtasks": {
             "type": "array",
@@ -7578,6 +7610,22 @@
               ],
               "additionalProperties": false
             }
+          },
+          "folder": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "path": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "name",
+              "path"
+            ],
+            "additionalProperties": false
           },
           "subtasks": {
             "type": "array",
@@ -8911,6 +8959,22 @@
               ],
               "additionalProperties": false
             }
+          },
+          "folder": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "path": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "name",
+              "path"
+            ],
+            "additionalProperties": false
           },
           "subtasks": {
             "type": "array",
@@ -10271,6 +10335,22 @@
               "additionalProperties": false
             }
           },
+          "folder": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "path": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "name",
+              "path"
+            ],
+            "additionalProperties": false
+          },
           "subtasks": {
             "type": "array",
             "items": {
@@ -11491,6 +11571,22 @@
               ],
               "additionalProperties": false
             }
+          },
+          "folder": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "path": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "name",
+              "path"
+            ],
+            "additionalProperties": false
           },
           "subtasks": {
             "type": "array",
@@ -12725,6 +12821,22 @@
               "additionalProperties": false
             }
           },
+          "folder": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "path": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "name",
+              "path"
+            ],
+            "additionalProperties": false
+          },
           "subtasks": {
             "type": "array",
             "items": {
@@ -13949,6 +14061,22 @@
               "additionalProperties": false
             }
           },
+          "folder": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "path": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "name",
+              "path"
+            ],
+            "additionalProperties": false
+          },
           "subtasks": {
             "type": "array",
             "items": {
@@ -15169,6 +15297,22 @@
               ],
               "additionalProperties": false
             }
+          },
+          "folder": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "path": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "name",
+              "path"
+            ],
+            "additionalProperties": false
           },
           "subtasks": {
             "type": "array",
@@ -16485,6 +16629,22 @@
               "additionalProperties": false
             }
           },
+          "folder": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "path": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "name",
+              "path"
+            ],
+            "additionalProperties": false
+          },
           "subtasks": {
             "type": "array",
             "items": {
@@ -17711,6 +17871,22 @@
               ],
               "additionalProperties": false
             }
+          },
+          "folder": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "path": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "name",
+              "path"
+            ],
+            "additionalProperties": false
           },
           "subtasks": {
             "type": "array",
@@ -18974,6 +19150,22 @@
               "additionalProperties": false
             }
           },
+          "folder": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "path": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "name",
+              "path"
+            ],
+            "additionalProperties": false
+          },
           "subtasks": {
             "type": "array",
             "items": {
@@ -20195,6 +20387,22 @@
               "additionalProperties": false
             }
           },
+          "folder": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "path": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "name",
+              "path"
+            ],
+            "additionalProperties": false
+          },
           "subtasks": {
             "type": "array",
             "items": {
@@ -21415,6 +21623,22 @@
               ],
               "additionalProperties": false
             }
+          },
+          "folder": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "path": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "name",
+              "path"
+            ],
+            "additionalProperties": false
           },
           "subtasks": {
             "type": "array",
@@ -22849,6 +23073,22 @@
               "additionalProperties": false
             }
           },
+          "folder": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "path": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "name",
+              "path"
+            ],
+            "additionalProperties": false
+          },
           "subtasks": {
             "type": "array",
             "items": {
@@ -24194,6 +24434,22 @@
               "additionalProperties": false
             }
           },
+          "folder": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "path": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "name",
+              "path"
+            ],
+            "additionalProperties": false
+          },
           "subtasks": {
             "type": "array",
             "items": {
@@ -25517,6 +25773,22 @@
               "additionalProperties": false
             }
           },
+          "folder": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "path": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "name",
+              "path"
+            ],
+            "additionalProperties": false
+          },
           "subtasks": {
             "type": "array",
             "items": {
@@ -26756,6 +27028,22 @@
               ],
               "additionalProperties": false
             }
+          },
+          "folder": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "path": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "name",
+              "path"
+            ],
+            "additionalProperties": false
           },
           "subtasks": {
             "type": "array",
@@ -29799,6 +30087,22 @@
               "additionalProperties": false
             }
           },
+          "folder": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "path": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "name",
+              "path"
+            ],
+            "additionalProperties": false
+          },
           "subtasks": {
             "type": "array",
             "items": {
@@ -31846,6 +32150,22 @@
                 ],
                 "additionalProperties": false
               }
+            },
+            "folder": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "path": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "name",
+                "path"
+              ],
+              "additionalProperties": false
             },
             "subtasks": {
               "type": "array",

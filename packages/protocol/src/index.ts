@@ -555,7 +555,7 @@ export type StepRun = z.infer<typeof StepRunSchema>;
 export const GateRunSchema = z.object({
   kind: z.enum(GATE_KINDS),
   command: z.string(),
-  /** The package it ran in; "." is the workspace root. */
+  /** The package it ran in; "." is the workspace root, and another folder's start with its name (`api`, `api:web`). */
   package: z.string(),
   exitCode: z.number().int().nullable(),
   timedOut: z.boolean(),
@@ -566,6 +566,8 @@ export const GateRunSchema = z.object({
   at: z.string(),
   /** Format: the files it rewrote. A check: files it changed, which were reverted. */
   changed: z.array(z.string()).optional(),
+  /** A multi-folder task's other folder it ran in, by name (M8-01); none in the primary folder. */
+  folder: z.string().optional(),
 });
 export type GateRun = z.infer<typeof GateRunSchema>;
 
@@ -701,6 +703,33 @@ export const MetricsSummarySchema = z.object({
 });
 export type MetricsSummary = z.infer<typeof MetricsSummarySchema>;
 
+/**
+ * The git worktree a task works in, on its own branch (every tier since M5-01): `base` is the commit it started from,
+ * `from` the branch that was checked out then (a PR's base), and `untracked` the files already untracked after its
+ * setup (installed dependencies), which aren't its changes. `removed` once the worktree is gone (merged, or cleaned up);
+ * the branch can outlive it.
+ */
+export const TaskWorktreeSchema = z.object({
+  path: z.string(),
+  branch: z.string(),
+  base: z.string(),
+  from: z.string().optional(),
+  untracked: z.array(z.string()),
+  removed: z.boolean().optional(),
+});
+
+/**
+ * One of a multi-folder workspace's other folders (M8-01): `name` prefixes its paths in the contract's areas and the
+ * evidence (`api:src/routes.ts`). A git folder gets its own worktree on the task's branch; one without git is worked
+ * in directly.
+ */
+export const TaskFolderSchema = z.object({
+  name: z.string(),
+  path: z.string(),
+  worktree: TaskWorktreeSchema.optional(),
+});
+export type TaskFolder = z.infer<typeof TaskFolderSchema>;
+
 export const TaskSchema = z.object({
   id: TaskIdSchema,
   /** What the user asked for, verbatim. */
@@ -731,22 +760,10 @@ export const TaskSchema = z.object({
   title: z.string().optional(),
   /** The sub-tasks this one runs after. */
   dependsOn: z.array(TaskIdSchema).optional(),
-  /**
-   * The git worktree a task works in, on its own branch (every tier since M5-01): `base` is the commit it started
-   * from, `from` the branch that was checked out then (a PR's base), and `untracked` the files already untracked after
-   * its setup (installed dependencies), which aren't its changes. `removed` once the worktree is gone (merged, or
-   * cleaned up); the branch can outlive it.
-   */
-  worktree: z
-    .object({
-      path: z.string(),
-      branch: z.string(),
-      base: z.string(),
-      from: z.string().optional(),
-      untracked: z.array(z.string()),
-      removed: z.boolean().optional(),
-    })
-    .optional(),
+  /** The task's worktree in the primary folder (`TaskWorktreeSchema`). */
+  worktree: TaskWorktreeSchema.optional(),
+  /** A multi-folder workspace's other folders (M8-01), each with its worktree once a run made one. */
+  folders: z.array(TaskFolderSchema).max(16).optional(),
   /** An XL task's sub-tasks, in the split's order. */
   subtasks: z.array(TaskIdSchema).optional(),
   /** Where the user merged the task's branch. */
@@ -1442,6 +1459,8 @@ export const methodSchemas = {
       request: z.string().min(1).max(20_000),
       /** The chat it's made from (UX-13): its last messages, for drafting. */
       context: z.string().max(12_000).optional(),
+      /** A multi-folder workspace's other folders (M8-01), checked like `session.start`'s. */
+      folders: z.array(z.string().min(1).max(4096)).max(16).optional(),
     }),
     result: TaskSchema,
   },

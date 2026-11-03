@@ -151,6 +151,9 @@ function targetOf(d: Described, tool: string, root: string): string {
 /** Where the runner reports what the run's records keep: approvals and guard blocks (M3-09 security notes). */
 export type RunRecorder = { approval(record: ApprovalRecord): void; guardBlock(block: GuardBlock): void };
 
+/** A multi-folder task's other folder (M8-01): its name, its code folder, and where its changes count from. */
+export type OtherFolder = { name: string; dir: string; base: string | null; untracked: string[] };
+
 /** Runs a task's steps as real Claude sessions and its gates as the project's commands. */
 export function sessionRunner(
   root: string,
@@ -158,6 +161,7 @@ export function sessionRunner(
   library: Library,
   host: SessionHost,
   recorder: RunRecorder,
+  others: OtherFolder[] = [],
 ): Runner {
   const run = task.run;
   if (!run) throw new Error("The task has no run.");
@@ -181,6 +185,8 @@ export function sessionRunner(
       host.sdk,
       {
         cwd: root,
+        // The other folders' worktrees, so a step reaches them and the guard allows them (M8-01).
+        ...(others.length ? { additionalDirectories: others.map((o) => o.dir) } : {}),
         claudePath: host.claudePath,
         ...(model ? { model } : {}),
         // Read steps only have read tools, which need no approval; write steps ask in the profile picked at Run.
@@ -293,16 +299,34 @@ export function sessionRunner(
       return turn(session, prompt, true);
     },
     async gates(kinds, round) {
-      const commands = resolveGates(root, detectWorkspace(root), kinds);
-      const notRun = kinds.filter((k) => !commands.some((c) => c.kind === k));
+      // Each folder runs its own commands (M8-01); a gate counts as run when any folder has it.
+      const folders = [{ name: undefined, dir: root }, ...others];
+      const plans = folders.map((f) => ({ ...f, commands: resolveGates(f.dir, detectWorkspace(f.dir), kinds) }));
+      const notRun = kinds.filter((k) => !plans.some((p) => p.commands.some((c) => c.kind === k)));
       gatesAbort = new AbortController();
       try {
-        return { runs: await runGates(root, commands, round, gatesAbort.signal), notRun };
+        const runs = [];
+        for (const p of plans) {
+          if (!p.commands.length) continue;
+          const done = await runGates(p.dir, p.commands, round, gatesAbort.signal);
+          // The folder's name leads its package, so every gate's key and log line tells the folders apart.
+          const name = p.name;
+          runs.push(
+            ...(name
+              ? done.map((r) => ({ ...r, folder: name, package: r.package === "." ? name : `${name}:${r.package}` }))
+              : done),
+          );
+        }
+        return { runs, notRun };
       } finally {
         gatesAbort = null;
       }
     },
-    diff: () => taskDiff(root, run.base, run.untrackedAtStart),
+    diff: () =>
+      [
+        taskDiff(root, run.base, run.untrackedAtStart),
+        ...others.map((o) => `# In the folder ${o.name}\n${taskDiff(o.dir, o.base, o.untracked)}`),
+      ].join("\n"),
     message(text) {
       // A write step's session first: parallel read steps run beside it only in planning.
       const target = [...inTurn].reverse().find((e) => e.write) ?? inTurn.at(-1);

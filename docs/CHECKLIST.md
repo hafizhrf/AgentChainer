@@ -1583,7 +1583,19 @@ first.
       diff and git show;
     - Workspace settings switch between the workspace's folders too, so readiness, the setup plan, commands and
       permissions are per folder.
-    Step 5 (tasks across folders) is still to come.
+  - Step 5a:
+    - a task made from a multi-folder chat works across its folders (`task.create {folders}`);
+    - drafting reads them and names areas `api:path`;
+    - each git folder gets a worktree on the task's branch, and steps reach the other worktrees;
+    - gates run in each folder with its own commands;
+    - the evidence lists changed files as `api:path`, and the secrets scan covers them;
+    - Merge and cleanup cover every folder, and a PR's body says which folders' branches aren't in it.
+    Checked live with haiku (≈$0.013) on two scratch git repos:
+    - drafted areas `api:routes.js`, `api:routes.test.js` and `README.md`;
+    - both worktrees were set up, and `npm test` passed in `.` and `api`;
+    - the api checkout was untouched until Merge, which went into both folders' `main`;
+    - cleanup removed both worktrees.
+    Step 5b (XL sub-tasks per folder, one PR per repository) is still to come.
 - [x] **M8-02** A fleet view: every running session and task step across workspaces, with live status (working,
       waiting for approval, idle, done), cost, and one click to open it. From CAO's dashboard and status badges; it
       extends M4's agent tree.

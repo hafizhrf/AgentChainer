@@ -449,7 +449,7 @@ export function TaskPage({
               {task.title ?? task.request}
             </h1>
             <span className="muted" title={cwd}>
-              {folderName(cwd)} · {usd(task.costUsd)} spent
+              {[folderName(cwd), ...(task.folders ?? []).map((f) => f.name)].join(" + ")} · {usd(task.costUsd)} spent
             </span>
           </div>
           <span className="grow" />
@@ -1662,7 +1662,7 @@ function GateList({ runs, before }: { runs: GateRun[]; before?: ReadonlySet<stri
   return (
     <ul className="task-gates">
       {runs.map((g) => (
-        <li key={`${g.kind}-${g.package}-${g.round}`}>
+        <li key={`${g.folder ?? ""}-${g.kind}-${g.package}-${g.round}`}>
           <details>
             <summary>
               {passedGate(g) ? (
@@ -1670,9 +1670,10 @@ function GateList({ runs, before }: { runs: GateRun[]; before?: ReadonlySet<stri
               ) : (
                 <CircleX size={14} className="err" aria-label="Failed" />
               )}
+              {g.folder && <span className="chip">{g.folder}</span>}
               <span className="task-gate-kind">{g.kind}</span>
               <code>{g.command}</code>
-              {g.package !== "." && <span className="muted">{g.package}</span>}
+              {g.package !== "." && g.package !== g.folder && <span className="muted">{g.package}</span>}
               {before?.has(gateKey(g)) && (
                 <span className="badge">
                   {passedGate(g) ? "fixed: failed before the task" : "failed before the task"}

@@ -87,7 +87,13 @@ export function workspaceLines(profile: WorkspaceProfile, gates: GateKind[]): st
 }
 
 /** What else drafting reads (UX-13): the chat a task came from, and, when redrafting, the contract and the reply. */
-export type DraftExtra = { context?: string; current?: TaskContract; feedback?: string };
+export type DraftExtra = {
+  context?: string;
+  current?: TaskContract;
+  feedback?: string;
+  /** A multi-folder workspace's other folders (M8-01), which drafting reads and names areas in. */
+  folders?: { name: string; path: string }[];
+};
 
 export function draftPrompt(
   request: string,
@@ -108,6 +114,14 @@ export function draftPrompt(
         ]
       : []),
     ...(extra.feedback ? ["", `The person's reply: ${extra.feedback}`, "Draft the contract again, following it."] : []),
+    ...(extra.folders?.length
+      ? [
+          "",
+          "This workspace has other folders too, which you can read:",
+          ...extra.folders.map((f) => `- ${f.name}: ${f.path}`),
+          `Name an affected area in one of them with the folder's name and a colon, e.g. \`${extra.folders[0]?.name}:src/index.ts\`; an area without a prefix is in this folder.`,
+        ]
+      : []),
     "",
     ...workspaceLines(profile, gates),
   ].join("\n");
@@ -196,6 +210,7 @@ export async function draftContract(
   opts: DraftOptions = {},
 ): Promise<{ contract: TaskContract | null; error?: string; costUsd: number }> {
   const gates = availableGates(profile, root);
+  const folders = opts.extra?.folders?.map((f) => f.path) ?? [];
   let costUsd = 0;
   const { result } = await guarded(root, async () => {
     const q = sdk.query({
@@ -212,7 +227,8 @@ export async function draftContract(
         maxBudgetUsd: opts.maxBudgetUsd ?? 0.5,
         systemPrompt: { type: "preset", preset: "claude_code", append: GUIDE },
         outputFormat: { type: "json_schema", schema: DRAFT_JSON_SCHEMA },
-        hooks: { PreToolUse: [{ hooks: [generatorHook(root, [])] }] },
+        hooks: { PreToolUse: [{ hooks: [generatorHook(root, [], folders)] }] },
+        ...(folders.length ? { additionalDirectories: folders } : {}),
         // The hook above already decided; anything that reaches here is allowed.
         canUseTool: async (_tool, input) => ({ behavior: "allow", updatedInput: input }),
         ...(opts.abortController ? { abortController: opts.abortController } : {}),

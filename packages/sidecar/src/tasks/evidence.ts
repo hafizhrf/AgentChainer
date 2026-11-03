@@ -116,7 +116,8 @@ export function sectionLines(text: string | null, title: string): string[] {
 export function purposes(summary: string | null): Map<string, string> {
   const out = new Map<string, string>();
   for (const line of sectionLines(summary, "Changes")) {
-    const m = /^`?([^`:\s][^`:]*?)`?\s*[:—–-]\s+(.+)$/.exec(line);
+    // A multi-folder task's other folders name their files `api:path` (M8-01).
+    const m = /^`?((?:[\w.-]{2,}:)?[^`:\s][^`:]*?)`?\s*[:—–-]\s+(.+)$/.exec(line);
     if (m?.[1] && m[2]) out.set(m[1].trim().replace(/^\.\//, ""), m[2].trim());
   }
   return out;
@@ -126,7 +127,9 @@ function purposeOf(path: string, known: Map<string, string>): string | null {
   const exact = known.get(path);
   if (exact) return exact;
   for (const [p, text] of known) if (path.endsWith(`/${p}`) || p.endsWith(`/${path}`)) return text;
-  return null;
+  // Another folder's file the implementer named without its folder (`api:routes.js` as `routes.js`).
+  const bare = /^[\w.-]{2,}:(.+)$/.exec(path)?.[1];
+  return bare ? purposeOf(bare, known) : null;
 }
 
 /** Why a run has no review: its tier has none, the run ended first, or the answer couldn't be read. */

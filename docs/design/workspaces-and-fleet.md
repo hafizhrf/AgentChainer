@@ -257,9 +257,9 @@ They're used as ideas only; no code is copied.
 1. This doc covers M8-01 and M8-02 in detail; M8-03…06 are sketched and designed later.
 2. Workspace definitions live in the app's settings, not in a repository.
 3. The fleet view is built first.
+4. The folder prefix in affected areas is the folder's name (`api:src/routes.ts`).
+5. The fleet view doesn't keep finished items after a restart; Sessions and Tasks keep those.
+6. The chat and task overhaul ([chat-and-tasks.md](chat-and-tasks.md)) comes before the fleet view.
 
 **Still open:**
-- The folder prefix in affected areas: the folder's name (proposed), or its index.
-- Whether the fleet view also lists today's finished items after a restart. Proposed: no; Sessions and Tasks keep
-  those.
 - What the CLI loads from added folders (§5.2, **(verify)**), settled in step 3.

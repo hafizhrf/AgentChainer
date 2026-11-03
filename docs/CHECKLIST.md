@@ -1057,6 +1057,18 @@ for the desktop shell, start screen and session view to be cleaned up (UX-02, UX
     the middle of the row; the evidence report scrolled inside the scrolling page, with a banner-sized title and
     cramped sections; its gates table said "." for the root package (now "root").
   - Open: the owner's own look in both themes.
+  - Superseded by UX-13 (owner, 2026-11-03): a task becomes a chat thread with cards instead of a page.
+- [ ] **UX-12** A complete chat room. → design: [chat-and-tasks.md](design/chat-and-tasks.md) §4. Owner request,
+      2026-11-03: Shift+Tab cycles the mode; slash commands with descriptions and the app's own commands; question
+      cards for `AskUserQuestion`; the agent switches to plan mode by itself (`EnterPlanMode`); input history,
+      attachments and an editable queue; a todo panel, a context meter and compaction dividers.
+- [ ] **UX-13** One thread for chats and tasks (§5). One New with a Chat | Task switch; tasks as tabs with the right
+      panel; drafting streams in the thread; the contract and triage as editable cards refined by replying; steps
+      stream in the thread and the running step can be messaged; approvals and results as cards; a Task tab; "Make
+      this a task".
+- [ ] **UX-14** A live and AI-made workflow canvas (§6). A Flow tab shows the run's workflow with each step's live
+      status, hand-offs and fix rounds; Generate with AI drafts project workflows; M/L/XL tasks may get their own
+      flow, approved with the contract.
 
 ### Exit criteria
 

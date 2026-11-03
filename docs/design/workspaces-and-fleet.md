@@ -183,7 +183,10 @@ They're used as ideas only; no code is copied.
 - **M8-03 Supervisor and worker sessions:** a supervisor session hands work to worker sessions through an in-app MCP
   server, with tools to assign, hand off, message and read an inbox. Workers run under the app's approvals and
   budgets, and show in the fleet view.
-  - Open: how a worker's result returns, and how this relates to XL's fixed split (M3-07).
+  - Designed in [supervisor.md](supervisor.md), 2026-11-03.
+    - A worker's result returns both ways: `handoff` waits for it, and `assign` delivers it to the supervisor's
+      inbox.
+    - XL keeps its fixed split; a Team chat is for open-ended work.
 - **M8-04 Agent profiles manager:** create from a template, edit, clone and delete profiles, each validated before
   saving and with its own tool allowlist. It builds on M3-05's roles and UX-10's Plugins page.
   - Open: the profiles' file format, and the scope (user or project).

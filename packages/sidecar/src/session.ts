@@ -16,6 +16,7 @@ import type {
 // Types only: the SDK itself is loaded at runtime by sdk-loader.ts (node_modules in dev, verified download when packaged).
 import type {
   HookCallback,
+  McpSdkServerConfigWithInstance,
   PermissionResult,
   PermissionUpdate,
   Query,
@@ -65,7 +66,15 @@ export type SessionOptions = {
    * turn, may switch itself to plan mode, and is asked to ask the person rather than guess.
    */
   interactive?: boolean;
+  /**
+   * The app's own tools, as an in-process MCP server (M8-03: a Team chat's tools to run workers). Its calls are allowed
+   * without asking: they only start or message sessions whose own tool calls are asked about as usual.
+   */
+  appTools?: McpSdkServerConfigWithInstance;
 };
+
+/** The name of the app's in-process MCP server, so its tools are `mcp__agentchainer__<tool>`. */
+export const APP_TOOLS = "agentchainer";
 
 /**
  * Added to an interactive session's system prompt (UX-12): like the CLI, the agent asks before acting on an ambiguous
@@ -131,6 +140,11 @@ type SessionCallbacks = {
   answered?: (request: { toolName: string; input: Record<string, unknown> }, answer: PermissionAnswer) => void;
   /** The fleet status changed (M8-02): working, waiting, idle or ended. */
   statusChanged?: (item: FleetItem) => void;
+  /**
+   * Every turn that a message started has ended, whoever sent it (M8-03): a Team's worker reports from here, so a turn
+   * the person starts in the worker's tab reports too. Called after the turn's events.
+   */
+  turnEnded?: (result: TurnResult) => void;
 };
 
 /**
@@ -165,6 +179,8 @@ export class Session {
   private ended = false;
   /** A task step's tag, set by the task's runner, so the fleet view says whose step it is (M8-02). */
   tag: TaskTag | undefined;
+  /** A Team chat's worker: the supervisor's session id, for the fleet view (M8-03). */
+  parentId: string | undefined;
   /** The command list goes out once, at the start; later changes arrive as `commands_changed`. */
   private commandsSent = false;
 
@@ -195,6 +211,7 @@ export class Session {
         enableFileCheckpointing: true,
         ...(options.model ? { model: options.model } : {}),
         ...(options.additionalDirectories?.length ? { additionalDirectories: options.additionalDirectories } : {}),
+        ...(options.appTools ? { mcpServers: { [APP_TOOLS]: options.appTools } } : {}),
         env: {
           ...process.env,
           // The to-do tool is off by default on newer models; the todo panel (UX-12) shows its list. On CLI 2.1.314 this
@@ -242,6 +259,10 @@ export class Session {
                 updatedInput: input,
                 updatedPermissions: [{ type: "setMode", mode: "plan", destination: "session" }],
               });
+              return;
+            }
+            if (options.appTools && toolName.startsWith(`mcp__${APP_TOOLS}__`)) {
+              resolve({ behavior: "allow", updatedInput: input });
               return;
             }
             const always = ctx.suppressAlwaysAllowRule ? [] : alwaysUpdates(ctx.suggestions);
@@ -447,6 +468,7 @@ export class Session {
       startedAt: this.startedAt,
       since: this.statusSince,
       ...(this.tag ? { task: this.tag } : {}),
+      ...(this.parentId ? { parentId: this.parentId } : {}),
     };
   }
 
@@ -465,6 +487,16 @@ export class Session {
     this.callbacks.statusChanged?.(this.fleetItem);
   }
 
+  /** No turn runs, so a message sent now starts one (M8-03: when a Team delivers its workers' reports). */
+  get idle(): boolean {
+    return !this.busy && !this.ended;
+  }
+
+  /** What the session has spent since it started, an estimate. */
+  get costUsd(): number {
+    return this.totalCostUsd;
+  }
+
   /** A turn runs: one the user started, or one the CLI started after background work. */
   private get busy(): boolean {
     return this.openTurns + this.autoTurns > 0;
@@ -473,6 +505,7 @@ export class Session {
   private async pump(): Promise<void> {
     try {
       for await (const message of this.q) {
+        let ended: TurnResult | undefined;
         if (RECORD_PATH) appendFileSync(RECORD_PATH, `${JSON.stringify(message)}\n`);
         // Every turn starts with init (spike S2). One that no user message opened is the CLI going on after background
         // work (M4-07). The CLI runs turns one at a time, so the next result is that turn's.
@@ -495,17 +528,19 @@ export class Session {
           const costUsd = Math.max(0, message.total_cost_usd - this.totalCostUsd);
           this.totalCostUsd = message.total_cost_usd;
           const ok = message.subtype === "success";
-          this.waiters.shift()?.resolve({
+          ended = {
             subtype: message.subtype,
             isError: message.is_error,
             text: ok ? message.result : "",
             ...(ok && message.structured_output !== undefined ? { structured: message.structured_output } : {}),
             costUsd,
-          });
+          };
+          this.waiters.shift()?.resolve(ended);
         }
         for (const event of normalize(message)) this.callbacks.emit(event);
         if (message.type === "result" || message.type === "system") this.touch();
         if (message.type === "result" && this.interactive) void this.sendContextUsage();
+        if (ended) this.callbacks.turnEnded?.(ended);
       }
     } catch (err) {
       this.callbacks.emit({ type: "error", message: err instanceof Error ? err.message : String(err) });

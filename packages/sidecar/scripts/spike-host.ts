@@ -1,10 +1,10 @@
 // Drives the sidecar the way the Rust core will (spikes S2/S3) and checks real behaviour
 // against the user's own `claude` CLI.
 //
-// Usage: node scripts/spike-host.ts --cwd <empty scratch dir> [--model haiku] [--scenario basic|mode|interrupt|guard|auto|subagents|nested|background|sessions|approvals|plan|fixtures|image|exit|all] [--record out.jsonl] [--sidecar <executable> --data-dir <dir>]
+// Usage: node scripts/spike-host.ts --cwd <empty scratch dir> [--model haiku] [--scenario basic|mode|interrupt|guard|auto|subagents|nested|background|sessions|approvals|plan|fixtures|image|team|exit|all] [--record out.jsonl] [--sidecar <executable> --data-dir <dir>]
 // Makes real model calls with the user's own login (haiku keeps a full run around a few cents).
 import { execFileSync, spawn, spawnSync } from "node:child_process";
-import { cpSync, existsSync, readdirSync, readFileSync, rmSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { performance } from "node:perf_hooks";
 import { createInterface } from "node:readline";
@@ -16,6 +16,7 @@ import {
   type AgentEvent,
   type MethodName,
   type Methods,
+  type Notifications,
   type PermissionRequest,
   PROTOCOL_VERSION,
   type SessionInfo,
@@ -64,6 +65,8 @@ const state = {
     | null,
 };
 const permissionLog: PermissionRequest[] = [];
+/** Sessions the sidecar opened on its own: a Team chat's workers (M8-03). */
+const openedLog: Notifications["session.opened"][] = [];
 
 /** Spawns a sidecar; `restartSidecar()` replaces it, as when the app is quit and relaunched (exit criterion M1-E2). */
 function startSidecar() {
@@ -102,6 +105,10 @@ function onLine(line: string) {
       );
     if (event.type === "error") console.log(`    [error] ${event.message}`);
     state.onEvent?.(event);
+  } else if (frame.method === "session.opened") {
+    const opened = frame.params as Notifications["session.opened"];
+    console.log(`    [session.opened] ${opened.name} (${opened.access}) of ${opened.parentId.slice(0, 8)}`);
+    openedLog.push(opened);
   } else if (frame.method === "permission.request") {
     const req = frame.params as PermissionRequest;
     permissionLog.push(req);
@@ -807,6 +814,103 @@ async function exit() {
   await request("session.setMode", { sessionId, mode: "default" });
 }
 
+/**
+ * A Team chat (M8-03): the supervisor assigns two read workers, gets both reports delivered once it's idle and answers
+ * from them; then a handoff returns a worker's answer as the tool's result. A few cents on haiku.
+ */
+async function team() {
+  mkdirSync(join(cwd, "team-src"), { recursive: true });
+  writeFileSync(join(cwd, "team-src", "a.ts"), "export const a = 1;\n");
+  writeFileSync(join(cwd, "team-src", "b.ts"), "export const b = 2;\n");
+  writeFileSync(join(cwd, "team-src", "c.ts"), "export const c = 3;\n");
+  writeFileSync(join(cwd, "TEAM.md"), "Mango tango\nsecond line\nthird line\n");
+
+  const refused = await request("session.start", { cwd, model: values.model, team: true }).then(
+    () => "started",
+    (err: Error) => err.message,
+  );
+  check("a Team chat needs a budget cap", /budget cap/.test(refused), refused);
+
+  const main = state.sessionId;
+  const capUsd = 0.6;
+  state.sessionId = (
+    await request("session.start", { cwd, model: values.model, team: true, maxBudgetUsd: capUsd })
+  ).sessionId;
+  const before = permissionLog.length;
+  const reports: AgentEvent[] = [];
+  const budgets: AgentEvent[] = [];
+  const workerEvents = new Map<string, number>();
+  const delivered = new Promise<string>((resolve) => {
+    let reply = "";
+    const timer = setTimeout(() => resolve(`(timed out) ${reply}`), 240_000);
+    state.onEvent = (event) => {
+      if (event.type === "worker.message") reports.push(event);
+      if (event.type === "team.budget") budgets.push(event);
+      if (event.type === "text.delta" && reports.length > 0) reply += event.text;
+      if (event.type === "turn.completed" && reports.length >= 2) {
+        clearTimeout(timer);
+        resolve(reply.trim());
+      }
+    };
+  });
+  const countWorker = (sessionId: string) => (e: AgentEvent) =>
+    void workerEvents.set(sessionId, (workerEvents.get(sessionId) ?? 0) + (e.type === "text.delta" ? 0 : 1));
+  const openedBefore = openedLog.length;
+  const watch = setInterval(() => {
+    for (const o of openedLog.slice(openedBefore)) {
+      if (!state.others.has(o.sessionId)) state.others.set(o.sessionId, countWorker(o.sessionId));
+    }
+  }, 50);
+  console.log("  ▶ assign two workers");
+  await request("session.send", {
+    sessionId: state.sessionId,
+    text:
+      "Use the `assign` tool twice, both in your first reply: a worker named 'count' that counts the files in the " +
+      "team-src folder, and a worker named 'first-line' that reads the first line of TEAM.md. Don't do either job " +
+      "yourself and don't call any other tool. Then end your turn. When both reports have reached you, reply with " +
+      "exactly: DONE <number of files> <first line>",
+  });
+  const answer = await delivered;
+  clearInterval(watch);
+  const opened = openedLog.slice(openedBefore);
+  check(
+    "assign opens read workers, each told to the UI before its events",
+    opened.length === 2 &&
+      opened.every((o) => o.parentId === state.sessionId && o.access === "read") &&
+      opened.every((o) => (workerEvents.get(o.sessionId) ?? 0) > 0),
+    `opened=${opened.map((o) => `${o.name}:${o.access}`).join(",")} events=${[...workerEvents.values()].join(",")}`,
+  );
+  check(
+    "both reports reach the supervisor, which answers from them",
+    reports.length >= 2 && /DONE\s+3\s+Mango tango/i.test(answer),
+    `reports=${reports.length} answer=${JSON.stringify(answer.slice(0, 120))}`,
+  );
+  const last = budgets.at(-1);
+  check(
+    "the shared spend stays under the cap; read workers ask nothing",
+    last?.type === "team.budget" && last.spentUsd < capUsd && !last.stopped && permissionLog.length === before,
+    `spent=${last?.type === "team.budget" ? last.spentUsd.toFixed(4) : "?"} prompts=${permissionLog.length - before}`,
+  );
+
+  const handoff = await turn(
+    "Use the `handoff` tool once: a new worker named 'lines' that counts the lines in TEAM.md. Reply with exactly: " +
+      "LINES <number> using its answer.",
+    undefined,
+    { settle: false },
+  );
+  const used = handoff.events.some((e) => e.type === "tool.started" && e.name === "mcp__agentchainer__handoff");
+  check(
+    "handoff returns the worker's answer as the tool's result",
+    used && /LINES\s+3/.test(handoff.reply),
+    `used=${used} reply=${JSON.stringify(handoff.reply.slice(0, 80))}`,
+  );
+
+  await request("session.close", { sessionId: state.sessionId });
+  await request("session.delete", { cwd, sessionId: state.sessionId });
+  state.others.clear();
+  state.sessionId = main;
+}
+
 const scenarios: Record<string, () => Promise<void>> = {
   basic,
   mode,
@@ -821,6 +925,7 @@ const scenarios: Record<string, () => Promise<void>> = {
   plan,
   fixtures,
   image,
+  team,
   exit,
 };
 // "all" skips exit, which needs an empty --cwd of its own.
@@ -836,6 +941,8 @@ for (const file of [
   "planned.txt",
   "deny-probe.txt",
   "calc.txt",
+  "team-src",
+  "TEAM.md",
   ".claude",
 ]) {
   rmSync(join(cwd, file), { recursive: true, force: true });

@@ -1140,6 +1140,27 @@ export const AgentEventSchema = z.discriminatedUnion("type", [
     preTokens: z.number(),
     postTokens: z.number().optional(),
   }),
+  /**
+   * A Team chat's worker reported back (M8-03): its turn ended, and the sidecar handed the report to the supervisor as
+   * its next message. Shown as the worker's card, not as something the person typed.
+   */
+  z.object({
+    type: z.literal("worker.message"),
+    workerId: z.string(),
+    name: z.string(),
+    text: z.string(),
+    isError: z.boolean(),
+  }),
+  /**
+   * What a Team chat and its workers have spent together, against its one cap (M8-03). `stopped` once the cap is
+   * reached: the workers are closed and no more reports are delivered.
+   */
+  z.object({
+    type: z.literal("team.budget"),
+    spentUsd: z.number(),
+    capUsd: z.number(),
+    stopped: z.boolean(),
+  }),
   z.object({ type: z.literal("error"), message: z.string() }),
 ]);
 export type AgentEvent = z.infer<typeof AgentEventSchema>;
@@ -1197,6 +1218,11 @@ export const methodSchemas = {
        * `cwd` (the SDK's `additionalDirectories`). Checked like the New workspace dialog checks them.
        */
       folders: z.array(z.string().min(1).max(4096)).max(16).optional(),
+      /**
+       * A Team chat (M8-03): the session gets the app's tools to start worker sessions, hand them work and read their
+       * reports. Needs `maxBudgetUsd`, which then caps the chat and its workers together.
+       */
+      team: z.boolean().optional(),
     }),
     result: z.object({ sessionId: SessionIdSchema }),
   },
@@ -1788,8 +1814,26 @@ export const FleetItemSchema = z.object({
   /** When the status last changed. */
   since: z.string(),
   task: TaskTagSchema.optional(),
+  /** A Team chat's worker (M8-03): the supervisor's session id. */
+  parentId: z.string().optional(),
 });
 export type FleetItem = z.infer<typeof FleetItemSchema>;
+
+/**
+ * A session the sidecar opened on its own (M8-03): a Team chat's worker. Sent before the worker's first message, so
+ * the UI has its tab before any of its events arrive.
+ */
+export const SessionOpenedSchema = z.object({
+  sessionId: z.string(),
+  /** The supervisor's session id. */
+  parentId: z.string(),
+  cwd: z.string(),
+  /** The name the supervisor gave the worker. */
+  name: z.string(),
+  /** `read`: Read, Grep and Glob only. `write`: the supervisor's tools, under the usual approvals. */
+  access: z.enum(["read", "write"]),
+});
+export type SessionOpened = z.infer<typeof SessionOpenedSchema>;
 
 export const PermissionRequestSchema = z.object({
   sessionId: z.string(),
@@ -1828,6 +1872,8 @@ export const notificationSchemas = {
   "task.updated": z.object({ cwd: z.string(), task: TaskSchema }),
   /** A session's fleet status changed (M8-02): working, waiting for the person, idle or ended. */
   "fleet.changed": z.object({ item: FleetItemSchema }),
+  /** The sidecar opened a session on its own: a Team chat's worker (M8-03). */
+  "session.opened": SessionOpenedSchema,
 } as const;
 
 export type NotificationName = keyof typeof notificationSchemas;

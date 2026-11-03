@@ -4,7 +4,7 @@ import { Download, RefreshCw } from "lucide-react";
 import { useState } from "react";
 import { applyTheme } from "./appearance.ts";
 import { Modal } from "./Dialog.tsx";
-import { EDITORS, EFFORT_OPTIONS, MODE_HELP, MODELS, modeOptions, THEMES } from "./options.ts";
+import { EDITORS, EFFORT_OPTIONS, MODE_HELP, modelChoices, modeOptions, THEMES } from "./options.ts";
 import type { Settings } from "./settings.ts";
 import { asMode } from "./tabs.ts";
 import { asTheme } from "./theme.ts";
@@ -115,7 +115,7 @@ export function SettingsDialog({
               <Select
                 label="Default model"
                 value={draft.defaultModel ?? ""}
-                options={MODELS}
+                options={modelChoices()}
                 onChange={(value) => setDraft({ ...draft, defaultModel: value || null })}
               />
             </Field>

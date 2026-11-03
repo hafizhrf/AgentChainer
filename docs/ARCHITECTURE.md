@@ -205,7 +205,8 @@ mapped into a stable internal `AgentEvent` union so the UI never depends on raw 
 | `turn.completed {costUsd, modelUsage, durationMs, numTurns, stopReason, denials}` | `result` |
 | `context.compacted {trigger, preTokens, postTokens}` | `system/compact_boundary`: a divider in the thread (UX-12) |
 | `commands.changed {commands: [{name, description, argumentHint, aliases}]}` | `Query.supportedCommands()` when a chat starts, then `system/commands_changed`: the composer's `/` menu (UX-12) |
-| `context.usage {percentage, totalTokens, maxTokens}` | `Query.getContextUsage()` after each chat turn: the status bar's context meter (UX-12) |
+| `models.changed {models: [{value, displayName, description, efforts}]}` | `Query.supportedModels()` when a chat starts: the model pickers, named as the CLI's `/model` names them (UX-12) |
+| `context.usage {percentage, totalTokens, maxTokens, categories}` | `Query.getContextUsage()` after each chat turn: the status bar's context meter and `/usage` (UX-12) |
 | `api.retry` | `system/api_retry` |
 | `error` | SDK errors / `is_error` results |
 

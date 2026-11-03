@@ -231,7 +231,10 @@ export class Session {
     });
     void this.pump();
     // The list is there before the first message, so `/` works in a new chat; init would only come with the first turn.
-    if (this.interactive) void this.sendCommands();
+    if (this.interactive) {
+      void this.sendCommands();
+      void this.sendModels();
+    }
   }
 
   /** Returns the message's uuid, which `rewind()` takes. Images go before the text, as the API recommends. */
@@ -342,6 +345,24 @@ export class Session {
     }
   }
 
+  /** The models the CLI offers, named as its `/model` names them, for the composer's picker. */
+  private async sendModels(): Promise<void> {
+    try {
+      const models = await this.q.supportedModels();
+      this.callbacks.emit({
+        type: "models.changed",
+        models: models.map((m) => ({
+          value: m.value,
+          displayName: m.displayName,
+          description: m.description,
+          ...(m.supportedEffortLevels?.length ? { efforts: [...m.supportedEffortLevels] } : {}),
+        })),
+      });
+    } catch (err) {
+      log(`supportedModels failed: ${err instanceof Error ? err.message : String(err)}`);
+    }
+  }
+
   /** How full the context window is; a failure only leaves the meter as it was. */
   private async sendContextUsage(): Promise<void> {
     try {
@@ -351,6 +372,9 @@ export class Session {
         percentage: u.percentage,
         totalTokens: u.totalTokens,
         maxTokens: u.maxTokens,
+        categories: u.categories
+          .filter((c) => c.kind !== "deferred" && c.tokens > 0)
+          .map((c) => ({ name: c.name, tokens: c.tokens, kind: c.kind })),
       });
     } catch (err) {
       log(`getContextUsage failed: ${err instanceof Error ? err.message : String(err)}`);

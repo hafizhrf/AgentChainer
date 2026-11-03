@@ -344,7 +344,9 @@ export function SessionView({
             </Group>
             <footer className="statusbar">
               <span>{tab.model ?? "…"}</span>
-              <span>{MODE_NAMES[tab.mode]}</span>
+              <span className="mode-label" data-mode={tab.mode}>
+                {MODE_NAMES[tab.mode]}
+              </span>
               <span className="grow" />
               {tab.context && (
                 <span

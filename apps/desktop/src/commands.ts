@@ -1,21 +1,27 @@
-﻿import { EFFORTS, type Effort, PERMISSION_MODES, type PermissionMode, type SlashCommand } from "@agentchainer/protocol";
+import type { ModelOption } from "@agentchainer/protocol";
+import { EFFORTS, type Effort, PERMISSION_MODES, type PermissionMode, type SlashCommand } from "@agentchainer/protocol";
 import { fuzzyFilter } from "./fuzzy.ts";
-import { MODE_NAMES, MODELS } from "./options.ts";
+import { knownModels, MODE_NAMES } from "./options.ts";
 import type { Item } from "./transcript.ts";
 
 /**
- * The chat room's slash commands and keys (UX-12, docs/design/chat-and-tasks.md Â§4). App commands run in the app;
+ * The chat room's slash commands and keys (UX-12, docs/design/chat-and-tasks.md §4). App commands run in the app;
  * every other command is sent to Claude as text, as typed.
  */
 
-export type AppCommand = "clear" | "model" | "mode" | "effort" | "cost" | "fork" | "help";
+export type AppCommand = "clear" | "model" | "mode" | "effort" | "usage" | "fork" | "help";
 
 export const APP_COMMANDS: (SlashCommand & { name: AppCommand })[] = [
   { name: "clear", description: "Start a new chat in this folder", argumentHint: "" },
-  { name: "model", description: "Switch the model", argumentHint: "haiku | sonnet | opus | default" },
-  { name: "mode", description: "Switch the permission mode (also Shift+Tab)", argumentHint: "safe | standard | plan" },
-  { name: "effort", description: "Switch the reasoning effort", argumentHint: `${EFFORTS.join(" | ")} | default` },
-  { name: "cost", description: "Show this chat's spend and context use", argumentHint: "" },
+  { name: "model", description: "Pick the model", argumentHint: "" },
+  { name: "mode", description: "Pick the permission mode (also Shift+Tab)", argumentHint: "" },
+  { name: "effort", description: "Pick the reasoning effort", argumentHint: "" },
+  {
+    name: "usage",
+    description: "This chat's spend, tokens and context window",
+    argumentHint: "",
+    aliases: ["cost", "stats", "context"],
+  },
   { name: "fork", description: "Fork this chat into a new tab", argumentHint: "" },
   { name: "help", description: "List the app's commands", argumentHint: "" },
 ];
@@ -50,12 +56,19 @@ export function slashMenu(session: SlashCommand[], query: string): MenuCommand[]
   return out;
 }
 
-/** `/model sonnet` â†’ `{ name: "model", arg: "sonnet" }`, for app commands only; anything else goes to Claude. */
+/**
+ * `/model sonnet` → `{ name: "model", arg: "sonnet" }`, for app commands or their aliases (`/cost` is `/usage`);
+ * anything else goes to Claude.
+ */
 export function parseAppCommand(text: string): { name: AppCommand; arg: string } | null {
   const m = /^\/(\S+)(?:\s+([\s\S]*))?$/.exec(text.trim());
-  const name = APP_COMMANDS.find((c) => c.name === m?.[1])?.name;
+  const word = m?.[1] ?? "";
+  const name = APP_COMMANDS.find((c) => c.name === word || c.aliases?.includes(word))?.name;
   return name ? { name, arg: (m?.[2] ?? "").trim() } : null;
 }
+
+/** Commands that open a picker or a panel above the composer when typed without an argument. */
+export const POPUP_COMMANDS = new Set<AppCommand>(["model", "mode", "effort", "usage", "help"]);
 
 /** The mode a name or id means: "plan", "Plan first", "acceptEdits" and "standard" all work. */
 export function modeFromArg(arg: string): PermissionMode | null {
@@ -69,10 +82,13 @@ export function modeFromArg(arg: string): PermissionMode | null {
   );
 }
 
-export function modelFromArg(arg: string): string | null {
+/** A model by its value ("sonnet", "claude-opus-5") or its CLI name ("Opus 5.5"); "default" is the app's "". */
+export function modelFromArg(arg: string, models: ModelOption[] = knownModels()): string | null {
   const a = arg.trim().toLowerCase();
   if (a === "default") return "";
-  return MODELS.find((m) => m.value === a)?.value ?? null;
+  const m = models.find((x) => x.value.toLowerCase() === a || x.displayName.toLowerCase() === a);
+  if (m) return m.value === "default" ? "" : m.value;
+  return /^claude-[a-z0-9-]+$/.test(a) ? a : null;
 }
 
 export function effortFromArg(arg: string): Effort | null | undefined {
@@ -81,14 +97,14 @@ export function effortFromArg(arg: string): Effort | null | undefined {
   return EFFORTS.find((e) => e === a);
 }
 
-/** The order Shift+Tab walks, like the CLI's: Safe â†’ Standard â†’ Plan first â†’ Autonomous (only with a budget cap). */
+/** The order Shift+Tab walks, like the CLI's: Safe → Standard → Plan first → Autonomous (only with a budget cap). */
 export function nextMode(mode: PermissionMode, canAutonomous: boolean): PermissionMode {
   const cycle: PermissionMode[] = ["default", "acceptEdits", "plan", ...(canAutonomous ? ["auto" as const] : [])];
   const i = cycle.indexOf(mode);
   return cycle[(i + 1) % cycle.length] ?? "default";
 }
 
-/** The person's sent messages, oldest first, for â†‘/â†“ in the composer. */
+/** The person's sent messages, oldest first, for ↑/↓ in the composer. */
 export function sentMessages(items: Item[]): string[] {
   const out: string[] = [];
   for (const i of items) if (i.kind === "user" && i.text.trim() && out.at(-1) !== i.text) out.push(i.text);

@@ -17,7 +17,7 @@ import { applyEvent, type Item } from "./transcript.ts";
 
 const session = [
   { name: "compact", description: "Summarize the conversation", argumentHint: "<instructions>" },
-  { name: "usage", description: "Show usage", argumentHint: "", aliases: ["stats"] },
+  { name: "insights", description: "Show insights", argumentHint: "", aliases: ["metrics"] },
   { name: "model", description: "The CLI's model picker", argumentHint: "" },
 ];
 
@@ -31,11 +31,11 @@ describe("the slash menu (UX-12)", () => {
         ["model", true],
         ["mode", true],
         ["effort", true],
-        ["cost", true],
+        ["usage", true],
         ["fork", true],
         ["help", true],
         ["compact", false],
-        ["usage", false],
+        ["insights", false],
       ],
     );
   });
@@ -46,14 +46,15 @@ describe("the slash menu (UX-12)", () => {
       ["compact"],
     );
     assert.deepEqual(
-      slashMenu(session, "stats").map((c) => c.name),
-      ["usage"],
+      slashMenu(session, "metrics").map((c) => c.name),
+      ["insights"],
     );
   });
 
   it("runs only the app's commands in the app, with their argument", () => {
     assert.deepEqual(parseAppCommand("/model  sonnet "), { name: "model", arg: "sonnet" });
     assert.deepEqual(parseAppCommand("/clear"), { name: "clear", arg: "" });
+    assert.deepEqual(parseAppCommand("/cost"), { name: "usage", arg: "" }, "the CLI's aliases work too");
     assert.equal(parseAppCommand("/compact keep the plan"), null);
     assert.equal(parseAppCommand("please /clear this"), null);
   });
@@ -64,9 +65,16 @@ describe("the slash menu (UX-12)", () => {
     assert.equal(modeFromArg("standard"), "acceptEdits");
     assert.equal(modeFromArg("autonomous"), "auto");
     assert.equal(modeFromArg("yolo"), null);
-    assert.equal(modelFromArg("Sonnet"), "sonnet");
-    assert.equal(modelFromArg("default"), "");
-    assert.equal(modelFromArg("gpt"), null);
+    const models = [
+      { value: "default", displayName: "Default (recommended)", description: "" },
+      { value: "fable", displayName: "Fable 5.1", description: "" },
+      { value: "sonnet", displayName: "Sonnet 5.5", description: "" },
+    ];
+    assert.equal(modelFromArg("Sonnet", models), "sonnet");
+    assert.equal(modelFromArg("fable 5.1", models), "fable");
+    assert.equal(modelFromArg("default", models), "");
+    assert.equal(modelFromArg("claude-opus-4-8", models), "claude-opus-4-8", "a full id is passed on");
+    assert.equal(modelFromArg("gpt", models), null);
     assert.equal(effortFromArg("high"), "high");
     assert.equal(effortFromArg("default"), null);
     assert.equal(effortFromArg("max-ish"), undefined);
@@ -214,5 +222,23 @@ describe("attachments as mentions (UX-12)", () => {
     assert.equal(mention("C:\\work\\app", "C:\\work\\app\\src\\a.ts"), "@src/a.ts");
     assert.equal(mention("/work/app/", "/work/app/docs/My Notes.md"), '@"docs/My Notes.md"');
     assert.equal(mention("/work/app", "/work/application/x.png"), "@/work/application/x.png");
+  });
+});
+
+describe("model choices from the CLI (UX-12)", () => {
+  it("names models as the CLI does, with its default as the app's empty choice, and keeps a picked one", async () => {
+    const { modelChoices } = await import("./options.ts");
+    const choices = modelChoices(
+      [
+        { value: "default", displayName: "Default (recommended)", description: "Opus 5.5 · everyday" },
+        { value: "haiku", displayName: "Haiku 5.5", description: "Fastest" },
+      ],
+      "claude-opus-4-8",
+    );
+    assert.deepEqual(choices, [
+      { value: "", label: "Default (recommended)", hint: "Opus 5.5 · everyday" },
+      { value: "haiku", label: "Haiku 5.5", hint: "Fastest" },
+      { value: "claude-opus-4-8", label: "claude-opus-4-8" },
+    ]);
   });
 });

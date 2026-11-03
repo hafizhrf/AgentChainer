@@ -1,13 +1,70 @@
-import { EFFORTS, type PERMISSION_MODES } from "@agentchainer/protocol";
+import { EFFORTS, type ModelOption, type PERMISSION_MODES } from "@agentchainer/protocol";
 
 /** Choices shared by the start screen, the composer and Settings. */
 
-export const MODELS = [
-  { value: "", label: "Default model", hint: "From your Claude settings" },
-  { value: "haiku", label: "Haiku", hint: "Fast, cheap" },
-  { value: "sonnet", label: "Sonnet", hint: "Balanced" },
-  { value: "opus", label: "Opus", hint: "Most capable" },
+/** Until a chat has started once: the CLI's aliases, which always point at its latest models. */
+const FALLBACK_MODELS: ModelOption[] = [
+  { value: "default", displayName: "Default (recommended)", description: "From your Claude settings" },
+  { value: "opus", displayName: "Opus", description: "The latest Opus" },
+  { value: "sonnet", displayName: "Sonnet", description: "The latest Sonnet" },
+  { value: "haiku", displayName: "Haiku", description: "The latest Haiku" },
 ];
+const MODELS_KEY = "agentchainer.models";
+/** The device's storage, when there is one (not in unit tests). */
+const storage = () =>
+  (globalThis as { localStorage?: { getItem(k: string): string | null; setItem(k: string, v: string): void } })
+    .localStorage;
+let known: ModelOption[] | null = null;
+
+/**
+ * The models the CLI offered in the last chat (UX-12), as its `/model` names them, kept on this device so the start
+ * screen and Settings list them too. Storage can be missing or throw; then the CLI's aliases stand in.
+ */
+export function knownModels(): ModelOption[] {
+  if (known) return known;
+  try {
+    const saved = JSON.parse(storage()?.getItem(MODELS_KEY) ?? "null");
+    if (
+      Array.isArray(saved) &&
+      saved.every((m) => typeof m?.value === "string" && typeof m?.displayName === "string")
+    ) {
+      known = saved as ModelOption[];
+      return known;
+    }
+  } catch {
+    // Not available: use the aliases.
+  }
+  return FALLBACK_MODELS;
+}
+
+export function rememberModels(models: ModelOption[]): void {
+  if (!models.length) return;
+  known = models;
+  try {
+    storage()?.setItem(MODELS_KEY, JSON.stringify(models));
+  } catch {
+    // Kept for this run only.
+  }
+}
+
+/**
+ * Select options for models. The CLI's "default" is the app's "" (no model set). A model picked earlier that the list
+ * no longer has stays as an option, so the select still shows it.
+ */
+export function modelChoices(
+  models: ModelOption[] = knownModels(),
+  current = "",
+): { value: string; label: string; hint?: string }[] {
+  const opts = models.map((m) => ({
+    value: m.value === "default" ? "" : m.value,
+    label: m.displayName,
+    ...(m.description ? { hint: m.description } : {}),
+  }));
+  if (!opts.some((o) => o.value === ""))
+    opts.unshift({ value: "", label: "Default (recommended)", hint: "From your Claude settings" });
+  if (current && !opts.some((o) => o.value === current)) opts.push({ value: current, label: current });
+  return opts;
+}
 
 /** "Open in editor" targets (M1-28); each needs its command-line launcher on PATH, except the system default. */
 export const EDITORS = [

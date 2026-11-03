@@ -1,4 +1,11 @@
-import type { AgentEvent, Effort, PermissionMode, PermissionRequest, SlashCommand } from "@agentchainer/protocol";
+import type {
+  AgentEvent,
+  Effort,
+  ModelOption,
+  PermissionMode,
+  PermissionRequest,
+  SlashCommand,
+} from "@agentchainer/protocol";
 import { PERMISSION_MODES } from "@agentchainer/protocol";
 import { applyEvent, type Item } from "./transcript.ts";
 
@@ -19,8 +26,10 @@ export type Tab = {
   claudeCodeVersion?: string;
   /** Slash commands and skills for the composer's `/` menu, with descriptions once the session sends them (UX-12). */
   slashCommands: SlashCommand[];
+  /** The models the CLI offers, as its `/model` names them (UX-12); empty until the session sends them. */
+  models: ModelOption[];
   /** How full the context window was after the last turn (UX-12); null until a turn reports it. */
-  context: { percentage: number; totalTokens: number; maxTokens: number } | null;
+  context: Omit<Extract<AgentEvent, { type: "context.usage" }>, "type"> | null;
   /** Set while Claude switched itself to plan mode (UX-12): the mode to go back to. */
   planSwitch: { previous: PermissionMode } | null;
   items: Item[];
@@ -85,6 +94,7 @@ export function newTab(
     effort: options.effort ?? null,
     budgetUsd: options.budgetUsd ?? null,
     slashCommands: [],
+    models: [],
     context: null,
     planSwitch: null,
     items: options.items ?? [],
@@ -123,8 +133,12 @@ export function tabEvent(tab: Tab, e: AgentEvent, now?: number): Tab {
       };
     case "commands.changed":
       return { ...tab, slashCommands: e.commands };
-    case "context.usage":
-      return { ...tab, context: { percentage: e.percentage, totalTokens: e.totalTokens, maxTokens: e.maxTokens } };
+    case "models.changed":
+      return { ...tab, models: e.models };
+    case "context.usage": {
+      const { type: _type, ...context } = e;
+      return { ...tab, context };
+    }
     case "tool.started":
       // Claude switching itself to plan mode (UX-12): the sidecar already allowed it; remember where it came from.
       if (e.name === "EnterPlanMode" && e.parentToolUseId === null && tab.mode !== "plan") {

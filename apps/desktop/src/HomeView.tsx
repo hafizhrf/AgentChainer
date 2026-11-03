@@ -4,7 +4,7 @@ import { Folder, FolderOpen, Play, Wrench, X } from "lucide-react";
 import { type ReactNode, useState } from "react";
 import type { Confirm } from "./Dialog.tsx";
 import { GitInitOffer } from "./GitInitOffer.tsx";
-import { MODE_HELP, MODELS, modeOptions } from "./options.ts";
+import { MODE_HELP, modelChoices, modeOptions } from "./options.ts";
 import { Readiness } from "./Readiness.tsx";
 import { SessionList } from "./SessionList.tsx";
 import { asMode, folderName } from "./tabs.ts";
@@ -100,7 +100,7 @@ export function HomeView({
           </div>
           <div className="field-row">
             <Field label="Model">
-              <Select label="Model" value={model} onChange={onModelChange} options={MODELS} />
+              <Select label="Model" value={model} onChange={onModelChange} options={modelChoices(undefined, model)} />
             </Field>
             <Field label="Permission profile">
               <Select

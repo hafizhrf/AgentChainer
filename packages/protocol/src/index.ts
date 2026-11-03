@@ -927,6 +927,16 @@ export const SlashCommandSchema = z.object({
 });
 export type SlashCommand = z.infer<typeof SlashCommandSchema>;
 
+/** A model the CLI offers, as its `/model` lists it (UX-12): the SDK's `supportedModels()`. */
+export const ModelOptionSchema = z.object({
+  /** What `setModel` takes: an alias like "opus", "default", or a full id. */
+  value: z.string(),
+  displayName: z.string(),
+  description: z.string(),
+  efforts: z.array(z.string()).optional(),
+});
+export type ModelOption = z.infer<typeof ModelOptionSchema>;
+
 /** Normalized agent activity, independent of raw SDK message shapes (ARCHITECTURE §5.2). */
 export const AgentEventSchema = z.discriminatedUnion("type", [
   z.object({
@@ -1076,12 +1086,18 @@ export const AgentEventSchema = z.discriminatedUnion("type", [
   }),
   /** The full list of commands, replacing the last one (UX-12): after init, and when skills appear mid-session. */
   z.object({ type: z.literal("commands.changed"), commands: z.array(SlashCommandSchema) }),
+  /** The models the CLI offers, when a chat starts (UX-12): the composer's model picker, named as the CLI names them. */
+  z.object({ type: z.literal("models.changed"), models: z.array(ModelOptionSchema) }),
   /** How full the context window is, after each turn (UX-12). */
   z.object({
     type: z.literal("context.usage"),
     percentage: z.number(),
     totalTokens: z.number(),
     maxTokens: z.number(),
+    /** What fills the window, for `/usage`: system prompt, tools, memory files, messages, the buffer, free space. */
+    categories: z
+      .array(z.object({ name: z.string(), tokens: z.number(), kind: z.enum(["used", "free", "buffer", "deferred"]) }))
+      .optional(),
   }),
   /** Earlier messages were summarized to free the context window, by `/compact` or automatically (UX-12). */
   z.object({

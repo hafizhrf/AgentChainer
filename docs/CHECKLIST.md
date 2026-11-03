@@ -1067,6 +1067,11 @@ for the desktop shell, start screen and session view to be cleaned up (UX-02, UX
       used by Claude; Skip); Claude's own `EnterPlanMode` switches the chat to Plan first with "Back to Safe"; the
       context meter, `/cost`, Shift+Tab and ↑ history; light and dark. Not checked live: a compaction divider and the
       todo panel (unit tests only).
+      Follow-up (owner, 2026-11-03): Claude's questions are tabs, one at a time, with a Submit tab, keys 1–9 and ←/→;
+      the composer's border shows the mode (Standard violet, Plan first cyan, Autonomous orange, Safe neutral, with
+      the mode's name beside it); the models are the CLI's own list and names (`supportedModels()`), kept for the
+      start screen and Settings; Enter on a `/` command runs it, and `/model`, `/mode`, `/effort`, `/usage` (alias
+      `/cost`, `/stats`, `/context`) and `/help` open a picker or a panel above the composer. Checked in the app.
 - [ ] **UX-13** One thread for chats and tasks (§5). One New with a Chat | Task switch; tasks as tabs with the right
       panel; drafting streams in the thread; the contract and triage as editable cards refined by replying; steps
       stream in the thread and the running step can be messaged; approvals and results as cards; a Task tab; "Make

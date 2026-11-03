@@ -264,7 +264,20 @@ describe("an interactive session (UX-12)", () => {
           supportedCommands: async () => [
             { name: "compact", description: "Summarize the conversation", argumentHint: "<instructions>", aliases: [] },
           ],
-          getContextUsage: async () => ({ percentage: 23, totalTokens: 46_000, maxTokens: 200_000 }),
+          supportedModels: async () => [
+            { value: "default", displayName: "Default (recommended)", description: "Opus · everyday" },
+            { value: "haiku", displayName: "Haiku", description: "Fastest", supportedEffortLevels: ["low", "high"] },
+          ],
+          getContextUsage: async () => ({
+            percentage: 23,
+            totalTokens: 46_000,
+            maxTokens: 200_000,
+            categories: [
+              { name: "System prompt", tokens: 3000, kind: "used" },
+              { name: "Deferred tools", tokens: 9000, kind: "deferred" },
+              { name: "Free space", tokens: 154_000, kind: "free" },
+            ],
+          }),
         });
       },
     } as unknown as AgentSdkModule;
@@ -279,13 +292,29 @@ describe("an interactive session (UX-12)", () => {
     await s.turn("hi");
     await new Promise((r) => setTimeout(r, 10));
     assert.deepEqual(
-      events.filter((e) => e.type === "commands.changed" || e.type === "context.usage"),
+      events.filter((e) => ["commands.changed", "models.changed", "context.usage"].includes(e.type)),
       [
         {
           type: "commands.changed",
           commands: [{ name: "compact", description: "Summarize the conversation", argumentHint: "<instructions>" }],
         },
-        { type: "context.usage", percentage: 23, totalTokens: 46_000, maxTokens: 200_000 },
+        {
+          type: "models.changed",
+          models: [
+            { value: "default", displayName: "Default (recommended)", description: "Opus · everyday" },
+            { value: "haiku", displayName: "Haiku", description: "Fastest", efforts: ["low", "high"] },
+          ],
+        },
+        {
+          type: "context.usage",
+          percentage: 23,
+          totalTokens: 46_000,
+          maxTokens: 200_000,
+          categories: [
+            { name: "System prompt", tokens: 3000, kind: "used" },
+            { name: "Free space", tokens: 154_000, kind: "free" },
+          ],
+        },
       ],
     );
     s.close();

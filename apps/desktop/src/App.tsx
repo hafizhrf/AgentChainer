@@ -25,7 +25,7 @@ import { APP_COMMANDS, type AppCommand, effortFromArg, modeFromArg, modelFromArg
 import { useConfirm } from "./Dialog.tsx";
 import { joinPath } from "./files.ts";
 import { HomeView, pickFolder } from "./HomeView.tsx";
-import { MODE_NAMES, MODELS, THEMES } from "./options.ts";
+import { MODE_NAMES, modelChoices, rememberModels, THEMES } from "./options.ts";
 import { type PermissionAnswer, PermissionDialog } from "./PermissionDialog.tsx";
 import { PANEL_TAB_LABEL, PANEL_TABS, type PanelTab, parseHidden, serializeHidden, toggleHidden } from "./panelTabs.ts";
 import { SessionView } from "./SessionView.tsx";
@@ -243,6 +243,8 @@ export function App() {
         turnWaiters.current.get(sessionId)?.(event);
         turnWaiters.current.delete(sessionId);
       }
+      // The CLI's model list, kept for the start screen and Settings too (UX-12).
+      if (event.type === "models.changed") rememberModels(event.models);
       patchTab(sessionId, (t) => tabEvent(t, event, Date.now()));
     });
     const ping = setInterval(() => {
@@ -576,7 +578,7 @@ export function App() {
         else void changeEffort(id, e);
         return;
       }
-      case "cost": {
+      case "usage": {
         const spent =
           t.cost.totalUsd === null ? "not known yet for a resumed session" : `≈$${t.cost.totalUsd.toFixed(4)}`;
         const ctx = t.context
@@ -811,7 +813,7 @@ export function App() {
         for (const m of PERMISSION_MODES)
           if (m !== t.mode)
             add("Session", `mode-${m}`, `Permission profile: ${MODE_NAMES[m]}`, () => void changeMode(t.sessionId, m));
-        for (const m of MODELS)
+        for (const m of modelChoices(t.models.length ? t.models : undefined))
           if (m.value && m.value !== t.modelAlias)
             add("Session", `model-${m.value}`, `Model: ${m.label}`, () => void changeModel(t.sessionId, m.value));
       }

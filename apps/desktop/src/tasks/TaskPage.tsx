@@ -34,7 +34,7 @@ import {
 import { useCallback, useEffect, useRef, useState } from "react";
 import { type Confirm, Modal } from "../Dialog.tsx";
 import { Markdown } from "../Markdown.tsx";
-import { MODE_NAMES, MODELS, modeOptions } from "../options.ts";
+import { MODE_NAMES, modelChoices, modeOptions } from "../options.ts";
 import { isRpcError } from "../rpc-client.ts";
 import { request, subscribe } from "../sidecar.ts";
 import { TranscriptView } from "../TranscriptView.tsx";
@@ -414,7 +414,12 @@ export function TaskPage({
               </p>
               <div className="card-footer">
                 <div className="task-model">
-                  <Select value={modelAlias} onChange={setModelAlias} options={MODELS} label="Model for the draft" />
+                  <Select
+                    value={modelAlias}
+                    onChange={setModelAlias}
+                    options={modelChoices(undefined, modelAlias)}
+                    label="Model for the draft"
+                  />
                 </div>
                 <span className="grow" />
                 <button type="button" disabled={!text.trim() || busy !== null} onClick={() => void start()}>
@@ -450,7 +455,12 @@ export function TaskPage({
             <Quote text={task.request} />
             <div className="card-footer">
               <div className="task-model">
-                <Select value={modelAlias} onChange={setModelAlias} options={MODELS} label="Model for the draft" />
+                <Select
+                  value={modelAlias}
+                  onChange={setModelAlias}
+                  options={modelChoices(undefined, modelAlias)}
+                  label="Model for the draft"
+                />
               </div>
               <span className="grow" />
               <button type="button" className="secondary" onClick={() => void discard(task)}>
@@ -644,7 +654,12 @@ export function TaskPage({
               ) : isXl(task) && task.state === "ready" && !task.subtasks?.length ? (
                 <>
                   <div className="task-model">
-                    <Select value={modelAlias} onChange={setModelAlias} options={MODELS} label="Model for the split" />
+                    <Select
+                      value={modelAlias}
+                      onChange={setModelAlias}
+                      options={modelChoices(undefined, modelAlias)}
+                      label="Model for the split"
+                    />
                   </div>
                   <button type="button" disabled={busy !== null} onClick={() => void split(task.id)}>
                     {busy === "split" && <Loader2 size={14} className="spin" />}

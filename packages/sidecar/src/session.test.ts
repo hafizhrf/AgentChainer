@@ -105,15 +105,24 @@ describe("background work (M4-07)", () => {
     s.close();
   });
 
+  const envOf = (s: ReturnType<typeof scriptedSdk>) => (s.options().env ?? {}) as Record<string, string | undefined>;
+
   it("lets only interactive sessions run background work, with a Stop per task", () => {
     const on = scriptedSdk([]);
     new Session(on.sdk, { cwd: "/w", claudePath: "claude", background: true }, callbacks()).close();
-    assert.deepEqual(on.options().env, { AGENTCHAINER_ALLOW_BACKGROUND: "1" });
+    assert.equal(envOf(on).AGENTCHAINER_ALLOW_BACKGROUND, "1");
     assert.equal(on.options().perTaskStopAffordance, true);
     const off = scriptedSdk([]);
     new Session(off.sdk, { cwd: "/w", claudePath: "claude" }, callbacks()).close();
-    assert.equal(off.options().env, undefined);
+    assert.equal(envOf(off).AGENTCHAINER_ALLOW_BACKGROUND, undefined);
     assert.equal(off.options().perTaskStopAffordance, undefined);
+  });
+
+  it("turns the to-do tool on, keeping the app's environment (UX-12)", () => {
+    const s = scriptedSdk([]);
+    new Session(s.sdk, { cwd: "/w", claudePath: "claude" }, callbacks()).close();
+    assert.equal(envOf(s).CLAUDE_CODE_ENABLE_TODO_TOOLS, "1");
+    assert.equal(envOf(s).PATH ?? envOf(s).Path, process.env.PATH ?? process.env.Path);
   });
 });
 

@@ -1058,7 +1058,7 @@ for the desktop shell, start screen and session view to be cleaned up (UX-02, UX
     cramped sections; its gates table said "." for the root package (now "root").
   - Open: the owner's own look in both themes.
   - Superseded by UX-13 (owner, 2026-11-03): a task becomes a chat thread with cards instead of a page.
-- [ ] **UX-12** A complete chat room. → design: [chat-and-tasks.md](design/chat-and-tasks.md) §4. Owner request,
+- [x] **UX-12** A complete chat room. → design: [chat-and-tasks.md](design/chat-and-tasks.md) §4. Owner request,
       2026-11-03: Shift+Tab cycles the mode; slash commands with descriptions and the app's own commands; question
       cards for `AskUserQuestion`; the agent switches to plan mode by itself (`EnterPlanMode`); input history,
       attachments and an editable queue; a todo panel, a context meter and compaction dividers.
@@ -1072,6 +1072,14 @@ for the desktop shell, start screen and session view to be cleaned up (UX-02, UX
       the mode's name beside it); the models are the CLI's own list and names (`supportedModels()`), kept for the
       start screen and Settings; Enter on a `/` command runs it, and `/model`, `/mode`, `/effort`, `/usage` (alias
       `/cost`, `/stats`, `/context`) and `/help` open a picker or a panel above the composer. Checked in the app.
+      Follow-up (2026-11-03):
+      - The todo panel never appeared: the to-do tool is off by default for SDK sessions on newer models
+        ([todo tracking](https://code.claude.com/docs/en/agent-sdk/todo-tracking.md)). Sessions now set
+        `CLAUDE_CODE_ENABLE_TODO_TOOLS=1`, which gives `TodoWrite` on CLI 2.1.314 (probed live).
+      - The ⇧⇥ chip is gone (owner, 2026-11-03). A context ring fills up as the context is used; its label says what's
+        left, and a click runs `/compact`.
+      Checked live with haiku in the app: a TodoWrite list showed "Todos 1 of 3 done" with its three items; `/compact`
+      and a click on the ring each added the "Earlier messages summarized" divider (48k → 9k tokens).
 - [x] **UX-13** One thread for chats and tasks (§5). One New with a Chat | Task switch; tasks as tabs with the right
       panel; drafting streams in the thread; the contract and triage as editable cards refined by replying; steps
       stream in the thread and the running step can be messaged; approvals and results as cards; a Task tab; "Make

@@ -495,9 +495,6 @@ export function Composer({
             onChange={(m) => onModeChange(asMode(m))}
             disabled={tab.ended}
           />
-          <kbd className="mode-key" title="Shift+Tab cycles the permission mode">
-            ⇧⇥
-          </kbd>
           <ModeHelp current={tab.mode} />
           <Select
             compact
@@ -526,6 +523,13 @@ export function Composer({
             <Paperclip size={14} />
           </button>
           <span className="grow" />
+          {tab.context && !tab.ended && (
+            <ContextRing
+              percentage={tab.context.percentage}
+              disabled={tab.running}
+              onCompact={() => onSend("/compact", [])}
+            />
+          )}
           {tab.ended ? (
             <button
               type="button"
@@ -567,5 +571,48 @@ export function Composer({
         </div>
       </div>
     </div>
+  );
+}
+
+/**
+ * How full the context window is, as a ring that fills up (owner request, 2026-11-03, like Claude's own apps); a click
+ * summarizes earlier messages with the CLI's `/compact`. The tooltip says what's left in words, so it's never the
+ * ring alone.
+ */
+function ContextRing({
+  percentage,
+  disabled,
+  onCompact,
+}: {
+  percentage: number;
+  disabled: boolean;
+  onCompact: () => void;
+}) {
+  const used = Math.min(100, Math.max(0, percentage));
+  const left = Math.round(100 - used);
+  const r = 7;
+  const around = 2 * Math.PI * r;
+  const label = `${left}% of the context window left. ${disabled ? "Compact once this turn ends." : "Click to compact now."}`;
+  return (
+    <button
+      type="button"
+      className={`ghost icon context-ring${used >= 80 ? " warn" : ""}`}
+      aria-label={label}
+      title={label}
+      disabled={disabled}
+      onClick={onCompact}
+    >
+      <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true">
+        <circle cx="9" cy="9" r={r} className="context-ring-track" />
+        <circle
+          cx="9"
+          cy="9"
+          r={r}
+          className="context-ring-fill"
+          strokeDasharray={`${(used / 100) * around} ${around}`}
+          transform="rotate(-90 9 9)"
+        />
+      </svg>
+    </button>
   );
 }

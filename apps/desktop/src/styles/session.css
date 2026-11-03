@@ -589,10 +589,24 @@
 
 /* ---------- Chat room extras (UX-12) ---------- */
 
-.mode-key {
-  margin: 0 var(--space-1);
-  color: var(--muted);
-  font-size: var(--text-xs);
+/* How full the context window is (UX-12): a ring that fills up; a click compacts. */
+.context-ring-track,
+.context-ring-fill {
+  fill: none;
+  stroke-width: 2.2;
+}
+
+.context-ring-track {
+  stroke: var(--border-strong);
+}
+
+.context-ring-fill {
+  stroke: var(--accent);
+  stroke-linecap: round;
+}
+
+.context-ring.warn .context-ring-fill {
+  stroke: var(--warn);
 }
 
 /* The border says the permission mode (UX-12); the mode's name is in the picker next to it, so it's never color alone. */
@@ -618,7 +632,6 @@
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--mode) 22%, transparent);
 }
 
-.composer-box[data-mode]:not([data-mode="default"]) .mode-key,
 .statusbar .mode-label[data-mode]:not([data-mode="default"]) {
   color: var(--mode);
 }

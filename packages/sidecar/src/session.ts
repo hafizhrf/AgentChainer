@@ -195,8 +195,15 @@ export class Session {
         enableFileCheckpointing: true,
         ...(options.model ? { model: options.model } : {}),
         ...(options.additionalDirectories?.length ? { additionalDirectories: options.additionalDirectories } : {}),
+        env: {
+          ...process.env,
+          // The to-do tool is off by default on newer models; the todo panel (UX-12) shows its list. On CLI 2.1.314 this
+          // gives TodoWrite (probed live); `allowedTools` would too, but would skip canUseTool for it.
+          CLAUDE_CODE_ENABLE_TODO_TOOLS: "1",
+          ...(options.background ? { [ALLOW_BACKGROUND]: "1" } : {}),
+        },
         // The app shows a Stop per background task, so an interrupt stops the turn only (sdk.d.ts).
-        ...(options.background ? { env: { [ALLOW_BACKGROUND]: "1" }, perTaskStopAffordance: true } : {}),
+        ...(options.background ? { perTaskStopAffordance: true } : {}),
         pathToClaudeCodeExecutable: options.claudePath,
         // Spawned here, as the SDK would, only to keep the process: see close().
         spawnClaudeCodeProcess: ({ command, args, cwd, env, signal }) => {

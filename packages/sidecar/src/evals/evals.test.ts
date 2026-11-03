@@ -7,6 +7,7 @@ import { fileURLToPath } from "node:url";
 import type { Task } from "@agentchainer/protocol";
 import { removeFixtureCopies } from "../detect/fixture-copy.ts";
 import { WORKFLOWS_DIR } from "../tasks/project-workflows.ts";
+import { checkReport } from "./check.ts";
 import type { SidecarClient } from "./client.ts";
 import {
   delta,
@@ -248,5 +249,59 @@ describe("report", () => {
     assert.ok("catalog/workflows/s.yaml" in inputs && "agents/ac-implementer.md" in inputs);
     const text = readFileSync(path.join(repoRoot, "catalog/workflows/s.yaml"), "utf8").replace(/\r\n/g, "\n");
     assert.equal(inputs["catalog/workflows/s.yaml"], sha256(text));
+  });
+});
+
+describe("report check (M7-03)", () => {
+  const inputs = { "catalog/workflows/s.yaml": sha256("s"), "agents/ac-implementer.md": sha256("i") };
+  const run: CaseRun = {
+    case: "a",
+    variant: "app",
+    passed: true,
+    state: "done",
+    gatesPassed: true,
+    failedGates: [],
+    costUsd: 0.01,
+    durationMs: 1000,
+    fixRounds: 0,
+    checks: [{ name: "hidden test", exitCode: 0 }],
+  };
+  const report: EvalReport = {
+    version: 1,
+    generatedAt: "2026-11-03T00:00:00.000Z",
+    app: { commit: "abc", dirty: false },
+    suite: { file: "test/evals/suite.json", cases: ["a"] },
+    n: 1,
+    maxUsd: 3,
+    spentUsd: 0.01,
+    skipped: 0,
+    inputs,
+    variants: [summarize(app, [run], ["a"])],
+    deltas: [],
+    runs: [run],
+  };
+  const md = renderMarkdown(report);
+
+  it("passes a report made with today's files", () => {
+    assert.deepEqual(checkReport(report, md, { ...inputs }), []);
+  });
+
+  it("names each workflow or role prompt that changed, appeared or went since the report", () => {
+    assert.deepEqual(
+      checkReport(report, md, { "catalog/workflows/s.yaml": sha256("s2"), "agents/ac-new.md": sha256("n") }),
+      [
+        "catalog/workflows/s.yaml changed since the report.",
+        "agents/ac-new.md is new since the report.",
+        "agents/ac-implementer.md was removed since the report.",
+      ],
+    );
+  });
+
+  it("fails without a report, with no runs, or with a Markdown that doesn't match", () => {
+    assert.match(checkReport(null, null, inputs)[0] ?? "", /no eval report/);
+    assert.deepEqual(checkReport({ ...report, runs: [] }, renderMarkdown({ ...report, runs: [] }), inputs), [
+      "The report has no runs.",
+    ]);
+    assert.deepEqual(checkReport(report, `${md}edited`, inputs), ["report.md isn't the one report.json renders to."]);
   });
 });

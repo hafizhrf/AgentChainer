@@ -1678,6 +1678,49 @@
                   "properties": {
                     "type": {
                       "type": "string",
+                      "const": "models.changed"
+                    },
+                    "models": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "value": {
+                            "type": "string"
+                          },
+                          "displayName": {
+                            "type": "string"
+                          },
+                          "description": {
+                            "type": "string"
+                          },
+                          "efforts": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          }
+                        },
+                        "required": [
+                          "value",
+                          "displayName",
+                          "description"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "models"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string",
                       "const": "context.usage"
                     },
                     "percentage": {
@@ -1688,6 +1731,35 @@
                     },
                     "maxTokens": {
                       "type": "number"
+                    },
+                    "categories": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "name": {
+                            "type": "string"
+                          },
+                          "tokens": {
+                            "type": "number"
+                          },
+                          "kind": {
+                            "type": "string",
+                            "enum": [
+                              "used",
+                              "free",
+                              "buffer",
+                              "deferred"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "name",
+                          "tokens",
+                          "kind"
+                        ],
+                        "additionalProperties": false
+                      }
                     }
                   },
                   "required": [
@@ -24482,6 +24554,49 @@
               "properties": {
                 "type": {
                   "type": "string",
+                  "const": "models.changed"
+                },
+                "models": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "value": {
+                        "type": "string"
+                      },
+                      "displayName": {
+                        "type": "string"
+                      },
+                      "description": {
+                        "type": "string"
+                      },
+                      "efforts": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "required": [
+                      "value",
+                      "displayName",
+                      "description"
+                    ],
+                    "additionalProperties": false
+                  }
+                }
+              },
+              "required": [
+                "type",
+                "models"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string",
                   "const": "context.usage"
                 },
                 "percentage": {
@@ -24492,6 +24607,35 @@
                 },
                 "maxTokens": {
                   "type": "number"
+                },
+                "categories": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "name": {
+                        "type": "string"
+                      },
+                      "tokens": {
+                        "type": "number"
+                      },
+                      "kind": {
+                        "type": "string",
+                        "enum": [
+                          "used",
+                          "free",
+                          "buffer",
+                          "deferred"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "name",
+                      "tokens",
+                      "kind"
+                    ],
+                    "additionalProperties": false
+                  }
                 }
               },
               "required": [

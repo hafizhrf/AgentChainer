@@ -24,6 +24,11 @@
   --err: #b42318;
   --err-bg: #fdecea;
   --focus: #5f9d7c;
+  /* Permission modes (UX-12): the composer's border, like the CLI's prompt. Safe stays neutral. */
+  --mode-default: var(--border-strong);
+  --mode-acceptEdits: #7c3aed;
+  --mode-plan: #0e7490;
+  --mode-auto: #c2410c;
   --shadow-sm: 0 1px 2px rgb(16 24 20 / 6%);
   --shadow-lg: 0 12px 40px rgb(16 24 20 / 18%);
 
@@ -70,6 +75,10 @@
   --err: #f28b82;
   --err-bg: #3a2120;
   --focus: #7fb89a;
+  --mode-default: var(--border-strong);
+  --mode-acceptEdits: #b197fc;
+  --mode-plan: #4fc3d9;
+  --mode-auto: #f59e5b;
   --shadow-sm: 0 1px 2px rgb(0 0 0 / 30%);
   --shadow-lg: 0 16px 48px rgb(0 0 0 / 50%);
 }
@@ -96,6 +105,10 @@
     --err: #f28b82;
     --err-bg: #3a2120;
     --focus: #7fb89a;
+    --mode-default: var(--border-strong);
+    --mode-acceptEdits: #b197fc;
+    --mode-plan: #4fc3d9;
+    --mode-auto: #f59e5b;
     --shadow-sm: 0 1px 2px rgb(0 0 0 / 30%);
     --shadow-lg: 0 16px 48px rgb(0 0 0 / 50%);
   }

@@ -3,10 +3,19 @@ import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { open } from "@tauri-apps/plugin-dialog";
 import { ArrowUp, ListPlus, Paperclip, Pencil, Play, SendHorizontal, Square, X } from "lucide-react";
 import { type ClipboardEvent, type KeyboardEvent, useEffect, useMemo, useRef, useState } from "react";
-import { type AppCommand, mention, nextMode, parseAppCommand, sentMessages, slashMenu } from "./commands.ts";
+import { HelpPopup, PickerPopup, type PopupKind, UsagePopup } from "./ComposerPopup.tsx";
+import {
+  type AppCommand,
+  mention,
+  nextMode,
+  POPUP_COMMANDS,
+  parseAppCommand,
+  sentMessages,
+  slashMenu,
+} from "./commands.ts";
 import { fuzzyFilter, tokenAt } from "./fuzzy.ts";
 import { ModeHelp } from "./ModeHelp.tsx";
-import { EFFORT_OPTIONS, MODELS, modeOptions } from "./options.ts";
+import { EFFORT_OPTIONS, MODE_HELP, MODE_NAMES, modelChoices, modeOptions } from "./options.ts";
 import { asMode, type Tab } from "./tabs.ts";
 import { Select } from "./ui/Select.tsx";
 
@@ -64,6 +73,12 @@ export function Composer({
   const [pasteError, setPasteError] = useState<string | null>(null);
   const [pick, setPick] = useState(0);
   const [dropping, setDropping] = useState(false);
+  /** A picker or panel a slash command opened (UX-12). */
+  const [popup, setPopup] = useState<PopupKind | null>(null);
+  const closePopup = () => {
+    setPopup(null);
+    requestAnimationFrame(() => area.current?.focus());
+  };
   /** Start of a token whose suggestions the user dismissed with Esc. */
   const [dismissed, setDismissed] = useState<number | null>(null);
   /** Where ↑/↓ is in the sent messages (null: not browsing), and the draft to come back to. */
@@ -158,6 +173,8 @@ export function Composer({
     setDismissed(null);
     history.current = null;
     const command = parseAppCommand(text);
+    // `/model`, `/usage`… without an argument open their picker or panel, like the CLI's.
+    if (command && !command.arg && POPUP_COMMANDS.has(command.name)) return setPopup(command.name as PopupKind);
     if (command) return onCommand(command.name, command.arg);
     setImages([]);
     if (tab.running || queue.length > 0) setQueue((q) => [...q, { text, images }]);
@@ -259,8 +276,8 @@ export function Composer({
       if (e.key === "Enter" || e.key === "Tab") {
         e.preventDefault();
         const choice = suggestions[Math.min(pick, suggestions.length - 1)];
-        // Enter on a command that takes no argument runs it, as in the CLI; otherwise it's completed for the argument.
-        if (e.key === "Enter" && token?.kind === "/" && choice && !choice.hint && draft.slice(cursor).trim() === "") {
+        // Enter runs the highlighted command, as in the CLI; Tab completes it, to type an argument after it.
+        if (e.key === "Enter" && token?.kind === "/" && choice) {
           submit(choice.insert);
           return;
         }
@@ -331,7 +348,50 @@ export function Composer({
           </button>
         </div>
       )}
-      <div className={`composer-box${dropping ? " dropping" : ""}`}>
+      {popup === "model" && (
+        <PickerPopup
+          title="Model"
+          items={modelChoices(tab.models.length ? tab.models : undefined, tab.modelAlias)}
+          current={tab.modelAlias}
+          onPick={(v) => {
+            onModelChange(v);
+            closePopup();
+          }}
+          onClose={closePopup}
+        />
+      )}
+      {popup === "mode" && (
+        <PickerPopup
+          title="Permission mode"
+          items={(["default", "acceptEdits", "plan", "auto"] as const).map((m) => ({
+            value: m,
+            label: MODE_NAMES[m],
+            hint: m === "auto" && !canAutonomous ? "Needs a budget cap (Settings)" : MODE_HELP[m],
+            disabled: m === "auto" && !canAutonomous,
+          }))}
+          current={tab.mode}
+          onPick={(v) => {
+            onModeChange(asMode(v));
+            closePopup();
+          }}
+          onClose={closePopup}
+        />
+      )}
+      {popup === "effort" && (
+        <PickerPopup
+          title="Effort"
+          items={EFFORT_OPTIONS}
+          current={tab.effort ?? ""}
+          onPick={(v) => {
+            onEffortChange((v || null) as Effort | null);
+            closePopup();
+          }}
+          onClose={closePopup}
+        />
+      )}
+      {popup === "usage" && <UsagePopup tab={tab} onClose={closePopup} />}
+      {popup === "help" && <HelpPopup commands={tab.slashCommands} onClose={closePopup} />}
+      <div className={`composer-box${dropping ? " dropping" : ""}`} data-mode={tab.mode}>
         {suggestions.length > 0 && (
           <ul className="suggestions" aria-label={token?.kind === "@" ? "Matching files" : "Matching commands"}>
             {suggestions.map((s, i) => (
@@ -408,7 +468,7 @@ export function Composer({
             compact
             label="Model"
             value={tab.modelAlias}
-            options={MODELS}
+            options={modelChoices(tab.models.length ? tab.models : undefined, tab.modelAlias)}
             onChange={onModelChange}
             disabled={tab.ended}
           />

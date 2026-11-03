@@ -1091,7 +1091,7 @@ for the desktop shell, start screen and session view to be cleaned up (UX-02, UX
       the app with haiku: an Edit approval as a card, a message sent mid-step that Claude acted on ("the
       negative-percent test you asked for is in"), and a no-budget run to Done with "no budget" in the run, the panel
       and the evidence report. Evidence: #86 and this step's PR.
-- [ ] **UX-14** A live and AI-made workflow canvas (§6). A Flow tab shows the run's workflow with each step's live
+- [x] **UX-14** A live and AI-made workflow canvas (§6). A Flow tab shows the run's workflow with each step's live
       status, hand-offs and fix rounds; Generate with AI drafts project workflows; M/L/XL tasks may get their own
       flow, approved with the contract.
       Note: step 4 (the live flow) is built: a task's right panel has Task | Flow tabs; Flow draws the run's workflow
@@ -1099,7 +1099,13 @@ for the desktop shell, start screen and session view to be cleaned up (UX-02, UX
       stopped, not run; an icon and a word), its turns and cost, and the fix rounds used on each fix edge; clicking a
       step opens it in the thread. An XL task draws its sub-tasks in rows by what they wait for; clicking one opens it.
       Checked in the app with haiku: a finished run's flow, a jump to its Implement step, and a new run drawn live
-      (Implement running, Gates waiting, then both done). Step 5 (AI-made flows) is next.
+      (Implement running, Gates waiting, then both done). Evidence: #88.
+      Step 5 is built: Generate with AI in the workflow editor (`workflow.generate`: the description, then a diff to
+      keep or discard; nothing saved), and a draft S, M or L task's own flow (`task.proposeFlow`, shown on the Flow
+      tab with "Use the tier's flow"), approved with the contract and followed by the run (`source: "task"`, its hash
+      in the evidence and Metrics). Checked in the app: a generated S workflow that added a test planner (sonnet,
+      ≈$0.02, passed the checks, kept in the editor, not saved); a task's own flow (Claude kept the S flow for a small
+      task and said why), then a haiku run to Done whose run and evidence name the task's own flow.
 
 ### Exit criteria
 

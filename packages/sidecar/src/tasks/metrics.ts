@@ -55,9 +55,11 @@ const rate = (part: number, whole: number) => (whole ? part / whole : null);
 /** A workflow's key and its name in the breakdown: the app's by id, a project's by file and hash. */
 function workflowOf(r: RunSummary): { key: string; label: string } {
   const w = r.workflow;
-  return w.source === "project"
-    ? { key: `${w.id}@${w.hash}`, label: `${w.file ?? w.id} (${w.hash})` }
-    : { key: w.id, label: `${w.id} v${w.version}` };
+  return w.source === "task"
+    ? { key: `${w.id}@${w.hash}`, label: `a task's own flow (${w.hash})` }
+    : w.source === "project"
+      ? { key: `${w.id}@${w.hash}`, label: `${w.file ?? w.id} (${w.hash})` }
+      : { key: w.id, label: `${w.id} v${w.version}` };
 }
 
 export function computeMetrics(tasks: Task[], filter: MetricsFilter = {}): MetricsSummary {

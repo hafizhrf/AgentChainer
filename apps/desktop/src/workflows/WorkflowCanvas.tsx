@@ -51,7 +51,7 @@ function StatusMark({ state }: { state: NodeState }) {
             ? CircleMinus
             : CircleDashed;
   return (
-    <span className={`workflow-status ${state.status}`}>
+    <span className={`step-status ${state.status}`}>
       <Icon size={12} className={state.status === "running" ? "spin" : undefined} aria-hidden />
       {STATUS_TEXT[state.status]}
       {state.turns > 1 ? ` · ${state.turns} turns` : ""}

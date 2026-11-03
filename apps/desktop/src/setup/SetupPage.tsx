@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { type ReactNode, useCallback, useEffect, useState } from "react";
 import type { Confirm } from "../Dialog.tsx";
+import { FolderSwitcher } from "../FolderSwitcher.tsx";
 import { request } from "../sidecar.ts";
 import { folderName } from "../tabs.ts";
 import { IconButton } from "../ui/IconButton.tsx";
@@ -53,6 +54,8 @@ export function SetupPage({
   confirm,
   onBack,
   initialView = "overview",
+  folders = [],
+  onFolderChange,
 }: {
   cwd: string;
   /** Model alias for generators ("" = the CLI's default). */
@@ -61,6 +64,9 @@ export function SetupPage({
   confirm: Confirm;
   onBack: () => void;
   initialView?: SetupView;
+  /** A multi-folder workspace's folders, primary first (M8-01): readiness, the plan and the rest are per folder. */
+  folders?: string[];
+  onFolderChange?: (dir: string) => void;
 }) {
   const [view, setView] = useState<SetupView>(initialView);
   const [focus, setFocus] = useState<string | null>(null);
@@ -124,9 +130,13 @@ export function SetupPage({
         </button>
         <div className="setup-title">
           <h1>Workspace settings</h1>
-          <span className="muted" title={cwd}>
-            {folderName(cwd)}
-          </span>
+          {folders.length > 1 && onFolderChange ? (
+            <FolderSwitcher folders={folders} current={cwd} onChange={onFolderChange} />
+          ) : (
+            <span className="muted" title={cwd}>
+              {folderName(cwd)}
+            </span>
+          )}
         </div>
         <div className="setup-chips">
           {profile?.stacks.map((s) => (

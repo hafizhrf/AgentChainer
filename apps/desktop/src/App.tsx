@@ -118,6 +118,8 @@ export function App() {
     model: string;
     back: string | null;
     view?: SetupView;
+    /** A multi-folder workspace's folders, primary first (M8-01): the page switches between them. */
+    folders?: string[];
   } | null>(null);
   /** Approvals from task steps' sessions, which have no tab (M3-06), oldest first. */
   const [taskApprovals, setTaskApprovals] = useState<PermissionRequest[]>([]);
@@ -1127,7 +1129,14 @@ export function App() {
                     onModeChange={setMode}
                     canAutonomous={settings?.budgetUsd != null}
                     onStart={() => void startSession(workspace, model, mode, homeDef?.folders ?? [])}
-                    onOpenSetup={() => setSetup({ cwd: workspace, model, back: null })}
+                    onOpenSetup={() =>
+                      setSetup({
+                        cwd: workspace,
+                        model,
+                        back: null,
+                        ...(homeDef ? { folders: [homeDef.primary, ...homeDef.folders] } : {}),
+                      })
+                    }
                     openIds={new Set(tabs.filter((t) => !t.ended).map((t) => t.sessionId))}
                     onOpenStored={openStored}
                     confirm={confirm}
@@ -1177,7 +1186,14 @@ export function App() {
                     onFork={() => void forkTab(t.sessionId)}
                     onClose={() => closeTab(t.sessionId)}
                     onOpenFile={(file, line) => void openInEditor(t.sessionId, t.cwd, file, line)}
-                    onOpenSetup={() => setSetup({ cwd: t.cwd, model: t.modelAlias, back: t.sessionId })}
+                    onOpenSetup={(dir) =>
+                      setSetup({
+                        cwd: dir ?? t.cwd,
+                        model: t.modelAlias,
+                        back: t.sessionId,
+                        ...(t.folders?.length ? { folders: [t.cwd, ...t.folders] } : {}),
+                      })
+                    }
                     confirm={confirm}
                   />
                 ))}
@@ -1191,6 +1207,8 @@ export function App() {
                       confirm={confirm}
                       onBack={() => setSetup(null)}
                       {...(setup.view ? { initialView: setup.view } : {})}
+                      folders={setup.folders ?? []}
+                      onFolderChange={(dir) => setSetup({ ...setup, cwd: dir })}
                     />
                   </Suspense>
                 )}

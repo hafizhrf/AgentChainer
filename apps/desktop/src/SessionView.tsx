@@ -6,6 +6,8 @@ import { type Attachment, Composer } from "./Composer.tsx";
 import type { AppCommand } from "./commands.ts";
 import { latestTodos } from "./commands.ts";
 import type { Confirm } from "./Dialog.tsx";
+import { FolderSwitcher } from "./FolderSwitcher.tsx";
+import { joinPath } from "./files.ts";
 import { AgentDrawer } from "./graph/AgentDrawer.tsx";
 import { BackgroundTasks } from "./graph/BackgroundTasks.tsx";
 import { SessionTimeline } from "./graph/SessionTimeline.tsx";
@@ -91,8 +93,8 @@ export function SessionView({
   onRename: (title: string) => void;
   onFork: () => void;
   onClose: () => void;
-  /** Opens Workspace settings (M2-08…M2-17) for this session's folder. */
-  onOpenSetup: () => void;
+  /** Opens Workspace settings (M2-08…M2-17) for this session's folder, or one of its workspace's other folders. */
+  onOpenSetup: (dir?: string) => void;
   /** The right panel's tab when it opens (self-test screenshots). */
   panelTab?: PanelTab | undefined;
   /** Right-panel tabs the user hid (`panelTabs.ts`). */
@@ -119,7 +121,10 @@ export function SessionView({
   const right = usePanelRef();
   /** The right panel's width before a diff widened it. */
   const narrow = useRef<number | null>(null);
-  const workspace = useWorkspace(tab.cwd, !hidden);
+  /** The folder the right panel shows: a multi-folder workspace's session can switch to its other folders (M8-01). */
+  const [panelDir, setPanelDir] = useState(tab.cwd);
+  const dirs = useMemo(() => [tab.cwd, ...(tab.folders ?? [])], [tab.cwd, tab.folders]);
+  const workspace = useWorkspace(panelDir, !hidden);
   const { refresh } = workspace;
   const paths = useMemo(() => workspace.files?.files.map((f) => f.path) ?? [], [workspace.files]);
   const warning = budgetWarning(tab);
@@ -219,7 +224,7 @@ export function SessionView({
               onRename={onRename}
               onFork={onFork}
               onClose={onClose}
-              onOpenSetup={onOpenSetup}
+              onOpenSetup={() => onOpenSetup()}
             />
             {warning && <div className="banner">{warning}</div>}
             <Group
@@ -381,20 +386,28 @@ export function SessionView({
           >
             <aside className="right-panel" aria-label="Workspace">
               <div className="right-tabs" hidden={selected !== null || agent !== undefined}>
+                <FolderSwitcher
+                  folders={dirs}
+                  current={panelDir}
+                  onChange={(dir) => {
+                    setSelected(null);
+                    setPanelDir(dir);
+                  }}
+                />
                 <Suspense fallback={<p className="muted panel-loading">Loading…</p>}>
                   <WorkspacePanel
                     key={panelTab}
                     {...(panelTab ? { initialTab: panelTab } : {})}
-                    cwd={tab.cwd}
+                    cwd={panelDir}
                     files={workspace.files}
                     error={workspace.error}
                     items={tab.items}
                     selected={selected}
                     confirm={confirm}
                     onSelect={setSelected}
-                    onOpenFile={(path) => onOpenFile(path)}
+                    onOpenFile={(path) => onOpenFile(joinPath(panelDir, path))}
                     onRefresh={() => void refresh()}
-                    onOpenSetup={onOpenSetup}
+                    onOpenSetup={() => onOpenSetup(panelDir)}
                     hiddenTabs={hiddenTabs}
                     onHiddenTabsChange={onHiddenTabsChange}
                     onHidePanel={onToggleRight}
@@ -416,12 +429,12 @@ export function SessionView({
               {selected && (
                 <Suspense fallback={<p className="muted">Loading diff viewer…</p>}>
                   <DiffView
-                    cwd={tab.cwd}
+                    cwd={panelDir}
                     path={selected}
                     version={workspace.files}
                     confirm={confirm}
                     onClose={() => setSelected(null)}
-                    onOpenInEditor={(line) => onOpenFile(selected, line)}
+                    onOpenInEditor={(line) => onOpenFile(joinPath(panelDir, selected), line)}
                   />
                 </Suspense>
               )}

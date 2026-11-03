@@ -31,7 +31,7 @@ export type CaseRun = {
 const CHECK_TIMEOUT_MS = 180_000;
 
 /**
- * Runs `c` once with `variant` on a fresh copy of its fixture: the written contract is triaged and approved at the
+ * Runs `c` once with `variant` on a fresh copy of its fixture (with the case's start files committed): the written contract is triaged and approved at the
  * case's tier (no drafting, so every variant starts from the same contract), the run goes to its end, then the hidden
  * files are copied in and the acceptance checks run. `cancelAbove` cancels the run once it costs more than that.
  */
@@ -39,9 +39,16 @@ export async function runCase(
   client: SidecarClient,
   c: EvalCase,
   variant: Variant,
-  opts: { hiddenRoot: string; cancelAbove: number; log?: (line: string) => void },
+  opts: { root: string; cancelAbove: number; log?: (line: string) => void },
 ): Promise<CaseRun> {
   const cwd = copyFixture(c.fixture);
+  if (c.start) {
+    cpSync(path.join(opts.root, "start", c.start), cwd, { recursive: true });
+    execFileSync("git", ["-c", "user.name=t", "-c", "user.email=t@example.invalid", "commit", "-qam", "start"], {
+      cwd,
+      stdio: "ignore",
+    });
+  }
   for (const [f, text] of Object.entries(variant.workflows)) {
     mkdirSync(path.join(cwd, WORKFLOWS_DIR), { recursive: true });
     writeFileSync(path.join(cwd, WORKFLOWS_DIR, f), text);
@@ -99,7 +106,7 @@ export async function runCase(
     });
     row.durationMs = Date.now() - t0;
     const code = codeFolder(cwd, end);
-    if (c.hidden) cpSync(path.join(opts.hiddenRoot, c.id), code, { recursive: true });
+    if (c.hidden) cpSync(path.join(opts.root, "hidden", c.id), code, { recursive: true });
     row.checks = c.checks.map((check) => ({ name: check.name, exitCode: runCheck(check.argv, code) }));
     row.passed = row.checks.every((k) => k.exitCode === 0);
   } catch (err) {

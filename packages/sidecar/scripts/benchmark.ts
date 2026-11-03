@@ -71,7 +71,7 @@ try {
       break;
     }
     const row = await runCase(client, c, v, {
-      hiddenRoot: here("../test/evals/hidden"),
+      root: here("../test/evals"),
       cancelAbove: maxUsd - spent,
       log: console.log,
     });

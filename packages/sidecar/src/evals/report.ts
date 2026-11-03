@@ -223,9 +223,18 @@ export function renderMarkdown(r: EvalReport): string {
   const disagree = r.runs.filter((x) => x.passed && x.state !== "done");
   if (disagree.length) {
     out.push("", "## Runs that passed the checks but not by the task's own verdict", "");
+    const groups = new Map<string, { runs: CaseRun[]; gates: Set<string> }>();
     for (const x of disagree) {
-      const gates = x.failedGates.length ? `; failed gates: ${x.failedGates.join(", ")}` : "";
-      out.push(`- ${x.variant} / ${x.case}: ${x.state}${gates}`);
+      const key = `${x.variant} / ${x.case}`;
+      const g = groups.get(key) ?? { runs: [], gates: new Set() };
+      g.runs.push(x);
+      for (const gate of x.failedGates) g.gates.add(gate);
+      groups.set(key, g);
+    }
+    for (const [key, g] of groups) {
+      const states = [...new Set(g.runs.map((x) => x.state))].join(", ");
+      const gates = g.gates.size ? `; failed gates: ${[...g.gates].join(", ")}` : "";
+      out.push(`- ${key}: ${g.runs.length} ${g.runs.length === 1 ? "run" : "runs"} ${states}${gates}`);
     }
   }
   const failed = r.runs.filter((x) => !x.passed);

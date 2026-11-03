@@ -92,6 +92,11 @@ reader; an XL task counts once, with its sub-tasks' costs inside it.
   template reports its success and cost delta on the benchmark before merge".
 - A change that isn't meant to change behavior (a comment, a typo) still needs a report. Re-running the benchmark is
   cheap (§5); the check doesn't try to tell harmless changes apart.
+- **As built (step 4):** the check covers the tier workflows and the role prompts in `agents/`, the files a task run
+  reads (§5). It compares their sha256, with LF line ends, against the report's `inputs`, so it needs no git diff and
+  also runs on pushes to `main`. A missing report, one without runs, or a `report.md` that isn't what `report.json`
+  renders to also fails. It runs in the Checks job; `report.json` is left out of Biome because the benchmark writes
+  it.
 
 ## 7. OpenTelemetry (M7-04, owner decision 2)
 

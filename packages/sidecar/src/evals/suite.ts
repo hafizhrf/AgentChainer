@@ -23,6 +23,14 @@ export const EvalCaseSchema = z.object({
   request: z.string().min(1),
   contract: TaskContractSchema.omit({ task: true, approvedAt: true }),
   tier: TierSchema.exclude(["XL"]),
+  /**
+   * A folder under `test/evals/start/` copied over the fixture and committed before the run, e.g. to fix the fixture's
+   * seeded bug so the case's gates start green.
+   */
+  start: z
+    .string()
+    .regex(/^[a-z0-9-]+$/)
+    .optional(),
   /** Files under `test/evals/hidden/<id>/`, copied over the code folder after the run, before the checks. */
   hidden: z.boolean().default(false),
   checks: z.array(CheckSchema).min(1),

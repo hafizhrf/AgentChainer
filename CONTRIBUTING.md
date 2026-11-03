@@ -61,6 +61,15 @@ Troubleshooting:
    `feat(sidecar): add env.check [M0-19]`. The `PR title` workflow checks this.
 5. In the PR description, list the evidence for every checklist item you tick: test runs, spike write-ups, screenshots.
    Never claim a check passed that you didn't run.
+6. **Changing a tier workflow (`catalog/workflows/`) or a role prompt (`agents/`)?** Run the eval benchmark with your
+   own `claude` login, commit its report, and paste the report's summary into the PR description. CI fails until the
+   committed report matches the changed files:
+   ```bash
+   node packages/sidecar/scripts/benchmark.ts --variant main:workflows-ref=origin/main --variant branch
+   ```
+   It costs about $1 per variant with haiku at N=3 and writes `packages/sidecar/test/evals/report.json` and `.md`. A
+   role prompt change has no `main` variant yet (variants swap workflows and models only), so its report is a run of
+   `branch` alone.
 
 `main` is protected: PRs only, CI must be green, linear history, no force pushes.
 

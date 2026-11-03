@@ -1015,6 +1015,15 @@ fieldset.workflow-fix > legend {
   white-space: nowrap;
 }
 
+/* A step's detail on up to two lines, the rest in its tooltip (UX-17). */
+.workflow-step .clamp-2 {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-height: 1.35;
+}
+
 .workflow-step-kind {
   color: var(--muted);
   font-size: var(--text-xs);
@@ -1046,13 +1055,19 @@ fieldset.workflow-fix > legend {
   stroke-dasharray: 5 4;
 }
 
-.workflow-canvas .react-flow__edge-text {
-  fill: var(--fg);
+/* A fix loop's label, in its own lane (UX-17). */
+.workflow-fix-label {
+  position: absolute;
+  top: 0;
+  left: 0;
+  padding: 1px 6px;
+  border: 1px solid var(--warn);
+  border-radius: var(--radius-full);
+  background: var(--surface);
+  color: var(--fg);
   font-size: var(--text-xs);
-}
-
-.workflow-canvas .react-flow__edge-textbg {
-  fill: var(--surface);
+  white-space: nowrap;
+  pointer-events: all;
 }
 
 /* Project workflow files the app can't use, with the schema's own message (M6-04). */

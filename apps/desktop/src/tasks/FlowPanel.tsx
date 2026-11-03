@@ -95,8 +95,8 @@ export function FlowPanel({
       return { nodes, edges, states, fixes: {} };
     }
     const { nodes, edges } = workflowGraph(loaded?.workflow ?? null);
-    return { nodes, edges, states: flowStates(nodes, run), fixes: fixesUsed(edges, run) };
-  }, [xl, subtasks, loaded, run]);
+    return { nodes, edges, states: flowStates(nodes, run, task.state === "running"), fixes: fixesUsed(edges, run) };
+  }, [xl, subtasks, loaded, run, task.state]);
 
   /** A draft S, M or L task can get its own flow from AI, or drop it (UX-14). */
   async function own(kind: "propose" | "drop") {

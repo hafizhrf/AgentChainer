@@ -34,7 +34,8 @@ export type WorkflowEdge = {
 };
 
 export const STEP_W = 240;
-export const STEP_H = 76;
+/** Room for the status line, the name and a detail of up to two lines (UX-17). */
+export const STEP_H = 92;
 const GAP_Y = 48;
 const GAP_X = 16;
 /** Room around a group's members for its own label. */

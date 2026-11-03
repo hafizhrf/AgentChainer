@@ -68,6 +68,15 @@ describe("a run on its workflow's canvas (UX-14)", () => {
     assert.deepEqual([fix?.maxRounds, fix && fixesUsed(edges, finished)[fix.id]], [2, 1]);
   });
 
+  it("shows a step left running by a run that stopped (the app closed mid-run) as stopped (UX-17)", () => {
+    const left = run(
+      [entry("plan", "plan", "agent", "done"), entry("implement", "implement", "agent", "running")],
+      false,
+    );
+    assert.equal(byLabel(flowStates(nodes, left), "Implement")?.status, "running");
+    assert.equal(byLabel(flowStates(nodes, left, false), "Implement")?.status, "cancelled");
+  });
+
   it("draws nothing as a run before there is one", () => {
     assert.ok(Object.values(flowStates(nodes, null)).every((s) => s.status === "pending"));
   });

@@ -53,20 +53,39 @@
   stroke: var(--accent);
 }
 
+/* Quiet zoom controls (UX-17): one small panel of icon buttons, like the app's other icon buttons. */
 .session-graph .react-flow__controls {
   border: 1px solid var(--border);
   border-radius: var(--radius);
   overflow: hidden;
+  background: var(--surface);
   box-shadow: var(--shadow-sm);
 }
 
 .session-graph .react-flow__controls-button {
+  width: 28px;
+  min-height: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
   border-bottom: 1px solid var(--border);
-  background: var(--surface);
+  border-radius: 0;
+  background: transparent;
+  color: var(--muted);
+}
+
+.session-graph .react-flow__controls-button:last-child {
+  border-bottom: 0;
+}
+
+.session-graph .react-flow__controls-button:hover {
+  background: var(--surface-3);
   color: var(--fg);
 }
 
 .react-flow__controls-button > svg {
+  width: 12px;
+  height: 12px;
   fill: currentColor;
 }
 

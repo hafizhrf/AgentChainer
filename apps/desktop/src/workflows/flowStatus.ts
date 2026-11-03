@@ -16,8 +16,15 @@ export type NodeState = {
   turns: number;
 };
 
-/** By node id: the state of each step the run's timeline names. A step with no entry yet is pending. */
-export function flowStates(nodes: WorkflowNode[], run: TaskRun | null | undefined): Record<string, NodeState> {
+/**
+ * By node id: the state of each step the run's timeline names. A step with no entry yet is pending. `live` is whether
+ * the run is going on: a step still "running" in a run that isn't (the app closed mid-run, UX-17) is shown stopped.
+ */
+export function flowStates(
+  nodes: WorkflowNode[],
+  run: TaskRun | null | undefined,
+  live = true,
+): Record<string, NodeState> {
   const out: Record<string, NodeState> = {};
   const ended = run ? !run.steps.some((s) => s.status === "running") && run.endedAt !== undefined : false;
   for (const node of nodes) {
@@ -27,7 +34,9 @@ export function flowStates(nodes: WorkflowNode[], run: TaskRun | null | undefine
     const last = entries.at(-1);
     out[node.id] = {
       status: entries.some((e) => e.status === "running")
-        ? "running"
+        ? live
+          ? "running"
+          : "cancelled"
         : last
           ? last.status
           : ended

@@ -1166,7 +1166,7 @@ for the desktop shell, start screen and session view to be cleaned up (UX-02, UX
 
 ### Exit criteria
 
-- [ ] **UX-17** A tidy workflow canvas. Owner feedback, 2026-11-03, with a screenshot of a task's Flow tab: "tampilannya
+- [x] **UX-17** A tidy workflow canvas. Owner feedback, 2026-11-03, with a screenshot of a task's Flow tab: "tampilannya
       masih kurang rapih".
   - The fix-loop labels ("fix round 0 of 2", "fix round 0 of 1") overlap each other and sit on the edges.
   - The dashed loop edges leave the nodes on their left side and run outside the column.
@@ -1174,6 +1174,17 @@ for the desktop shell, start screen and session view to be cleaned up (UX-02, UX
   - The zoom controls are heavy bordered boxes, unlike the app's other controls.
   - Wanted: loop edges that route cleanly beside the column with readable labels that never overlap; full subtitles,
     wrapping or with a tooltip; quiet controls. Checked in both themes, on the editor and on a task's live Flow tab.
+  Note: done.
+  - Each fix loop runs in its own lane right of the column. Its pill label ("fix ×2", or "fix 0/2" on a run) sits
+    halfway along the lane, and its tooltip says where failures go.
+  - Step details wrap to two lines.
+  - Invisible spacer nodes make fitting the view keep room for the lanes and for the zoom controls, now one quiet
+    panel.
+  - A step a stopped run left "running" (the app closed mid-run) shows as stopped.
+  - Checked over CDP on Windows:
+    - the S and L workflows in the editor, dark and light;
+    - an interrupted M task's Flow tab, where the two loops' labels no longer overlap and the controls cover no
+      step.
 - [ ] **UX-E1** All M1/M2 screens use the design system, in light and dark themes.
 - [ ] **UX-E2** Usability test participants complete the M1 exit scenarios without help.
 

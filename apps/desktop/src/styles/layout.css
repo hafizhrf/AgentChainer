@@ -43,6 +43,8 @@
 
 .titlebar-menu {
   height: 26px;
+  /* Buttons default to 32 px high; in a 36 px bar that leaves no room above and below. */
+  min-height: 0;
   padding: 0 var(--space-2);
   border: 0;
   border-radius: var(--radius-sm);
@@ -64,7 +66,8 @@
   align-items: center;
   gap: var(--space-2);
   width: min(420px, 40vw);
-  height: 24px;
+  height: 26px;
+  min-height: 0;
   padding: 0 var(--space-2);
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);

@@ -24,14 +24,17 @@ export type ChildRun = { done: Promise<Task>; cancel: () => void };
 
 /** What an XL run needs from the world, injected so it's tested without git or models. */
 export interface XlWorld {
-  /** Adds the worktree for a task id on its branch, from `from` (or reuses its branch); returns its code folder. */
-  worktree(id: string, from: string): { path: string; branch: string; code: string };
+  /**
+   * Adds the worktree for a task id on its branch, from `from` (or reuses its branch); returns its code folder. `repo`
+   * is another folder of a multi-folder workspace (M8-01); the primary folder's repository otherwise, as for the rest.
+   */
+  worktree(id: string, from: string, repo?: string): { path: string; branch: string; code: string };
   /** The code folder of an existing worktree. */
-  codeOf(path: string): string;
+  codeOf(path: string, repo?: string): string;
   exists(path: string): boolean;
-  removeWorktree(path: string): void;
+  removeWorktree(path: string, repo?: string): void;
   head(): string | null;
-  tip(branch: string): string;
+  tip(branch: string, repo?: string): string;
   /** Runs the install command in a fresh worktree; null when the workspace has none. */
   setup(code: string, signal: AbortSignal): Promise<SetupRun | null>;
   untracked(code: string): string[];
@@ -197,13 +200,24 @@ export class XlOrchestrator {
       }
       wt = { path: added.path, branch: added.branch, base, untracked: world.untracked(added.code) };
       this.commit(() => ({ base }), { worktree: wt });
-      this.finish(id, { status: "done", note: setup ? `${added.branch}; ${setupNote(setup)}` : added.branch });
+      // A multi-folder task's branches in its other folders were made with the run (M8-01); they're set up here.
+      const notes = [setup ? `${added.branch}; ${setupNote(setup)}` : added.branch];
+      for (const f of this.folders()) {
+        const ready = await world.setup(f.code, this.abort.signal);
+        if (ready && (ready.exitCode !== 0 || ready.timedOut)) {
+          this.finish(id, { status: "failed", note: `${f.name}: ${setupNote(ready)}` });
+          this.fail(`Setting up the task branch in ${f.name} failed: ${setupNote(ready)}`);
+          return null;
+        }
+        if (ready) notes.push(`${f.name}: ${setupNote(ready)}`);
+      }
+      this.finish(id, { status: "done", note: notes.join("; ") });
     }
     const code = world.codeOf(wt.path);
     // A baseline that finished counts; one the app was cut off in runs again.
     if (!this.rec.steps.some((s) => s.kind === "baseline" && s.status !== "running" && s.note !== "Interrupted")) {
       const id = this.begin({ step: "baseline", label: "Gates before the task", kind: "baseline" });
-      const { runs, notRun } = await world.gates(code, this.d.workflow.integration.gates, 0, this.abort.signal);
+      const { runs, notRun } = await this.gates(code, 0);
       this.commit(() => ({ baseline: runs, notRun }));
       if (this.cancelled) {
         this.finish(id, { status: "cancelled" });
@@ -298,8 +312,10 @@ export class XlOrchestrator {
       taskId: child.id,
     });
     if (!child.worktree || child.worktree.removed || !world.exists(child.worktree.path)) {
-      const from = world.tip(this.task.worktree?.branch ?? "");
-      const added = world.worktree(child.id, from);
+      // A sub-task in another folder branches from the task's branch in that folder's repository (M8-01).
+      const repo = child.folder?.path;
+      const from = world.tip(this.task.worktree?.branch ?? "", repo);
+      const added = world.worktree(child.id, from, repo);
       const setup = await world.setup(added.code, this.abort.signal);
       if (setup && (setup.exitCode !== 0 || setup.timedOut)) {
         return { id: child.id, entry, child: { ...child, state: "failed" }, note: `Setup failed: ${setupNote(setup)}` };
@@ -317,25 +333,32 @@ export class XlOrchestrator {
   }
 
   /** Commits the sub-task on its branch and merges it into the task branch; why the run stops, or null. */
-  private merge(code: string, child: Task, merged: Set<string>): string | null {
+  private merge(primary: string, child: Task, merged: Set<string>): string | null {
     const { world } = this.d;
     const n = this.number(child);
+    // Into the task's branch in the sub-task's own folder (M8-01).
+    const repo = child.folder?.path;
+    const into = repo ? this.folders().find((f) => f.name === child.folder?.name)?.code : primary;
     const id = this.begin({ step: `merge-${n}`, label: `Merge sub-task ${n}`, kind: "merge", taskId: child.id });
     const wt = child.worktree;
     if (!wt) {
       this.finish(id, { status: "failed", note: "It has no worktree." });
       return `${this.name(child)} has no worktree to merge.`;
     }
+    if (!into) {
+      this.finish(id, { status: "failed", note: `The task has no branch in ${child.folder?.name}.` });
+      return `${this.name(child)} works in ${child.folder?.name}, where the task has no branch.`;
+    }
     const accepted = child.state === "accepted";
     try {
       if (!wt.removed && world.exists(wt.path)) {
         world.commit(
-          world.codeOf(wt.path),
+          world.codeOf(wt.path, repo),
           `${child.title ?? child.request}\n\nAgentChainer sub-task ${n} of task ${this.task.id}${accepted ? ", accepted with risk" : ""}.`,
           wt.untracked,
         );
       }
-      const r = world.merge(code, wt.branch, `Merge sub-task ${n}: ${child.title ?? child.request}`);
+      const r = world.merge(into, wt.branch, `Merge sub-task ${n}: ${child.title ?? child.request}`);
       if (!r.merged) {
         this.finish(id, { status: "failed", note: `Conflicts in ${r.conflicts.join(", ")}.` });
         return `Merging ${this.name(child, "sub-task")} conflicts in ${r.conflicts.join(", ")}. The merge is left in progress in the task's worktree: resolve and commit it there, or abort it, then Continue.`;
@@ -350,7 +373,7 @@ export class XlOrchestrator {
       // Its work is merged, so a folder that can't go yet (on Windows, while a process it started still runs there) is
       // left for Clean up instead of stopping the run.
       try {
-        world.removeWorktree(wt.path);
+        world.removeWorktree(wt.path, repo);
         world.save({ ...world.load(child.id), worktree: { ...wt, removed: true } });
       } catch {
         kept = true;
@@ -363,6 +386,36 @@ export class XlOrchestrator {
     this.finish(id, { status: "done", note: note.filter(Boolean).join(" ") });
     merged.add(child.id);
     return null;
+  }
+
+  /** A multi-folder task's branches in its other folders (M8-01): each folder's name and code folder. */
+  private folders(): { name: string; code: string }[] {
+    return (this.task.folders ?? []).flatMap((f) =>
+      f.worktree && !f.worktree.removed ? [{ name: f.name, code: this.d.world.codeOf(f.worktree.path, f.path) }] : [],
+    );
+  }
+
+  /**
+   * The integration gates on the task's branch, in each of its folders with that folder's commands (M8-01); another
+   * folder's runs carry its name, as a task's do. A gate counts as run when any folder has it.
+   */
+  private async gates(code: string, round: number): Promise<{ runs: GateRun[]; notRun: GateKind[] }> {
+    const kinds = this.d.workflow.integration.gates;
+    const first = await this.d.world.gates(code, kinds, round, this.abort.signal);
+    const runs = [...first.runs];
+    let notRun = first.notRun;
+    for (const f of this.folders()) {
+      const r = await this.d.world.gates(f.code, kinds, round, this.abort.signal);
+      runs.push(
+        ...r.runs.map((g) => ({
+          ...g,
+          folder: f.name,
+          package: g.package === "." ? f.name : `${f.name}:${g.package}`,
+        })),
+      );
+      notRun = notRun.filter((k) => r.notRun.includes(k));
+    }
+    return { runs, notRun };
   }
 
   /** A sub-task's number, from its place in the split. */
@@ -380,12 +433,7 @@ export class XlOrchestrator {
   private async integrate(code: string): Promise<Task> {
     const round = Math.max(-1, ...this.rec.gates.map((g) => g.round)) + 1;
     const id = this.begin({ step: "integration", label: "Integration gates", kind: "gates" });
-    const { runs, notRun } = await this.d.world.gates(
-      code,
-      this.d.workflow.integration.gates,
-      round,
-      this.abort.signal,
-    );
+    const { runs, notRun } = await this.gates(code, round);
     this.commit((r) => ({ gates: [...r.gates, ...runs], notRun }));
     if (this.cancelled) {
       this.finish(id, { status: "cancelled" });

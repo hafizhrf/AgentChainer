@@ -243,7 +243,7 @@ They're used as ideas only; no code is copied.
 4. **Per-folder features:** the folder switcher in the right panel and in Workspace settings, and readiness per folder.
 5. **Tasks across folders,** in two PRs:
    - 5a: worktrees, steps across them, gates, evidence, merge and cleanup;
-   - 5b: one PR per repository, then XL sub-tasks per folder → M8-01.
+   - 5b: one PR per repository (#94), then XL sub-tasks per folder → M8-01, done.
 
 ## 11. Alternatives considered
 

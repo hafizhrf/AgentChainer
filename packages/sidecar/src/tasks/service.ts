@@ -472,7 +472,7 @@ export function deleteTaskSafe(root: string, id: string): void {
   const children = (task.subtasks ?? []).map((c) => loadTask(root, c));
   if (children.some((c) => runs.has(c.id))) throw invalid("A sub-task is running. Stop the task first.");
   for (const t of [...children, task]) {
-    if (t.worktree && !t.worktree.removed) removeWorktree(root, t.worktree.path);
+    if (t.worktree && !t.worktree.removed) removeWorktree(t.folder?.path ?? root, t.worktree.path);
     removeFolderWorktrees(t);
     if (t !== task) deleteTask(root, t.id);
   }
@@ -482,7 +482,9 @@ export function deleteTaskSafe(root: string, id: string): void {
 /** Where a task's code is: its worktree while it exists, otherwise the workspace (one without git). */
 function codeRootOf(root: string, task: Task): string {
   const wt = task.worktree;
-  return wt && !wt.removed && existsSync(wt.path) ? codeRootIn(root, wt.path) : root;
+  // An XL sub-task in another folder works in that folder's repository (M8-01).
+  const repo = task.folder?.path ?? root;
+  return wt && !wt.removed && existsSync(wt.path) ? codeRootIn(repo, wt.path) : repo;
 }
 
 /** Tasks a new run can start from. */
@@ -758,9 +760,11 @@ export async function splitTask(root: string, id: string, claude: Claude, model?
   const budgetUsd = task.triage.budgetUsd;
   return cancellable(id, async (controller) => {
     const profile = detectWorkspace(root);
+    const folders = (task.folders ?? []).map(({ name, path }) => ({ name, path }));
     const r = await proposeSplit(claude.sdk, claude.claudePath, root, contract, profile, xl.split, {
       ...(model ? { model } : {}),
       abortController: controller,
+      ...(folders.length ? { folders } : {}),
     });
     const now = new Date();
     const spent: Task = { ...task, costUsd: task.costUsd + r.costUsd, updatedAt: now.toISOString() };
@@ -800,6 +804,11 @@ export async function splitTask(root: string, id: string, claude: Claude, model?
         },
         parent: { id, index },
         dependsOn: sub.dependsOn.map((j) => ids[j]).filter((d): d is string => d !== undefined),
+        // The other folder it works in (M8-01).
+        ...(() => {
+          const f = folders.find((x) => x.name === sub.folder);
+          return f ? { folder: f } : {};
+        })(),
       };
       saveTask(root, child);
       ids.push(child.id);
@@ -852,8 +861,15 @@ function startXl(
   if (!children.length || children.some((c) => c.state !== "ready")) {
     throw invalid("Split the task and approve every sub-task first.");
   }
+  // A multi-folder XL task branches in each of its folders, which must be in git too (M8-01); the run sets them up.
+  for (const f of task.folders ?? []) {
+    if (!repoOf(f.path) || !headOf(f.path)) {
+      throw invalid(`XL tasks run in git worktrees: ${f.name} needs a git repository with at least one commit.`);
+    }
+  }
+  const branched = branchFolders(task).task;
   const started: Task = {
-    ...task,
+    ...branched,
     state: "running",
     ...withPastRun(task),
     run: startRun(root, task, xl, eff, { ...opts, base: headOf(root), untrackedAtStart: [] }, now),
@@ -990,7 +1006,7 @@ export function mergeResult(
 function commitResult(root: string, task: Task, title?: string): void {
   const wt = task.worktree;
   if (!wt || wt.removed || !existsSync(wt.path)) return;
-  commitIn(codeRootIn(root, wt.path), task, wt.untracked, title);
+  commitIn(codeRootIn(task.folder?.path ?? root, wt.path), task, wt.untracked, title);
 }
 
 /** Commits a task's changes in one of its code folders (the primary worktree, or another folder's: M8-01). */
@@ -1042,8 +1058,9 @@ export function cleanupTask(root: string, id: string, deleteBranches: boolean): 
     if (!wt) continue;
     // What the run left uncommitted goes on its branch first, so removing the folder loses nothing.
     if (!deleteBranches) commitResult(root, t);
-    if (!wt.removed) removeWorktree(root, wt.path);
-    if (deleteBranches) deleteBranch(root, wt.branch);
+    const repo = t.folder?.path ?? root;
+    if (!wt.removed) removeWorktree(repo, wt.path);
+    if (deleteBranches) deleteBranch(repo, wt.branch);
     saveTask(root, { ...loadTask(root, t.id), worktree: { ...wt, removed: true } });
   }
   // The other folders' worktrees (M8-01), the same way.
@@ -1764,7 +1781,9 @@ export function writeEvidence(root: string, task: Task, now = new Date()): { mar
   if (!task.run) throw invalid("The task hasn't run yet.");
   // XL tasks and sub-tasks changed their worktree, where the files their setup installed don't count.
   const code = codeRootOf(root, task);
-  const own = fileStats(code, task.run.base, task.worktree?.untracked ?? task.run.untrackedAtStart);
+  const stats = fileStats(code, task.run.base, task.worktree?.untracked ?? task.run.untrackedAtStart);
+  // An XL sub-task in another folder names its files with the folder, like its XL task's report does.
+  const own = task.folder ? stats.map((f) => ({ ...f, path: `${task.folder?.name}:${f.path}` })) : stats;
   // A multi-folder task's other folders' changes, named `folder:path` (M8-01).
   const files = [...own, ...folderFileStats(task)];
   const children = subtasksOf(root, task);
@@ -1780,7 +1799,7 @@ export function writeEvidence(root: string, task: Task, now = new Date()): { mar
     files,
     summary: children.length ? subtaskSummaries(root, children) : readTaskFile(root, task.id, "summary.md"),
     review,
-    secrets: scanSecretsAcross(code, own, task),
+    secrets: scanSecretsAcross(code, stats, task),
     deploys: listDeploys(root, task.id),
     subtasks: children.map((c) => ({
       number: (c.parent?.index ?? 0) + 1,

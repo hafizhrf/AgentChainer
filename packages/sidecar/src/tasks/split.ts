@@ -33,6 +33,11 @@ export const SPLIT_JSON_SCHEMA = {
             description: "The numbers (1-based) of earlier sub-tasks whose changes this one needs first",
           },
           contract: DRAFT_JSON_SCHEMA,
+          folder: {
+            type: "string",
+            description:
+              "In a workspace with several folders: the one folder this sub-task works in; omit for the main one",
+          },
         },
         required: ["title", "request", "tier", "dependsOn", "contract"],
         additionalProperties: false,
@@ -58,8 +63,28 @@ answer with the structured output:
   risks; affectedAreas (workspace-relative paths, one per item); openQuestions, empty unless something is undecided.
 Keep every item short. Don't implement anything and don't plan the code.`;
 
-export function splitPrompt(contract: TaskContract, profile: WorkspaceProfile, gates: GateKind[]): string {
-  return [contractText(contract), "", ...workspaceLines(profile, gates)].join("\n");
+/** A multi-folder workspace's other folders (M8-01): each sub-task works in one of them or in the main one. */
+export type SplitFolder = { name: string; path: string };
+
+export function splitPrompt(
+  contract: TaskContract,
+  profile: WorkspaceProfile,
+  gates: GateKind[],
+  folders: SplitFolder[] = [],
+): string {
+  return [
+    contractText(contract),
+    "",
+    ...workspaceLines(profile, gates),
+    ...(folders.length
+      ? [
+          "",
+          "This workspace has other folders too, which you can read, each its own repository:",
+          ...folders.map((f) => `- ${f.name}: ${f.path}`),
+          "Each sub-task works in one folder: set `folder` to its name, or leave it out for this one. Split work that spans folders into one sub-task per folder, with dependsOn where one needs the other's change. A sub-task's affectedAreas are relative to its folder.",
+        ]
+      : []),
+  ].join("\n");
 }
 
 /** One proposed sub-task, cleaned up: `dependsOn` holds indexes of earlier sub-tasks in this list. */
@@ -69,6 +94,8 @@ export type SubtaskDraft = {
   tier: SubTier;
   dependsOn: number[];
   contract: TaskContract;
+  /** The other folder it works in, by name (M8-01); none for the main one. */
+  folder?: string;
 };
 
 const text = (v: unknown, max: number) => (typeof v === "string" ? v.trim().replace(/\s+/g, " ").slice(0, max) : "");
@@ -77,7 +104,7 @@ const text = (v: unknown, max: number) => (typeof v === "string" ? v.trim().repl
  * Cleans the split's answer: untitled entries are dropped, the tier is S, M or L (M when unclear), and a dependency
  * must name an earlier sub-task that was kept, so the order has no cycles.
  */
-export function normalizeSplit(raw: unknown, gates: GateKind[]): SubtaskDraft[] {
+export function normalizeSplit(raw: unknown, gates: GateKind[], folders: string[] = []): SubtaskDraft[] {
   const list =
     raw && typeof raw === "object" && Array.isArray((raw as { subtasks?: unknown }).subtasks)
       ? ((raw as { subtasks: unknown[] }).subtasks as unknown[])
@@ -99,7 +126,16 @@ export function normalizeSplit(raw: unknown, gates: GateKind[]): SubtaskDraft[] 
       ),
     ].filter((n): n is number => n !== undefined);
     kept.set(i + 1, out.length);
-    out.push({ title, request, tier, dependsOn, contract: normalizeContract(request, e.contract, gates) });
+    // Only a folder the workspace has; anything else works in the main one.
+    const folder = folders.find((f) => f === e.folder);
+    out.push({
+      title,
+      request,
+      tier,
+      dependsOn,
+      contract: normalizeContract(request, e.contract, gates),
+      ...(folder ? { folder } : {}),
+    });
   }
   return out;
 }
@@ -112,13 +148,14 @@ export async function proposeSplit(
   contract: TaskContract,
   profile: WorkspaceProfile,
   step: AgentStep,
-  opts: { model?: string; abortController?: AbortController } = {},
+  opts: { model?: string; abortController?: AbortController; folders?: SplitFolder[] } = {},
 ): Promise<{ subtasks: SubtaskDraft[]; error?: string; costUsd: number }> {
   const gates = availableGates(profile, root);
+  const folders = opts.folders ?? [];
   let costUsd = 0;
   const { result } = await guarded(root, async () => {
     const q = sdk.query({
-      prompt: splitPrompt(contract, profile, gates),
+      prompt: splitPrompt(contract, profile, gates, folders),
       options: {
         cwd: root,
         pathToClaudeCodeExecutable: claudePath,
@@ -131,7 +168,20 @@ export async function proposeSplit(
         maxBudgetUsd: step.limits.maxBudgetUsd,
         systemPrompt: { type: "preset", preset: "claude_code", append: GUIDE },
         outputFormat: { type: "json_schema", schema: SPLIT_JSON_SCHEMA },
-        hooks: { PreToolUse: [{ hooks: [generatorHook(root, [])] }] },
+        hooks: {
+          PreToolUse: [
+            {
+              hooks: [
+                generatorHook(
+                  root,
+                  [],
+                  folders.map((f) => f.path),
+                ),
+              ],
+            },
+          ],
+        },
+        ...(folders.length ? { additionalDirectories: folders.map((f) => f.path) } : {}),
         canUseTool: async (_tool, input) => ({ behavior: "allow", updatedInput: input }),
         ...(opts.abortController ? { abortController: opts.abortController } : {}),
       },
@@ -140,7 +190,11 @@ export async function proposeSplit(
       if (m.type !== "result") continue;
       costUsd += m.total_cost_usd;
       if (m.subtype !== "success") return { subtasks: [], error: `The split stopped: ${m.subtype}.` };
-      const subtasks = normalizeSplit(m.structured_output, gates);
+      const subtasks = normalizeSplit(
+        m.structured_output,
+        gates,
+        folders.map((f) => f.name),
+      );
       return subtasks.length ? { subtasks } : { subtasks, error: "The split proposed no sub-tasks." };
     }
     return { subtasks: [], error: "The split ended without a result." };

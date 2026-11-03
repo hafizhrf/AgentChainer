@@ -46,17 +46,17 @@ export function gitWorld(
   },
 ): XlWorld {
   return {
-    worktree(id, from) {
-      const path = worktreePath(root, id);
+    worktree(id, from, repo = root) {
+      const path = worktreePath(repo, id);
       const branch = branchOf(id);
-      addWorktree(root, path, branch, from);
-      return { path, branch, code: codeRootIn(root, path) };
+      addWorktree(repo, path, branch, from);
+      return { path, branch, code: codeRootIn(repo, path) };
     },
-    codeOf: (path) => codeRootIn(root, path),
+    codeOf: (path, repo = root) => codeRootIn(repo, path),
     exists: (path) => existsSync(path),
-    removeWorktree: (path) => removeWorktree(root, path),
+    removeWorktree: (path, repo = root) => removeWorktree(repo, path),
     head: () => headOf(root),
-    tip: (branch) => tipOf(root, branch),
+    tip: (branch, repo = root) => tipOf(repo, branch),
     setup: setupWorktree,
     untracked: (code) => untracked(code),
     async gates(code, kinds, round, signal) {

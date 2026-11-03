@@ -95,6 +95,8 @@ export function App() {
   const [cwd, setCwd] = useState("");
   const [model, setModel] = useState("");
   const [mode, setMode] = useState<PermissionMode>("default");
+  /** The agent profile a new chat starts as (M8-04); "" for none. */
+  const [profile, setProfile] = useState("");
   const [tabs, setTabs] = useState<Tab[]>([]);
   /** The active tab's session id; null shows the new-session screen. */
   const [active, setActive] = useState<string | null>(null);
@@ -279,7 +281,7 @@ export function App() {
       }
       // A Team chat's worker (M8-03): its tab opens beside the supervisor's without taking focus, before its events.
       if (n.method === "session.opened") {
-        const { sessionId, parentId, cwd: dir, name, access } = n.params;
+        const { sessionId, parentId, cwd: dir, name, access, profile: workerProfile } = n.params;
         setTabs((ts) => {
           const parent = ts.find((t) => t.sessionId === parentId);
           const tab = newTab(sessionId, dir, {
@@ -287,6 +289,7 @@ export function App() {
             mode: "default",
             parentId,
             access,
+            ...(workerProfile ? { profile: workerProfile } : {}),
             modelAlias: parent?.modelAlias ?? "",
             ...(parent?.folders?.length ? { folders: parent.folders } : {}),
             items: [
@@ -473,6 +476,7 @@ export function App() {
     mode: PermissionMode,
     folders: string[] = [],
     team = false,
+    agentProfile = "",
   ): Promise<string | null> {
     try {
       const { effort, budgetUsd: cap, showThinking } = sessionOptions(mode);
@@ -489,10 +493,13 @@ export function App() {
         showThinking,
         ...(folders.length ? { folders } : {}),
         ...(team ? { team } : {}),
+        ...(agentProfile ? { profile: agentProfile } : {}),
       });
       const also = folders.length ? `, with ${folders.map(folderName).join(", ")}` : "";
       const items = [
-        notice(`Session started in ${folderName(dir)}${also}`),
+        notice(
+          `Session started in ${folderName(dir)}${also}${agentProfile ? `, as the agent profile ${agentProfile}` : ""}`,
+        ),
         ...(team && budgetUsd
           ? [
               notice(
@@ -512,6 +519,7 @@ export function App() {
           effort,
           budgetUsd,
           folders,
+          ...(agentProfile ? { profile: agentProfile } : {}),
           ...(team && budgetUsd ? { teamCapUsd: budgetUsd } : {}),
         }),
       ]);
@@ -533,9 +541,12 @@ export function App() {
       const { events, times } = await request("session.history", { cwd: dir, sessionId });
       // A chat of a multi-folder workspace resumes across the same folders (M8-01).
       const folders = tabs.find((t) => t.sessionId === sessionId)?.folders ?? [];
+      // …and as the same agent profile (M8-04), when its tab still knows it.
+      const asProfile = tabs.find((t) => t.sessionId === sessionId)?.profile;
       await request("session.start", {
         cwd: dir,
         resume: sessionId,
+        ...(asProfile ? { profile: asProfile } : {}),
         permissionMode: mode,
         ...(modelAlias ? { model: modelAlias } : {}),
         ...(effort ? { effort } : {}),
@@ -559,6 +570,7 @@ export function App() {
         effort,
         budgetUsd,
         folders,
+        ...(asProfile ? { profile: asProfile } : {}),
       });
       setTabs((ts) => (ts.some((t) => t.sessionId === sessionId) ? updateTab(ts, sessionId, () => tab) : [...ts, tab]));
       setActive(sessionId);
@@ -661,7 +673,7 @@ export function App() {
     const id = t.sessionId;
     switch (name) {
       case "clear":
-        void startSession(t.cwd, t.modelAlias, t.mode, t.folders, t.team !== undefined);
+        void startSession(t.cwd, t.modelAlias, t.mode, t.folders, t.team !== undefined, t.profile);
         return;
       case "fork":
         void forkTab(id);
@@ -802,7 +814,7 @@ export function App() {
   /** Starts a chat nothing was sent to over as a Team chat, or as a plain one (M8-03): the tools come with the start. */
   async function setTeam(t: Tab, on: boolean) {
     if (!isFresh(t)) return;
-    const id = await startSession(t.cwd, t.modelAlias, t.mode, t.folders ?? [], on);
+    const id = await startSession(t.cwd, t.modelAlias, t.mode, t.folders ?? [], on, t.profile);
     if (!id) return;
     void request("session.close", { sessionId: t.sessionId }).catch(() => undefined);
     setTabs((ts) => ts.filter((x) => x.sessionId !== t.sessionId));
@@ -1198,7 +1210,9 @@ export function App() {
                     mode={mode}
                     onModeChange={setMode}
                     canAutonomous={settings?.budgetUsd != null}
-                    onStart={() => void startSession(workspace, model, mode, homeDef?.folders ?? [])}
+                    profile={profile}
+                    onProfileChange={setProfile}
+                    onStart={() => void startSession(workspace, model, mode, homeDef?.folders ?? [], false, profile)}
                     onOpenSetup={() =>
                       setSetup({
                         cwd: workspace,

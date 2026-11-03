@@ -35,6 +35,8 @@ export type Tab = {
   /** A Team chat's worker (M8-03): the supervisor's session id, and what the worker may do. */
   parentId?: string;
   access?: "read" | "write";
+  /** The agent profile the session runs as (M8-04): its prompt, model and only its tools. */
+  profile?: string;
   /** A Team chat (M8-03): what it and its workers spent together, against its one cap. */
   team?: { capUsd: number; spentUsd: number; stopped: boolean };
   /** What the composer starts as (UX-13): New in Task mode opens a chat whose composer makes a task. */
@@ -96,6 +98,7 @@ export function newTab(
     folders?: string[];
     parentId?: string;
     access?: "read" | "write";
+    profile?: string;
     /** A Team chat's cap (M8-03). */
     teamCapUsd?: number;
   },
@@ -106,6 +109,7 @@ export function newTab(
     ...(options.folders?.length ? { folders: options.folders } : {}),
     ...(options.parentId ? { parentId: options.parentId } : {}),
     ...(options.access ? { access: options.access } : {}),
+    ...(options.profile ? { profile: options.profile } : {}),
     ...(options.teamCapUsd ? { team: { capUsd: options.teamCapUsd, spentUsd: 0, stopped: false } } : {}),
     title: options.title,
     modelAlias: options.modelAlias ?? "",

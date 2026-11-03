@@ -114,7 +114,9 @@ export function Sidebar({
                   >
                     <span className="nav-title">{t.title}</span>
                     <span className="nav-sub">
-                      {child ? `Worker · ${t.access === "write" ? "can edit" : "read only"}` : folderName(t.cwd)}
+                      {child
+                        ? `Worker${t.profile ? ` · ${t.profile}` : ""} · ${t.access === "write" ? "can edit" : "read only"}`
+                        : `${folderName(t.cwd)}${t.profile ? ` · ${t.profile}` : ""}`}
                       {t.team ? " · Team" : ""}
                     </span>
                   </button>

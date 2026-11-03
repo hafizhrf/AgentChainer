@@ -1,12 +1,20 @@
-import { type EnvCheck, PERMISSION_MODES, type PermissionMode, type SessionInfo } from "@agentchainer/protocol";
+import {
+  type AgentDefinition,
+  agentProblems,
+  type EnvCheck,
+  PERMISSION_MODES,
+  type PermissionMode,
+  type SessionInfo,
+} from "@agentchainer/protocol";
 import { open } from "@tauri-apps/plugin-dialog";
 import { Folder, FolderOpen, Play, Wrench, X } from "lucide-react";
-import { type ReactNode, useState } from "react";
+import { type ReactNode, useEffect, useState } from "react";
 import type { Confirm } from "./Dialog.tsx";
 import { GitInitOffer } from "./GitInitOffer.tsx";
 import { MODE_HELP, modelChoices, modeOptions } from "./options.ts";
 import { Readiness } from "./Readiness.tsx";
 import { SessionList } from "./SessionList.tsx";
+import { request } from "./sidecar.ts";
 import { asMode, folderName } from "./tabs.ts";
 import { Field } from "./ui/Field.tsx";
 import { Select } from "./ui/Select.tsx";
@@ -34,6 +42,8 @@ export function HomeView({
   onModelChange,
   mode,
   onModeChange,
+  profile,
+  onProfileChange,
   canAutonomous,
   onStart,
   onOpenSetup,
@@ -55,6 +65,9 @@ export function HomeView({
   onModelChange: (alias: string) => void;
   mode: PermissionMode;
   onModeChange: (mode: PermissionMode) => void;
+  /** The agent profile a new chat starts as (M8-04); "" for none. */
+  profile: string;
+  onProfileChange: (name: string) => void;
   canAutonomous: boolean;
   onStart: () => void;
   /** Opens Workspace settings for the chosen folder. */
@@ -66,6 +79,11 @@ export function HomeView({
   children?: ReactNode;
 }) {
   const workspace = cwd.trim();
+  const profiles = useProfiles(connected ? workspace : "");
+  // A profile the new folder doesn't have is dropped, so Start never names a missing one.
+  useEffect(() => {
+    if (profile && profiles && !profiles.some((p) => p.name === profile)) onProfileChange("");
+  }, [profile, profiles, onProfileChange]);
   const blocked = !env?.ready
     ? "Finish the setup check first."
     : !workspace
@@ -115,6 +133,26 @@ export function HomeView({
             </Field>
           </div>
           <p className="field-help">{MODE_HELP[mode]}</p>
+          {profiles && profiles.length > 0 && (
+            <Field
+              label="Agent profile"
+              help="Run the chat as one of your agents: its instructions, its model unless you pick one, and only its tools. Manage them in Workspace settings → Agents."
+            >
+              <Select
+                label="Agent profile"
+                value={profile}
+                onChange={onProfileChange}
+                options={[
+                  { value: "", label: "None", hint: "Claude as usual" },
+                  ...profiles.map((p) => ({
+                    value: p.name,
+                    label: p.name,
+                    hint: `${p.scope === "user" ? "Yours" : "This project"} · ${p.description}`,
+                  })),
+                ]}
+              />
+            </Field>
+          )}
           <div className="card-footer">
             {blocked && <span className="muted">{blocked}</span>}
             <span className="grow" />
@@ -247,4 +285,30 @@ export function WorkspaceCard({
       )}
     </section>
   );
+}
+
+/** The workspace's and the user's agents that can run as a profile (M8-04): readable, with no problems. */
+function useProfiles(workspace: string): AgentDefinition[] | null {
+  const [profiles, setProfiles] = useState<AgentDefinition[] | null>(null);
+  useEffect(() => {
+    if (!workspace) {
+      setProfiles(null);
+      return;
+    }
+    let live = true;
+    request("agents.list", { cwd: workspace })
+      .then(({ agents }) => {
+        if (!live) return;
+        const seen = new Set<string>();
+        // A project agent wins over the user's of the same name, as when the sidecar loads it.
+        setProfiles(
+          agents.filter((a) => !a.error && agentProblems(a).length === 0 && !seen.has(a.name) && seen.add(a.name)),
+        );
+      })
+      .catch(() => live && setProfiles([]));
+    return () => {
+      live = false;
+    };
+  }, [workspace]);
+  return profiles;
 }

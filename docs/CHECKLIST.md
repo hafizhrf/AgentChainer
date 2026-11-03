@@ -1678,7 +1678,7 @@ first.
     - `notes.txt` was written after Allow once;
     - both reports reached the supervisor as cards, and it summed them up;
     - closing the supervisor ended both workers.
-- [ ] **M8-04** An agent profiles manager: create from a template, edit, clone and delete, validated before saving,
+- [x] **M8-04** An agent profiles manager: create from a template, edit, clone and delete, validated before saving,
       with per-profile tool allowlists. From CAO's profile editor; builds on M3-05's roles and UX-10's Plugins page.
       → design: [agent-profiles.md](design/agent-profiles.md) (owner decisions, 2026-11-03).
   - Sidecar (PR 1):
@@ -1690,8 +1690,25 @@ first.
     - an unknown tool is refused;
     - a chat ran as a read-only profile with its prompt and model, and Write was "No such tool available";
     - a Team worker ran as the profile.
-  - UI (PR 2): templates, clone, scope, the tool picker, live checks, and the start screen's profile picker. The box is
-    ticked then.
+  - UI (PR 2), in Workspace settings → Agents:
+    - Start from (a task role, whose copy gets a free `-copy` name, or a starter);
+    - Clone;
+    - Save to (this project, or all my projects after a confirm);
+    - editable user agents;
+    - a grouped tool picker with MCP entries;
+    - problems listed live, which keep Save disabled.
+  - Also in PR 2:
+    - an Agent profile select in the start screen's Options;
+    - the profile shown as a chip in the session header and in the sidebar, and on Team workers;
+    - `/clear`, the Team toggle and Resume keep the profile.
+  - Checked in the app over CDP, dark and light:
+    - the explainer starter filled the form, and a bad tool ("Teleport") was flagged live with Save disabled;
+    - saving to the project wrote `.claude/agents/m804-explainer.md`;
+    - Clone, then "All my projects" and the confirm, wrote `~/.claude/agents/m804-explainer-copy.md`;
+    - a haiku chat started as the profile showed its chip, used only Glob and Read, and didn't create the file it was
+      asked to write;
+    - both test agents were deleted through the UI, with the scope's wording in the confirm, and the empty user folder
+      removed.
 - [ ] **M8-05** Scheduled flows: run a task template on a schedule (e.g. a nightly dependency bump), locally, with a
       budget cap and an evidence report per run. From CAO's flows.
 - [ ] **M8-06** Lessons from outcomes: suggest CLAUDE.md additions from finished tasks' evidence, each one approved

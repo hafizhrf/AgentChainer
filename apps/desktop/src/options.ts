@@ -124,7 +124,8 @@ export const EFFORT_OPTIONS = [
   ...EFFORTS.map((e) => ({ value: e, label: `${e[0]?.toUpperCase()}${e.slice(1)} effort` })),
 ];
 
-const isMac = typeof navigator !== "undefined" && /Mac/.test(navigator.userAgent);
+/** macOS keeps the native menu bar; Windows and Linux get the app's own title bar with its menus (UX-15). */
+export const isMac = typeof navigator !== "undefined" && /Mac/.test(navigator.userAgent);
 
 /** A keyboard shortcut as the platform writes it: "⌘J" or "⇧⌘P" on macOS, "Ctrl+J" or "Ctrl+Shift+P" elsewhere. */
 export const shortcut = (key: string, { shift = false }: { shift?: boolean } = {}) =>

@@ -1,6 +1,6 @@
 import { listen } from "@tauri-apps/api/event";
 import { useEffect, useRef } from "react";
-import { shortcut } from "./options.ts";
+import { isMac, shortcut } from "./options.ts";
 
 /** Native menu items that reach the UI (UX-07). Keep in sync with `UI_COMMANDS` in `src-tauri/src/menu.rs`. */
 export const MENU_COMMANDS = [
@@ -37,7 +37,26 @@ export const MENU_SHORTCUTS: Partial<Record<MenuCommand, { key: string; shift?: 
   "command-palette": { key: "P", shift: true },
 };
 
-/** Runs the handler for each `menu` event from the Rust core. Handlers may change every render. */
+/** The menu command a key press is the shortcut of, if any: Ctrl (⌘ on macOS) with the key, and Shift as it says. */
+export function commandForKey(e: {
+  key: string;
+  ctrlKey: boolean;
+  metaKey: boolean;
+  shiftKey: boolean;
+  altKey: boolean;
+}): MenuCommand | null {
+  if (e.altKey || !(isMac ? e.metaKey : e.ctrlKey)) return null;
+  const key = e.key.length === 1 ? e.key.toUpperCase() : e.key;
+  for (const [command, s] of Object.entries(MENU_SHORTCUTS)) {
+    if (s && s.key === key && (s.shift ?? false) === e.shiftKey) return command as MenuCommand;
+  }
+  return null;
+}
+
+/**
+ * Runs the handler for each `menu` event from the Rust core: the native menu on macOS, the title bar's menus elsewhere
+ * (UX-15). Handlers may change every render.
+ */
 export function useMenuCommands(handlers: Record<MenuCommand, () => void>): void {
   const current = useRef(handlers);
   current.current = handlers;

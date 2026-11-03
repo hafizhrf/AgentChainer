@@ -1117,6 +1117,26 @@ for the desktop shell, start screen and session view to be cleaned up (UX-02, UX
   - It follows the theme (light and dark), with keyboard access to the menus (Alt opens them on Windows), double-click
     to maximize, and snap layouts on Windows 11 **(verify)**.
   - It needs the window capabilities (minimize, maximize, close, start dragging), with a THREAT_MODEL note.
+  Note: built, in `TitleBar.tsx`.
+  - Windows and Linux: `tauri.windows.conf.json` and `tauri.linux.conf.json` set `decorations: false`. The native
+    menu is built on macOS only.
+  - The bar holds:
+    - the mark (`BrandMark.tsx`);
+    - Radix Menubar menus with the same items and shortcuts as `menu.rs`, sent through `menu_select`;
+    - Edit runs on what had focus, and Paste reads the clipboard's text through the official clipboard plugin;
+    - the search field (it opens the palette and names the workspace);
+    - the sidebar, terminal and workspace panel toggles;
+    - minimize, maximize or restore, and close.
+  - The menus' shortcuts are caught in the webview (`commandForKey`), and Alt alone focuses the menus.
+  - macOS: `titleBarStyle: Overlay` with the traffic lights over the bar's inset left end.
+  - Checked on Windows in the app (CDP), dark and light:
+    - every menu;
+    - Ctrl+Shift+P and Ctrl+\;
+    - the toggles, and maximize and restore;
+    - Edit → Select All, Cut, Copy and Paste with real clicks;
+    - Alt.
+  - Still to check by hand: dragging and snap layouts on Windows 11 (the custom buttons don't show the snap flyout
+    **(verify)**), and macOS and Linux.
 - [ ] **UX-16** An app icon with its own meaning. Owner request, 2026-11-03: minimal like VS Code's, but on theme.
   - The idea: AgentChainer chains agents into checked work, so the mark is two linked chain links whose join is a
     check mark: agents linked, and every hand-off verified. It's a flat shape in one or two colors from the tokens,

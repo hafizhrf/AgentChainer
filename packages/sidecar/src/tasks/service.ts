@@ -219,7 +219,7 @@ export function approveTask(
   edited: TaskContract,
   tier: Tier,
   reason: string | undefined,
-  budgetUsd: number,
+  budgetUsd: number | null,
   now = new Date(),
 ): Task {
   const task = loadTask(root, id);
@@ -329,7 +329,7 @@ function runXlWorkflow(root: string, task: Task): XlWorkflow {
 }
 
 /** Runs in progress in this sidecar, by task id: a tier's workflow, or an XL run. */
-const runs = new Map<string, { cancel: () => void; readonly current: Task }>();
+const runs = new Map<string, { cancel: () => void; message?: (text: string) => boolean; readonly current: Task }>();
 /** Each run's promise, until it has fully ended: its sessions closed after its end was saved. */
 const endings = new Map<string, Promise<unknown>>();
 
@@ -477,7 +477,12 @@ export function taskBranch(root: string, task: Task): { task: Task; fresh: boole
 function track(
   root: string,
   id: string,
-  running: { run: () => Promise<Task>; cancel: () => void; readonly current: Task },
+  running: {
+    run: () => Promise<Task>;
+    cancel: () => void;
+    message?: (text: string) => boolean;
+    readonly current: Task;
+  },
   notify: (task: Task) => void,
 ): Promise<Task> {
   runs.set(id, running);
@@ -563,6 +568,17 @@ export function resumeTask(root: string, id: string, host: SessionHost, notify: 
   return running;
 }
 
+/**
+ * The person's message to a running task's current step (UX-13). An XL task's sub-tasks take theirs in their own
+ * threads.
+ */
+export function messageRun(id: string, text: string): boolean {
+  const run = runs.get(id);
+  if (!run) throw invalid("The task isn't running.");
+  if (!run.message?.(text)) throw invalid("No step is working right now; send it once a step is running.");
+  return true;
+}
+
 /** Stops a running task. */
 export function stopRun(id: string): boolean {
   const orchestrator = runs.get(id);
@@ -644,7 +660,7 @@ export async function splitTask(root: string, id: string, claude: Claude, model?
         triage: {
           ...proposal,
           chosen,
-          budgetUsd: Math.min(DEFAULT_BUDGET_USD[chosen], budgetUsd),
+          budgetUsd: budgetUsd === null ? DEFAULT_BUDGET_USD[chosen] : Math.min(DEFAULT_BUDGET_USD[chosen], budgetUsd),
           ...(chosen !== proposal.proposed ? { override: { reason: "Sub-tasks run as S, M or L." } } : {}),
         },
         parent: { id, index },

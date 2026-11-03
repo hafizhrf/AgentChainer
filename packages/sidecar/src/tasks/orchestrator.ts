@@ -42,6 +42,8 @@ export type Runner = {
   diff(): string;
   /** Stops what's running now: a session's turn or a gate. */
   stop(): void;
+  /** The person's message to the step that's running (UX-13); false when no step's turn runs. */
+  message?(text: string): boolean;
   /** The run ended: close what's still open. Resolves once the sessions' processes have exited. */
   close(): Promise<void>;
 };
@@ -261,6 +263,11 @@ export class Orchestrator {
     this.runner.stop();
   }
 
+  /** The person's message to the running step (UX-13). */
+  message(text: string): boolean {
+    return this.runner.message?.(text) ?? false;
+  }
+
   async run(): Promise<Task> {
     try {
       // A resumed run: entries left running when the app stopped didn't finish.
@@ -330,9 +337,11 @@ export class Orchestrator {
     return this.task;
   }
 
-  /** What's left of the task's budget for a step that wants `cap`; 0 when it's used up. */
+  /** What's left of the task's budget for a step that wants `cap`; 0 when it's used up. No budget: the step's cap. */
   private budget(cap: number): number {
-    const left = (this.task.triage?.budgetUsd ?? 0) - this.rec.costUsd;
+    const total = this.task.triage?.budgetUsd;
+    if (total === null) return cap;
+    const left = (total ?? 0) - this.rec.costUsd;
     return left < MIN_STEP_BUDGET_USD ? 0 : Math.min(cap, left);
   }
 

@@ -108,7 +108,21 @@ export function approveBlocker(state: {
   if (c.acceptanceCriteria.length === 0) return "Add at least one acceptance criterion.";
   if (state.tier !== state.proposed && !state.reason.trim())
     return `Say why ${state.tier} rather than ${state.proposed}.`;
+  if (state.budget === NO_BUDGET) return state.tier === "XL" ? "An XL task needs a budget per sub-task." : null;
   const budget = Number(state.budget);
   if (!Number.isFinite(budget) || budget <= 0 || budget > 1000) return "Set a budget between $0 and $1000.";
   return null;
+}
+
+/** The budget field's value for a task with no spend cap (UX-13). */
+export const NO_BUDGET = "none";
+
+/** What `task.approve` takes: null for no budget. */
+export const budgetValue = (budget: string): number | null => (budget === NO_BUDGET ? null : Number(budget));
+
+/** "$2", "$2 per sub-task", or "no budget". */
+export function budgetText(budgetUsd: number | null | undefined, xl = false): string {
+  if (budgetUsd === null) return "no budget";
+  if (budgetUsd === undefined) return "";
+  return `$${budgetUsd}${xl ? " per sub-task" : ""}`;
 }

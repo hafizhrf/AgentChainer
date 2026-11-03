@@ -364,3 +364,51 @@ describe("an interactive session (UX-12)", () => {
     s.close();
   });
 });
+
+describe("Session.inject (UX-13)", () => {
+  /** Like the CLI: a message sent while a turn runs joins that turn, which ends with one result. */
+  function mergingSdk() {
+    const seen: unknown[] = [];
+    const sdk = {
+      query: ({ prompt }: { prompt: AsyncIterable<unknown> }) => {
+        const messages = (async function* () {
+          let first = true;
+          for await (const m of prompt) {
+            seen.push(m);
+            if (!first) continue;
+            first = false;
+            await new Promise((r) => setTimeout(r, 20));
+            yield {
+              type: "result",
+              subtype: "success",
+              result: "done",
+              duration_ms: 1,
+              num_turns: 1,
+              is_error: false,
+              total_cost_usd: 0.02,
+            };
+          }
+        })();
+        return Object.assign(messages, { close: () => undefined, interrupt: async () => undefined });
+      },
+    } as unknown as AgentSdkModule;
+    return { sdk, seen };
+  }
+
+  it("adds the person's message to the running turn without counting a turn, and shows it", async () => {
+    const { sdk, seen } = mergingSdk();
+    const events: AgentEvent[] = [];
+    const s = new Session(sdk, { cwd: "/w", claudePath: "claude" }, callbacks(events));
+    assert.equal(s.inject("too early"), false, "nothing runs yet");
+    const turn = s.turn("implement it");
+    assert.equal(s.inject("also keep the API"), true);
+    const r = await turn;
+    assert.deepEqual([r.text, r.costUsd], ["done", 0.02]);
+    await new Promise((r) => setTimeout(r, 10));
+    assert.equal(seen.length, 2, "the message went to the CLI");
+    const shown = events.find((e) => e.type === "user.message");
+    assert.equal(shown?.type === "user.message" && shown.text, "also keep the API");
+    assert.equal(s.inject("after the turn"), false);
+    s.close();
+  });
+});

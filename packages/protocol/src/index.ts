@@ -496,8 +496,11 @@ export const TriageSchema = z.object({
   /** What the task runs at: the proposal, unless the user picked another tier with a reason. */
   chosen: TierSchema,
   override: z.object({ reason: z.string().min(1) }).optional(),
-  /** The task's spend cap, defaulting by tier. */
-  budgetUsd: z.number().positive(),
+  /**
+   * The task's spend cap, defaulting by tier; null for no cap (the person's choice). Each step's own limit from its
+   * workflow still applies.
+   */
+  budgetUsd: z.number().positive().nullable(),
   at: z.string(),
 });
 export type Triage = z.infer<typeof TriageSchema>;
@@ -1448,7 +1451,8 @@ export const methodSchemas = {
       contract: TaskContractSchema,
       tier: TierSchema,
       reason: z.string().optional(),
-      budgetUsd: z.number().positive().max(1000),
+      /** null: no spend cap for the task as a whole. */
+      budgetUsd: z.number().positive().max(1000).nullable(),
     }),
     result: TaskSchema,
   },
@@ -1461,6 +1465,14 @@ export const methodSchemas = {
   "task.start": {
     params: TaskRef.extend({ permissionMode: PermissionModeSchema.exclude(["plan"]), model: z.string().optional() }),
     result: TaskSchema,
+  },
+  /**
+   * The person's message to a running task's current step (UX-13): it goes into the turn that's running, as in a chat.
+   * Refused when no step is working.
+   */
+  "task.message": {
+    params: TaskRef.extend({ text: z.string().min(1).max(8000) }),
+    result: z.object({ sent: z.boolean() }),
   },
   /** Continues an interrupted run from the step it stopped in. */
   "task.resume": { params: TaskRef, result: TaskSchema },

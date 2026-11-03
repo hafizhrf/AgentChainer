@@ -21,7 +21,7 @@ function workflowOf(tier: "S" | "M" | "L"): Workflow {
   return w;
 }
 
-function task(tier: "S" | "M" | "L", budgetUsd = 3): Task {
+function task(tier: "S" | "M" | "L", budgetUsd: number | null = 3): Task {
   const workflow = workflowOf(tier);
   return {
     id: "2026-10-30-0000abcd",
@@ -67,7 +67,7 @@ const gate = (kind: GateKind, exitCode: number, round: number): GateRun => ({
   at: "2026-10-30T00:00:00.000Z",
 });
 
-type Call = { kind: "start" | "followUp" | "gates"; step?: string; prompt?: string; tag?: StepTag };
+type Call = { kind: "start" | "followUp" | "gates"; step?: string; prompt?: string; tag?: StepTag; budget?: number };
 
 /** A scripted runner: agent turns succeed unless scripted otherwise; gate rounds follow `gateResults`. */
 /**
@@ -92,8 +92,8 @@ function fakeRunner(opts: {
     ...opts.outcomes?.[`${kind}:${step.id}`],
   });
   const runner: Runner = {
-    async start(step, prompt, _budget, tag) {
-      calls.push({ kind: "start", step: step.id, prompt, tag });
+    async start(step, prompt, budget, tag) {
+      calls.push({ kind: "start", step: step.id, prompt, tag, budget });
       await opts.onStart?.(step);
       return outcome(step, "start");
     },
@@ -334,6 +334,17 @@ describe("orchestrator", () => {
       ["gates"],
       "only the baseline ran",
     );
+  });
+
+  it("runs with no budget: the write step's session has no cap, a read step keeps its own", async () => {
+    const { runner, calls } = fakeRunner({});
+    const { o } = orchestrate(task("M", null), runner);
+    const done = await o.run();
+    assert.notEqual(done.state, "failed");
+    const budgets = Object.fromEntries(calls.filter((c) => c.kind === "start").map((c) => [c.step, c.budget]));
+    const plan = workflowOf("M").steps.find((s) => s.id === "plan");
+    assert.equal(budgets.plan, plan && "limits" in plan ? plan.limits.maxBudgetUsd : undefined);
+    assert.equal(budgets.implement, Number.POSITIVE_INFINITY);
   });
 
   it("ends unverified when the workspace has no gates", async () => {

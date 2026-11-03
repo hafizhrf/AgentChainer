@@ -165,6 +165,8 @@ export function sessionRunner(
   /** The tag each session's events carry now: it follows the timeline entry (a step, then its fixes). */
   const tags = new Map<string, TaskTag>();
   let gatesAbort: AbortController | null = null;
+  /** Sessions in a turn now, newest last, with whether each is a write step's: where the person's message goes. */
+  const inTurn: { session: Session; write: boolean }[] = [];
   /** Tool calls in progress, to tell what a guard block was. */
   const started = new Map<string, { tool: string; input: Record<string, unknown> }>();
 
@@ -180,7 +182,8 @@ export function sessionRunner(
         ...(model ? { model } : {}),
         // Read steps only have read tools, which need no approval; write steps ask in the profile picked at Run.
         permissionMode: step.access === "write" ? run.permissionMode : "default",
-        maxBudgetUsd: budgetUsd,
+        // A task with no budget gives its write step no cap at all (UX-13).
+        ...(Number.isFinite(budgetUsd) ? { maxBudgetUsd: budgetUsd } : {}),
         readOnly: step.access === "read",
         appendSystemPrompt: role.prompt,
         maxTurns: step.limits.maxTurns,
@@ -244,7 +247,9 @@ export function sessionRunner(
     return session;
   };
 
-  const turn = async (session: Session, prompt: string): Promise<AgentOutcome> => {
+  const turn = async (session: Session, prompt: string, write = false): Promise<AgentOutcome> => {
+    const entry = { session, write };
+    inTurn.push(entry);
     try {
       const r = await session.turn(prompt);
       return {
@@ -257,6 +262,8 @@ export function sessionRunner(
       };
     } catch {
       return { sessionId: session.id, ok: false, subtype: "ended", text: "", costUsd: 0 };
+    } finally {
+      inTurn.splice(inTurn.indexOf(entry), 1);
     }
   };
 
@@ -265,7 +272,7 @@ export function sessionRunner(
       const session = openSession(step, budgetUsd);
       tags.set(session.id, { ...tag, cwd: root });
       if (step.access === "write") live.set(step.id, session);
-      const out = await turn(session, prompt);
+      const out = await turn(session, prompt, step.access === "write");
       if (step.access === "read") void session.close();
       return out;
     },
@@ -277,7 +284,7 @@ export function sessionRunner(
         live.set(step.id, session);
       }
       tags.set(session.id, { ...tag, cwd: root });
-      return turn(session, prompt);
+      return turn(session, prompt, true);
     },
     async gates(kinds, round) {
       const commands = resolveGates(root, detectWorkspace(root), kinds);
@@ -290,6 +297,11 @@ export function sessionRunner(
       }
     },
     diff: () => taskDiff(root, run.base, run.untrackedAtStart),
+    message(text) {
+      // A write step's session first: parallel read steps run beside it only in planning.
+      const target = [...inTurn].reverse().find((e) => e.write) ?? inTurn.at(-1);
+      return target ? target.session.inject(text) : false;
+    },
     stop() {
       gatesAbort?.abort();
       for (const s of open) void s.close();

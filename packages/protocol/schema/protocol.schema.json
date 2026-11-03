@@ -4258,8 +4258,15 @@
                     "additionalProperties": false
                   },
                   "budgetUsd": {
-                    "type": "number",
-                    "exclusiveMinimum": 0
+                    "anyOf": [
+                      {
+                        "type": "number",
+                        "exclusiveMinimum": 0
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
                   },
                   "at": {
                     "type": "string"
@@ -5359,8 +5366,15 @@
                     "additionalProperties": false
                   },
                   "budgetUsd": {
-                    "type": "number",
-                    "exclusiveMinimum": 0
+                    "anyOf": [
+                      {
+                        "type": "number",
+                        "exclusiveMinimum": 0
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
                   },
                   "at": {
                     "type": "string"
@@ -6466,8 +6480,15 @@
                     "additionalProperties": false
                   },
                   "budgetUsd": {
-                    "type": "number",
-                    "exclusiveMinimum": 0
+                    "anyOf": [
+                      {
+                        "type": "number",
+                        "exclusiveMinimum": 0
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
                   },
                   "at": {
                     "type": "string"
@@ -7676,8 +7697,15 @@
                     "additionalProperties": false
                   },
                   "budgetUsd": {
-                    "type": "number",
-                    "exclusiveMinimum": 0
+                    "anyOf": [
+                      {
+                        "type": "number",
+                        "exclusiveMinimum": 0
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
                   },
                   "at": {
                     "type": "string"
@@ -8615,9 +8643,16 @@
             "type": "string"
           },
           "budgetUsd": {
-            "type": "number",
-            "exclusiveMinimum": 0,
-            "maximum": 1000
+            "anyOf": [
+              {
+                "type": "number",
+                "exclusiveMinimum": 0,
+                "maximum": 1000
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "required": [
@@ -8905,8 +8940,15 @@
                     "additionalProperties": false
                   },
                   "budgetUsd": {
-                    "type": "number",
-                    "exclusiveMinimum": 0
+                    "anyOf": [
+                      {
+                        "type": "number",
+                        "exclusiveMinimum": 0
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
                   },
                   "at": {
                     "type": "string"
@@ -10003,8 +10045,15 @@
                     "additionalProperties": false
                   },
                   "budgetUsd": {
-                    "type": "number",
-                    "exclusiveMinimum": 0
+                    "anyOf": [
+                      {
+                        "type": "number",
+                        "exclusiveMinimum": 0
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
                   },
                   "at": {
                     "type": "string"
@@ -11113,8 +11162,15 @@
                     "additionalProperties": false
                   },
                   "budgetUsd": {
-                    "type": "number",
-                    "exclusiveMinimum": 0
+                    "anyOf": [
+                      {
+                        "type": "number",
+                        "exclusiveMinimum": 0
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
                   },
                   "at": {
                     "type": "string"
@@ -11915,6 +11971,46 @@
         "additionalProperties": false
       }
     },
+    "task.message": {
+      "params": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "cwd": {
+            "type": "string",
+            "minLength": 1
+          },
+          "id": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}-[0-9a-f]{8}$"
+          },
+          "text": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 8000
+          }
+        },
+        "required": [
+          "cwd",
+          "id",
+          "text"
+        ],
+        "additionalProperties": false
+      },
+      "result": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "sent": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "sent"
+        ],
+        "additionalProperties": false
+      }
+    },
     "task.resume": {
       "params": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -12211,8 +12307,15 @@
                     "additionalProperties": false
                   },
                   "budgetUsd": {
-                    "type": "number",
-                    "exclusiveMinimum": 0
+                    "anyOf": [
+                      {
+                        "type": "number",
+                        "exclusiveMinimum": 0
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
                   },
                   "at": {
                     "type": "string"
@@ -13315,8 +13418,15 @@
                     "additionalProperties": false
                   },
                   "budgetUsd": {
-                    "type": "number",
-                    "exclusiveMinimum": 0
+                    "anyOf": [
+                      {
+                        "type": "number",
+                        "exclusiveMinimum": 0
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
                   },
                   "at": {
                     "type": "string"
@@ -14454,8 +14564,15 @@
                     "additionalProperties": false
                   },
                   "budgetUsd": {
-                    "type": "number",
-                    "exclusiveMinimum": 0
+                    "anyOf": [
+                      {
+                        "type": "number",
+                        "exclusiveMinimum": 0
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
                   },
                   "at": {
                     "type": "string"
@@ -15552,8 +15669,15 @@
                     "additionalProperties": false
                   },
                   "budgetUsd": {
-                    "type": "number",
-                    "exclusiveMinimum": 0
+                    "anyOf": [
+                      {
+                        "type": "number",
+                        "exclusiveMinimum": 0
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
                   },
                   "at": {
                     "type": "string"
@@ -16650,8 +16774,15 @@
                     "additionalProperties": false
                   },
                   "budgetUsd": {
-                    "type": "number",
-                    "exclusiveMinimum": 0
+                    "anyOf": [
+                      {
+                        "type": "number",
+                        "exclusiveMinimum": 0
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
                   },
                   "at": {
                     "type": "string"
@@ -17960,8 +18091,15 @@
                     "additionalProperties": false
                   },
                   "budgetUsd": {
-                    "type": "number",
-                    "exclusiveMinimum": 0
+                    "anyOf": [
+                      {
+                        "type": "number",
+                        "exclusiveMinimum": 0
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
                   },
                   "at": {
                     "type": "string"
@@ -19182,8 +19320,15 @@
                     "additionalProperties": false
                   },
                   "budgetUsd": {
-                    "type": "number",
-                    "exclusiveMinimum": 0
+                    "anyOf": [
+                      {
+                        "type": "number",
+                        "exclusiveMinimum": 0
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
                   },
                   "at": {
                     "type": "string"
@@ -20382,8 +20527,15 @@
                     "additionalProperties": false
                   },
                   "budgetUsd": {
-                    "type": "number",
-                    "exclusiveMinimum": 0
+                    "anyOf": [
+                      {
+                        "type": "number",
+                        "exclusiveMinimum": 0
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
                   },
                   "at": {
                     "type": "string"
@@ -21499,8 +21651,15 @@
                     "additionalProperties": false
                   },
                   "budgetUsd": {
-                    "type": "number",
-                    "exclusiveMinimum": 0
+                    "anyOf": [
+                      {
+                        "type": "number",
+                        "exclusiveMinimum": 0
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
                   },
                   "at": {
                     "type": "string"
@@ -24352,8 +24511,15 @@
                     "additionalProperties": false
                   },
                   "budgetUsd": {
-                    "type": "number",
-                    "exclusiveMinimum": 0
+                    "anyOf": [
+                      {
+                        "type": "number",
+                        "exclusiveMinimum": 0
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
                   },
                   "at": {
                     "type": "string"
@@ -26271,8 +26437,15 @@
                       "additionalProperties": false
                     },
                     "budgetUsd": {
-                      "type": "number",
-                      "exclusiveMinimum": 0
+                      "anyOf": [
+                        {
+                          "type": "number",
+                          "exclusiveMinimum": 0
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
                     },
                     "at": {
                       "type": "string"

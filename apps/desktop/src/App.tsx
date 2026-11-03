@@ -121,6 +121,8 @@ export function App() {
   const stepTotals = useRef(new Map<string, number>());
   /** Tasks open as tabs (UX-13), beside the sessions; the active one is `task:<id>` in `active`. */
   const [taskTabs, setTaskTabs] = useState<TaskTab[]>([]);
+  /** For each open task thread, the tasks whose approvals it shows as cards (the task and its sub-tasks). */
+  const [shownTasks, setShownTasks] = useState<Record<string, string[]>>({});
   /** Self-test screenshots only: the right panel's tab. */
   const [panelTab, setPanelTab] = useState<PanelTab | undefined>(undefined);
   const [showFirstChange, setShowFirstChange] = useState(false);
@@ -140,7 +142,8 @@ export function App() {
 
   const patchTab = (sessionId: string, fn: (tab: Tab) => Tab) => setTabs((ts) => updateTab(ts, sessionId, fn));
   /** A task thread reports its task as it changes, for its tab in the sidebar (UX-13). */
-  const onTaskChange = useCallback((task: Task, busy: boolean) => {
+  const onTaskChange = useCallback((task: Task, busy: boolean, ids: string[]) => {
+    setShownTasks((all) => ({ ...all, [task.id]: ids }));
     setTaskTabs((all) =>
       all.map((t) =>
         t.id === task.id
@@ -844,7 +847,9 @@ export function App() {
   // Claude's questions are cards in the thread (UX-12), not this dialog.
   const permission = activeTab?.permissions.find((p) => p.toolName !== "AskUserQuestion");
   // A task step's approval shows when the active session has none waiting.
-  const stepApproval = permission ? undefined : taskApprovals[0];
+  // A step's approval shows as a card in its task's thread (UX-13); only one whose task has no open thread is a dialog.
+  const threaded = new Set(taskTabs.flatMap((t) => shownTasks[t.id] ?? [t.id]));
+  const stepApproval = permission ? undefined : taskApprovals.find((p) => !p.task || !threaded.has(p.task.id));
   const workspace = cwd.trim();
 
   /** Everything the command palette offers (UX-07), built from the same actions as the menu and the views. */
@@ -1094,6 +1099,9 @@ export function App() {
                         confirm={confirm}
                         onClose={() => closeTaskTab(t.id)}
                         onChange={onTaskChange}
+                        approvals={taskApprovals}
+                        onAnswerApproval={(req, reply) => void answerTaskStep(req, reply)}
+                        onStopFromApproval={(req) => void stopTaskStep(req)}
                         onOpenFile={(file) =>
                           invoke("open_in_editor", { file, line: null, editor: settings?.editor ?? "system" })
                         }

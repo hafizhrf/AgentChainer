@@ -374,6 +374,94 @@ describe("an interactive session (UX-12)", () => {
   });
 });
 
+describe("Session app tools and turn ends (M8-03)", () => {
+  it("adds the app's MCP server and allows its tools without asking; other tools are still asked", async () => {
+    const { sdk, options } = fakeSdk([]);
+    const asked: string[] = [];
+    const appTools = { type: "sdk", name: "agentchainer", instance: {} } as never;
+    const s = new Session(
+      sdk,
+      { cwd: "/w", claudePath: "claude", appTools },
+      { ...callbacks(), askPermission: (r) => void asked.push(r.toolName) },
+    );
+    assert.deepEqual(options().mcpServers, { agentchainer: appTools });
+    const canUseTool = options().canUseTool as (n: string, i: unknown, c: Record<string, unknown>) => Promise<unknown>;
+    const ctx = (requestId: string) => ({ requestId, toolUseID: requestId, signal: new AbortController().signal });
+    assert.deepEqual(await canUseTool("mcp__agentchainer__assign", { name: "a" }, ctx("1")), {
+      behavior: "allow",
+      updatedInput: { name: "a" },
+    });
+    void canUseTool("mcp__other__assign", {}, ctx("2"));
+    assert.deepEqual(asked, ["mcp__other__assign"]);
+    s.close();
+  });
+
+  it("asks about the app's tool names in a session without app tools", async () => {
+    const { sdk, options } = fakeSdk([]);
+    const asked: string[] = [];
+    const s = new Session(
+      sdk,
+      { cwd: "/w", claudePath: "claude" },
+      {
+        ...callbacks(),
+        askPermission: (r) => void asked.push(r.toolName),
+      },
+    );
+    assert.equal(options().mcpServers, undefined);
+    const canUseTool = options().canUseTool as (n: string, i: unknown, c: Record<string, unknown>) => Promise<unknown>;
+    void canUseTool(
+      "mcp__agentchainer__assign",
+      {},
+      { requestId: "1", toolUseID: "1", signal: new AbortController().signal },
+    );
+    assert.deepEqual(asked, ["mcp__agentchainer__assign"]);
+    s.close();
+  });
+
+  it("reports every turn end, after its events, with the session idle again", async () => {
+    const { sdk } = fakeSdk([
+      { subtype: "success", result: "one", total_cost_usd: 0.1 },
+      { subtype: "error_max_budget_usd", is_error: true, total_cost_usd: 0.3 },
+    ]);
+    const seen: string[] = [];
+    let s: Session | undefined;
+    const ended = new Promise<void>((done) => {
+      s = new Session(
+        sdk,
+        { cwd: "/w", claudePath: "claude" },
+        {
+          ...callbacks(),
+          emit: (e) => void seen.push(e.type),
+          turnEnded: (r) => {
+            seen.push(`ended:${r.subtype}:${r.text}:${Math.round(r.costUsd * 10)}:${s?.idle}`);
+            if (r.isError) done();
+          },
+        },
+      );
+    });
+    assert.equal(s?.idle, true);
+    s?.send("go");
+    assert.equal(s?.idle, false);
+    s?.send("again");
+    await ended;
+    assert.deepEqual(
+      seen.filter((x) => x.startsWith("ended") || x === "turn.completed"),
+      ["turn.completed", "ended:success:one:1:false", "turn.completed", "ended:error_max_budget_usd::2:true"],
+    );
+    assert.equal(Math.round((s?.costUsd ?? 0) * 10), 3);
+    s?.close();
+  });
+
+  it("names a worker's supervisor in its fleet item", () => {
+    const { sdk } = fakeSdk([]);
+    const s = new Session(sdk, { cwd: "/w", claudePath: "claude" }, callbacks());
+    assert.equal(s.fleetItem.parentId, undefined);
+    s.parentId = "sup";
+    assert.equal(s.fleetItem.parentId, "sup");
+    s.close();
+  });
+});
+
 describe("Session.inject (UX-13)", () => {
   /** Like the CLI: a message sent while a turn runs joins that turn, which ends with one result. */
   function mergingSdk() {

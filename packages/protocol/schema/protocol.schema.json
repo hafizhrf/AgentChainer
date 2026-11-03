@@ -157,6 +157,9 @@
                     "label"
                   ],
                   "additionalProperties": false
+                },
+                "parentId": {
+                  "type": "string"
                 }
               },
               "required": [
@@ -393,6 +396,9 @@
               "minLength": 1,
               "maxLength": 4096
             }
+          },
+          "team": {
+            "type": "boolean"
           }
         },
         "required": [
@@ -1900,6 +1906,60 @@
                     "type",
                     "trigger",
                     "preTokens"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "const": "worker.message"
+                    },
+                    "workerId": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "text": {
+                      "type": "string"
+                    },
+                    "isError": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "workerId",
+                    "name",
+                    "text",
+                    "isError"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "const": "team.budget"
+                    },
+                    "spentUsd": {
+                      "type": "number"
+                    },
+                    "capUsd": {
+                      "type": "number"
+                    },
+                    "stopped": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "spentUsd",
+                    "capUsd",
+                    "stopped"
                   ],
                   "additionalProperties": false
                 },
@@ -30975,6 +31035,60 @@
               "properties": {
                 "type": {
                   "type": "string",
+                  "const": "worker.message"
+                },
+                "workerId": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "text": {
+                  "type": "string"
+                },
+                "isError": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "type",
+                "workerId",
+                "name",
+                "text",
+                "isError"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "const": "team.budget"
+                },
+                "spentUsd": {
+                  "type": "number"
+                },
+                "capUsd": {
+                  "type": "number"
+                },
+                "stopped": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "type",
+                "spentUsd",
+                "capUsd",
+                "stopped"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string",
                   "const": "error"
                 },
                 "message": {
@@ -32411,6 +32525,9 @@
                 "label"
               ],
               "additionalProperties": false
+            },
+            "parentId": {
+              "type": "string"
             }
           },
           "required": [
@@ -32427,6 +32544,39 @@
       },
       "required": [
         "item"
+      ],
+      "additionalProperties": false
+    },
+    "session.opened": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "sessionId": {
+          "type": "string"
+        },
+        "parentId": {
+          "type": "string"
+        },
+        "cwd": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "access": {
+          "type": "string",
+          "enum": [
+            "read",
+            "write"
+          ]
+        }
+      },
+      "required": [
+        "sessionId",
+        "parentId",
+        "cwd",
+        "name",
+        "access"
       ],
       "additionalProperties": false
     }

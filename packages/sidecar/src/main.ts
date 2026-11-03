@@ -51,7 +51,7 @@ import {
 import { normalize } from "./normalize.ts";
 import { listRules, removeRule } from "./permissions.ts";
 import { log, notify, RpcFailure, serve } from "./rpc.ts";
-import { loadSdk } from "./sdk-loader.ts";
+import { type AgentSdkModule, loadSdk } from "./sdk-loader.ts";
 import { Session } from "./session.ts";
 import { replayEvents, retention, toSessionInfo } from "./stored-sessions.ts";
 import { generateWorkflow } from "./tasks/generate-workflow.ts";
@@ -105,6 +105,7 @@ import {
   writeEvidence,
 } from "./tasks/service.ts";
 import { loadTask } from "./tasks/store.ts";
+import { sessionWorkers, Team, teamTools, type WorkerBase } from "./team.ts";
 import { fileDiff, gitInit, listFiles, revert } from "./workspace.ts";
 
 /** Live sessions by SDK session id, one per workspace tab (M1-08). */
@@ -116,6 +117,28 @@ function requireSession(sessionId: string): Session {
     throw new RpcFailure(RpcErrorCode.noSession, "This session isn't running. Resume it from the session list.");
   }
   return session;
+}
+
+/**
+ * A Team chat's crew (M8-03): its workers are live sessions like any tab's, opened by the sidecar, so the UI is told
+ * of each before its first event.
+ */
+function newTeam(sdk: AgentSdkModule, capUsd: number, parentId: () => string, base: WorkerBase): Team {
+  const team: Team = new Team(capUsd, {
+    emit: (event) => notify("agent.event", { sessionId: parentId(), event }),
+    open: (spec, on) => open(spec, on),
+  });
+  const open = sessionWorkers(sdk, base, parentId, {
+    register: (s) => sessions.set(s.id, s),
+    unregister: (s) => {
+      if (sessions.get(s.id) === s) sessions.delete(s.id);
+    },
+    opened: (info) => notify("session.opened", info),
+    event: (sessionId, event) => notify("agent.event", { sessionId, event }),
+    permission: (sessionId, request) => notify("permission.request", { sessionId, ...request }),
+    status: (item) => notify("fleet.changed", { item }),
+  });
+  return team;
 }
 
 /** The user's own CLI for plugin installs (spike S6), or null when it isn't found. */
@@ -226,7 +249,21 @@ serve(
       return { ok: true };
     },
 
-    "session.start": async ({ cwd, model, permissionMode, effort, maxBudgetUsd, showThinking, resume, folders }) => {
+    "session.start": async ({
+      cwd,
+      model,
+      permissionMode,
+      effort,
+      maxBudgetUsd,
+      showThinking,
+      resume,
+      folders,
+      team,
+    }) => {
+      // A Team chat (M8-03) runs workers on the person's budget, so it needs a cap for them all.
+      if (team && !maxBudgetUsd) {
+        throw new RpcFailure(RpcErrorCode.invalidParams, "A Team chat needs a budget cap for it and its workers.");
+      }
       // A multi-folder workspace's other folders (M8-01): the same rules as the New workspace dialog, and they exist.
       if (folders?.length) {
         const problems = folderProblems([cwd, ...folders], homedir());
@@ -242,6 +279,16 @@ serve(
       }
       // First run of the packaged app downloads and verifies the SDK here (a few seconds).
       const { sdk } = await prepareSdk();
+      const crew =
+        team && maxBudgetUsd
+          ? newTeam(sdk, maxBudgetUsd, () => session.id, {
+              cwd,
+              claudePath,
+              ...(model ? { model } : {}),
+              ...(effort ? { effort } : {}),
+              ...(folders?.length ? { additionalDirectories: folders } : {}),
+            })
+          : null;
       const session: Session = new Session(
         sdk,
         {
@@ -257,16 +304,20 @@ serve(
           // Interactive sessions show their background tasks and stop them one by one (M4-07).
           background: true,
           interactive: true,
+          ...(crew ? { appTools: teamTools(sdk, crew) } : {}),
         },
         {
           emit: (event) => notify("agent.event", { sessionId: session.id, event }),
           askPermission: (request) => notify("permission.request", { sessionId: session.id, ...request }),
           statusChanged: (item) => notify("fleet.changed", { item }),
+          ...(crew ? { turnEnded: () => crew.supervisorTurnEnded() } : {}),
           onEnd: () => {
             if (sessions.get(session.id) === session) sessions.delete(session.id);
+            void crew?.close();
           },
         },
       );
+      crew?.attach(session);
       sessions.set(session.id, session);
       return { sessionId: session.id };
     },

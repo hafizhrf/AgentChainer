@@ -1662,6 +1662,10 @@ first.
 - [ ] **M8-03** Supervisor and worker sessions: a supervisor session hands work to worker sessions (assign, hand
       off, send a message, an inbox) through an in-app MCP server, under the app's approvals and budgets. From CAO's
       supervisor/worker model; it goes beyond XL's fixed split (M3-07).
+      → design: [supervisor.md](design/supervisor.md) (owner decisions, 2026-11-03).
+  - Sidecar (PR 1): the Team, its in-process MCP server and `session.opened`. Unit tests, and the live `team`
+    scenario on haiku: 5 of 5 checks passed, about $0.03.
+  - UI (PR 2): the Team toggle, nested worker tabs, worker cards and the fleet rows. The box is ticked then.
 - [ ] **M8-04** An agent profiles manager: create from a template, edit, clone and delete, validated before saving,
       with per-profile tool allowlists. From CAO's profile editor; builds on M3-05's roles and UX-10's Plugins page.
 - [ ] **M8-05** Scheduled flows: run a task template on a schedule (e.g. a nightly dependency bump), locally, with a

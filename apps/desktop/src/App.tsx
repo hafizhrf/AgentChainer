@@ -273,6 +273,8 @@ export function App() {
         if (task.state !== "running") setTaskApprovals((q) => q.filter((p) => p.task?.id !== task.id));
         return;
       }
+      // A Team chat's worker (M8-03). Nothing in the UI starts a Team chat yet; its tab comes with the Team toggle.
+      if (n.method === "session.opened") return;
       const { sessionId, event, task } = n.params;
       if (event.type === "turn.completed") {
         if (task && !tabsRef.current.some((t) => t.sessionId === sessionId)) recordStepCost(sessionId, event, task.cwd);

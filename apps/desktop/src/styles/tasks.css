@@ -1560,3 +1560,40 @@ fieldset.schedule-days > legend {
 .fleet-time.warn {
   color: var(--warn);
 }
+
+/* ---------- Lessons (M8-06) ---------- */
+
+.task-lessons .lesson-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.lesson-text {
+  font-weight: 500;
+}
+
+.lesson-why {
+  margin: 2px 0 0 calc(var(--space-2) + 16px);
+  font-size: var(--text-sm);
+}
+
+.lesson-sources {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  margin: var(--space-1) 0 0 calc(var(--space-2) + 16px);
+}
+
+.task-lessons .ok-text {
+  color: var(--ok);
+}
+
+/* A lesson's line is long: the diff wraps rather than scrolling sideways. */
+.task-lessons .plan-preview {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}

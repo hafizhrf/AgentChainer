@@ -201,7 +201,10 @@ They're used as ideas only; no code is copied.
     - edits go ahead, and anything else waits for the person.
 - **M8-06 Lessons from outcomes:** suggest additions to `CLAUDE.md` from finished tasks' evidence. It's opt-in, and
   each suggestion is approved by the person.
-  - Open: which evidence counts, and how a suggestion is deduplicated.
+  - Designed in [lessons.md](lessons.md), 2026-11-03:
+    - all recorded signals count (fixed gates, review findings, guard blocks, denials, the implementer's notes);
+    - a lesson is dropped when CLAUDE.md or a dismissal already says it;
+    - suggestions are made only on request and added one by one.
 
 ## 7. UI
 

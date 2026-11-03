@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { newTab, tabEvent } from "./tabs.ts";
-import { nestedTabs, teamSpend, teamTool } from "./team.ts";
+import { nestedTabs, teamSpend, teamTool, usdShort } from "./team.ts";
 
 describe("Team chats (M8-03)", () => {
   it("names the Team tools by what they do, with the worker and its access", () => {
@@ -60,5 +60,18 @@ describe("Team chats (M8-03)", () => {
     w = tabEvent(w, { type: "user.message", messageId: "m1", text: "count files" });
     assert.equal(w.running, true);
     assert.equal(w.items.at(-1)?.kind, "user");
+  });
+
+  it("shortens money where the composer has little room", () => {
+    assert.deepEqual([0, 0.023, 2, 2.5, 1500, 1000, 10_000_000, 2_500_000].map(usdShort), [
+      "$0",
+      "$0.02",
+      "$2",
+      "$2.50",
+      "$1.5K",
+      "$1K",
+      "$10M",
+      "$2.5M",
+    ]);
   });
 });

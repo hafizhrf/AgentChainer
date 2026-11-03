@@ -17,7 +17,7 @@ import { fuzzyFilter, tokenAt } from "./fuzzy.ts";
 import { ModeHelp } from "./ModeHelp.tsx";
 import { EFFORT_OPTIONS, MODE_HELP, MODE_NAMES, modelChoices, modeOptions } from "./options.ts";
 import { asMode, isFresh, type Tab } from "./tabs.ts";
-import { teamSpend } from "./team.ts";
+import { teamSpend, usdShort } from "./team.ts";
 import { Select } from "./ui/Select.tsx";
 
 /** An image pasted into the composer: base64 data for the API and a data URL for the thumbnail. */
@@ -474,122 +474,131 @@ export function Composer({
           disabled={tab.ended}
         />
         <div className="composer-toolbar">
-          {onTask && (
-            <fieldset className="segmented kind-switch">
-              <legend className="sr-only">Send as</legend>
-              {(["chat", "task"] as const).map((k) => (
-                <button
-                  key={k}
-                  type="button"
-                  className={kind === k ? "active" : undefined}
-                  aria-pressed={kind === k}
-                  title={k === "chat" ? "Talk with Claude" : "A task: a contract first, then a verified run"}
-                  onClick={() => setKind(k)}
-                >
-                  {k === "chat" ? "Chat" : "Task"}
-                </button>
-              ))}
-            </fieldset>
-          )}
-          <Select
-            compact
-            label="Permission profile"
-            value={tab.mode}
-            options={modeOptions(PERMISSION_MODES, canAutonomous)}
-            onChange={(m) => onModeChange(asMode(m))}
-            disabled={tab.ended}
-          />
-          <ModeHelp current={tab.mode} />
-          <Select
-            compact
-            label="Model"
-            value={tab.modelAlias}
-            options={modelChoices(tab.models.length ? tab.models : undefined, tab.modelAlias)}
-            onChange={onModelChange}
-            disabled={tab.ended}
-          />
-          <Select
-            compact
-            label="Effort"
-            value={tab.effort ?? ""}
-            options={EFFORT_OPTIONS}
-            onChange={(e) => onEffortChange((e || null) as Effort | null)}
-            disabled={tab.ended}
-          />
-          <button
-            type="button"
-            className="ghost icon"
-            aria-label="Attach files"
-            title="Attach files as @path (or drop them here)"
-            onClick={() => void attach()}
-            disabled={tab.ended}
-          >
-            <Paperclip size={14} />
-          </button>
-          {/* A Team chat (M8-03) is chosen before the first message; a worker's tab can't be one. */}
-          {!tab.parentId && isFresh(tab) && (
-            <button
-              type="button"
-              className="secondary small team-toggle"
-              aria-pressed={tab.team !== undefined}
-              title={
-                tab.team
-                  ? "A Team chat: Claude can start worker sessions, each in its own tab. Click to make it a plain chat."
-                  : "Let Claude start worker sessions that work in parallel, each in its own tab, under one budget cap"
-              }
-              onClick={() => onTeam(tab.team === undefined)}
-            >
-              <Users size={14} />
-              Team
-            </button>
-          )}
-          <span className="grow" />
-          {tab.team && <span className={`team-spend${tab.team.stopped ? " stopped" : ""}`}>{teamSpend(tab.team)}</span>}
-          {tab.context && !tab.ended && (
-            <ContextRing
-              percentage={tab.context.percentage}
-              disabled={tab.running}
-              onCompact={() => onSend("/compact", [])}
+          {/* What the message is sent with; these wrap onto a second row rather than squeeze into each other. */}
+          <div className="composer-controls">
+            {onTask && (
+              <fieldset className="segmented kind-switch">
+                <legend className="sr-only">Send as</legend>
+                {(["chat", "task"] as const).map((k) => (
+                  <button
+                    key={k}
+                    type="button"
+                    className={kind === k ? "active" : undefined}
+                    aria-pressed={kind === k}
+                    title={k === "chat" ? "Talk with Claude" : "A task: a contract first, then a verified run"}
+                    onClick={() => setKind(k)}
+                  >
+                    {k === "chat" ? "Chat" : "Task"}
+                  </button>
+                ))}
+              </fieldset>
+            )}
+            <Select
+              compact
+              label="Permission profile"
+              value={tab.mode}
+              options={modeOptions(PERMISSION_MODES, canAutonomous)}
+              onChange={(m) => onModeChange(asMode(m))}
+              disabled={tab.ended}
             />
-          )}
-          {tab.ended ? (
+            <ModeHelp current={tab.mode} />
+            <Select
+              compact
+              label="Model"
+              value={tab.modelAlias}
+              options={modelChoices(tab.models.length ? tab.models : undefined, tab.modelAlias)}
+              onChange={onModelChange}
+              disabled={tab.ended}
+            />
+            <Select
+              compact
+              label="Effort"
+              value={tab.effort ?? ""}
+              options={EFFORT_OPTIONS}
+              onChange={(e) => onEffortChange((e || null) as Effort | null)}
+              disabled={tab.ended}
+            />
             <button
               type="button"
-              className="small"
-              onClick={onResume}
-              title="Continue this conversation in a new live session"
+              className="ghost icon"
+              aria-label="Attach files"
+              title="Attach files as @path (or drop them here)"
+              onClick={() => void attach()}
+              disabled={tab.ended}
             >
-              <Play size={14} />
-              Resume session
+              <Paperclip size={14} />
             </button>
-          ) : (
-            <>
-              <span className="composer-hint">
-                {tab.running ? "Esc stops" : "Enter sends · Shift+Enter new line · ↑ history"}
-              </span>
-              {tab.running && (
-                <button
-                  type="button"
-                  className="secondary icon round"
-                  onClick={onInterrupt}
-                  aria-label="Stop the running turn"
-                  title="Stop (Esc)"
-                >
-                  <Square size={12} fill="currentColor" />
-                </button>
-              )}
+            {/* A Team chat (M8-03) is chosen before the first message; a worker's tab can't be one. */}
+            {!tab.parentId && isFresh(tab) && (
               <button
                 type="button"
-                className="icon round"
-                disabled={!draft.trim()}
-                onClick={() => submit()}
-                aria-label={tab.running ? "Queue message" : "Send message"}
-                title={tab.running ? "Queue (Enter)" : "Send (Enter)"}
+                className="ghost small team-toggle"
+                aria-pressed={tab.team !== undefined}
+                title={
+                  tab.team
+                    ? `A Team chat: Claude can start worker sessions, each in its own tab. ${teamSpend(tab.team)}. Click to make it a plain chat.`
+                    : "Let Claude start worker sessions that work in parallel, each in its own tab, under one budget cap"
+                }
+                onClick={() => onTeam(tab.team === undefined)}
               >
-                {tab.running ? <ListPlus size={16} /> : <ArrowUp size={16} />}
+                <Users size={14} />
+                Team
               </button>
-            </>
-          )}
+            )}
+          </div>
+          <div className="composer-actions">
+            {tab.team && (
+              <span className={`team-spend${tab.team.stopped ? " stopped" : ""}`} title={teamSpend(tab.team)}>
+                <Users size={12} aria-hidden />
+                {tab.team.stopped ? "Stopped at cap" : `${usdShort(tab.team.spentUsd)} / ${usdShort(tab.team.capUsd)}`}
+              </span>
+            )}
+            {tab.context && !tab.ended && (
+              <ContextRing
+                percentage={tab.context.percentage}
+                disabled={tab.running}
+                onCompact={() => onSend("/compact", [])}
+              />
+            )}
+            {tab.ended ? (
+              <button
+                type="button"
+                className="small"
+                onClick={onResume}
+                title="Continue this conversation in a new live session"
+              >
+                <Play size={14} />
+                Resume session
+              </button>
+            ) : (
+              <>
+                <span className="composer-hint">
+                  {tab.running ? "Esc stops" : "Enter to send · Shift+Enter new line"}
+                </span>
+                {tab.running && (
+                  <button
+                    type="button"
+                    className="secondary icon round"
+                    onClick={onInterrupt}
+                    aria-label="Stop the running turn"
+                    title="Stop (Esc)"
+                  >
+                    <Square size={12} fill="currentColor" />
+                  </button>
+                )}
+                <button
+                  type="button"
+                  className="icon round"
+                  disabled={!draft.trim()}
+                  onClick={() => submit()}
+                  aria-label={tab.running ? "Queue message" : "Send message"}
+                  title={tab.running ? "Queue (Enter)" : "Send (Enter)"}
+                >
+                  {tab.running ? <ListPlus size={16} /> : <ArrowUp size={16} />}
+                </button>
+              </>
+            )}
+          </div>
         </div>
       </div>
     </div>

@@ -494,17 +494,69 @@
   margin: var(--space-2) var(--space-3) 0;
 }
 
+/*
+ * Two groups (owner feedback, 2026-11-03: "berantakan"): the controls on the left wrap onto a second row when the
+ * composer is narrow, never squeezing into each other; the actions on the right never shrink or wrap.
+ */
+.composer-box {
+  container-type: inline-size;
+}
+
 .composer-toolbar {
   display: flex;
-  align-items: center;
-  gap: 2px;
+  align-items: flex-end;
+  gap: var(--space-2);
   padding: var(--space-1) var(--space-2) var(--space-2);
 }
 
+.composer-controls {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px;
+}
+
+.composer-controls > * {
+  flex-shrink: 0;
+}
+
+/* A long model name ("Default (recommended)") ends in an ellipsis; its full name is in the menu. */
+.composer-controls .select-trigger.compact {
+  max-width: 150px;
+}
+
+.composer-controls .select-trigger.compact > span:first-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.composer-actions {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
 .composer-hint {
-  margin-right: var(--space-2);
+  margin: 0 var(--space-1);
   color: var(--muted);
   font-size: var(--text-xs);
+  white-space: nowrap;
+}
+
+@container (max-width: 980px) {
+  .composer-hint {
+    display: none;
+  }
+}
+
+@container (max-width: 560px) {
+  .team-spend {
+    display: none;
+  }
 }
 
 .queue {
@@ -1317,13 +1369,23 @@
   opacity: 1;
 }
 
-/* The Team toggle and its spend (M8-03). */
+/* The Team toggle and its spend (M8-03): a control like the others, accented when on. */
+.team-toggle {
+  min-height: 26px;
+  padding: 0 var(--space-2);
+  color: var(--muted);
+  font-weight: 400;
+}
+
 .team-toggle[aria-pressed="true"] {
   color: var(--accent);
-  border-color: var(--accent);
+  background: var(--accent-soft);
 }
 
 .team-spend {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   color: var(--muted);
   font-size: var(--text-xs);
   white-space: nowrap;

@@ -81,6 +81,7 @@ import {
   mergeGates,
   mergePrTask,
   mergeResult,
+  messageRun,
   newTask,
   overlapsOf,
   present,
@@ -549,6 +550,11 @@ serve(
     "task.draft": async ({ cwd, id, model }) => {
       requireFolder(cwd);
       return draftTask(cwd, id, await claude(), model, draftEvents(cwd, id));
+    },
+
+    "task.message": ({ cwd, id, text }) => {
+      requireFolder(cwd);
+      return { sent: messageRun(id, text) };
     },
 
     "task.redraft": async ({ cwd, id, model, feedback }) => {

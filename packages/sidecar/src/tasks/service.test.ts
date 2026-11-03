@@ -26,6 +26,7 @@ import {
   mergeGates,
   mergePrTask,
   mergeResult,
+  messageRun,
   newTask,
   overlapsOf,
   prPreview,
@@ -743,3 +744,9 @@ function approvedXl(task: ReturnType<typeof newTask>): ReturnType<typeof newTask
     },
   };
 }
+
+describe("messages to a running task (UX-13)", () => {
+  it("refuses a message for a task that isn't running", () => {
+    assert.throws(() => messageRun("t-20261103-00000000", "hi"), /isn't running/);
+  });
+});

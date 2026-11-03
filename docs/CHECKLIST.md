@@ -1072,7 +1072,7 @@ for the desktop shell, start screen and session view to be cleaned up (UX-02, UX
       the mode's name beside it); the models are the CLI's own list and names (`supportedModels()`), kept for the
       start screen and Settings; Enter on a `/` command runs it, and `/model`, `/mode`, `/effort`, `/usage` (alias
       `/cost`, `/stats`, `/context`) and `/help` open a picker or a panel above the composer. Checked in the app.
-- [ ] **UX-13** One thread for chats and tasks (§5). One New with a Chat | Task switch; tasks as tabs with the right
+- [x] **UX-13** One thread for chats and tasks (§5). One New with a Chat | Task switch; tasks as tabs with the right
       panel; drafting streams in the thread; the contract and triage as editable cards refined by replying; steps
       stream in the thread and the running step can be messaged; approvals and results as cards; a Task tab; "Make
       this a task".
@@ -1084,6 +1084,13 @@ for the desktop shell, start screen and session view to be cleaned up (UX-02, UX
       tasks. The run, its results and the footer actions stay as they were inside the thread until step 3. Checked in
       the app with haiku: a task from an empty chat, streamed drafting, a reply that removed a constraint, Approve and
       run to Done with its gates, result and evidence in the thread; `/task` from a chat with history.
+      Step 3 is built: the run's steps are blocks in the thread, with running steps' transcripts live (from their
+      events, before the step records its session); a step's approvals and questions are cards in its thread (the
+      dialog only for a task with no open thread); the composer messages the running step (`task.message`, which
+      joins the step's turn); and an S, M or L task can run with **no budget** (owner request, 2026-11-03). Checked in
+      the app with haiku: an Edit approval as a card, a message sent mid-step that Claude acted on ("the
+      negative-percent test you asked for is in"), and a no-budget run to Done with "no budget" in the run, the panel
+      and the evidence report. Evidence: #86 and this step's PR.
 - [ ] **UX-14** A live and AI-made workflow canvas (§6). A Flow tab shows the run's workflow with each step's live
       status, hand-offs and fix rounds; Generate with AI drafts project workflows; M/L/XL tasks may get their own
       flow, approved with the contract.

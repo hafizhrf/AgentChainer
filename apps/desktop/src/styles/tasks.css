@@ -1314,3 +1314,75 @@ div.draft-block.live {
   margin-right: 4px;
   vertical-align: -2px;
 }
+
+/* ---------- A task's run in its thread (UX-13) ---------- */
+
+.run-divider {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+  padding: var(--space-1) 0;
+  border-bottom: 1px solid var(--border);
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+
+.run-divider > .muted {
+  font-weight: 400;
+}
+
+.step-block {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
+.step-block.running {
+  border-color: var(--mode-plan);
+}
+
+.step-block.failed {
+  border-color: var(--err);
+}
+
+.step-block + .step-block {
+  border-top: 1px solid var(--border);
+}
+
+.step-block > .step-head {
+  border-radius: var(--radius);
+}
+
+.step-role {
+  font-size: var(--text-xs);
+}
+
+.step-body {
+  max-height: 520px;
+  overflow-y: auto;
+  padding: var(--space-2) var(--space-4) var(--space-3);
+  border-top: 1px solid var(--border);
+}
+
+.run-outcome {
+  margin: 0;
+}
+
+.approval-card {
+  border-color: var(--warn);
+}
+
+.approval-card.risk-high {
+  border-color: var(--err);
+}
+
+.approval-card .approval-command {
+  margin: 0;
+}
+
+.approval-why,
+.approval-reasons {
+  margin: 0;
+  font-size: var(--text-sm);
+}

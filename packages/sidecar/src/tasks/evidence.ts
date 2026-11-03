@@ -69,7 +69,8 @@ export type Evidence = {
     tier: string;
     proposed: string;
     overrideReason?: string;
-    budgetUsd: number;
+    /** null: the person ran it with no budget. */
+    budgetUsd: number | null;
     approvedAt?: string;
     /** The workflow the run used, and the project's file when it replaced the app's (M6-04). */
     workflow?: TaskRun["workflow"];
@@ -213,7 +214,7 @@ export function buildEvidence({
       tier: triage?.chosen ?? "",
       proposed: triage?.proposed ?? "",
       ...(triage?.override ? { overrideReason: triage.override.reason } : {}),
-      budgetUsd: triage?.budgetUsd ?? 0,
+      budgetUsd: triage ? triage.budgetUsd : 0,
       ...(contract?.approvedAt ? { approvedAt: contract.approvedAt } : {}),
       ...(run ? { workflow: run.workflow } : {}),
     },
@@ -296,7 +297,7 @@ export function renderEvidence(e: Evidence): string {
   add(`# Task evidence: ${e.task.objective || e.task.request}`, "");
   add(`- **Request:** ${e.task.request}`);
   add(
-    `- **Tier:** ${e.task.tier}${e.task.tier !== e.task.proposed ? ` (proposed ${e.task.proposed}; changed because: ${e.task.overrideReason ?? "no reason"})` : ""}, budget $${e.task.budgetUsd}`,
+    `- **Tier:** ${e.task.tier}${e.task.tier !== e.task.proposed ? ` (proposed ${e.task.proposed}; changed because: ${e.task.overrideReason ?? "no reason"})` : ""}, ${e.task.budgetUsd === null ? "no budget" : `budget $${e.task.budgetUsd}`}`,
   );
   if (e.task.approvedAt) add(`- **Contract approved:** ${e.task.approvedAt}`);
   const w = e.task.workflow;

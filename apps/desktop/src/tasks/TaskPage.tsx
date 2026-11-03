@@ -2,11 +2,11 @@ import {
   type AcceptanceCriterion,
   type GateRun,
   type PermissionMode,
+  type PermissionRequest,
   RpcErrorCode,
   type StepRun,
   type Task,
   type TaskContract,
-  type TaskSummary,
   type Tier,
   type Triage,
 } from "@agentchainer/protocol";
@@ -37,18 +37,20 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { type Confirm, Modal } from "../Dialog.tsx";
 import { Markdown } from "../Markdown.tsx";
 import { MODE_NAMES, modelChoices, modeOptions } from "../options.ts";
+import type { PermissionAnswer } from "../PermissionDialog.tsx";
+import { QuestionCard } from "../QuestionCard.tsx";
 import { isRpcError } from "../rpc-client.ts";
 import { request, subscribe } from "../sidecar.ts";
 import { TranscriptView } from "../TranscriptView.tsx";
 import { folderName } from "../tabs.ts";
 import type { Item } from "../transcript.ts";
-import { ActionMenu } from "../ui/ActionMenu.tsx";
 import { CopyButton } from "../ui/CopyButton.tsx";
 import { EditableList, StringList } from "../ui/EditableList.tsx";
 import { Field } from "../ui/Field.tsx";
 import { IconButton } from "../ui/IconButton.tsx";
 import { EmptyState } from "../ui/Section.tsx";
 import { Select } from "../ui/Select.tsx";
+import { ApprovalCard } from "./ApprovalCard.tsx";
 import { CreatePrDialog } from "./CreatePr.tsx";
 import { DeployCard } from "./DeployCard.tsx";
 import { MergeGates } from "./MergeGates.tsx";
@@ -76,10 +78,13 @@ import {
 } from "./run.ts";
 import {
   approveBlocker,
+  budgetText,
+  budgetValue,
   checkLabel,
   checkOptions,
   contractChanged,
   DEFAULT_BUDGET_USD,
+  NO_BUDGET,
   signalLabel,
   TIER_HELP,
   TIERS,
@@ -102,7 +107,7 @@ type Busy =
 /** Profiles a run's write steps can ask in; plan mode doesn't fit a step that must implement. */
 const RUN_MODES: Exclude<PermissionMode, "plan">[] = ["default", "acceptEdits", "auto"];
 
-const message = (err: unknown) => (err instanceof Error ? err.message : String(err));
+const errorText = (err: unknown) => (err instanceof Error ? err.message : String(err));
 const usd = (n: number) => `≈$${n.toFixed(n < 0.1 ? 4 : 2)}`;
 
 /** One entry of a task's thread, in order: a drafting (its events) or the person's reply to the contract. */
@@ -124,6 +129,9 @@ export function TaskPage({
   onOpenFile,
   onClose,
   onChange,
+  approvals,
+  onAnswerApproval,
+  onStopFromApproval,
 }: {
   cwd: string;
   taskId: string;
@@ -137,8 +145,12 @@ export function TaskPage({
   /** Opens a file (an absolute path) in the editor from settings. */
   onOpenFile: (file: string) => Promise<unknown>;
   onClose: () => void;
-  /** The shown task as it changes, for its tab in the sidebar. */
-  onChange?: (task: Task, busy: boolean) => void;
+  /** The shown task as it changes, for its tab in the sidebar; `ids` are the tasks whose approvals it shows. */
+  onChange?: (task: Task, busy: boolean, ids: string[]) => void;
+  /** Task steps' approvals and questions waiting in this workspace (UX-13); the thread shows its own. */
+  approvals: PermissionRequest[];
+  onAnswerApproval: (request: PermissionRequest, answer: PermissionAnswer) => void;
+  onStopFromApproval: (request: PermissionRequest) => void;
 }) {
   const [task, setTask] = useState<Task | null>(null);
   const [modelAlias, setModelAlias] = useState(model);
@@ -151,6 +163,11 @@ export function TaskPage({
   const [budget, setBudget] = useState("");
   const [runMode, setRunMode] = useState<Exclude<PermissionMode, "plan">>(mode === "plan" ? "default" : mode);
   const [stepItems, setStepItems] = useState<StepItems>({});
+  /**
+   * Each running step's session, from its events: a step records its session only when its turn ends, so this is
+   * what shows its transcript live (UX-13).
+   */
+  const [liveSessions, setLiveSessions] = useState<Record<string, string>>({});
   const [thread, setThread] = useState<ThreadEntry[]>([]);
   const [accepting, setAccepting] = useState(false);
   const [acceptReason, setAcceptReason] = useState("");
@@ -182,7 +199,7 @@ export function TaskPage({
                 ? all
                 : [...all, { kind: "draft", sessionId }],
             );
-          }
+          } else setLiveSessions((all) => (all[tag.stepId] === sessionId ? all : { ...all, [tag.stepId]: sessionId }));
           setStepItems((items) => withStepEvent(items, sessionId, event, Date.now()));
         }
       }),
@@ -197,7 +214,7 @@ export function TaskPage({
         const list = await Promise.all(ids.split(",").map((id) => request("task.get", { cwd, id })));
         setChildren(Object.fromEntries(list.map((t) => [t.id, t])));
       } catch (err) {
-        setError(message(err));
+        setError(errorText(err));
       }
     },
     [cwd],
@@ -219,16 +236,30 @@ export function TaskPage({
     };
   }, [cwd, parentId]);
 
+  /** This task and its sub-tasks: the approvals the thread shows as cards. */
+  const ownIds = [task?.id ?? "", ...(task?.subtasks ?? [])].join(",");
   useEffect(() => {
-    if (task) onChange?.(task, busy !== null);
-  }, [task, busy, onChange]);
+    if (task) onChange?.(task, busy !== null, ownIds.split(",").filter(Boolean));
+  }, [task, busy, onChange, ownIds]);
+  const waiting = approvals.filter((a) => a.task && ownIds.split(",").includes(a.task.id));
+  const runningStep = task?.state === "running" ? task.run?.steps.find((s) => s.status === "running") : undefined;
+
+  /** The person's message to the running step (UX-13): it joins the step's turn, as in a chat. */
+  async function message(text: string) {
+    if (!task) return;
+    try {
+      await request("task.message", { cwd, id: task.id, text });
+    } catch (err) {
+      setError(errorText(err));
+    }
+  }
 
   function show(t: Task) {
     setTask((current) => newer(current, t, "reply"));
     setEdited(t.contract);
     setTier(t.triage?.chosen ?? "S");
     setReason(t.triage?.override?.reason ?? "");
-    setBudget(t.triage ? String(t.triage.budgetUsd) : "");
+    setBudget(t.triage ? (t.triage.budgetUsd === null ? NO_BUDGET : String(t.triage.budgetUsd)) : "");
   }
 
   /** Runs a task action and shows its result; on failure, shows the task as stored (a failed draft records its spend). */
@@ -238,7 +269,7 @@ export function TaskPage({
     try {
       show(await action());
     } catch (err) {
-      setError(isRpcError(err, RpcErrorCode.cancelled) ? "Stopped. Nothing was changed." : message(err));
+      setError(isRpcError(err, RpcErrorCode.cancelled) ? "Stopped. Nothing was changed." : errorText(err));
       await request("task.get", { cwd, id }).then(show, () => undefined);
     } finally {
       setBusy(null);
@@ -271,7 +302,7 @@ export function TaskPage({
           void draft(t.id);
         }
       },
-      (err: unknown) => live && setError(message(err)),
+      (err: unknown) => live && setError(errorText(err)),
     );
     return () => {
       live = false;
@@ -290,13 +321,13 @@ export function TaskPage({
           contract: tidyContract(contract),
           tier,
           ...(reason.trim() ? { reason: reason.trim() } : {}),
-          budgetUsd: Number(budget),
+          budgetUsd: budgetValue(budget),
         }),
       );
       setEditing(false);
       if (andRun) await runTask(id);
     } catch (err) {
-      setError(message(err));
+      setError(errorText(err));
     } finally {
       setBusy(null);
     }
@@ -316,7 +347,7 @@ export function TaskPage({
       confirmLabel: "Stop",
       danger: true,
     });
-    if (ok) await request("task.cancel", { cwd, id: t.id }).catch((err: unknown) => setError(message(err)));
+    if (ok) await request("task.cancel", { cwd, id: t.id }).catch((err: unknown) => setError(errorText(err)));
   }
 
   async function acceptRisk(id: string) {
@@ -345,7 +376,7 @@ export function TaskPage({
       setThread([]);
       setError(null);
     } catch (err) {
-      setError(message(err));
+      setError(errorText(err));
     }
   }
 
@@ -361,7 +392,7 @@ export function TaskPage({
       await request("task.delete", { cwd, id: t.id });
       onClose();
     } catch (err) {
-      setError(message(err));
+      setError(errorText(err));
     }
   }
 
@@ -515,7 +546,13 @@ export function TaskPage({
                   tier={tier}
                   onTier={(t) => {
                     setTier(t);
-                    setBudget(String(t === triage.chosen ? triage.budgetUsd : DEFAULT_BUDGET_USD[t]));
+                    setBudget((b) =>
+                      b === NO_BUDGET && t !== "XL"
+                        ? b
+                        : String(
+                            t === triage.chosen && triage.budgetUsd !== null ? triage.budgetUsd : DEFAULT_BUDGET_USD[t],
+                          ),
+                    );
                   }}
                   reason={reason}
                   onReason={setReason}
@@ -585,6 +622,7 @@ export function TaskPage({
                 task={task}
                 cwd={cwd}
                 items={stepItems}
+                live={liveSessions}
                 onLoaded={(sessionId, items) => setStepItems((all) => ({ ...all, [sessionId]: items }))}
                 onOpenTask={(id) => void open(id)}
               />
@@ -618,14 +656,40 @@ export function TaskPage({
                 task={task}
                 cwd={cwd}
                 onOpenFile={(file) =>
-                  onOpenFile(file).catch((err: unknown) => setError(`Couldn't open the report: ${message(err)}`))
+                  onOpenFile(file).catch((err: unknown) => setError(`Couldn't open the report: ${errorText(err)}`))
                 }
               />
+            )}
+            {waiting.map((a) =>
+              a.toolName === "AskUserQuestion" ? (
+                <QuestionCard key={a.requestId} request={a} onAnswer={(r) => onAnswerApproval(a, r)} />
+              ) : (
+                <ApprovalCard
+                  key={a.requestId}
+                  request={a}
+                  cwd={a.task?.cwd ?? cwd}
+                  onAnswer={(r) => onAnswerApproval(a, r)}
+                  onStopTask={() => onStopFromApproval(a)}
+                />
+              ),
             )}
             <div ref={bottom} />
           </div>
         </div>
 
+        {task.state === "running" && !isXl(task) && (
+          <TaskComposer
+            disabled={!runningStep || (runningStep.kind !== "agent" && runningStep.kind !== "fix")}
+            busy={false}
+            placeholder={
+              runningStep && (runningStep.kind === "agent" || runningStep.kind === "fix")
+                ? `Message ${runningStep.label}: it joins the step's work, e.g. “keep the public API as it is”`
+                : "A step that runs Claude takes messages; this one runs the project's checks."
+            }
+            hint="Enter sends it to the running step"
+            onSend={(text) => void message(text)}
+          />
+        )}
         {task.state === "draft" ? (
           <TaskComposer
             disabled={busy !== null || !task.contract}
@@ -640,7 +704,11 @@ export function TaskPage({
               <>
                 <span className="muted">
                   Run {usd(task.run?.costUsd ?? 0)}
-                  {isXl(task) ? ` · $${task.triage?.budgetUsd} per sub-task` : ` of $${task.triage?.budgetUsd}`}
+                  {isXl(task)
+                    ? ` · ${budgetText(task.triage?.budgetUsd, true)}`
+                    : task.triage?.budgetUsd === null
+                      ? " · no budget"
+                      : ` of ${budgetText(task.triage?.budgetUsd)}`}
                 </span>
                 <span className="grow" />
                 <button type="button" className="danger" onClick={() => void stop(task)}>
@@ -892,10 +960,7 @@ function TaskFacts({ task, cwd, onOpenTask }: { task: Task; cwd: string; onOpenT
         {task.triage && (
           <>
             <dt>Budget</dt>
-            <dd>
-              ${task.triage.budgetUsd}
-              {task.triage.chosen === "XL" ? " per sub-task" : ""}
-            </dd>
+            <dd>{budgetText(task.triage.budgetUsd, task.triage.chosen === "XL")}</dd>
           </>
         )}
         <dt>Spent</dt>
@@ -925,12 +990,17 @@ function TaskComposer({
   busy,
   modelAlias,
   onModel,
+  placeholder,
+  hint = "Enter redrafts the contract with your reply",
   onSend,
 }: {
   disabled: boolean;
   busy: boolean;
-  modelAlias: string;
-  onModel: (alias: string) => void;
+  /** The drafting model, while the task is a draft. */
+  modelAlias?: string;
+  onModel?: (alias: string) => void;
+  placeholder?: string;
+  hint?: string;
   onSend: (text: string) => void;
 }) {
   const [text, setText] = useState("");
@@ -946,11 +1016,12 @@ function TaskComposer({
         <textarea
           rows={2}
           value={text}
-          aria-label="Reply to the contract"
+          aria-label={onModel ? "Reply to the contract" : "Message the running step"}
           placeholder={
             busy
               ? "Claude is drafting…"
-              : "Reply to change the contract, e.g. “leave applyDiscount alone” or “add a test for an empty cart”"
+              : (placeholder ??
+                "Reply to change the contract, e.g. “leave applyDiscount alone” or “add a test for an empty cart”")
           }
           disabled={disabled}
           onChange={(e) => setText(e.target.value)}
@@ -962,21 +1033,23 @@ function TaskComposer({
           }}
         />
         <div className="composer-toolbar">
-          <Select
-            compact
-            label="Model for the draft"
-            value={modelAlias}
-            options={modelChoices(undefined, modelAlias)}
-            onChange={onModel}
-          />
+          {onModel && (
+            <Select
+              compact
+              label="Model for the draft"
+              value={modelAlias ?? ""}
+              options={modelChoices(undefined, modelAlias)}
+              onChange={onModel}
+            />
+          )}
           <span className="grow" />
-          <span className="composer-hint">Enter redrafts the contract with your reply</span>
+          <span className="composer-hint">{hint}</span>
           <button
             type="button"
             className="icon round"
             disabled={disabled || !text.trim()}
             onClick={send}
-            aria-label="Send the reply"
+            aria-label={onModel ? "Send the reply" : "Send to the running step"}
           >
             <ArrowUp size={16} />
           </button>
@@ -1011,46 +1084,6 @@ function Quote({ text }: { text: string }) {
       <span className="field-label">Request</span>
       {text}
     </blockquote>
-  );
-}
-
-export function TaskList({
-  tasks,
-  onOpen,
-  onDiscard,
-}: {
-  tasks: TaskSummary[];
-  onOpen: (id: string) => void;
-  onDiscard: (t: TaskSummary) => void;
-}) {
-  return (
-    <section className="card">
-      <div className="card-title">
-        <h2>Tasks in this workspace</h2>
-      </div>
-      {tasks.length === 0 ? (
-        <EmptyState>No tasks yet. They're kept in .agentchainer/tasks/, out of git.</EmptyState>
-      ) : (
-        <ul className="task-list">
-          {tasks.map((t) => (
-            <li key={t.id} className="task-row">
-              <button type="button" className="task-row-main" onClick={() => onOpen(t.id)}>
-                <span className="task-row-title">{t.request}</span>
-                <span className="muted">
-                  {new Date(t.createdAt).toLocaleString()} · {usd(t.costUsd)}
-                </span>
-              </button>
-              {t.tier && <span className={`tier-badge tier-${t.tier}`}>{t.tier}</span>}
-              <span className={`badge tone-${stateLabel(t.state).tone}`}>{stateLabel(t.state).label}</span>
-              <ActionMenu
-                label={`Actions for ${t.request}`}
-                items={[{ label: "Discard", danger: true, onSelect: () => onDiscard(t) }]}
-              />
-            </li>
-          ))}
-        </ul>
-      )}
-    </section>
   );
 }
 
@@ -1273,17 +1306,33 @@ function TriageCard({
       )}
       <Field
         label={tier === "XL" ? "Budget per sub-task (USD)" : "Budget (USD)"}
-        help="The task stops when it's spent."
+        help={
+          budget === NO_BUDGET
+            ? "No spend cap: the task runs until it's done or you stop it. Read-only steps keep their own small limits."
+            : "The task stops when it's spent."
+        }
       >
         <input
           type="number"
           min={0.1}
           max={1000}
           step={0.5}
-          value={budget}
+          value={budget === NO_BUDGET ? "" : budget}
+          placeholder={budget === NO_BUDGET ? "No budget" : undefined}
+          disabled={budget === NO_BUDGET}
           onChange={(e) => onBudget(e.target.value)}
         />
       </Field>
+      {tier !== "XL" && (
+        <label className="check no-budget">
+          <input
+            type="checkbox"
+            checked={budget === NO_BUDGET}
+            onChange={(e) => onBudget(e.target.checked ? NO_BUDGET : String(DEFAULT_BUDGET_USD[tier]))}
+          />
+          No budget
+        </label>
+      )}
     </aside>
   );
 }
@@ -1350,10 +1399,7 @@ function ContractView({ task, contract, triage }: { task: Task; contract: TaskCo
               )}
             </dd>
             <dt>Budget</dt>
-            <dd>
-              ${triage.budgetUsd}
-              {triage.chosen === "XL" ? " per sub-task" : ""}
-            </dd>
+            <dd>{budgetText(triage.budgetUsd, triage.chosen === "XL")}</dd>
           </dl>
           <div className="task-field">
             <span className="field-label">Acceptance criteria</span>
@@ -1417,12 +1463,15 @@ function RunView({
   task,
   cwd,
   items,
+  live,
   onLoaded,
   onOpenTask,
 }: {
   task: Task;
   cwd: string;
   items: StepItems;
+  /** Running steps' sessions, by step id, until each step records its own. */
+  live: Record<string, string>;
   onLoaded: (sessionId: string, items: StepItems[string]) => void;
   /** Opens a sub-task's page, from an XL run's timeline. */
   onOpenTask: (id: string) => void;
@@ -1457,79 +1506,79 @@ function RunView({
 
   return (
     <>
-      <section className="card task-run">
-        <div className="card-title">
-          <Play size={16} aria-hidden />
-          <h2>Run</h2>
-          <span className={`badge tone-${tone}`}>{label}</span>
-          <span className="grow" />
-          <span className="muted">
-            {MODE_NAMES[run.permissionMode]} · {usd(run.costUsd)}
-            {isXl(task) ? " across its sub-tasks" : ` of $${task.triage?.budgetUsd}`}
-          </span>
-        </div>
-        {run.outcome && <p className={`callout tone-${tone}`}>{run.outcome}</p>}
-        {run.acceptance && (
-          <p className="callout">
-            <strong>Risk accepted</strong> {new Date(run.acceptance.at).toLocaleString()}: {run.acceptance.reason}
-          </p>
-        )}
-        <ol className="task-steps">
-          {run.steps.map((entry) => {
-            const expanded = shown === entry.id;
-            const gates = runsOfEntry(task, entry);
-            const sessionItems = entry.sessionId ? items[entry.sessionId] : undefined;
-            return (
-              <li key={entry.id} className={`task-step ${entry.status}`}>
-                <button
-                  type="button"
-                  className="task-step-head"
-                  aria-expanded={expanded}
-                  onClick={() => void toggle(entry)}
-                >
-                  <ChevronRight size={14} className="task-step-chevron" aria-hidden />
-                  <StepIcon status={entry.status} />
-                  <span className="task-step-label">{entry.label}</span>
-                  {entry.role && <span className="muted">{entry.role}</span>}
-                  {entry.group && (
-                    <span className="badge" title={`Runs at the same time as the other ${entry.group} steps`}>
-                      parallel
-                    </span>
-                  )}
-                  <span className="grow muted task-step-note">{entry.note}</span>
-                  <span className="muted">{duration(entry.startedAt, entry.endedAt)}</span>
-                  {(entry.kind === "agent" || entry.kind === "fix" || entry.kind === "subtask") && (
-                    <span className="muted">{usd(entry.costUsd)}</span>
-                  )}
-                </button>
-                {expanded &&
-                  (entry.kind === "gates" || entry.kind === "baseline" ? (
-                    <GateList runs={gates} before={entry.kind === "gates" ? before : undefined} />
-                  ) : entry.kind === "subtask" && entry.taskId ? (
-                    <div className="task-step-empty task-step-actions">
-                      <span className="muted grow">
-                        {entry.note ?? "Runs its own tier's workflow in its worktree."}
-                      </span>
-                      <button type="button" className="secondary small" onClick={() => onOpenTask(entry.taskId ?? "")}>
-                        Open sub-task
-                      </button>
-                    </div>
-                  ) : entry.kind === "setup" || entry.kind === "merge" ? (
-                    <p className="muted task-step-empty">{entry.note ?? "Working…"}</p>
-                  ) : sessionItems?.length ? (
-                    <div className="task-step-transcript transcript">
-                      <TranscriptView cwd={cwd} items={sessionItems} />
-                    </div>
-                  ) : (
-                    <p className="muted task-step-empty">
-                      {entry.status === "running" ? "Waiting for the session's first words…" : "No transcript."}
-                    </p>
-                  ))}
-              </li>
-            );
-          })}
-        </ol>
-      </section>
+      <div className="run-divider">
+        <Play size={14} aria-hidden />
+        <span>Run</span>
+        <span className={`badge tone-${tone}`}>{label}</span>
+        <span className="grow" />
+        <span className="muted">
+          {MODE_NAMES[run.permissionMode]} · {usd(run.costUsd)}
+          {isXl(task)
+            ? " across its sub-tasks"
+            : task.triage?.budgetUsd === null
+              ? " · no budget"
+              : ` of ${budgetText(task.triage?.budgetUsd)}`}
+        </span>
+      </div>
+      {run.steps.map((entry) => {
+        const expanded = shown === entry.id;
+        const gates = runsOfEntry(task, entry);
+        const sessionId = entry.sessionId ?? live[entry.id];
+        const sessionItems = sessionId ? items[sessionId] : undefined;
+        return (
+          <section key={entry.id} className={`step-block task-step ${entry.status}`} id={`step-${entry.id}`}>
+            <button
+              type="button"
+              className="task-step-head step-head"
+              aria-expanded={expanded}
+              onClick={() => void toggle(entry)}
+            >
+              <ChevronRight size={14} className="task-step-chevron" aria-hidden />
+              <StepIcon status={entry.status} />
+              <span className="task-step-label">{entry.label}</span>
+              {entry.role && <span className="chip step-role">{entry.role}</span>}
+              {entry.group && (
+                <span className="badge" title={`Runs at the same time as the other ${entry.group} steps`}>
+                  parallel
+                </span>
+              )}
+              <span className="grow muted task-step-note">{entry.note}</span>
+              <span className="muted">{duration(entry.startedAt, entry.endedAt)}</span>
+              {(entry.kind === "agent" || entry.kind === "fix" || entry.kind === "subtask") && (
+                <span className="muted">{usd(entry.costUsd)}</span>
+              )}
+            </button>
+            {expanded && (
+              <div className="step-body">
+                {entry.kind === "gates" || entry.kind === "baseline" ? (
+                  <GateList runs={gates} before={entry.kind === "gates" ? before : undefined} />
+                ) : entry.kind === "subtask" && entry.taskId ? (
+                  <div className="task-step-empty task-step-actions">
+                    <span className="muted grow">{entry.note ?? "Runs its own tier's workflow in its worktree."}</span>
+                    <button type="button" className="secondary small" onClick={() => onOpenTask(entry.taskId ?? "")}>
+                      Open sub-task
+                    </button>
+                  </div>
+                ) : entry.kind === "setup" || entry.kind === "merge" ? (
+                  <p className="muted task-step-empty">{entry.note ?? "Working…"}</p>
+                ) : sessionItems?.length ? (
+                  <TranscriptView cwd={cwd} items={sessionItems} />
+                ) : (
+                  <p className="muted task-step-empty">
+                    {entry.status === "running" ? "Waiting for the session's first words…" : "No transcript."}
+                  </p>
+                )}
+              </div>
+            )}
+          </section>
+        );
+      })}
+      {run.outcome && <p className={`callout tone-${tone} run-outcome`}>{run.outcome}</p>}
+      {run.acceptance && (
+        <p className="callout">
+          <strong>Risk accepted</strong> {new Date(run.acceptance.at).toLocaleString()}: {run.acceptance.reason}
+        </p>
+      )}
       <section className="card">
         <div className="card-title">
           <h2>Gates</h2>
@@ -1623,7 +1672,7 @@ function EvidenceCard({
     setError(null);
     request("task.evidence", { cwd, id: task.id }).then(
       (r) => live && setReport(r),
-      (err: unknown) => live && setError(message(err)),
+      (err: unknown) => live && setError(errorText(err)),
     );
     return () => {
       live = false;
@@ -1908,7 +1957,7 @@ function ResultCard({
       await action();
       onChanged(await request("task.get", { cwd, id: task.id }));
     } catch (err) {
-      onError(message(err));
+      onError(errorText(err));
     } finally {
       setBusy(null);
     }

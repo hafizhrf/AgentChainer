@@ -1,7 +1,17 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import type { TaskContract } from "@agentchainer/protocol";
-import { approveBlocker, checkLabel, checkOptions, contractChanged, signalLabel, tidyContract } from "./taskForm.ts";
+import {
+  approveBlocker,
+  budgetText,
+  budgetValue,
+  checkLabel,
+  checkOptions,
+  contractChanged,
+  NO_BUDGET,
+  signalLabel,
+  tidyContract,
+} from "./taskForm.ts";
 
 const contract: TaskContract = {
   task: "Fix total()",
@@ -65,5 +75,20 @@ describe("task form", () => {
     assert.equal(approveBlocker({ ...ok, tier: "M", reason: "Touches two modules" }), null);
     assert.match(approveBlocker({ ...ok, budget: "0" }) ?? "", /budget/);
     assert.match(approveBlocker({ ...ok, budget: "abc" }) ?? "", /budget/);
+  });
+
+  it("takes no budget, except for an XL task, whose budget is per sub-task (UX-13)", () => {
+    const ok = {
+      edited: contract,
+      stale: false,
+      tier: "S" as const,
+      proposed: "S" as const,
+      reason: "",
+      budget: NO_BUDGET,
+    };
+    assert.equal(approveBlocker(ok), null);
+    assert.match(approveBlocker({ ...ok, tier: "XL", proposed: "XL" }) ?? "", /XL task needs a budget/);
+    assert.deepEqual([budgetValue(NO_BUDGET), budgetValue("2.5")], [null, 2.5]);
+    assert.deepEqual([budgetText(null), budgetText(2), budgetText(2, true)], ["no budget", "$2", "$2 per sub-task"]);
   });
 });

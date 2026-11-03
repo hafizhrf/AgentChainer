@@ -254,6 +254,20 @@ export class Session {
     return uuid;
   }
 
+  /**
+   * Adds the person's message to the turn that's running (UX-13): the CLI takes it into that turn, with no result of
+   * its own (probed on CLI 2.1.314), so it doesn't count as a turn. Shown as a user message in the session's events.
+   * False when no turn runs; a message that lands just after a turn ends starts one the CLI runs on its own, which
+   * the session already counts as a background turn.
+   */
+  inject(text: string): boolean {
+    if (!this.busy) return false;
+    const uuid = randomUUID();
+    this.input.push({ type: "user", message: { role: "user", content: text }, parent_tool_use_id: null, uuid });
+    this.callbacks.emit({ type: "user.message", messageId: uuid, text });
+    return true;
+  }
+
   /** Sends a message and resolves with how its turn ended: what a task's orchestrator drives steps with. */
   turn(text: string): Promise<TurnResult> {
     const result = new Promise<TurnResult>((resolve, reject) => this.waiters.push({ resolve, reject }));

@@ -215,3 +215,38 @@ describe("event snapshots for UI tests (M1-34)", () => {
     });
   }
 });
+
+describe("normalize: commands and compaction (UX-12)", () => {
+  it("relays a changed command list, without empty aliases", () => {
+    assert.deepEqual(
+      normalize({
+        type: "system",
+        subtype: "commands_changed",
+        commands: [
+          { name: "review", description: "Review a PR", argumentHint: "<pr>", aliases: [] },
+          { name: "usage", description: "Show usage", argumentHint: "", aliases: ["cost", "stats"] },
+        ],
+      } as unknown as SDKMessage),
+      [
+        {
+          type: "commands.changed",
+          commands: [
+            { name: "review", description: "Review a PR", argumentHint: "<pr>" },
+            { name: "usage", description: "Show usage", argumentHint: "", aliases: ["cost", "stats"] },
+          ],
+        },
+      ],
+    );
+  });
+
+  it("marks where earlier messages were summarized", () => {
+    assert.deepEqual(
+      normalize({
+        type: "system",
+        subtype: "compact_boundary",
+        compact_metadata: { trigger: "auto", pre_tokens: 150_000, post_tokens: 12_000 },
+      } as unknown as SDKMessage),
+      [{ type: "context.compacted", trigger: "auto", preTokens: 150_000, postTokens: 12_000 }],
+    );
+  });
+});

@@ -203,7 +203,9 @@ mapped into a stable internal `AgentEvent` union so the UI never depends on raw 
 | `turn.started {reason: "background"}` | `system/init` with no user turn open: the CLI's own turn after background work (the Session, M4-07) |
 | `permission.requested` / `permission.resolved` | `canUseTool` broker |
 | `turn.completed {costUsd, modelUsage, durationMs, numTurns, stopReason, denials}` | `result` |
-| `context.compacted` | `system/compact_boundary` |
+| `context.compacted {trigger, preTokens, postTokens}` | `system/compact_boundary`: a divider in the thread (UX-12) |
+| `commands.changed {commands: [{name, description, argumentHint, aliases}]}` | `Query.supportedCommands()` when a chat starts, then `system/commands_changed`: the composer's `/` menu (UX-12) |
+| `context.usage {percentage, totalTokens, maxTokens}` | `Query.getContextUsage()` after each chat turn: the status bar's context meter (UX-12) |
 | `api.retry` | `system/api_retry` |
 | `error` | SDK errors / `is_error` results |
 

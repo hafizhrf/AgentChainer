@@ -1,4 +1,4 @@
-import type { AgentEvent, Effort, PermissionMode, PermissionRequest } from "@agentchainer/protocol";
+import type { AgentEvent, Effort, PermissionMode, PermissionRequest, SlashCommand } from "@agentchainer/protocol";
 import { PERMISSION_MODES } from "@agentchainer/protocol";
 import { applyEvent, type Item } from "./transcript.ts";
 
@@ -17,8 +17,12 @@ export type Tab = {
   /** The session's spend cap (`maxBudgetUsd`), fixed when it started. */
   budgetUsd: number | null;
   claudeCodeVersion?: string;
-  /** Slash commands and skills for the composer's `/` palette. */
-  slashCommands: string[];
+  /** Slash commands and skills for the composer's `/` menu, with descriptions once the session sends them (UX-12). */
+  slashCommands: SlashCommand[];
+  /** How full the context window was after the last turn (UX-12); null until a turn reports it. */
+  context: { percentage: number; totalTokens: number; maxTokens: number } | null;
+  /** Set while Claude switched itself to plan mode (UX-12): the mode to go back to. */
+  planSwitch: { previous: PermissionMode } | null;
   items: Item[];
   running: boolean;
   /** How the last turn ended (`success`, `error_max_budget_usd`, …); queued messages only go out after a success. */
@@ -81,6 +85,8 @@ export function newTab(
     effort: options.effort ?? null,
     budgetUsd: options.budgetUsd ?? null,
     slashCommands: [],
+    context: null,
+    planSwitch: null,
     items: options.items ?? [],
     running: false,
     lastSubtype: null,
@@ -109,8 +115,22 @@ export function tabEvent(tab: Tab, e: AgentEvent, now?: number): Tab {
         model: e.model,
         claudeCodeVersion: e.claudeCodeVersion,
         mode: asMode(e.permissionMode),
-        ...(e.slashCommands ? { slashCommands: e.slashCommands } : {}),
+        ...(asMode(e.permissionMode) !== "plan" ? { planSwitch: null } : {}),
+        // Names only, until the session sends the described list (`commands.changed`), which then wins.
+        ...(e.slashCommands && !tab.slashCommands.some((c) => c.description)
+          ? { slashCommands: e.slashCommands.map((name) => ({ name, description: "", argumentHint: "" })) }
+          : {}),
       };
+    case "commands.changed":
+      return { ...tab, slashCommands: e.commands };
+    case "context.usage":
+      return { ...tab, context: { percentage: e.percentage, totalTokens: e.totalTokens, maxTokens: e.maxTokens } };
+    case "tool.started":
+      // Claude switching itself to plan mode (UX-12): the sidecar already allowed it; remember where it came from.
+      if (e.name === "EnterPlanMode" && e.parentToolUseId === null && tab.mode !== "plan") {
+        return { ...tab, mode: "plan", planSwitch: { previous: tab.mode }, items: applyEvent(tab.items, e, now) };
+      }
+      return { ...tab, items: applyEvent(tab.items, e, now) };
     case "turn.completed": {
       const totalTokens = e.usage
         ? {

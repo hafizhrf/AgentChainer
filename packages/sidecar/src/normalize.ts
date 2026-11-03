@@ -1,5 +1,5 @@
-import type { AgentEvent } from "@agentchainer/protocol";
-import type { ModelUsage, SDKMessage } from "@anthropic-ai/claude-agent-sdk";
+import type { AgentEvent, SlashCommand as ProtocolSlashCommand } from "@agentchainer/protocol";
+import type { ModelUsage, SDKMessage, SlashCommand } from "@anthropic-ai/claude-agent-sdk";
 
 /**
  * Maps one raw SDK message to zero or more normalized events (ARCHITECTURE §5.2).
@@ -85,6 +85,18 @@ export function normalize(m: SDKMessage): AgentEvent[] {
                 ...(t.subagent_type ? { agentType: t.subagent_type } : {}),
                 ...(t.parent_task_id ? { parentTaskId: t.parent_task_id } : {}),
               })),
+          },
+        ];
+      }
+      if (m.subtype === "commands_changed") return [{ type: "commands.changed", commands: m.commands.map(command) }];
+      if (m.subtype === "compact_boundary") {
+        const c = m.compact_metadata;
+        return [
+          {
+            type: "context.compacted",
+            trigger: c.trigger,
+            preTokens: c.pre_tokens,
+            ...(c.post_tokens !== undefined ? { postTokens: c.post_tokens } : {}),
           },
         ];
       }
@@ -175,6 +187,16 @@ export function normalize(m: SDKMessage): AgentEvent[] {
     default:
       return [];
   }
+}
+
+/** The SDK's command description, without fields the UI doesn't use. */
+export function command(c: SlashCommand): ProtocolSlashCommand {
+  return {
+    name: c.name,
+    description: c.description,
+    argumentHint: c.argumentHint,
+    ...(c.aliases?.length ? { aliases: c.aliases } : {}),
+  };
 }
 
 /** Session token totals over every model used, subagents included. */

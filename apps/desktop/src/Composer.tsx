@@ -1,6 +1,9 @@
 import { type Effort, type Image, PERMISSION_MODES, type PermissionMode } from "@agentchainer/protocol";
-import { ArrowUp, ListPlus, Play, Square, X } from "lucide-react";
+import { getCurrentWebview } from "@tauri-apps/api/webview";
+import { open } from "@tauri-apps/plugin-dialog";
+import { ArrowUp, ListPlus, Paperclip, Pencil, Play, SendHorizontal, Square, X } from "lucide-react";
 import { type ClipboardEvent, type KeyboardEvent, useEffect, useMemo, useRef, useState } from "react";
+import { type AppCommand, mention, nextMode, parseAppCommand, sentMessages, slashMenu } from "./commands.ts";
 import { fuzzyFilter, tokenAt } from "./fuzzy.ts";
 import { ModeHelp } from "./ModeHelp.tsx";
 import { EFFORT_OPTIONS, MODELS, modeOptions } from "./options.ts";
@@ -10,22 +13,29 @@ import { Select } from "./ui/Select.tsx";
 /** An image pasted into the composer: base64 data for the API and a data URL for the thumbnail. */
 export type Attachment = Image & { preview: string };
 type Queued = { text: string; images: Attachment[] };
+/** One row of the `@` or `/` menu. */
+type Suggestion = { key: string; insert: string; label: string; hint?: string; detail?: string };
 
 const IMAGE_TYPES = new Set(["image/png", "image/jpeg", "image/gif", "image/webp"]);
 const MAX_IMAGES = 5;
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 
 /**
- * The composer of a session tab (M1-13…M1-15):
- * - Enter sends; while a turn runs, messages queue and go out one by one after each successful turn.
- * - `@` suggests workspace files and `/` the session's slash commands and skills, both fuzzy-matched.
- * - Model, effort and permission profile switch mid-session.
+ * The composer of a session tab (M1-13…M1-15, UX-12):
+ * - Enter sends; while a turn runs, messages queue and go out one by one after each successful turn. A queued message
+ *   can be edited, or sent now (which stops the turn first).
+ * - `@` suggests workspace files and `/` the app's and the session's commands, with their descriptions. App commands
+ *   (`/clear`, `/model`, …) run here; every other command goes to Claude as typed.
+ * - Shift+Tab cycles the permission mode; ↑/↓ walk the messages sent in this session.
+ * - Files can be attached (a picker, or dropped on the window): they go in as `@path`, which Claude reads.
  */
 export function Composer({
   tab,
+  active,
   files,
   seed,
   onSend,
+  onCommand,
   onInterrupt,
   onResume,
   onModeChange,
@@ -33,11 +43,14 @@ export function Composer({
   onEffortChange,
 }: {
   tab: Tab;
+  /** The tab is the one shown: only then do dropped files land here. */
+  active: boolean;
   /** Workspace-relative file paths for `@` mentions. */
   files: string[];
   /** Text to put in the composer (a starter prompt); a new object each time it's used. */
   seed: { text: string } | null;
   onSend: (text: string, images: Attachment[]) => void;
+  onCommand: (name: AppCommand, arg: string) => void;
   onInterrupt: () => void;
   onResume: () => void;
   onModeChange: (mode: PermissionMode) => void;
@@ -50,10 +63,17 @@ export function Composer({
   const [images, setImages] = useState<Attachment[]>([]);
   const [pasteError, setPasteError] = useState<string | null>(null);
   const [pick, setPick] = useState(0);
+  const [dropping, setDropping] = useState(false);
   /** Start of a token whose suggestions the user dismissed with Esc. */
   const [dismissed, setDismissed] = useState<number | null>(null);
+  /** Where ↑/↓ is in the sent messages (null: not browsing), and the draft to come back to. */
+  const history = useRef<{ index: number; draft: string } | null>(null);
   const area = useRef<HTMLTextAreaElement>(null);
   const wasRunning = useRef(tab.running);
+  /** "Send now" stopped the turn: the next queued message goes out however that turn ended. */
+  const flush = useRef(false);
+  const sent = useMemo(() => sentMessages(tab.items), [tab.items]);
+  const canAutonomous = tab.budgetUsd !== null;
 
   useEffect(() => {
     if (!seed) return;
@@ -62,31 +82,111 @@ export function Composer({
     area.current?.focus();
   }, [seed]);
 
-  // Send the next queued message once a turn finishes successfully. Errors and the budget cap keep the queue.
+  // Send the next queued message once a turn finishes successfully. Errors and the budget cap keep the queue, unless
+  // the turn was stopped to send a message now.
   useEffect(() => {
     const finished = wasRunning.current && !tab.running;
     wasRunning.current = tab.running;
-    if (!finished || tab.ended || tab.lastSubtype !== "success") return;
+    if (!finished || tab.ended) return;
+    if (tab.lastSubtype !== "success" && !flush.current) return;
+    flush.current = false;
     const [next, ...rest] = queue;
     if (next === undefined) return;
     setQueue(rest);
     onSend(next.text, next.images);
   }, [tab.running, tab.ended, tab.lastSubtype, queue, onSend]);
 
+  const insert = (text: string) => {
+    const el = area.current;
+    const at = el ? el.selectionStart : draft.length;
+    const pad = at > 0 && !/\s$/.test(draft.slice(0, at)) ? " " : "";
+    const next = `${draft.slice(0, at)}${pad}${text} ${draft.slice(at)}`;
+    const caret = at + pad.length + text.length + 1;
+    setDraft(next);
+    setCursor(caret);
+    requestAnimationFrame(() => {
+      area.current?.focus();
+      area.current?.setSelectionRange(caret, caret);
+    });
+  };
+  const insertRef = useRef(insert);
+  insertRef.current = insert;
+
+  // Files dropped on the window go to the shown tab's composer as `@path` (Tauri hands the drop to the app).
+  useEffect(() => {
+    if (!active || tab.ended) return;
+    let stop: (() => void) | undefined;
+    let gone = false;
+    void getCurrentWebview()
+      .onDragDropEvent((e) => {
+        if (e.payload.type === "over" || e.payload.type === "enter") setDropping(true);
+        else if (e.payload.type === "leave") setDropping(false);
+        else if (e.payload.type === "drop") {
+          setDropping(false);
+          for (const p of e.payload.paths) insertRef.current(mention(tab.cwd, p));
+        }
+      })
+      .then((un) => {
+        if (gone) un();
+        else stop = un;
+      })
+      .catch(() => undefined);
+    return () => {
+      gone = true;
+      stop?.();
+    };
+  }, [active, tab.ended, tab.cwd]);
+
   const token = tokenAt(draft, cursor);
-  const suggestions = useMemo(() => {
+  const suggestions = useMemo<Suggestion[]>(() => {
     if (!token || token.start === dismissed) return [];
-    return token.kind === "@" ? fuzzyFilter(token.query, files) : fuzzyFilter(token.query, tab.slashCommands);
+    if (token.kind === "@") return fuzzyFilter(token.query, files).map((f) => ({ key: f, insert: `@${f}`, label: f }));
+    return slashMenu(tab.slashCommands, token.query).map((c) => ({
+      key: c.name,
+      insert: `/${c.name}`,
+      label: `/${c.name}`,
+      ...(c.argumentHint ? { hint: c.argumentHint } : {}),
+      ...(c.description ? { detail: c.app ? `${c.description} · app` : c.description } : {}),
+    }));
   }, [token, dismissed, files, tab.slashCommands]);
 
-  function submit() {
-    const text = draft.trim();
+  function submit(typed = draft) {
+    const text = typed.trim();
     if (!text || tab.ended) return;
     setDraft("");
     setCursor(0);
+    setDismissed(null);
+    history.current = null;
+    const command = parseAppCommand(text);
+    if (command) return onCommand(command.name, command.arg);
     setImages([]);
     if (tab.running || queue.length > 0) setQueue((q) => [...q, { text, images }]);
     else onSend(text, images);
+  }
+
+  /** Puts a queued message back in the composer to change it. */
+  function edit(i: number) {
+    const q = queue[i];
+    if (!q) return;
+    setQueue((all) => all.filter((_, j) => j !== i));
+    setDraft(q.text);
+    setImages(q.images);
+    setCursor(q.text.length);
+    area.current?.focus();
+  }
+
+  /** Sends a queued message now: it goes first, and the running turn stops. */
+  function sendNow(i: number) {
+    const q = queue[i];
+    if (!q) return;
+    setQueue((all) => [q, ...all.filter((_, j) => j !== i)]);
+    flush.current = true;
+    onInterrupt();
+  }
+
+  async function attach() {
+    const picked = await open({ multiple: true, title: "Attach files" }).catch(() => null);
+    for (const p of Array.isArray(picked) ? picked : picked ? [picked] : []) insert(mention(tab.cwd, p));
   }
 
   /** Pasted screenshots become image attachments (M1-13); other pastes stay text. */
@@ -113,19 +213,42 @@ export function Composer({
     }
   }
 
-  function accept(choice: string) {
-    if (!token) return;
-    const prefix = token.kind === "@" ? "@" : "/";
-    const insert = `${prefix}${choice} `;
-    const next = draft.slice(0, token.start) + insert + draft.slice(cursor);
-    const caret = token.start + insert.length;
+  function accept(choice: Suggestion | undefined) {
+    if (!token || !choice) return;
+    const insertText = `${choice.insert} `;
+    const next = draft.slice(0, token.start) + insertText + draft.slice(cursor);
+    const caret = token.start + insertText.length;
     setDraft(next);
     setCursor(caret);
     setPick(0);
     requestAnimationFrame(() => area.current?.setSelectionRange(caret, caret));
   }
 
+  /** ↑/↓ through the sent messages, from the first line (↑) or the last (↓) only, so multi-line edits still work. */
+  function browse(e: KeyboardEvent<HTMLTextAreaElement>, step: -1 | 1): boolean {
+    const el = e.currentTarget;
+    const before = el.value.slice(0, el.selectionStart);
+    const after = el.value.slice(el.selectionEnd);
+    if ((step === -1 && before.includes("\n")) || (step === 1 && after.includes("\n"))) return false;
+    if (history.current === null && step === 1) return false;
+    if (sent.length === 0) return false;
+    const h = history.current ?? { index: sent.length, draft };
+    const index = Math.max(0, Math.min(sent.length, h.index + step));
+    history.current = index === sent.length ? null : { ...h, index };
+    const text = index === sent.length ? h.draft : (sent[index] ?? "");
+    setDraft(text);
+    setCursor(text.length);
+    requestAnimationFrame(() => area.current?.setSelectionRange(text.length, text.length));
+    return true;
+  }
+
   function onKey(e: KeyboardEvent<HTMLTextAreaElement>) {
+    // Shift+Tab cycles the mode, as in the CLI; plain Tab still accepts a suggestion.
+    if (e.key === "Tab" && e.shiftKey) {
+      e.preventDefault();
+      if (!tab.ended) onModeChange(nextMode(tab.mode, canAutonomous));
+      return;
+    }
     if (suggestions.length > 0) {
       if (e.key === "ArrowDown" || e.key === "ArrowUp") {
         e.preventDefault();
@@ -135,7 +258,13 @@ export function Composer({
       }
       if (e.key === "Enter" || e.key === "Tab") {
         e.preventDefault();
-        accept(suggestions[Math.min(pick, suggestions.length - 1)] ?? "");
+        const choice = suggestions[Math.min(pick, suggestions.length - 1)];
+        // Enter on a command that takes no argument runs it, as in the CLI; otherwise it's completed for the argument.
+        if (e.key === "Enter" && token?.kind === "/" && choice && !choice.hint && draft.slice(cursor).trim() === "") {
+          submit(choice.insert);
+          return;
+        }
+        accept(choice);
         return;
       }
       if (e.key === "Escape") {
@@ -144,6 +273,10 @@ export function Composer({
         setDismissed(token?.start ?? null);
         return;
       }
+    }
+    if ((e.key === "ArrowUp" || e.key === "ArrowDown") && !e.shiftKey && !e.altKey) {
+      if (browse(e, e.key === "ArrowUp" ? -1 : 1)) e.preventDefault();
+      return;
     }
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
@@ -167,6 +300,25 @@ export function Composer({
               <button
                 type="button"
                 className="ghost icon tiny"
+                aria-label="Edit queued message"
+                onClick={() => edit(i)}
+              >
+                <Pencil size={12} />
+              </button>
+              {tab.running && (
+                <button
+                  type="button"
+                  className="ghost icon tiny"
+                  aria-label="Send now: stop the turn and send this"
+                  title="Send now (stops the turn)"
+                  onClick={() => sendNow(i)}
+                >
+                  <SendHorizontal size={12} />
+                </button>
+              )}
+              <button
+                type="button"
+                className="ghost icon tiny"
                 aria-label="Remove from queue"
                 onClick={() => setQueue((all) => all.filter((_, j) => j !== i))}
               >
@@ -179,13 +331,15 @@ export function Composer({
           </button>
         </div>
       )}
-      <div className="composer-box">
+      <div className={`composer-box${dropping ? " dropping" : ""}`}>
         {suggestions.length > 0 && (
           <ul className="suggestions" aria-label={token?.kind === "@" ? "Matching files" : "Matching commands"}>
             {suggestions.map((s, i) => (
-              <li key={s} className={i === pick ? "active" : undefined}>
+              <li key={s.key} className={i === pick ? "active" : undefined}>
                 <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => accept(s)}>
-                  {token?.kind === "/" ? `/${s}` : s}
+                  <span className="suggestion-name">{s.label}</span>
+                  {s.hint && <span className="suggestion-hint">{s.hint}</span>}
+                  {s.detail && <span className="suggestion-detail">{s.detail}</span>}
                 </button>
               </li>
             ))}
@@ -218,14 +372,19 @@ export function Composer({
           placeholder={
             tab.ended
               ? "This session ended. Resume it to continue."
-              : tab.running
-                ? "Claude is working… type a follow-up to queue it"
-                : "Ask Claude to do something… @ for files, / for commands"
+              : dropping
+                ? "Drop to attach as @path"
+                : tab.running
+                  ? "Claude is working… type a follow-up to queue it"
+                  : "Ask Claude to do something… @ for files, / for commands"
           }
           onChange={(e) => {
             setDraft(e.target.value);
             track(e.target);
             setPick(0);
+            // A dismissed menu stays shut for that token only: once it's gone, the next one opens again.
+            if (dismissed !== null && !tokenAt(e.target.value, e.target.selectionStart)) setDismissed(null);
+            history.current = null;
           }}
           onSelect={(e) => track(e.currentTarget)}
           onKeyDown={onKey}
@@ -237,10 +396,13 @@ export function Composer({
             compact
             label="Permission profile"
             value={tab.mode}
-            options={modeOptions(PERMISSION_MODES, tab.budgetUsd !== null)}
+            options={modeOptions(PERMISSION_MODES, canAutonomous)}
             onChange={(m) => onModeChange(asMode(m))}
             disabled={tab.ended}
           />
+          <kbd className="mode-key" title="Shift+Tab cycles the permission mode">
+            ⇧⇥
+          </kbd>
           <ModeHelp current={tab.mode} />
           <Select
             compact
@@ -258,6 +420,16 @@ export function Composer({
             onChange={(e) => onEffortChange((e || null) as Effort | null)}
             disabled={tab.ended}
           />
+          <button
+            type="button"
+            className="ghost icon"
+            aria-label="Attach files"
+            title="Attach files as @path (or drop them here)"
+            onClick={() => void attach()}
+            disabled={tab.ended}
+          >
+            <Paperclip size={14} />
+          </button>
           <span className="grow" />
           {tab.ended ? (
             <button
@@ -271,7 +443,9 @@ export function Composer({
             </button>
           ) : (
             <>
-              <span className="composer-hint">{tab.running ? "Esc stops" : "Enter sends · Shift+Enter new line"}</span>
+              <span className="composer-hint">
+                {tab.running ? "Esc stops" : "Enter sends · Shift+Enter new line · ↑ history"}
+              </span>
               {tab.running && (
                 <button
                   type="button"
@@ -287,7 +461,7 @@ export function Composer({
                 type="button"
                 className="icon round"
                 disabled={!draft.trim()}
-                onClick={submit}
+                onClick={() => submit()}
                 aria-label={tab.running ? "Queue message" : "Send message"}
                 title={tab.running ? "Queue (Enter)" : "Send (Enter)"}
               >

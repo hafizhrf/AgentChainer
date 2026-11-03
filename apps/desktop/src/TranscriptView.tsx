@@ -170,6 +170,12 @@ const ItemView = memo(function ItemView({
       );
     case "notice":
       return <div className="notice">{item.text}</div>;
+    case "divider":
+      return (
+        <div className="transcript-divider">
+          <span>{item.text}</span>
+        </div>
+      );
     case "tool":
       return <ToolView tool={item} onOpenFile={onOpenFile} />;
     case "agent":

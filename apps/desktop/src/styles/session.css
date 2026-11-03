@@ -560,6 +560,224 @@
   background: var(--accent-soft);
 }
 
+.suggestions {
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.suggestion-name {
+  flex: none;
+}
+
+.suggestion-hint {
+  flex: none;
+  margin-left: var(--space-2);
+  color: var(--muted);
+}
+
+.suggestion-detail {
+  flex: 1;
+  min-width: 0;
+  margin-left: var(--space-3);
+  overflow: hidden;
+  color: var(--muted);
+  font-family: var(--font-sans);
+  text-align: right;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ---------- Chat room extras (UX-12) ---------- */
+
+.composer-box.dropping {
+  border-color: var(--accent);
+  border-style: dashed;
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+.mode-key {
+  margin: 0 var(--space-1);
+  color: var(--muted);
+  font-size: var(--text-xs);
+}
+
+.plan-switch,
+.question-card,
+.todo-panel {
+  width: 100%;
+  max-width: 800px;
+  margin: 0 auto var(--space-2);
+}
+
+.plan-switch {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--accent);
+  border-radius: var(--radius);
+  background: var(--accent-soft);
+  font-size: var(--text-sm);
+}
+
+.question-card {
+  display: flex;
+  flex-direction: column;
+  max-height: 60vh;
+  overflow-y: auto;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--accent);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+}
+
+.dialog .question-card {
+  max-width: none;
+  margin: 0;
+  padding: 0;
+  border: none;
+  box-shadow: none;
+}
+
+.question-card > header,
+.question-card > footer {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-sm);
+}
+
+.question {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  margin: 0;
+  padding: 0;
+  border: none;
+}
+
+.question > legend {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-bottom: var(--space-1);
+  padding: 0;
+  font-weight: 600;
+}
+
+.question-option {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+
+.question-option.on {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.question-option > input[type="radio"],
+.question-option > input[type="checkbox"] {
+  margin-top: 3px;
+}
+
+.question-option.other {
+  align-items: center;
+  cursor: default;
+}
+
+.question-option.other > input {
+  flex: 1;
+}
+
+.question-label {
+  font-weight: 500;
+}
+
+.question-preview {
+  margin: var(--space-1) 0 0;
+  padding: var(--space-2);
+  overflow-x: auto;
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  font-size: var(--text-xs);
+}
+
+.todo-panel {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  font-size: var(--text-sm);
+}
+
+.todo-summary {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-3);
+  cursor: pointer;
+}
+
+.todo-current {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.todo-panel > ul {
+  margin: 0;
+  padding: 0 var(--space-3) var(--space-2);
+  list-style: none;
+}
+
+.todo {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  padding: 2px 0;
+}
+
+.todo > svg {
+  flex: none;
+  margin-top: 2px;
+}
+
+.todo.completed > span {
+  color: var(--muted);
+  text-decoration: line-through;
+}
+
+.todo.in_progress {
+  font-weight: 500;
+}
+
+.transcript-divider {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin: var(--space-3) 0;
+  color: var(--muted);
+  font-size: var(--text-xs);
+}
+
+.transcript-divider::before,
+.transcript-divider::after {
+  content: "";
+  flex: 1;
+  border-top: 1px dashed var(--border-strong);
+}
+
+.context-meter.warn {
+  color: var(--warn);
+  font-weight: 600;
+}
+
 .attachments {
   display: flex;
   flex-wrap: wrap;

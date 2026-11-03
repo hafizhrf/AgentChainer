@@ -1062,6 +1062,11 @@ for the desktop shell, start screen and session view to be cleaned up (UX-02, UX
       2026-11-03: Shift+Tab cycles the mode; slash commands with descriptions and the app's own commands; question
       cards for `AskUserQuestion`; the agent switches to plan mode by itself (`EnterPlanMode`); input history,
       attachments and an editable queue; a todo panel, a context meter and compaction dividers.
+      Note: built (step 1 of the design). Checked live against CLI 2.1.314: 72 commands with descriptions arrive
+      before the first message; an `AskUserQuestion` round trip in the app (an option and an "Other" answer, both
+      used by Claude; Skip); Claude's own `EnterPlanMode` switches the chat to Plan first with "Back to Safe"; the
+      context meter, `/cost`, Shift+Tab and ↑ history; light and dark. Not checked live: a compaction divider and the
+      todo panel (unit tests only).
 - [ ] **UX-13** One thread for chats and tasks (§5). One New with a Chat | Task switch; tasks as tabs with the right
       panel; drafting streams in the thread; the contract and triage as editable cards refined by replying; steps
       stream in the thread and the running step can be messaged; approvals and results as cards; a Task tab; "Make

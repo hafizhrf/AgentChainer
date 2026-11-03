@@ -1488,6 +1488,9 @@ Decisions: [ADR-0009](adr/0009-release-signing-and-updates.md). Maintainer steps
 → PRD [F9](PRD.md#f9--multi-folder-workspaces-p2). Owner requests, 2026-10-30. Several ideas come from
 [CLI Agent Orchestrator](https://github.com/awslabs/cli-agent-orchestrator) (CAO, AWS Labs, Apache-2.0). They're
 reference only: no code is copied, and each one gets a plan before it's built.
+→ design: [workspaces-and-fleet.md](design/workspaces-and-fleet.md) (draft; M8-01 and M8-02 in detail, M8-03…06
+sketched). Owner decisions (2026-11-03): workspace definitions live in the app's settings; the fleet view is built
+first.
 
 - [ ] **M8-01** Multi-folder workspaces (F9): a workspace is a named set of folders, e.g. an app repo and its API
       repo.

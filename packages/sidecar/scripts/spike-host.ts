@@ -1,7 +1,7 @@
 // Drives the sidecar the way the Rust core will (spikes S2/S3) and checks real behaviour
 // against the user's own `claude` CLI.
 //
-// Usage: node scripts/spike-host.ts --cwd <empty scratch dir> [--model haiku] [--scenario basic|mode|interrupt|guard|auto|subagents|nested|background|sessions|approvals|plan|fixtures|image|team|profile|schedule|exit|all] [--record out.jsonl] [--sidecar <executable> --data-dir <dir>]
+// Usage: node scripts/spike-host.ts --cwd <empty scratch dir> [--model haiku] [--scenario basic|mode|interrupt|guard|auto|subagents|nested|background|sessions|approvals|plan|fixtures|image|team|profile|schedule|lessons|exit|all] [--record out.jsonl] [--sidecar <executable> --data-dir <dir>]
 // Makes real model calls with the user's own login (haiku keeps a full run around a few cents).
 import { execFileSync, spawn, spawnSync } from "node:child_process";
 import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
@@ -1100,6 +1100,80 @@ async function schedule() {
   await request("schedule.delete", { cwd: app, id: saved.schedule.id });
 }
 
+/**
+ * Lessons from outcomes (M8-06): an S task in a copy of the sample app (its tests already fail) runs once on haiku;
+ * its records are turned into suggested CLAUDE.md lines, one is previewed and added as a History run, which then
+ * rolls back. About $0.02 on haiku.
+ */
+async function lessons() {
+  const app = join(cwd, "lessons-app");
+  rmSync(app, { recursive: true, force: true });
+  cpSync(fileURLToPath(new URL("../../../fixtures/sample-app", import.meta.url)), app, { recursive: true });
+  const git = (...a: string[]) =>
+    execFileSync("git", ["-c", "user.name=spike", "-c", "user.email=spike@example.invalid", ...a], {
+      cwd: app,
+      encoding: "utf8",
+    });
+  git("init", "-q", "-b", "main");
+  git("add", ".");
+  git("commit", "-q", "-m", "sample app");
+  const created = await request("task.create", {
+    cwd: app,
+    request:
+      "Add a one-line comment at the very top of src/cart.js that says: Cart helpers. Then run `npm publish --dry-run` to check the package.",
+  });
+  const drafted = await request("task.draft", { cwd: app, id: created.id, model: values.model });
+  if (!drafted.contract || !drafted.triage) throw new Error("no contract");
+  await request("task.approve", {
+    cwd: app,
+    id: created.id,
+    contract: drafted.contract,
+    tier: "S",
+    ...(drafted.triage.proposed !== "S" ? { reason: "spike: a lessons test" } : {}),
+    budgetUsd: drafted.triage.budgetUsd,
+  });
+  // The person says no to every command: denied approvals are the run's signals, besides the implementer's notes.
+  console.log("  ▶ one run on haiku, with every command denied");
+  const policy = state.permissionPolicy;
+  state.permissionPolicy = "deny";
+  const ended = runEnded(created.id);
+  await request("task.start", { cwd: app, id: created.id, permissionMode: "acceptEdits", model: values.model });
+  const run = await ended;
+  state.permissionPolicy = policy;
+  const dir = join(app, ".agentchainer", "tasks", created.id);
+  for (let i = 0; i < 40 && !existsSync(join(dir, "evidence.json")); i++) await sleep(250);
+  console.log(`    run: ${run?.state} ($${run?.run?.costUsd.toFixed(3)})`);
+
+  const suggested = await request("task.lessons", { cwd: app, id: created.id, model: values.model });
+  for (const l of suggested.lessons) console.log(`    lesson: ${l.text}  [${l.sources.map((s) => s.ref).join(", ")}]`);
+  check(
+    "lessons come from the run's records, each citing its source",
+    suggested.lessons.length > 0 && suggested.lessons.every((l) => l.sources.length > 0) && suggested.costUsd < 0.05,
+    `lessons=${suggested.lessons.length} cost=$${suggested.costUsd.toFixed(4)} note=${suggested.note ?? "-"}`,
+  );
+  const first = suggested.lessons[0];
+  if (!first) return;
+  const preview = await request("task.lessonsPreview", { cwd: app, id: created.id, ids: [first.id] });
+  const applied = await request("task.lessonsApply", { cwd: app, id: created.id, ids: [first.id] });
+  const md = readFileSync(join(app, applied.path), "utf8");
+  check(
+    "a picked lesson goes into CLAUDE.md under ## Lessons, as previewed",
+    md === preview.after && md.includes("## Lessons") && md.includes(first.text),
+    `path=${applied.path} lines=${md.split("\n").length}`,
+  );
+  const undone = await request("bootstrap.rollback", { cwd: app, runId: applied.runId });
+  const runs = (await request("bootstrap.runs", { cwd: app })).runs;
+  check(
+    "rolling it back from History removes it, cleanly",
+    !existsSync(join(app, applied.path)) &&
+      undone.results.every((r) => r.status === "rolled-back") &&
+      !runs.some((r) => r.runId === applied.runId),
+    `exists=${existsSync(join(app, applied.path))} results=${JSON.stringify(undone.results.map((r) => r.status))} still listed=${runs.some((r) => r.runId === applied.runId)}`,
+  );
+  const again = await request("task.lessons", { cwd: app, id: created.id, stored: true });
+  check("the lessons not picked are dismissed", again.lessons.length === 0, `left=${again.lessons.length}`);
+}
+
 const scenarios: Record<string, () => Promise<void>> = {
   basic,
   mode,
@@ -1117,6 +1191,7 @@ const scenarios: Record<string, () => Promise<void>> = {
   team,
   profile,
   schedule,
+  lessons,
   exit,
 };
 // "all" skips exit, which needs an empty --cwd of its own.
@@ -1137,6 +1212,7 @@ for (const file of [
   "PROFILE.md",
   "profile-probe.txt",
   "sched-app",
+  "lessons-app",
   ".claude",
 ]) {
   rmSync(join(cwd, file), { recursive: true, force: true });

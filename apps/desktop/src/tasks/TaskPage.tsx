@@ -55,6 +55,7 @@ import { ApprovalCard } from "./ApprovalCard.tsx";
 import { CreatePrDialog } from "./CreatePr.tsx";
 import { DeployCard } from "./DeployCard.tsx";
 import { FlowPanel } from "./FlowPanel.tsx";
+import { LessonsCard } from "./LessonsCard.tsx";
 import { MergeGates } from "./MergeGates.tsx";
 import { PrChecks } from "./PrChecks.tsx";
 import { ProjectWorkflowNote } from "./ProjectWorkflowNote.tsx";
@@ -669,6 +670,10 @@ export function TaskPage({
                   onOpenFile(file).catch((err: unknown) => setError(`Couldn't open the report: ${errorText(err)}`))
                 }
               />
+            )}
+            {/* Lessons for CLAUDE.md from the run's records (M8-06): only on request, each one approved. */}
+            {task.run && task.state !== "draft" && task.state !== "ready" && task.state !== "running" && (
+              <LessonsCard task={task} cwd={cwd} />
             )}
             {waiting.map((a) =>
               a.toolName === "AskUserQuestion" ? (

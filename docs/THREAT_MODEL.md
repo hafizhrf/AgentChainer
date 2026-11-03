@@ -140,6 +140,17 @@ the session's live background tasks (M4-07).
 - **`agents.templates`** returns the shipped roles and 4 bundled starters, as data the form fills in from; nothing is
   written until the person saves.
 
+**Lessons (M8-06):**
+- **What runs:** `task.lessons` makes one model call with no tools and no settings, only on the person's click. It
+  sends the finished run's recorded signals, the current CLAUDE.md and the dismissed lessons.
+- **What crosses into CLAUDE.md:**
+  - Run records can carry repository content and model text (T-02), so they reach CLAUDE.md only as lines the person
+    reads and picks one by one, in a diff of the file.
+  - `task.lessonsApply` writes only `CLAUDE.md` or `.claude/CLAUDE.md` in the workspace root, as a History run that
+    can be rolled back.
+  - It refuses a line with a home-folder path or a key or token shape, and a file over 300 lines.
+- **Local data:** dismissed lessons are kept in `.agentchainer/lessons.json`, which git ignores.
+
 **Background work (M4-07):**
 - Interactive sessions let the CLI run subagents and shells in the background. They outlive the turn that started
   them, and the CLI starts a turn of its own when they end.

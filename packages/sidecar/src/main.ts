@@ -57,6 +57,7 @@ import { type AgentSdkModule, loadSdk } from "./sdk-loader.ts";
 import { ASK_FIRST, Session } from "./session.ts";
 import { replayEvents, retention, toSessionInfo } from "./stored-sessions.ts";
 import { generateWorkflow } from "./tasks/generate-workflow.ts";
+import { applyLessons, dismissLessons, previewLessons, storedLessons, suggestLessons } from "./tasks/lessons.ts";
 import { computeMetrics, loadAllTasks } from "./tasks/metrics.ts";
 import {
   checkWorkflowText,
@@ -81,6 +82,7 @@ import {
   deleteTaskSafe,
   draftTask,
   dropFlow,
+  evidenceOf,
   fixCiTask,
   listTasksLive,
   mergeGates,
@@ -199,6 +201,15 @@ function sessionHost({ sdk, claudePath }: Claude): SessionHost {
 }
 
 const taskUpdated = (cwd: string) => (task: Task) => notify("task.updated", { cwd, task });
+
+/** Where a lesson came from, as its CLAUDE.md line says: "task “Fix the totals”, 2026-11-03" (M8-06). */
+function lessonOrigin(cwd: string, id: string): string {
+  const task = loadTask(cwd, id);
+  const full = (task.title ?? task.request).replace(/\s+/g, " ").trim();
+  // Cut at a word, not inside one.
+  const title = full.length > 60 ? `${full.slice(0, 60).replace(/\s+\S*$/, "")}…` : full;
+  return `task “${title}”, ${task.createdAt.slice(0, 10)}`;
+}
 
 /**
  * Scheduled flows (M8-05): the watched workspaces' schedules, checked once a minute while the app is open. A run
@@ -780,6 +791,27 @@ serve(
     "task.evidence": ({ cwd, id }) => {
       requireFolder(cwd);
       return taskEvidence(cwd, id);
+    },
+
+    "task.lessons": async ({ cwd, id, model, stored }) => {
+      requireFolder(cwd);
+      if (stored) return { lessons: storedLessons(cwd, id), costUsd: 0 };
+      return suggestLessons(await claude(), cwd, id, evidenceOf(cwd, id), model);
+    },
+
+    "task.lessonsPreview": ({ cwd, id, ids }) => {
+      requireFolder(cwd);
+      return previewLessons(cwd, id, ids, lessonOrigin(cwd, id));
+    },
+
+    "task.lessonsApply": ({ cwd, id, ids }) => {
+      requireFolder(cwd);
+      return applyLessons(cwd, id, ids, lessonOrigin(cwd, id), catalog.version);
+    },
+
+    "task.lessonsDismiss": ({ cwd, id, ids }) => {
+      requireFolder(cwd);
+      return { lessons: dismissLessons(cwd, id, ids) };
     },
 
     "task.split": async ({ cwd, id, model }) => {

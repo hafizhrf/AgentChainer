@@ -40,7 +40,14 @@ import { runAsync } from "../run-async.ts";
 import type { AgentSdkModule } from "../sdk-loader.ts";
 import { git, listFiles, repoOf } from "../workspace.ts";
 import { availableGates, draftContract, normalizeContract } from "./contract.ts";
-import { buildEvidence, type FileChange, renderEvidence, type SecretsScan, sectionLines } from "./evidence.ts";
+import {
+  buildEvidence,
+  type Evidence,
+  type FileChange,
+  renderEvidence,
+  type SecretsScan,
+  sectionLines,
+} from "./evidence.ts";
 import { branchFolders, folderDirs, folderFileStats, removeFolderWorktrees, taskFolders } from "./folders.ts";
 import { generateWorkflow } from "./generate-workflow.ts";
 import shipped from "./library.json" with { type: "json" };
@@ -1872,6 +1879,12 @@ function subtaskSummaries(root: string, children: Task[]): string {
  * The stored report while nothing in the task changed after it was written; otherwise (a newer run, an interrupted
  * one, a run from before reports existed) it's built again from the records.
  */
+/** The task's evidence report as data, written again first when it's out of date (M8-06). */
+export function evidenceOf(root: string, id: string): Evidence {
+  taskEvidence(root, id);
+  return JSON.parse(readTaskFile(root, id, "evidence.json") ?? "null") as Evidence;
+}
+
 export function taskEvidence(root: string, id: string): { markdown: string; path: string } {
   const task = present(loadTask(root, id));
   if (!task.run || task.state === "running") throw invalid("The report is written when the run ends.");

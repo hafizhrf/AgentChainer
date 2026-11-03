@@ -160,6 +160,22 @@ export function agentProblems(
   return problems;
 }
 
+/** What in a finished run a lesson comes from (M8-06). */
+export const LessonSourceSchema = z.enum(["gate", "format", "review", "guard", "approval", "notes"]);
+export type LessonSource = z.infer<typeof LessonSourceSchema>;
+
+/**
+ * A suggested CLAUDE.md line from a finished task (M8-06, docs/design/lessons.md), with the run's records it comes
+ * from. Nothing is written until the person approves it.
+ */
+export const LessonSchema = z.object({
+  id: z.string(),
+  text: z.string(),
+  why: z.string(),
+  sources: z.array(z.object({ source: LessonSourceSchema, ref: z.string(), text: z.string() })),
+});
+export type Lesson = z.infer<typeof LessonSchema>;
+
 /** A starting point for a new agent (M8-04): a shipped task role or a bundled starter. Nothing is saved from it. */
 export const AgentTemplateSchema = z.object({
   id: z.string(),
@@ -1756,6 +1772,29 @@ export const methodSchemas = {
    * (`.agentchainer/tasks/<id>/evidence.md`).
    */
   "task.evidence": { params: TaskRef, result: z.object({ markdown: z.string(), path: z.string() }) },
+  /**
+   * Lessons from a finished task (M8-06): one small read-only model call words what the run's records point at as
+   * CLAUDE.md lines; none, and no call, when nothing does. `stored` returns the last suggestions without a call.
+   */
+  "task.lessons": {
+    params: TaskRef.extend({ model: z.string().optional(), stored: z.boolean().optional() }),
+    result: z.object({ lessons: z.array(LessonSchema), costUsd: z.number(), note: z.string().optional() }),
+  },
+  /** CLAUDE.md before and after the picked lessons, for the diff. */
+  "task.lessonsPreview": {
+    params: TaskRef.extend({ ids: z.array(z.string()).min(1) }),
+    result: z.object({ path: z.string(), before: z.string(), after: z.string() }),
+  },
+  /** Adds the picked lessons to CLAUDE.md as a History run; the rest are dismissed. */
+  "task.lessonsApply": {
+    params: TaskRef.extend({ ids: z.array(z.string()).min(1) }),
+    result: z.object({ runId: z.string(), path: z.string() }),
+  },
+  /** Never offers these again in this workspace. */
+  "task.lessonsDismiss": {
+    params: TaskRef.extend({ ids: z.array(z.string()).min(1) }),
+    result: z.object({ lessons: z.array(LessonSchema) }),
+  },
   /**
    * XL (M3-07): a read-only session splits the approved contract into sub-tasks, created as draft tasks with their own
    * contracts and triage. Again replaces sub-tasks that haven't run.

@@ -1755,8 +1755,28 @@ first.
       ended and `evidence-3.md` was written.
     - Toggle off, Run now (then stopped), Edit and Delete all worked.
     - The recent workspaces were restored afterwards.
-- [ ] **M8-06** Lessons from outcomes: suggest CLAUDE.md additions from finished tasks' evidence, each one approved
+- [x] **M8-06** Lessons from outcomes: suggest CLAUDE.md additions from finished tasks' evidence, each one approved
       by the user (opt-in). From CAO's memory and self-learning loop.
+      → design: [lessons.md](design/lessons.md) (owner decisions, 2026-11-03).
+  - **Opt-in:** Suggest lessons on a finished task is the opt-in; nothing runs otherwise.
+  - **Signals:** from the evidence, no model: gates fixed in a later round, the formatter's rewrites, must-fix and
+    should-fix review findings, guard blocks, denied approvals, and the implementer's notes.
+  - **Suggestions:** one haiku call words up to 5 lessons, each citing its signals. Duplicates of CLAUDE.md or of
+    dismissed lessons are dropped, and so are home paths and token shapes.
+  - **Adding:** picked lessons go under `## Lessons` in CLAUDE.md as a History run, after a diff; the rest are
+    dismissed for the workspace.
+  - **Live:** `spike-host.ts --scenario lessons` on haiku, about $0.01, 4 of 4 passed:
+    - 4 lessons came from a run whose commands were denied, including "don't retry a denied command through another
+      shell", which the run had done;
+    - one was added as previewed;
+    - it rolled back cleanly from History;
+    - the rest were dismissed.
+  - **In the app,** checked over CDP on Windows:
+    - Suggest showed 2 lessons with their why, source chips and the CLAUDE.md diff;
+    - adding 1 wrote it;
+    - Workspace settings → History → Roll back removed it.
+  - **Bug fixed along the way:** dismissing the rest used to change `.agentchainer/.gitignore` after the run was
+    recorded, which stopped that run from rolling back cleanly. The entry is now written first.
 - **Not adopted from CAO:**
   - other providers' CLIs (PRD §7 non-goal);
   - tmux terminal backends (the app has its own terminal and sessions);

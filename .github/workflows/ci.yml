@@ -49,6 +49,8 @@ jobs:
         run: pnpm test:coverage
       - name: Eval report covers today's workflows and role prompts (M7-03; no model calls)
         run: node packages/sidecar/scripts/check-eval-report.ts
+      - name: Compatibility matrix matches the CLI minimum and the SDK pin (X-08)
+        run: node scripts/check-compatibility.mjs
       - name: Release script tests
         run: node --test scripts/release-assets.test.mjs
       - name: Build frontend (tauri::generate_context! embeds it)

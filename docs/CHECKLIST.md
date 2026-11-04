@@ -1059,7 +1059,19 @@ for the desktop shell, start screen and session view to be cleaned up (UX-02, UX
       - an unreviewed plugin installed locally, its details, off and on, uninstalled;
       - a reviewed plugin installed at project scope and rolled back from History;
       - the settings files and `installed_plugins.json` clean afterwards.
-    - Open: the owner's click-through in light and dark.
+    - Clicked through in the app on macOS, in light and dark (2026-11-04, a debug build, haiku ≈$0.02 for the
+      self-test turns):
+      - the list and search, a reviewed plugin's detail (risk, license, review, permissions) and an unreviewed one's;
+      - Install… with the not-reviewed notice and the local default, and a real install;
+      - the Installed tab, then Uninstall with its confirm. The scratch repo's `.claude/` was gone afterwards.
+    - Fixed from the click-through:
+      - a local install showed as Off: the CLI reports `projectEnabled: false` for it, which is about the shared
+        settings file only;
+      - "1 agents";
+      - the radio buttons sat below their labels: radios got the text inputs' 32 px height;
+      - the not-reviewed notice still said "before you install it" on an installed plugin;
+      - the configure command wrapped mid-word.
+    - Open: the owner's own look.
 - [ ] **UX-11** Task pages pass. Owner feedback, 2026-10-30, with screenshots: "still messy".
   - Found:
     - content sat left-aligned with empty space on the right;

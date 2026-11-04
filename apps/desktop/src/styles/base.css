@@ -144,7 +144,8 @@ textarea {
   line-height: 1.5;
 }
 
-input[type="checkbox"] {
+input[type="checkbox"],
+input[type="radio"] {
   min-height: 0;
   accent-color: var(--accent);
 }

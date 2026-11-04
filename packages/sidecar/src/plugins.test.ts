@@ -257,6 +257,13 @@ describe("the Plugins page's listing (UX-10)", () => {
     );
   });
 
+  it("reads a local install as on, though the CLI says it's not on in the shared settings file", () => {
+    const root = workspace();
+    const entry = { id: "x@m", version: "1", scope: "local", projectPath: root, enabled: true, projectEnabled: false };
+    assert.equal(parseInstalled([entry], root, [])[0]?.enabled, true);
+    assert.equal(parseInstalled([{ ...entry, enabled: false }], root, [])[0]?.enabled, false);
+  });
+
   it("lists through the CLI once per session, until refreshed", async () => {
     const root = workspace();
     const { cli } = fakePluginCli(root);

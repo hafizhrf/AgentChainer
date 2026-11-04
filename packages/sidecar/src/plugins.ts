@@ -156,7 +156,8 @@ export function parseInstalled(json: unknown, root: string, available: MarketPlu
         id,
         ...(version ? { version } : {}),
         scope,
-        enabled: o.enabled !== false && o.projectEnabled !== false,
+        // `projectEnabled` is about the shared settings file only; a local install reports it false while it's on.
+        enabled: o.enabled !== false,
         ...(str(o.installedAt) ? { installedAt: str(o.installedAt) } : {}),
         here,
         ...(newer ? { update: newer } : {}),

@@ -5,6 +5,7 @@ import { type Catalog, type Item, type Profile, REQUIRED_REVIEWS } from "../cata
 import shippedLibrary from "../tasks/library.json" with { type: "json" };
 import { LibrarySchema, renderRoleFile } from "../tasks/library.ts";
 import { git, repoOf } from "../workspace.ts";
+import { readWorkspaceText } from "../workspace-files.ts";
 import { GENERATORS, type Proposal } from "./generate.ts";
 import { itemChanges } from "./steps.ts";
 import { stopHookFiles, stopTestTarget } from "./stop-hook.ts";
@@ -163,8 +164,7 @@ const ROLES = Object.values(LibrarySchema.parse(shippedLibrary).roles);
 function rolesAction(root: string): PlanAction | null {
   const files = ROLES.map((role) => {
     const rel = `.claude/agents/${role.name}.md`;
-    const abs = path.join(root, ...rel.split("/"));
-    return { path: rel, before: existsSync(abs) ? readFileSync(abs, "utf8") : "", after: renderRoleFile(role) };
+    return { path: rel, before: readWorkspaceText(root, rel), after: renderRoleFile(role) };
   }).filter((f) => f.before !== f.after);
   if (!files.length) return null;
   return {
@@ -183,10 +183,7 @@ function rolesAction(root: string): PlanAction | null {
 }
 
 function fixActions(root: string, fixes: Set<string>, profile: WorkspaceProfile): PlanAction[] {
-  const read = (rel: string) => {
-    const file = path.join(root, rel);
-    return existsSync(file) ? readFileSync(file, "utf8") : "";
-  };
+  const read = (rel: string) => readWorkspaceText(root, rel);
   const base = { kind: "fix" as const, risk: "low" as const, scope: "project" as const, permissions: [], secrets: [] };
   const actions: PlanAction[] = [];
   if (fixes.has("git-init")) {
@@ -350,7 +347,7 @@ export function planEnv(root: string, env: NodeJS.ProcessEnv = process.env): Pla
   }
   let enabledPlugins = new Set<string>();
   try {
-    const settings = JSON.parse(readFileSync(path.join(root, ".claude", "settings.json"), "utf8")) as {
+    const settings = JSON.parse(readWorkspaceText(root, ".claude/settings.json") || "{}") as {
       enabledPlugins?: Record<string, unknown>;
     };
     enabledPlugins = new Set(

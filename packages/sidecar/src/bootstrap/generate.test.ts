@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { after, describe, it } from "node:test";
@@ -77,6 +77,24 @@ describe("generator sessions are read-only (M2-20)", () => {
     assert.equal(await call("Write", { file_path: join(root, "x"), content: "" }), "deny");
     assert.equal(await call("Edit", { file_path: join(root, "x") }), "deny");
     assert.equal(await call("Read", { file_path: "/etc/hosts" }), "deny");
+  });
+
+  it("can't be talked out of the workspace by a link, the home folder, a network path or a Glob (review 2026-11-04)", async () => {
+    const outside = mkdtempSync(join(tmpdir(), "ac-outside-"));
+    writeFileSync(join(outside, "secret.txt"), "x");
+    symlinkSync(outside, join(root, "escape"));
+    try {
+      assert.equal(await call("Read", { file_path: join(root, "escape", "secret.txt") }), "deny", "a symlinked folder");
+      assert.equal(await call("Read", { file_path: "~/.gitconfig" }), "deny", "the CLI expands ~");
+      assert.equal(await call("Read", { file_path: "//attacker/share/x" }), "deny", "a network path");
+      assert.equal(await call("Read", { file_path: "\\\\attacker\\share\\x" }), "deny", "a UNC path");
+      assert.equal(await call("Glob", { pattern: "../../**/*" }), "deny", "a Glob above the workspace");
+      assert.equal(await call("Glob", { pattern: "src/**/*.ts" }), "allow");
+      assert.equal(await call("Grep", { pattern: "/api/v1|TODO" }), "allow", "Grep's pattern is a search, not a path");
+    } finally {
+      rmSync(join(root, "escape"));
+      rmSync(outside, { recursive: true, force: true });
+    }
   });
 });
 

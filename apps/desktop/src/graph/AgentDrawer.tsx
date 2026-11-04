@@ -1,3 +1,4 @@
+import { redactSecrets } from "@agentchainer/protocol";
 import { Bot, Square, X } from "lucide-react";
 import { useState } from "react";
 import { AgentChildren } from "../TranscriptView.tsx";
@@ -109,7 +110,7 @@ export function AgentDrawer({
         {agent.prompt && (
           <>
             <h3>Prompt</h3>
-            <pre className="agent-prompt">{agent.prompt}</pre>
+            <pre className="agent-prompt">{redactSecrets(agent.prompt)}</pre>
           </>
         )}
         <h3>Activity</h3>

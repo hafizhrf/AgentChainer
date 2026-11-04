@@ -2276,3 +2276,4 @@ export {
   type RiskLevel,
 } from "./approval.ts";
 export { folderKey, folderProblems } from "./folders.ts";
+export { hasSecret, redactForLog, redactSecrets, redactValue } from "./redact.ts";

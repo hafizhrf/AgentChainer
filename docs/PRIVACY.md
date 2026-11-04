@@ -25,8 +25,8 @@ AgentChainer never signs you in, and never reads or stores your credentials ([AD
 | Cost history | `agentchainer.db` in Data | Per turn: session id, folder, time, cost and token counts. No prompts or replies. |
 | Agent SDK | `sdk/` in Data | The pinned Claude Agent SDK, downloaded and verified on first run. |
 | Tools | `tools/` in Data | Pinned tool binaries that setup installs, such as gitleaks. |
-| App log | `agentchainer.log` in Logs | App and agent-runtime messages, including errors. It doesn't log conversations, but an error message can quote a file path or command output. |
-| Crash logs | `sidecar-crash-*.log` in Logs | The last lines the agent runtime printed before it stopped. |
+| App log | `agentchainer.log` in Logs | App and agent-runtime messages, including errors. It doesn't log conversations, but an error message can quote a file path or command output. Each line is masked before it's written: your home folder becomes `~`, and keys, tokens, passwords and email addresses are masked. |
+| Crash logs | `sidecar-crash-*.log` in Logs | The last lines the agent runtime printed before it stopped, masked like the app log. |
 | Layout | The app's web storage | Panel sizes, and whether panels are open. |
 
 **In your project folder**, AgentChainer only writes when you apply a workspace setup, save the workspace profile, or
@@ -63,6 +63,11 @@ set up.
 
 AgentChainer never checks for updates by itself, and sends nothing about you or your projects anywhere.
 
+The `claude` CLI is yours: what it sends to Anthropic, and its own data settings, are as you've set them, and
+AgentChainer doesn't change them ([Claude Code data usage](https://code.claude.com/docs/en/data-usage) **(verify)**).
+Vercel's and Wrangler's own telemetry are turned off when the app runs them for a deploy; Firebase and flyctl follow
+your settings.
+
 ## Diagnostics
 
 **Help → Export diagnostics** writes a file to a place you choose. Nothing is uploaded. The file contains:
@@ -71,9 +76,16 @@ AgentChainer never checks for updates by itself, and sends nothing about you or 
 
 Before it's written, the file is redacted:
 - your home folder becomes `~`;
-- API keys, tokens, passwords and email addresses are masked.
+- API keys, tokens, private keys, credentials in URLs, passwords and email addresses are masked.
 
 Read it before you attach it to a public issue: redaction catches common formats, not every possible secret.
+
+## Secrets on screen
+
+When a tool prints a key or token, the transcript, the agent drawer, gate output and deploy details show it masked,
+such as `[redacted key]`, with the same patterns. The model itself saw it, and the Claude CLI keeps its own transcripts:
+this only keeps secrets off your screen and out of screenshots. The approval dialog shows a tool's input as it will
+run, so you can check it.
 
 ## Changes
 

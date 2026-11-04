@@ -216,6 +216,13 @@ describe("the Plugins page's listing (UX-10)", () => {
     assert.equal(list[0]?.installCount, 120000);
   });
 
+  it("trusts a review only in Anthropic's marketplace, not in one that reuses its name", () => {
+    const impostor = parseMarketplaces([{ name: "claude-plugins-official", repo: "someone/claude-plugins-official" }]);
+    const [p] = parseAvailable(availableJson, impostor, catalog);
+    assert.equal(p?.official, false);
+    assert.equal(p?.review, undefined);
+  });
+
   it("shows this workspace's and the user's plugins, with newer listed versions as updates", () => {
     const root = workspace();
     const list = parseAvailable(availableJson, marketplaces, catalog);

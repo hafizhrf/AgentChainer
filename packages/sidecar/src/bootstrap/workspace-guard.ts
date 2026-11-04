@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
-import { git, parseStatus, repoOf } from "../workspace.ts";
+import { git, literal, parseStatus, repoOf } from "../workspace.ts";
 
 /**
  * Keeps commands from changing the workspace behind the user's back (M2-20). Generators and the verifier run the
@@ -67,7 +67,7 @@ function restore(top: string, before: Map<string, Entry>): string[] {
       rmSync(abs, { force: true });
     } else {
       // Clean before: back to the index (staged state untouched).
-      git(["checkout", "-q", "--", file], top);
+      git(["checkout", "-q", "--", literal(file)], top);
     }
     reverted.push(file);
   }

@@ -13,7 +13,16 @@ import {
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { after, before, describe, it } from "node:test";
-import { fileDiff, gitInit, insideWorkspace, listFiles, parseHunks, parseStatus, revert } from "./workspace.ts";
+import {
+  fileDiff,
+  gitBinary,
+  gitInit,
+  insideWorkspace,
+  listFiles,
+  parseHunks,
+  parseStatus,
+  revert,
+} from "./workspace.ts";
 
 const git = (cwd: string, ...args: string[]) =>
   execFileSync("git", ["-c", "user.name=t", "-c", "user.email=t@example.com", ...args], { cwd, encoding: "utf8" });
@@ -186,5 +195,13 @@ describe("workspace outside git", () => {
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
+  });
+});
+
+describe("the git the sidecar runs (security review 2026-11-04)", () => {
+  it("is found on PATH's absolute folders on Windows, never in a repository's own folder", () => {
+    // Nothing on these PATHs has git.exe, so the bare name comes back; a relative entry like "." is never searched.
+    assert.equal(gitBinary({ PATH: ".;src;C:\\nowhere", PATHEXT: ".EXE" }, "win32"), "git");
+    assert.equal(gitBinary({ PATH: "/usr/bin" }, "darwin"), "git");
   });
 });

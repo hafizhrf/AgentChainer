@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import path from "node:path";
-import type { Lesson, LessonSource } from "@agentchainer/protocol";
+import { hasSecret, type Lesson, type LessonSource } from "@agentchainer/protocol";
 import { z } from "zod";
 import { AC_DIR, ensureIgnored } from "../ac-dir.ts";
 import { applyFileEdits } from "../bootstrap/apply.ts";
@@ -191,9 +191,6 @@ function readClaudeMd(root: string): string {
 
 const HEADING = "## Lessons";
 const HOME_PATH = /(\/Users\/|\/home\/|[A-Z]:\\Users\\)\w/;
-/** Shapes of keys and tokens that must never be written into CLAUDE.md. */
-const SECRET =
-  /(sk-[A-Za-z0-9_-]{16,}|gh[pousr]_[A-Za-z0-9]{20,}|AKIA[0-9A-Z]{16}|xox[baprs]-[A-Za-z0-9-]{10,}|-----BEGIN [A-Z ]*PRIVATE KEY-----)/;
 
 /**
  * CLAUDE.md with the lessons added as bullets under `## Lessons` (made at the end when missing). The rest of the file
@@ -220,8 +217,7 @@ export function previewLessons(root: string, taskId: string, ids: string[], from
   if (!chosen.length) throw new Error("Pick at least one lesson.");
   for (const l of chosen) {
     if (HOME_PATH.test(l.text)) throw new Error("A lesson names a home-folder path; it can't go into CLAUDE.md.");
-    if (SECRET.test(l.text))
-      throw new Error("A lesson looks like it holds a key or token; it can't go into CLAUDE.md.");
+    if (hasSecret(l.text)) throw new Error("A lesson looks like it holds a key or token; it can't go into CLAUDE.md.");
   }
   const before = readClaudeMd(root);
   const after = withLessons(before, chosen, from);
@@ -370,7 +366,7 @@ export async function suggestLessons(
   const known = [...linesOf(claudeMd), ...dismissed];
   const bySignal = new Map(signals.map((s) => [s.ref, s]));
   const lessons: Lesson[] = (answer?.lessons ?? [])
-    .filter((l) => !isDuplicate(l.text, known) && !HOME_PATH.test(l.text) && !SECRET.test(l.text))
+    .filter((l) => !isDuplicate(l.text, known) && !HOME_PATH.test(l.text) && !hasSecret(l.text))
     .map((l) => ({
       id: randomUUID().slice(0, 8),
       text: l.text.trim(),

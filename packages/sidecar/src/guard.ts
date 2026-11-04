@@ -1,5 +1,6 @@
+import { realpathSync } from "node:fs";
 import { homedir } from "node:os";
-import { isAbsolute, relative, resolve } from "node:path";
+import { basename, dirname, isAbsolute, join, relative, resolve } from "node:path";
 import type { HookCallback } from "@anthropic-ai/claude-agent-sdk";
 
 /**
@@ -131,6 +132,29 @@ function isInside(path: string, dir: string): boolean {
   return rel === "" || (!rel.startsWith("..") && !isAbsolute(rel));
 }
 
+/** `path` with links resolved, as far as it exists: a file that isn't there yet resolves through its folder. */
+function realOrSelf(path: string): string {
+  try {
+    return realpathSync.native(path);
+  } catch {
+    const parent = dirname(path);
+    return parent === path ? path : join(realOrSelf(parent), basename(path));
+  }
+}
+
+/**
+ * Whether a read-only tool's path stays inside one of `roots` (the workspace and its other folders). `~` is expanded
+ * as the CLI does, links are followed to where they really point, and a network or device path (`\\server\share`,
+ * `//server/share`) never counts as inside. A Glob pattern counts by its fixed part, before the first wildcard.
+ */
+export function readsInside(target: string, roots: string[], home = homedir()): boolean {
+  if (/^(\\\\|\/\/)/.test(target)) return false;
+  const fixed = target.split(/[*?[{]/)[0] ?? "";
+  const full = resolve(roots[0] ?? ".", expandHome(fixed || ".", home));
+  const real = realOrSelf(full);
+  return roots.some((root) => isInside(real, realOrSelf(resolve(root))));
+}
+
 function isSecretPath(path: string, home: string): boolean {
   return SECRET_DIRS.some((dir) => isInside(path, resolve(home, dir)));
 }
@@ -166,9 +190,12 @@ export function readOnlyHook(root: string, who: string): HookCallback {
     if (guard) return deny(`Blocked by AgentChainer guard: ${guard}`);
     if (!READ_TOOLS.includes(input.tool_name)) return deny(`${who} can only read files, not use ${input.tool_name}.`);
     const args = (input.tool_input ?? {}) as Record<string, unknown>;
-    const target = args.file_path ?? args.path;
-    if (typeof target === "string" && target && relative(root, resolve(root, target)).startsWith("..")) {
-      return deny(`${who} can only read inside the workspace.`);
+    // Glob's `pattern` is a path; Grep's is what to search for.
+    const pattern = input.tool_name === "Glob" ? args.pattern : undefined;
+    for (const target of [args.file_path, args.path, pattern]) {
+      if (typeof target === "string" && target && !readsInside(target, [root])) {
+        return deny(`${who} can only read inside the workspace.`);
+      }
     }
     return {};
   };

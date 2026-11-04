@@ -1,7 +1,9 @@
 //! App log (checklist M1-35): one JSON object per line (`ts`, `level`, `source`, `msg`) in `agentchainer.log` in the
 //! app log dir, rotated to `.1` at 5 MB. The core logs supervisor events; the sidecar's stderr is logged line by
-//! line. A small hand-rolled logger instead of `tracing`: one file, no extra dependencies.
+//! line. Every line is masked first (`redact::for_log`): secrets, and the home folder as `~`. A small hand-rolled
+//! logger instead of `tracing`: one file, no extra dependencies.
 
+use crate::redact;
 use serde::Serialize;
 use std::fs::OpenOptions;
 use std::io::Write;
@@ -33,6 +35,8 @@ pub fn path() -> Option<PathBuf> {
 }
 
 pub fn write(level: &str, source: &str, msg: &str) {
+    // Masked before anything is printed or stored (X-03): the sidecar's stderr carries the CLI's and gh's own output.
+    let msg = &redact::for_log(msg, redact::home());
     eprintln!("[{source}] {msg}");
     let Some(lock) = LOG.get() else { return };
     let Ok(path) = lock.lock() else { return };
@@ -78,4 +82,21 @@ pub fn tail(n: usize) -> Vec<String> {
     let skip = lines.len().saturating_sub(n);
     lines.drain(..skip);
     lines
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn masks_a_line_before_it_is_written() {
+        let dir = std::env::temp_dir().join(format!("ac-applog-{}", std::process::id()));
+        super::init(&dir);
+        super::info(
+            "sidecar",
+            "claude: export ANTHROPIC_API_KEY=sk-ant-api03-abcdefghijklmnop",
+        );
+        let text = std::fs::read_to_string(dir.join("agentchainer.log")).unwrap_or_default();
+        let _ = std::fs::remove_dir_all(&dir);
+        assert!(text.contains("ANTHROPIC_API_KEY=[redacted key]"), "{text}");
+        assert!(!text.contains("sk-ant-api03"), "{text}");
+    }
 }

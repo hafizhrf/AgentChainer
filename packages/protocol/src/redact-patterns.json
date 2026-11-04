@@ -1,0 +1,72 @@
+{
+  "about": "Secrets masked in logs, displayed tool output and diagnostics (X-03), in this order. Read by redact.ts and by the Rust core (diagnostics.rs), so both mask the same things. Patterns use syntax both JS and Rust regex accept: no lookaround; `i` means case-insensitive; replacements may use $1, $2. A value starting with `[` is left alone, so text that's already masked stays as it is.",
+  "patterns": [
+    {
+      "pattern": "-----BEGIN [A-Z ]*PRIVATE KEY-----[\\s\\S]*?-----END [A-Z ]*PRIVATE KEY-----",
+      "replace": "[redacted private key]"
+    },
+    {
+      "pattern": "-----BEGIN [A-Z ]*PRIVATE KEY-----[A-Za-z0-9+/=\\s]*",
+      "replace": "[redacted private key]"
+    },
+    {
+      "pattern": "sk-ant-[A-Za-z0-9_-]{8,}",
+      "replace": "[redacted key]"
+    },
+    {
+      "pattern": "\\bsk-[A-Za-z0-9_-]{20,}",
+      "replace": "[redacted key]"
+    },
+    {
+      "pattern": "\\b[rs]k_(?:live|test)_[A-Za-z0-9]{10,}",
+      "replace": "[redacted key]"
+    },
+    {
+      "pattern": "\\bgh[pousr]_[A-Za-z0-9]{20,}",
+      "replace": "[redacted token]"
+    },
+    {
+      "pattern": "\\bgithub_pat_[A-Za-z0-9_]{20,}",
+      "replace": "[redacted token]"
+    },
+    {
+      "pattern": "\\bxox[abposr]-[A-Za-z0-9-]{10,}",
+      "replace": "[redacted token]"
+    },
+    {
+      "pattern": "\\bAKIA[0-9A-Z]{16}\\b",
+      "replace": "[redacted key]"
+    },
+    {
+      "pattern": "\\bAIza[0-9A-Za-z_-]{35}",
+      "replace": "[redacted key]"
+    },
+    {
+      "pattern": "\\bnpm_[A-Za-z0-9]{36}",
+      "replace": "[redacted token]"
+    },
+    {
+      "pattern": "\\beyJ[A-Za-z0-9_-]{8,}\\.eyJ[A-Za-z0-9_-]{8,}\\.[A-Za-z0-9_-]{8,}",
+      "replace": "[redacted token]"
+    },
+    {
+      "pattern": "\\bbearer\\s+[A-Za-z0-9._~+/-]+=*",
+      "flags": "i",
+      "replace": "Bearer [redacted]"
+    },
+    {
+      "pattern": "\\b([a-z][a-z0-9+.-]*://)[^\\s:/@]+:[^\\s@/]+@",
+      "flags": "i",
+      "replace": "$1[redacted]@"
+    },
+    {
+      "pattern": "\\b([A-Z0-9_]*(?:api[_-]?key|token|secret|password|passwd|credential|private[_-]?key)[A-Z0-9_]*)(\\\\?\"?\\s*[:=]\\s*\\\\?\"?)[^\\s\"',\\\\\\[]*[^\\s\"',\\\\\\[0-9][^\\s\"',\\\\\\[]*",
+      "flags": "i",
+      "replace": "$1$2[redacted]"
+    },
+    {
+      "pattern": "[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+\\.[A-Za-z0-9.-]+",
+      "replace": "[email]"
+    }
+  ]
+}

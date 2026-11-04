@@ -24,7 +24,7 @@ use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use serde::Serialize;
 use tauri::{AppHandle, Emitter, Manager};
 
-use crate::{applog, settings, shell_env};
+use crate::{applog, redact, settings, shell_env};
 
 const SIDECAR_ENTRY: &str = concat!(
     env!("CARGO_MANIFEST_DIR"),
@@ -203,6 +203,8 @@ fn run_once(
     let logger = std::thread::spawn(move || {
         for line in BufReader::new(stderr).lines().map_while(Result::ok) {
             applog::info("sidecar", &line);
+            // The tail becomes the crash log: masked like the app log.
+            let line = redact::for_log(&line, redact::home());
             if let Ok(mut tail) = tail_writer.lock() {
                 if tail.len() == STDERR_TAIL_LINES {
                     tail.pop_front();
@@ -241,13 +243,17 @@ fn run_once(
 
 /// The command for the sidecar this build should run, plus a label for error messages.
 fn command(app: &AppHandle) -> Result<(Command, String), String> {
-    let packaged = std::env::var_os("AGENTCHAINER_SIDECAR_BIN")
-        .map(PathBuf::from)
-        .or_else(|| {
-            (!cfg!(debug_assertions))
-                .then(bundled_sidecar_path)
-                .flatten()
-        });
+    // The override is for trying a packaged sidecar in a debug build; release builds always run their own (X-02).
+    let packaged = crate::dev_only(
+        std::env::var_os("AGENTCHAINER_SIDECAR_BIN"),
+        cfg!(debug_assertions),
+    )
+    .map(PathBuf::from)
+    .or_else(|| {
+        (!cfg!(debug_assertions))
+            .then(bundled_sidecar_path)
+            .flatten()
+    });
 
     let data_dir = app
         .path()
@@ -294,6 +300,7 @@ fn write_crash_log(app: &AppHandle, status: &str, tail: &[String]) {
         "sidecar exited: {status}\n--- last stderr lines ---\n{}\n",
         tail.join("\n")
     );
+    let text = redact::for_log(&text, redact::home());
     if std::fs::create_dir_all(&dir).is_ok() && std::fs::write(&file, text).is_ok() {
         applog::warn("core", &format!("crash log written to {}", file.display()));
     }

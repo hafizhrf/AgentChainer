@@ -3,6 +3,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import path from "node:path";
 import type { AuthState, EnvCheck } from "@agentchainer/protocol";
+import { gitBinary } from "./workspace.ts";
 
 /** Oldest Claude Code CLI version verified with this app (spikes S2/S3/S5 ran on 2.1.293). */
 export const MIN_CLAUDE_VERSION = "2.1.293";
@@ -104,7 +105,7 @@ export function readAuthStatus(path: string): AuthState | null {
 }
 
 export function gitVersion(): string | null {
-  const r = spawnSync("git", ["--version"], { encoding: "utf8", timeout: 10_000 });
+  const r = spawnSync(gitBinary(), ["--version"], { encoding: "utf8", timeout: 10_000 });
   return r.status === 0 ? r.stdout.trim() : null;
 }
 

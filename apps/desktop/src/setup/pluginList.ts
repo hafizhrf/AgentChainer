@@ -77,7 +77,9 @@ export function sourceLink(source: MarketPlugin["source"]): string | null {
 
 /** Who publishes it, as far as the listing tells: Anthropic's own folder, or the source's GitHub owner. */
 export function vendorOf(p: MarketPlugin): string | null {
-  if (p.marketplace === "claude-plugins-official" && p.source.path?.startsWith("plugins/")) return "Anthropic";
+  if (p.official && p.marketplace === "claude-plugins-official" && p.source.path?.startsWith("plugins/")) {
+    return "Anthropic";
+  }
   const owner = /^https:\/\/github\.com\/([^/]+)\//.exec(p.source.url ?? "")?.[1];
   return owner ?? null;
 }

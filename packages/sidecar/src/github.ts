@@ -1,7 +1,7 @@
 import { existsSync } from "node:fs";
 import { homedir } from "node:os";
 import path from "node:path";
-import type { GitHubStatus, PrCheck } from "@agentchainer/protocol";
+import { type GitHubStatus, type PrCheck, redactForLog } from "@agentchainer/protocol";
 import { runAsync } from "./run-async.ts";
 import { git } from "./workspace.ts";
 
@@ -149,27 +149,8 @@ export function jobOf(link: string): string | null {
   return /\/actions\/runs\/\d+\/job\/(\d+)(?:[/?#]|$)/.exec(link)?.[1] ?? null;
 }
 
-/** Secrets and personal details masked, as in the diagnostics bundle (`diagnostics.rs`). */
-const REDACT: [RegExp, string][] = [
-  [/sk-ant-[A-Za-z0-9_-]{8,}/g, "[redacted key]"],
-  [/\bsk-[A-Za-z0-9_-]{20,}/g, "[redacted key]"],
-  [/\bgh[pousr]_[A-Za-z0-9]{20,}/g, "[redacted token]"],
-  [/\bgithub_pat_[A-Za-z0-9_]{20,}/g, "[redacted token]"],
-  [/\bxox[abposr]-[A-Za-z0-9-]{10,}/g, "[redacted token]"],
-  [/\bAKIA[0-9A-Z]{16}\b/g, "[redacted key]"],
-  [/\bbearer\s+[A-Za-z0-9._~+/-]+=*/gi, "Bearer [redacted]"],
-  [
-    /\b([A-Z0-9_]*(?:api[_-]?key|token|secret|password|passwd|credential)[A-Z0-9_]*)(\\?"?\s*[:=]\s*\\?"?)[^\s"',\\]*[^\s"',\\0-9][^\s"',\\]*/gi,
-    "$1$2[redacted]",
-  ],
-  [/[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+\.[A-Za-z0-9.-]+/g, "[email]"],
-];
-
-export function redact(text: string, home = homedir()): string {
-  let out = home.length > 1 ? text.split(home).join("~") : text;
-  for (const [re, to] of REDACT) out = out.replace(re, to);
-  return out;
-}
+/** Secrets and personal details masked, as everywhere else (X-03, `redactForLog` in the protocol package). */
+export const redact = (text: string, home = homedir()): string => redactForLog(text, home);
 
 /** CI logs can be long; the end holds the failure. */
 export const MAX_LOG_CHARS = 32_000;

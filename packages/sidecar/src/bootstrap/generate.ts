@@ -1,14 +1,15 @@
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import type { WorkspaceProfile } from "@agentchainer/protocol";
 import type { HookCallback } from "@anthropic-ai/claude-agent-sdk";
 import { parse as parseYaml } from "yaml";
 import type { Item } from "../catalog/schema.ts";
-import { checkToolCall } from "../guard.ts";
+import { checkToolCall, readsInside } from "../guard.ts";
 import type { AgentSdkModule } from "../sdk-loader.ts";
 import { repoOf } from "../workspace.ts";
+import { readWorkspaceText } from "../workspace-files.ts";
 import skills from "./skills.json" with { type: "json" };
 import { ensureTool, findTool } from "./tools.ts";
 import { guarded } from "./workspace-guard.ts";
@@ -149,11 +150,11 @@ export function generatorHook(root: string, allowed: string[], also: string[] = 
       );
     }
     if (["Read", "Grep", "Glob"].includes(input.tool_name)) {
-      const target = args.file_path ?? args.path;
-      if (typeof target === "string" && target) {
-        const resolved = path.resolve(root, target);
-        // A multi-folder workspace's other folders (M8-01) are read like the primary one.
-        if ([root, ...also].every((dir) => path.relative(dir, resolved).startsWith("..")))
+      // A multi-folder workspace's other folders (M8-01) are read like the primary one.
+      // Glob's `pattern` is a path; Grep's is what to search for.
+      const pattern = input.tool_name === "Glob" ? args.pattern : undefined;
+      for (const target of [args.file_path, args.path, pattern]) {
+        if (typeof target === "string" && target && !readsInside(target, [root, ...also]))
           return deny("Generators can only read inside the workspace.");
       }
       return {};
@@ -197,8 +198,7 @@ export function toProposedFiles(root: string, spec: Spec, output: unknown): Prop
     }
     const after = String(f.content ?? "");
     if (Buffer.byteLength(after) > MAX_FILE_BYTES) throw new Error(`${rel} is larger than ${MAX_FILE_BYTES} bytes.`);
-    const file = path.join(root, ...rel.split("/"));
-    return { path: rel, before: existsSync(file) ? readFileSync(file, "utf8") : "", after };
+    return { path: rel, before: readWorkspaceText(root, rel), after };
   });
 }
 

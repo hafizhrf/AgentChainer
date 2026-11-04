@@ -99,7 +99,9 @@ export function parseAvailable(json: unknown, marketplaces: Listing["marketplace
     if (!o || !name || !marketplace) return [];
     const id = str(o.pluginId) ?? `${name}@${marketplace}`;
     const m = known.get(marketplace);
-    const item = reviewed.get(id);
+    const official = m ? m.official : marketplace === BUILT_IN;
+    // A review only counts for Anthropic's marketplace: a marketplace someone added could reuse its name.
+    const item = official ? reviewed.get(id) : undefined;
     return [
       {
         id,
@@ -109,7 +111,7 @@ export function parseAvailable(json: unknown, marketplaces: Listing["marketplace
         ...(str(o.version) ? { version: str(o.version) } : {}),
         ...(typeof o.installCount === "number" ? { installCount: o.installCount } : {}),
         source: sourceOf(o.source, m?.repo),
-        official: m ? m.official : marketplace === BUILT_IN,
+        official,
         ...(item ? { review: reviewOf(item) } : {}),
       },
     ];

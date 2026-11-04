@@ -24,7 +24,7 @@
 | [UX](#ux--product-design--ui-polish-before-r1) | v0.1 | Product design & UI polish (after M1/M2 work functionally) | ◐ Design system done; desktop shell, panels and setup page in place |
 | [R1](#r1--v01-release) | v0.1 | Packaging & release | ◐ Pipeline, updater, security review and docs in place; publishing waits for M0-01 and M0-22 |
 | [M3](#m3--adaptive-planner--task-contracts-v02) | v0.2 | Adaptive planner, contracts, evidence | ◐ Every tier (S, M, L, XL) runs live on macOS and Windows, with gates, evidence and accepted risk (preview); E2 passes; left: the owner's click-through and E1 (benchmark labels) |
-| [M4](#m4--agent-observability-v02v03) | v0.2–0.3 | Agent observability graph | ◐ Agent tree, graph, drawer, stop, timeline, replay, background tasks and agent library in; E2 frame times pass on Windows, fail on an Intel Mac (22–41 fps), Ubuntu not run |
+| [M4](#m4--agent-observability-v02v03) | v0.2–0.3 | Agent observability graph | ◐ Agent tree, graph, drawer, stop, timeline, replay, background tasks and agent library in; E2 frame times pass on Windows and, after the canvas fix, on an Intel Mac; Ubuntu not run |
 | [M5](#m5--git-workflow-pr--quality-gates-v03) | v0.3 | Git workflow, PRs, gates | ◐ Done for GitHub ([git-workflow.md](design/git-workflow.md)): worktrees, PRs, CI and Fix CI, merge gates, human merge; E1 passed on Windows. GitLab (M5-06, optional) left |
 | [M6](#m6--deployment--workflow-canvas-v04) | v0.4 | Deploy adapters, workflow canvas | ◐ Design approved ([deploy-and-canvas.md](design/deploy-and-canvas.md)); Vercel preview + smoke built; Cloudflare next |
 | [M7](#m7--evals--analytics-v05) | v0.5 | Evals & analytics | ☐ Not started |
@@ -1453,20 +1453,32 @@ Decisions: [ADR-0009](adr/0009-release-signing-and-updates.md). Maintainer steps
       session reopened with the same agents, nesting and times (step-4 PR).
 - [ ] **M4-E2** Pan and zoom hold 60 fps with 200 nodes on the slowest supported WebView.
       How to run, after a debug build: `node scripts/graph-bench.mjs`. It pans, then zooms, a synthetic 200-node
-      session graph for 4 s each, with no model calls.
+      session graph for 4 s each, with no model calls: fitted to the window, then close up at zoom 1. A second with
+      nothing moving comes first; when even that is below 55 fps, the window was covered and the run doesn't count.
       - Windows (2026-11-01): passed. WebView2 (Edge 156), 144 Hz display, 1280×780:
         - pan: 143 fps, p95 7.1 ms, 0.3% dropped;
         - zoom: 144 fps, p95 7.2 ms, 0% dropped.
-      - macOS (2026-11-04): **failed**, twice.
+        - That ran before the canvas fix below, which only takes paint work away; the next Windows run checks it
+          again, with the close-up phases.
+      - macOS (2026-11-04): passed after a fix.
         - Hardware: an Intel MacBook Pro 16" (2019) with UHD 630 and Radeon Pro 5300M, the built-in Retina display at
           60 Hz, a 1280×800 window @2x.
         - Build: a debug build (`tauri build --debug`; the UI is Vite's production bundle).
         - Conditions: Low Power Mode off, on AC. The app's window was the frontmost on screen for the whole run
-          (sampled every second), so WebKit wasn't throttling a hidden window.
-        - pan: 22.2 and 23.2 fps (p50 43 ms, p95 48–56 ms);
-        - zoom: 34.4 and 41.3 fps (p50 20–25 ms, p95 43–54 ms).
-        - Next: profile the graph in WebKit's inspector during pan and zoom, to find where the time goes (paint of the
-          nodes' styles at 2×, the edges' SVG, React work per viewport change), then fix and run again.
+          (sampled every 1.5 s, other apps hidden), so WebKit wasn't throttling a hidden window.
+        - Before: pan 22–23 fps (p50 43 ms), zoom 34–41 fps.
+        - Cause, from runs with parts of the graph left out (idle frames ran at 60 fps throughout):
+          - React Flow's `<Background>` is an SVG pattern the size of the canvas, repainted on every frame. Without
+            it, pan rose to 45 fps;
+          - the nodes' text and icons at zoom 0.1, where it can't be read;
+          - script was about 1 ms a frame, and the edges cost nothing measurable.
+        - Fix:
+          - a CSS dot grid (`graph/DotGrid.tsx`) that the compositor moves and scales, repainted only when the zoom
+            crosses a quarter octave, and not drawn when its dots would be under half a pixel;
+          - below zoom 0.4, nodes are drawn as plain boxes.
+        - After, two runs:
+          - fitted (zoom 0.1): pan 59.8 and 59.9 fps, zoom 59.9 and 59.9 fps, p95 18 ms, ≤ 0.4% dropped;
+          - close up (zoom 1): pan 59.7 and 59.7 fps, zoom 59.9 and 59.1 fps, p95 18 ms, ≤ 1.7% dropped.
       - Still to run: Ubuntu (WebKitGTK, likely the slowest). The box is ticked once macOS and Ubuntu pass, and M4-02
         with it.
 

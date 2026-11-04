@@ -44,9 +44,24 @@
 
 .session-graph .react-flow {
   --xy-background-color: var(--bg);
-  --xy-background-pattern-color: var(--border);
   --xy-edge-stroke: var(--border-strong);
   --xy-edge-stroke-width: 1.5;
+  --dot-grid-color: var(--border);
+}
+
+/* The dot grid (DotGrid.tsx): a layer under the nodes that the compositor moves and scales. */
+.dot-grid {
+  position: absolute;
+  top: 0;
+  left: 0;
+  transform-origin: 0 0;
+  pointer-events: none;
+}
+
+/* Zoomed far out (below 0.4), nodes are plain boxes: their text can't be read there, and leaving it out keeps pan and
+   zoom smooth with hundreds of nodes (M4-E2). */
+.session-graph .react-flow.far .graph-node > :not(.react-flow__handle) {
+  display: none;
 }
 
 .session-graph .graph-edge.live path {

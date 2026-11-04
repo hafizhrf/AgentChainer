@@ -81,6 +81,10 @@ reader; an XL task counts once, with its sub-tasks' costs inside it.
   - The delta against the baseline variant, with a simple interval; with a small N the report says the difference
     may be noise rather than claiming it.
   - The sha256 of each workflow and first-party skill a variant ran (§6).
+  - **Evidence (M3-E2):** every run that ended is checked against its own evidence report. The report's gate runs must
+    be the recorded ones, and the last round's gate commands, run again by hand before the hidden checks are copied
+    in, must give the recorded exit codes. The section appears only in reports whose runs were checked, so older
+    reports still render as committed.
 
 ## 6. The regression check (M7-03, owner decision 1)
 

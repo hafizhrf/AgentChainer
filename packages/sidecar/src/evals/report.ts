@@ -245,6 +245,24 @@ export function renderMarkdown(r: EvalReport): string {
       out.push(`- ${x.variant} / ${x.case}: ${x.state}${x.error ? `, ${x.error}` : ""}${checks ? `; ${checks}` : ""}`);
     }
   }
+  // M3-E2. Only in reports from runs that checked their evidence, so older reports render as they were committed.
+  const checked = r.runs.filter((x) => x.evidence);
+  if (checked.length) {
+    const reruns = checked.flatMap((x) => (x.evidence?.rerun ?? []).map((g) => ({ ...g, run: x })));
+    const off = reruns.filter((g) => g.recorded !== g.now);
+    const unlike = checked.filter((x) => !x.evidence?.reportMatches);
+    out.push(
+      "",
+      "## Evidence (M3-E2)",
+      "",
+      `- ${checked.length - unlike.length}/${checked.length} reports hold exactly their run's recorded gate runs.`,
+      `- ${reruns.length - off.length}/${reruns.length} last-round gate commands, run again by hand, gave the recorded exit code.`,
+    );
+    for (const x of unlike) out.push(`- ${x.variant} / ${x.case}: the report's gate runs differ from the run's.`);
+    for (const g of off) {
+      out.push(`- ${g.run.variant} / ${g.run.case}: ${g.gate} recorded ${g.recorded ?? "none"}, again ${g.now}.`);
+    }
+  }
   out.push("", "## Inputs", "", "sha256 of the first-party files a task run reads, at the app commit:", "");
   for (const [f, h] of Object.entries(r.inputs)) out.push(`- \`${f}\` ${h.slice(0, 12)}`);
   return `${out.join("\n")}\n`;

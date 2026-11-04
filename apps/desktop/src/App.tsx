@@ -224,6 +224,15 @@ export function App() {
         const cfg = await readSelftestConfig();
         if (!cfg || !checked.ready || selftestStarted) return;
         selftestStarted = true;
+        // Performance budgets (X-07): when Home is ready, how long that took, then idle for the memory sample.
+        if (cfg.bench === "startup") {
+          const uiReadyMs = Math.round(performance.now());
+          await request("debug.log", {
+            message: JSON.stringify({ selftest: { startup: { uiReadyMs, ready: checked.ready } } }),
+          });
+          setTimeout(() => void quitApp(), ((cfg.idleSeconds ?? 30) + 10) * 1000);
+          return;
+        }
         if (cfg.bench) return setBench(cfg);
         setCwd(cfg.cwd);
         const report = await runSelftest(cfg, {

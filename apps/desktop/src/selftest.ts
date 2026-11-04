@@ -38,8 +38,13 @@ export type SelftestConfig = {
   stay?: boolean;
   theme?: "light" | "dark";
   open?: (typeof OPEN_VIEWS)[number];
-  /** Runs a bench instead of a turn: `graph` measures pan and zoom with 200 graph nodes (M4-E2); no model call. */
-  bench?: "graph";
+  /**
+   * Runs a bench instead of a turn, with no model call: `graph` measures pan and zoom with 200 graph nodes (M4-E2);
+   * `startup` reports when Home is ready, then sits idle so the app's memory can be measured (X-07).
+   */
+  bench?: "graph" | "startup";
+  /** For `startup`: how long to stay idle after reporting, before quitting. */
+  idleSeconds?: number;
 };
 
 export async function readSelftestConfig(): Promise<SelftestConfig | null> {
@@ -48,6 +53,10 @@ export async function readSelftestConfig(): Promise<SelftestConfig | null> {
   const cfg = JSON.parse(raw) as Partial<SelftestConfig>;
   if (cfg.bench === "graph")
     return { cwd: cfg.cwd ?? "", prompt: "", bench: "graph", ...(cfg.stay ? { stay: true } : {}) };
+  if (cfg.bench === "startup") {
+    const idle = typeof cfg.idleSeconds === "number" && cfg.idleSeconds > 0 ? Math.min(cfg.idleSeconds, 600) : 30;
+    return { cwd: "", prompt: "", bench: "startup", idleSeconds: idle };
+  }
   if (typeof cfg.cwd !== "string" || typeof cfg.prompt !== "string") return null;
   return {
     cwd: cfg.cwd,

@@ -75,6 +75,9 @@ Windows signing needs `bundle.windows.signCommand` in `tauri.conf.json` once a c
 - [ ] Spot-check a download with `shasum -a 256 -c SHA256SUMS --ignore-missing`.
 - [ ] Clean-machine install on macOS, Windows 11 and Ubuntu LTS (R1-09). Follow INSTALL.md exactly, then do a first
       start, a session, and a workspace setup.
+- [ ] Performance budgets ([PERFORMANCE.md](PERFORMANCE.md), X-07): on a debug build of the release commit, run
+      `node scripts/perf-budgets.mjs` and `node scripts/selftest-latency.mjs --cwd <empty dir>`. Put the numbers in
+      the release notes. An exceeded budget is fixed first, or changed in PERFORMANCE.md with a reason.
 - [ ] The release notes read well. They are also shown in the app's update dialog.
 
 Publish from the release page. The updater then finds `latest.json` at `releases/latest/download/latest.json`.

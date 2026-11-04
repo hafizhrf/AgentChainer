@@ -143,6 +143,14 @@ jobs:
       - name: Launch smoke test (Xvfb)
         if: runner.os == 'Linux'
         run: xvfb-run -a -s "-screen 0 1440x900x24" node scripts/smoke-launch.mjs ${{ matrix.binary }} --screenshot screenshot-${{ matrix.name }}.png
+      # Performance budgets (X-07): startup and idle memory, tracked on every run as an artifact. Not blocking: hosted
+      # runners vary too much for a hard gate; docs/RELEASING.md checks them before a release.
+      - name: Performance budgets (tracked)
+        if: runner.os != 'Linux'
+        run: node scripts/perf-budgets.mjs --binary ${{ matrix.binary }} --json perf-${{ matrix.name }}.json --warn-only
+      - name: Performance budgets (tracked, Xvfb)
+        if: runner.os == 'Linux'
+        run: xvfb-run -a -s "-screen 0 1440x900x24" node scripts/perf-budgets.mjs --binary ${{ matrix.binary }} --json perf-${{ matrix.name }}.json --warn-only
       - name: Upload debug build and screenshot
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -151,5 +159,6 @@ jobs:
           path: |
             ${{ matrix.binary }}
             screenshot-${{ matrix.name }}.png
+            perf-${{ matrix.name }}.json
           if-no-files-found: warn
           retention-days: 14

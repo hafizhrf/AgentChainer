@@ -28,7 +28,7 @@
 | [M5](#m5--git-workflow-pr--quality-gates-v03) | v0.3 | Git workflow, PRs, gates | ◐ Done for GitHub ([git-workflow.md](design/git-workflow.md)): worktrees, PRs, CI and Fix CI, merge gates, human merge; E1 passed on Windows. GitLab (M5-06, optional) left |
 | [M6](#m6--deployment--workflow-canvas-v04) | v0.4 | Deploy adapters, workflow canvas | ◐ Built ([deploy-and-canvas.md](design/deploy-and-canvas.md)): Vercel, Cloudflare Workers, Firebase, Fly.io and Docker adapters, production with typed confirmation and rollback, the workflow canvas; left: live deploys with the owner's logins (E1), canvas Import/Export by hand |
 | [M7](#m7--evals--analytics-v05) | v0.5 | Evals & analytics | ◐ Metrics, the eval benchmark and the CI report check in ([evals.md](design/evals.md)); OpenTelemetry deferred; E1 ticks with the first PR that changes a workflow |
-| [M8](#m8--multi-folder-workspaces--agent-fleet-proposed) | later | Multi-folder workspaces, agent fleet | ✓ All six built: multi-folder workspaces, the fleet view, supervisor and worker sessions, agent profiles, scheduled runs, lessons |
+| [M8](#m8--multi-folder-workspaces--agent-fleet-proposed) | later | Multi-folder workspaces, agent fleet | ◐ All six built: multi-folder workspaces, the fleet view, supervisor and worker sessions, agent profiles, scheduled runs, lessons; open: M8-07, resuming a multi-folder chat loses its other folders |
 | [X](#cross-cutting-tracks-ongoing) | all | Security, quality, compatibility, docs, a11y | ☐ Ongoing |
 
 ---
@@ -1842,6 +1842,21 @@ first.
     - Workspace settings → History → Roll back removed it.
   - **Bug fixed along the way:** dismissing the rest used to change `.agentchainer/.gitignore` after the run was
     recorded, which stopped that run from rolling back cleanly. The entry is now written first.
+- [ ] **M8-07** Bug (owner report, 2026-11-04): a multi-folder workspace's chat resumes as a single-folder session in
+      its main folder.
+  - **Cause:** `resume()` (`App.tsx`) takes the folders from the session's open tab only
+    (`tabs.find(…)?.folders ?? []`). Two paths have no such tab:
+    - **Opening a stored session** from the sidebar or Home (`openStored`), e.g. after the app restarts. It resumes
+      with `folders: []`, so Claude sees only the primary folder, and the guard, the changes panel and the git panel
+      treat it as single-folder.
+    - **A fork** (`forkTab`): the copy has no tab yet, so it loses the folders even while the original's tab has them.
+  - **Fix:**
+    - Record each session's folders when it starts, keyed by session id, in the app's data, not the repository.
+    - Resume and fork use the record, and fall back to the named workspace whose primary folder is the session's
+      folder.
+    - The resumed tab shows the folder switcher as before.
+  - **Check:** a unit test for the lookup. In the app: start a chat in a two-folder workspace, quit, reopen, resume
+    it from the sidebar, and see Claude list both folders; then fork it.
 - **Not adopted from CAO:**
   - other providers' CLIs (PRD §7 non-goal);
   - tmux terminal backends (the app has its own terminal and sessions);

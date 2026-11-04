@@ -6,6 +6,7 @@ import {
   ClipboardList,
   History as HistoryIcon,
   ListChecks,
+  Puzzle,
   RefreshCw,
   Rocket,
   Save,
@@ -27,6 +28,7 @@ import { Metrics } from "./Metrics.tsx";
 import { gapsOf, Overview } from "./Overview.tsx";
 import { Permissions } from "./Permissions.tsx";
 import { PlanView } from "./PlanView.tsx";
+import { Plugins } from "./Plugins.tsx";
 import { useBootstrap } from "./useBootstrap.tsx";
 import { Workflows } from "./Workflows.tsx";
 
@@ -36,6 +38,7 @@ export type SetupView =
   | "plan"
   | "commands"
   | "agents"
+  | "plugins"
   | "permissions"
   | "workflows"
   | "deploy"
@@ -44,7 +47,7 @@ export type SetupView =
 
 /**
  * Workspace settings as a full page (UX-06), laid out like an IDE's project settings: what the workspace is made of at
- * the top, sections on the left (readiness, the setup plan, detected commands, agents, saved permission rules,
+ * the top, sections on the left (readiness, the setup plan, detected commands, agents, plugins, saved permission rules,
  * the tiers' workflows, deploys, task metrics, past runs), and the section's content on the right. Opens over the session or Home; Back returns there.
  */
 export function SetupPage({
@@ -73,6 +76,8 @@ export function SetupPage({
   const [scan, setScan] = useState<Scan | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState<string | null>(null);
+  // Known once the Plugins section has listed them: listing asks the CLI to refresh its marketplaces (ADR-0010).
+  const [pluginUpdates, setPluginUpdates] = useState(0);
 
   const rescan = useCallback(async () => {
     try {
@@ -108,6 +113,7 @@ export function SetupPage({
     },
     { id: "commands", label: "Commands", icon: <Terminal size={16} className="nav-icon" /> },
     { id: "agents", label: "Agents", icon: <Bot size={16} className="nav-icon" /> },
+    { id: "plugins", label: "Plugins", icon: <Puzzle size={16} className="nav-icon" />, count: pluginUpdates || null },
     { id: "permissions", label: "Permissions", icon: <ShieldCheck size={16} className="nav-icon" /> },
     { id: "workflows", label: "Workflows", icon: <Workflow size={16} className="nav-icon" /> },
     { id: "deploy", label: "Deploy", icon: <Rocket size={16} className="nav-icon" /> },
@@ -206,6 +212,9 @@ export function SetupPage({
           {view === "plan" && <PlanView bootstrap={bootstrap} focus={focus} onFocus={setFocus} />}
           {scan && view === "commands" && <Commands profile={scan.profile} />}
           {view === "agents" && <Agents cwd={cwd} confirm={confirm} onChanged={() => void bootstrap.load()} />}
+          {view === "plugins" && (
+            <Plugins cwd={cwd} confirm={confirm} onChanged={() => void bootstrap.load()} onUpdates={setPluginUpdates} />
+          )}
           {view === "permissions" && <Permissions cwd={cwd} confirm={confirm} />}
           {view === "workflows" && <Workflows cwd={cwd} confirm={confirm} />}
           {view === "deploy" && <Deploys cwd={cwd} />}

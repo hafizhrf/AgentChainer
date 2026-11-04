@@ -12,6 +12,11 @@ safely, and **why** it's worth it. The catalog lives in `catalog/` as data, so i
 
 ## 2. Trust tiers
 
+The catalog is what setup plans offer. Workspace settings → Plugins also lists every other plugin the user's CLI
+reports, marked "Not reviewed", and installs one only on an explicit request
+([ADR-0010](adr/0010-unreviewed-marketplace-plugins.md)). Those plugins aren't catalog items: none of the rules below
+apply to them, and they never reach a setup plan.
+
 | Tier | Who publishes | Review required | Auto-apply allowed |
 |---|---|---|---|
 | `first-party` | This repo (`skills/ac-*`, templates) | Normal PR review | Yes (opt-in) |
@@ -253,6 +258,24 @@ Sources: [cloudflare/security-audit-skill](https://github.com/cloudflare/securit
   `.agentchainer/.gitignore` keeps out of git, not in the committed lockfile. A run of local items only doesn't touch
   `lock.json`.
 
+- **Plugins installed from the Plugins page** (UX-10, [ADR-0010](adr/0010-unreviewed-marketplace-plugins.md)):
+  - an approved catalog plugin is recorded like a setup step;
+  - any other plugin is recorded with `"tier": "unreviewed"`, and with the source its marketplace listed at install
+    time, because the CLI can't pin plugin versions (S6). For example:
+
+    ```json
+    {
+      "id": "code-simplifier@claude-plugins-official",
+      "kind": "plugin",
+      "tier": "unreviewed",
+      "source": { "type": "listed", "marketplace": "claude-plugins-official", "plugin": "code-simplifier",
+                  "url": "https://github.com/anthropics/claude-plugins-official", "path": "plugins/code-simplifier" },
+      "scope": "local",
+      "installedAt": "2026-11-04T09:26:35Z",
+      "version": "1.0.0"
+    }
+    ```
+
 ## 8. Updates and rollback
 
 - **Upstream changes:** `.github/workflows/catalog-updates.yml` runs weekly (and on demand). It runs
@@ -274,8 +297,9 @@ Sources: [cloudflare/security-audit-skill](https://github.com/cloudflare/securit
   `CATALOG_BOT_TOKEN` secret. With the default token, CI doesn't start on the PR by itself.
 - **App releases** ship a catalog snapshot, and v0.1 never fetches catalog updates
   ([ADR-0007](adr/0007-catalog-distribution.md), M2-05).
-- **Installed items:** the app shows "update available" with the changelog. Updates are applied like any other action:
-  preview, apply, verify, record.
+- **Installed plugins:** Workspace settings → Plugins compares each installed plugin's version with the one its
+  marketplace lists, and offers **Update to X** (UX-10). Nothing updates by itself. A reviewed plugin moving past its
+  reviewed version says so. Other installed items have no update notice yet.
 - **Rollback:** per item or per bootstrap run. It uses `uninstall` steps and backups, and is verified by comparing hashes
   of touched files.
   - Scope is **project files** plus the CLI entries we added (plugins, MCP servers).

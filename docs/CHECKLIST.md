@@ -21,7 +21,7 @@
 | [M0](#m0--foundations--spikes) | — | Foundations & spikes | ◐ Exit criteria met. Owner items left: M0-01, M0-05, M0-07, M0-13, M0-14, M0-22 |
 | [M1](#m1--agent-session-core-v01-a) | v0.1 | Agent session core | ◐ Built. E1–E5 pass on macOS and Windows, and in the app on Windows; left: Ubuntu, E6 by hand, the click-through on macOS and Ubuntu |
 | [M2](#m2--workspace-bootstrap-v01-b) | v0.1 | Workspace bootstrap | ◐ Built. E1, E3, E4 pass; E2 (real repositories) deferred by the owner |
-| [UX](#ux--product-design--ui-polish-before-r1) | v0.1 | Product design & UI polish (after M1/M2 work functionally) | ◐ Design system, shell, chat room (UX-12), tasks as chats (UX-13), live flows (UX-14), icon (UX-16) and canvas (UX-17) in; title bar (UX-15) built, not yet ticked; left: research, click-throughs, usability tests |
+| [UX](#ux--product-design--ui-polish-before-r1) | v0.1 | Product design & UI polish (after M1/M2 work functionally) | ◐ Design system, shell, chat room (UX-12), tasks as chats (UX-13), live flows (UX-14), icon (UX-16) and canvas (UX-17) in; title bar (UX-15) and Plugins page (UX-10) built, not yet ticked; left: research, click-throughs, usability tests |
 | [R1](#r1--v01-release) | v0.1 | Packaging & release | ◐ Pipeline, updater, security review and docs in place; publishing waits for M0-01 and M0-22 |
 | [M3](#m3--adaptive-planner--task-contracts-v02) | v0.2 | Adaptive planner, contracts, evidence | ◐ Every tier (S, M, L, XL) runs live on macOS and Windows, with gates, evidence and accepted risk (preview); E2 passes; left: the owner's click-through and E1 (benchmark labels) |
 | [M4](#m4--agent-observability-v02v03) | v0.2–0.3 | Agent observability graph | ◐ Agent tree, graph, drawer, stop, timeline, replay, background tasks and agent library in; E2 frame times pass on Windows and, after the canvas fix, on an Intel Mac; Ubuntu not run |
@@ -1039,6 +1039,27 @@ for the desktop shell, start screen and session view to be cleaned up (UX-02, UX
   - It lists the reviewed catalog **and the whole official marketplace**; unreviewed plugins are clearly marked.
     That changes ADR-0005's trust model, so a new ADR comes first.
   - Plugins keep installing through the Claude CLI, from their original marketplace.
+  - Progress (2026-11-04), built as Workspace settings → Plugins
+    ([ADR-0010](adr/0010-unreviewed-marketplace-plugins.md)):
+    - **The listing:** the user's CLI lists 3,920 plugins (`claude-plugins-official` and the built-in
+      `anthropic-plugin-directory`).
+      - The catalog's 8 approved plugins are marked Reviewed; everything else is Not reviewed.
+      - Search, a Reviewed-only filter, 100 rows at a time.
+    - **The detail pane:**
+      - publisher, versions (installed, listed, reviewed), marketplace, a source link at the pinned commit, installs;
+      - license, permissions and risk for reviewed plugins;
+      - for installed ones, the CLI's inventory, flagging hooks and MCP servers as running code.
+    - **Changes:**
+      - Install… with the scope (local by default when unreviewed) and the not-reviewed notice. A command the
+        marketplace declares is confirmed by a person first.
+      - Update, turn off/on, Uninstall.
+      - Installs are History runs, with lockfile entries.
+    - **Live check** with CLI 2.1.293 in a scratch repo, through the sidecar's JSON-RPC:
+      - the listing;
+      - an unreviewed plugin installed locally, its details, off and on, uninstalled;
+      - a reviewed plugin installed at project scope and rolled back from History;
+      - the settings files and `installed_plugins.json` clean afterwards.
+    - Open: the owner's click-through in light and dark.
 - [ ] **UX-11** Task pages pass. Owner feedback, 2026-10-30, with screenshots: "still messy".
   - Found:
     - content sat left-aligned with empty space on the right;

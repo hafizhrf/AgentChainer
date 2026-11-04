@@ -52,6 +52,8 @@ set up.
 |---|---|---|
 | First start, and after an update that changes the SDK version | `registry.npmjs.org` | Downloads the pinned Agent SDK and checks its integrity hash. |
 | Every session | Through your Claude CLI | Claude itself. See the provider note above. |
+| When you open Workspace settings → Plugins, or click its Refresh | Through your Claude CLI: GitHub for `claude-plugins-official`, and Anthropic's plugin directory **(verify)** | `claude plugin list --available` refreshes the CLI's marketplace listings. The app reads only its output, once per app session unless you click Refresh. |
+| When you install or update a plugin on the Plugins page | Through your Claude CLI: the plugin's own repository | The CLI fetches the plugin from its marketplace. Nothing happens without your click. |
 | When you apply a setup that installs something | `github.com`, `codeload.github.com`, and `registry.npmjs.org` for MCP servers | Downloads exactly the pinned versions, checked against their hashes ([ADR-0005](adr/0005-catalog-trust-model.md)). The CLI fetches plugins from their marketplace repositories. |
 | When you click **Create PR…** on a task (M5) | Your repository's `origin` (through your git credentials) and the GitHub API (through your own `gh` login) | `gh` checks your sign-in for the remote's host when the dialog opens. **Push and create PR** pushes the task's branch and opens the pull request you previewed. |
 | While a task's page with a pull request is open (M5) | The GitHub API, through your `gh` | Reads the PR's checks, every 30 s and then less often, until they finish. **Fix CI…** reads the failing job's log (cut and redacted) and, when you click **Fix this**, pushes the fix to the task's branch. |

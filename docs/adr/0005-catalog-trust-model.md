@@ -1,6 +1,7 @@
 # ADR-0005: Catalog trust model — pinned, hashed, previewed, reversible
 
-- **Status:** Accepted
+- **Status:** Accepted; amended by [ADR-0010](0010-unreviewed-marketplace-plugins.md) (the Plugins page lists
+  and installs unreviewed marketplace plugins on request)
 - **Date:** 2026-10-28
 - **Deciders:** project owner
 - **Related:** [CATALOG.md](../CATALOG.md), [RISKS R-08](../RISKS.md), checklist M2-01…M2-18

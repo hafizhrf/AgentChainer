@@ -4455,6 +4455,592 @@
         "additionalProperties": false
       }
     },
+    "plugins.list": {
+      "params": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "cwd": {
+            "type": "string",
+            "minLength": 1
+          },
+          "refresh": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "cwd"
+        ],
+        "additionalProperties": false
+      },
+      "result": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "available": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "marketplace": {
+                  "type": "string"
+                },
+                "description": {
+                  "type": "string"
+                },
+                "version": {
+                  "type": "string"
+                },
+                "installCount": {
+                  "type": "number"
+                },
+                "source": {
+                  "type": "object",
+                  "properties": {
+                    "url": {
+                      "type": "string"
+                    },
+                    "path": {
+                      "type": "string"
+                    },
+                    "sha": {
+                      "type": "string"
+                    }
+                  },
+                  "additionalProperties": false
+                },
+                "official": {
+                  "type": "boolean"
+                },
+                "review": {
+                  "type": "object",
+                  "properties": {
+                    "itemId": {
+                      "type": "string"
+                    },
+                    "approved": {
+                      "type": "boolean"
+                    },
+                    "tier": {
+                      "type": "string",
+                      "enum": [
+                        "first-party",
+                        "official",
+                        "verified-vendor",
+                        "community"
+                      ]
+                    },
+                    "reviews": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "by": {
+                            "type": "string"
+                          },
+                          "date": {
+                            "type": "string"
+                          },
+                          "notes": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "by",
+                          "date"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "reviewedVersion": {
+                      "type": "string"
+                    },
+                    "license": {
+                      "type": "string"
+                    },
+                    "risk": {
+                      "type": "string",
+                      "enum": [
+                        "low",
+                        "medium",
+                        "high"
+                      ]
+                    },
+                    "permissions": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "summary": {
+                      "type": "string"
+                    },
+                    "homepage": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "itemId",
+                    "approved",
+                    "tier",
+                    "reviews",
+                    "license",
+                    "risk",
+                    "permissions",
+                    "summary"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "required": [
+                "id",
+                "name",
+                "marketplace",
+                "source",
+                "official"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "installed": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "version": {
+                  "type": "string"
+                },
+                "scope": {
+                  "type": "string",
+                  "enum": [
+                    "user",
+                    "project",
+                    "local",
+                    "managed"
+                  ]
+                },
+                "enabled": {
+                  "type": "boolean"
+                },
+                "installedAt": {
+                  "type": "string"
+                },
+                "here": {
+                  "type": "boolean"
+                },
+                "update": {
+                  "type": "object",
+                  "properties": {
+                    "to": {
+                      "type": "string"
+                    },
+                    "reviewed": {
+                      "type": [
+                        "boolean",
+                        "null"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "to",
+                    "reviewed"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "required": [
+                "id",
+                "scope",
+                "enabled",
+                "here"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "marketplaces": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "repo": {
+                  "type": "string"
+                },
+                "official": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "name",
+                "official"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "fetchedAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "available",
+          "installed",
+          "marketplaces",
+          "fetchedAt"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "plugins.details": {
+      "params": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "cwd": {
+            "type": "string",
+            "minLength": 1
+          },
+          "id": {
+            "type": "string",
+            "pattern": "^[\\w.-]+@[\\w.-]+$"
+          }
+        },
+        "required": [
+          "cwd",
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "result": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "text": {
+            "type": "string"
+          },
+          "inventory": {
+            "type": "object",
+            "properties": {
+              "skills": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "agents": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "hooks": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "mcpServers": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "lspServers": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            },
+            "required": [
+              "skills",
+              "agents",
+              "hooks",
+              "mcpServers",
+              "lspServers"
+            ],
+            "additionalProperties": false
+          },
+          "alwaysOnTokens": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "text"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "plugins.install": {
+      "params": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "cwd": {
+            "type": "string",
+            "minLength": 1
+          },
+          "id": {
+            "type": "string",
+            "pattern": "^[\\w.-]+@[\\w.-]+$"
+          },
+          "scope": {
+            "type": "string",
+            "enum": [
+              "project",
+              "local"
+            ]
+          },
+          "acceptCommand": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          }
+        },
+        "required": [
+          "cwd",
+          "id",
+          "scope"
+        ],
+        "additionalProperties": false
+      },
+      "result": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "oneOf": [
+          {
+            "type": "object",
+            "properties": {
+              "status": {
+                "type": "string",
+                "const": "done"
+              },
+              "version": {
+                "type": "string"
+              },
+              "warnings": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "runId": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "status",
+              "warnings"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "status": {
+                "type": "string",
+                "const": "confirm"
+              },
+              "command": {
+                "type": "string"
+              },
+              "sha256": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "status",
+              "command",
+              "sha256"
+            ],
+            "additionalProperties": false
+          }
+        ]
+      }
+    },
+    "plugins.update": {
+      "params": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "cwd": {
+            "type": "string",
+            "minLength": 1
+          },
+          "id": {
+            "type": "string",
+            "pattern": "^[\\w.-]+@[\\w.-]+$"
+          },
+          "scope": {
+            "type": "string",
+            "enum": [
+              "project",
+              "local"
+            ]
+          },
+          "acceptCommand": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          }
+        },
+        "required": [
+          "cwd",
+          "id",
+          "scope"
+        ],
+        "additionalProperties": false
+      },
+      "result": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "oneOf": [
+          {
+            "type": "object",
+            "properties": {
+              "status": {
+                "type": "string",
+                "const": "done"
+              },
+              "version": {
+                "type": "string"
+              },
+              "warnings": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "runId": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "status",
+              "warnings"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "status": {
+                "type": "string",
+                "const": "confirm"
+              },
+              "command": {
+                "type": "string"
+              },
+              "sha256": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "status",
+              "command",
+              "sha256"
+            ],
+            "additionalProperties": false
+          }
+        ]
+      }
+    },
+    "plugins.uninstall": {
+      "params": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "cwd": {
+            "type": "string",
+            "minLength": 1
+          },
+          "id": {
+            "type": "string",
+            "pattern": "^[\\w.-]+@[\\w.-]+$"
+          },
+          "scope": {
+            "type": "string",
+            "enum": [
+              "project",
+              "local"
+            ]
+          }
+        },
+        "required": [
+          "cwd",
+          "id",
+          "scope"
+        ],
+        "additionalProperties": false
+      },
+      "result": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "const": true
+          }
+        },
+        "required": [
+          "ok"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "plugins.setEnabled": {
+      "params": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "cwd": {
+            "type": "string",
+            "minLength": 1
+          },
+          "id": {
+            "type": "string",
+            "pattern": "^[\\w.-]+@[\\w.-]+$"
+          },
+          "scope": {
+            "type": "string",
+            "enum": [
+              "project",
+              "local"
+            ]
+          },
+          "enabled": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "cwd",
+          "id",
+          "scope",
+          "enabled"
+        ],
+        "additionalProperties": false
+      },
+      "result": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "const": true
+          }
+        },
+        "required": [
+          "ok"
+        ],
+        "additionalProperties": false
+      }
+    },
     "git.branches": {
       "params": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",

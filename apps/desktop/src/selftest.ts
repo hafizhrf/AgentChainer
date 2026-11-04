@@ -25,6 +25,7 @@ const OPEN_VIEWS = [
   "setup",
   "plan",
   "permissions",
+  "plugins",
   "fresh",
 ] as const;
 

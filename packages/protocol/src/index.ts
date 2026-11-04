@@ -466,6 +466,75 @@ export const BootstrapRunSchema = z.object({
 });
 export type BootstrapRun = z.infer<typeof BootstrapRunSchema>;
 
+/**
+ * A plugin a marketplace lists, from the user's own CLI (`claude plugin list --available --json`), for the Plugins page
+ * (UX-10, ADR-0010). `review` is set when the AgentChainer catalog has the plugin; `approved` says whether it has its
+ * tier's reviews. Everything else is listed as not reviewed.
+ */
+export const MarketPluginSchema = z.object({
+  /** `plugin@marketplace`. */
+  id: z.string(),
+  name: z.string(),
+  marketplace: z.string(),
+  description: z.string().optional(),
+  version: z.string().optional(),
+  installCount: z.number().optional(),
+  /** Where the marketplace says the plugin comes from: a repository URL, a folder in it, and the commit it pins. */
+  source: z.object({ url: z.string().optional(), path: z.string().optional(), sha: z.string().optional() }),
+  /** Listed by one of Anthropic's marketplaces, not one the user added. */
+  official: z.boolean(),
+  review: z
+    .object({
+      itemId: z.string(),
+      approved: z.boolean(),
+      tier: z.enum(["first-party", "official", "verified-vendor", "community"]),
+      reviews: z.array(z.object({ by: z.string(), date: z.string(), notes: z.string().optional() })),
+      reviewedVersion: z.string().optional(),
+      license: z.string(),
+      risk: z.enum(["low", "medium", "high"]),
+      permissions: z.array(z.string()),
+      summary: z.string(),
+      homepage: z.string().optional(),
+    })
+    .optional(),
+});
+export type MarketPlugin = z.infer<typeof MarketPluginSchema>;
+
+export const PluginScopeSchema = z.enum(["user", "project", "local", "managed"]);
+
+/** An installed plugin, from `claude plugin list --json`. */
+export const InstalledPluginSchema = z.object({
+  id: z.string(),
+  version: z.string().optional(),
+  scope: PluginScopeSchema,
+  enabled: z.boolean(),
+  installedAt: z.string().optional(),
+  /** Installed for this workspace (project or local scope), not for all of the user's projects. */
+  here: z.boolean(),
+  /** A newer listed version. `reviewed` says whether the catalog reviewed that version (null: not in the catalog). */
+  update: z.object({ to: z.string(), reviewed: z.boolean().nullable() }).optional(),
+});
+export type InstalledPlugin = z.infer<typeof InstalledPluginSchema>;
+
+/** An install or update: done, or waiting for a person to confirm a command the marketplace declares. */
+export const PluginChangeSchema = z.discriminatedUnion("status", [
+  z.object({
+    status: z.literal("done"),
+    version: z.string().optional(),
+    warnings: z.array(z.string()),
+    /** The History run an install was recorded in; Roll back uninstalls it. */
+    runId: z.string().optional(),
+  }),
+  z.object({
+    status: z.literal("confirm"),
+    /** The command, as the CLI showed it. */
+    command: z.string(),
+    /** Pass it back as `acceptCommand` once the person agreed. */
+    sha256: z.string(),
+  }),
+]);
+export type PluginChange = z.infer<typeof PluginChangeSchema>;
+
 /** What `bootstrap.apply` did, per action. */
 export const ApplyResultSchema = z.object({
   runId: z.string(),
@@ -1637,6 +1706,74 @@ export const methodSchemas = {
         }),
       ),
     }),
+  },
+
+  /* The Plugins page (UX-10, ADR-0010): every call goes through the user's own CLI. */
+  /** Installed and listed plugins. The listing is kept for the app session; `refresh` asks the CLI again. */
+  "plugins.list": {
+    params: WorkspaceRef.extend({ refresh: z.boolean().optional() }),
+    result: z.object({
+      available: z.array(MarketPluginSchema),
+      installed: z.array(InstalledPluginSchema),
+      marketplaces: z.array(z.object({ name: z.string(), repo: z.string().optional(), official: z.boolean() })),
+      fetchedAt: z.string(),
+    }),
+  },
+  /**
+   * What an installed plugin brings: the CLI's own text, and the counts read from it when its format is known. Plugins
+   * that aren't installed have no details yet.
+   */
+  "plugins.details": {
+    params: WorkspaceRef.extend({ id: z.string().regex(/^[\w.-]+@[\w.-]+$/) }),
+    result: z.object({
+      text: z.string(),
+      inventory: z
+        .object({
+          skills: z.array(z.string()),
+          agents: z.array(z.string()),
+          hooks: z.array(z.string()),
+          mcpServers: z.array(z.string()),
+          lspServers: z.array(z.string()),
+        })
+        .optional(),
+      alwaysOnTokens: z.number().optional(),
+    }),
+  },
+  /** Installs a plugin for this workspace, recorded as a History run like a setup step. */
+  "plugins.install": {
+    params: WorkspaceRef.extend({
+      id: z.string().regex(/^[\w.-]+@[\w.-]+$/),
+      scope: z.enum(["project", "local"]),
+      acceptCommand: z
+        .string()
+        .regex(/^[0-9a-f]{64}$/)
+        .optional(),
+    }),
+    result: PluginChangeSchema,
+  },
+  "plugins.update": {
+    params: WorkspaceRef.extend({
+      id: z.string().regex(/^[\w.-]+@[\w.-]+$/),
+      scope: z.enum(["project", "local"]),
+      acceptCommand: z
+        .string()
+        .regex(/^[0-9a-f]{64}$/)
+        .optional(),
+    }),
+    result: PluginChangeSchema,
+  },
+  "plugins.uninstall": {
+    params: WorkspaceRef.extend({ id: z.string().regex(/^[\w.-]+@[\w.-]+$/), scope: z.enum(["project", "local"]) }),
+    result: Ok,
+  },
+  /** Turns an installed plugin off or on for this workspace, without uninstalling it. */
+  "plugins.setEnabled": {
+    params: WorkspaceRef.extend({
+      id: z.string().regex(/^[\w.-]+@[\w.-]+$/),
+      scope: z.enum(["project", "local"]),
+      enabled: z.boolean(),
+    }),
+    result: Ok,
   },
 
   /* Git panel (M1-30). Never force-pushes. */

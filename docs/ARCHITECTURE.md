@@ -154,6 +154,8 @@ Planned surface (v0.1):
 | request | `workspace.saveProfile` | Write the profile to `.agentchainer/profile.json` |
 | request | `bootstrap.plan` | Fixes + catalog items + generators for the workspace, each with a preview (read-only; M2-11) |
 | request | `bootstrap.apply` / `bootstrap.runs` / `bootstrap.rollback` | Apply selected actions after re-planning; list runs; roll back a run or one action, byte for byte (M2-13…M2-17). `install` lists actions whose install command the user allowed to run before verification (M2-23) |
+| request | `plugins.list` / `plugins.details` | The Plugins page (UX-10, ADR-0010): every plugin the user's CLI lists, with the catalog's reviews, and the installed ones with update notices; kept per app session unless `refresh`. Details are an installed plugin's inventory, from the CLI's text |
+| request | `plugins.install` / `plugins.update` / `plugins.uninstall` / `plugins.setEnabled` | Per-workspace plugin changes through the CLI (`project` or `local` scope). An install is a History run; install and update return `confirm` with the command when the marketplace declares one, and run again with `acceptCommand` |
 | request | `bootstrap.autoApply` | Opt-in, before a new session: applies only recommended first-party and official items and the fixes that add lines; `runId` null when nothing applies (M2-18) |
 | request | `bootstrap.generate` | A read-only Claude session proposes files for a generator action; nothing is written (M2-19…M2-26) |
 | notification | `agent.event` | `{sessionId, event}`: a normalized `AgentEvent` (see §5.2) |

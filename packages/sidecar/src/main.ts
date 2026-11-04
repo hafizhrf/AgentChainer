@@ -46,11 +46,13 @@ import {
   installPlugin,
   listMarketplaces,
   listPlugins,
+  pluginCli,
   removeMcpServer,
   uninstallPlugin,
 } from "./installer.ts";
 import { normalize } from "./normalize.ts";
 import { listRules, removeRule } from "./permissions.ts";
+import { cliError, installListed, listPluginsFor, parseDetails, uninstallListed, updateListed } from "./plugins.ts";
 import { CHAT_TOOLS, loadProfile, type ProfileOptions, profileOptions, profileSummaries } from "./profiles.ts";
 import { log, notify, RpcFailure, serve } from "./rpc.ts";
 import { type AgentSdkModule, loadSdk } from "./sdk-loader.ts";
@@ -170,6 +172,14 @@ function cliFor(cwd: string): Cli | null {
     listPlugins: () => listPlugins(claude, cwd),
     listMarketplaces: () => listMarketplaces(claude, cwd),
   };
+}
+
+/** The user's CLI for the Plugins page (UX-10); every call fails clearly when the CLI isn't found. */
+function pluginsCli(cwd: string) {
+  const claude = findClaude();
+  if (!claude)
+    throw new RpcFailure(RpcErrorCode.invalidParams, "Claude Code CLI not found, so plugins can't be listed.");
+  return pluginCli(claude, cwd);
 }
 
 function requireFolder(cwd: string): void {
@@ -652,6 +662,41 @@ serve(
           { ...(actionId ? { actionId } : {}), ...(force ? { force } : {}) },
         ),
       };
+    },
+
+    "plugins.list": ({ cwd, refresh }) => {
+      requireFolder(cwd);
+      return listPluginsFor(cwd, pluginsCli(cwd), catalog, refresh ?? false);
+    },
+
+    "plugins.details": async ({ cwd, id }) => {
+      requireFolder(cwd);
+      const res = await pluginsCli(cwd).details(id);
+      if (!res.ok) throw cliError("claude plugin details", res);
+      return parseDetails(res.stdout);
+    },
+
+    "plugins.install": ({ cwd, id, scope, acceptCommand }) => {
+      requireFolder(cwd);
+      return installListed(cwd, pluginsCli(cwd), catalog, id, scope, acceptCommand);
+    },
+
+    "plugins.update": ({ cwd, id, scope, acceptCommand }) => {
+      requireFolder(cwd);
+      return updateListed(cwd, pluginsCli(cwd), catalog, id, scope, acceptCommand);
+    },
+
+    "plugins.uninstall": async ({ cwd, id, scope }) => {
+      requireFolder(cwd);
+      await uninstallListed(cwd, pluginsCli(cwd), id, scope);
+      return { ok: true as const };
+    },
+
+    "plugins.setEnabled": async ({ cwd, id, scope, enabled }) => {
+      requireFolder(cwd);
+      const res = await pluginsCli(cwd).setEnabled(id, scope, enabled);
+      if (!res.ok) throw cliError(`claude plugin ${enabled ? "enable" : "disable"}`, res);
+      return { ok: true as const };
     },
 
     "bootstrap.plan": ({ cwd, profiles }) => {

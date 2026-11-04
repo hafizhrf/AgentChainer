@@ -49,7 +49,7 @@ export type ApplyContext = {
 };
 
 type FileRecord = { path: string; existed: boolean; backup?: string; afterSha256: string | null };
-type Undo =
+export type Undo =
   | { type: "plugin"; pluginId: string; scope: "project" | "user" | "local" }
   | { type: "mcp"; name: string; scope: "project" | "user" | "local" }
   | { type: "git-unstage-removal"; paths: string[] }
@@ -83,11 +83,24 @@ export type ActionResult = {
 };
 export type RollbackResult = { id: string; status: "rolled-back" | "conflict" | "failed" | "kept"; message?: string };
 
-type LockItem = {
+/**
+ * A plugin installed from the Plugins page that the catalog hasn't reviewed (ADR-0010): where its marketplace said it
+ * came from at install time. The CLI can't pin plugin versions (spike S6), so `version` records what was installed.
+ */
+export type ListedSource = {
+  type: "listed";
+  marketplace: string;
+  plugin: string;
+  url?: string;
+  path?: string;
+  sha?: string;
+};
+export type LockItem = {
   id: string;
   kind: string;
+  /** A catalog tier, or "unreviewed" for a listed plugin (ADR-0010). */
   tier: string;
-  source: Item["source"];
+  source: Item["source"] | ListedSource;
   scope: string;
   installedAt: string;
   version?: string;
@@ -337,38 +350,163 @@ export async function applyActions(
     }
   }
 
-  // Lockfile and .agentchainer/.gitignore, as part of the run so a full rollback restores them too.
-  const applied = run.actions.filter((a) => a.status === "applied");
-  if (applied.length) {
-    const lock = readLock(root, ctx.catalog.version);
-    const local = readLock(root, ctx.catalog.version, LOCAL);
-    let localChanged = false;
-    let lockChanged = existsSync(abs(root, LOCK));
-    lock.catalogVersion = ctx.catalog.version;
-    lock.generatedBy = GENERATED_BY;
-    for (const a of applied) {
-      const entry = a.lock;
-      if (!entry) continue;
-      if ("kind" in entry && entry.scope === "local") {
-        local.items = [...local.items.filter((i) => i.id !== entry.id), entry];
-        localChanged = true;
-      } else {
-        lockChanged = true;
-        if ("kind" in entry) lock.items = [...lock.items.filter((i) => i.id !== entry.id), entry];
-        else if ("generator" in entry) lock.generated = [...lock.generated.filter((g) => g.id !== entry.id), entry];
-        else lock.fixes = [...lock.fixes.filter((f) => f.id !== entry.id), entry];
-      }
-    }
-    // A run of local-only items leaves the committed lockfile alone.
-    if (lockChanged) tracker.write(run.meta, LOCK, lockText(lock));
-    if (localChanged) tracker.write(run.meta, LOCAL, lockText(local));
-    ignoreOwnFiles(root, tracker, run.meta);
-    writeFileSync(path.join(runDir, "run.json"), `${JSON.stringify(run, null, 2)}\n`);
-  } else {
+  if (run.actions.some((a) => a.status === "applied")) finishRun(root, runDir, tracker, run);
+  else {
     rmSync(runDir, { recursive: true, force: true });
     removeIfEmpty(root);
   }
   return { runId, results };
+}
+
+/**
+ * Records the applied actions' lockfile entries and .agentchainer/.gitignore as part of the run, so a full rollback
+ * restores them too, then writes run.json.
+ */
+function finishRun(root: string, runDir: string, tracker: Tracker, run: RunRecord): void {
+  const lock = readLock(root, run.catalogVersion);
+  const local = readLock(root, run.catalogVersion, LOCAL);
+  let localChanged = false;
+  let lockChanged = existsSync(abs(root, LOCK));
+  lock.catalogVersion = run.catalogVersion;
+  lock.generatedBy = GENERATED_BY;
+  for (const a of run.actions.filter((a) => a.status === "applied")) {
+    const entry = a.lock;
+    if (!entry) continue;
+    if ("kind" in entry && entry.scope === "local") {
+      local.items = [...local.items.filter((i) => i.id !== entry.id), entry];
+      localChanged = true;
+    } else {
+      lockChanged = true;
+      if ("kind" in entry) lock.items = [...lock.items.filter((i) => i.id !== entry.id), entry];
+      else if ("generator" in entry) lock.generated = [...lock.generated.filter((g) => g.id !== entry.id), entry];
+      else lock.fixes = [...lock.fixes.filter((f) => f.id !== entry.id), entry];
+    }
+  }
+  // A run of local-only items leaves the committed lockfile alone.
+  if (lockChanged) tracker.write(run.meta, LOCK, lockText(lock));
+  if (localChanged) tracker.write(run.meta, LOCAL, lockText(local));
+  ignoreOwnFiles(root, tracker, run.meta);
+  writeFileSync(path.join(runDir, "run.json"), `${JSON.stringify(run, null, 2)}\n`);
+}
+
+/** The settings file `claude plugin install` edits for a scope. */
+const settingsFor = (scope: "project" | "local") =>
+  scope === "local" ? ".claude/settings.local.json" : ".claude/settings.json";
+
+/**
+ * Records a plugin installed from the Plugins page (UX-10) as a one-action run, so History lists it and Roll back
+ * uninstalls it, like a setup step. `install` makes the change through the CLI; it returns null when nothing was
+ * installed (the CLI wants a command confirmed first), and then no run is left behind.
+ */
+export async function recordPluginInstall(
+  root: string,
+  action: { id: string; title: string; scope: "project" | "local" },
+  install: () => Promise<{ pluginId: string; lock: LockItem; warnings: string[] } | null>,
+  catalogVersion: string,
+  now = new Date(),
+): Promise<string | null> {
+  const runId = `${now.toISOString().replace(/[:.]/g, "-")}-${randomBytes(3).toString("hex")}`;
+  const runDir = abs(root, `${BACKUPS}/${runId}`);
+  mkdirSync(runDir, { recursive: true });
+  const tracker = new Tracker(root, runDir);
+  const rec: ActionRecord = {
+    id: action.id,
+    title: action.title,
+    status: "applied",
+    warnings: [],
+    files: [],
+    undo: [],
+  };
+  const run: RunRecord = { runId, startedAt: now.toISOString(), catalogVersion, actions: [rec], meta: [] };
+  const dropRun = () => {
+    rmSync(runDir, { recursive: true, force: true });
+    removeIfEmpty(root);
+  };
+  tracker.watch(rec.files, settingsFor(action.scope));
+  let done: Awaited<ReturnType<typeof install>>;
+  try {
+    done = await install();
+  } catch (err) {
+    dropRun();
+    throw err;
+  }
+  if (!done) {
+    dropRun();
+    return null;
+  }
+  tracker.settle(rec.files);
+  rec.undo.push({ type: "plugin", pluginId: done.pluginId, scope: action.scope });
+  rec.warnings = done.warnings;
+  rec.lock = done.lock;
+  finishRun(root, runDir, tracker, run);
+  return runId;
+}
+
+/** The plugin id a lockfile entry installed, if it's a plugin. */
+export function lockPluginId(entry: LockItem): string | null {
+  const src = entry.source;
+  return src.type === "marketplace" || src.type === "listed" ? `${src.plugin}@${src.marketplace}` : null;
+}
+
+/**
+ * After the Plugins page uninstalls a plugin: its lockfile entries go, and the runs that installed it at that scope
+ * show it as rolled back, so a later Roll back doesn't try to uninstall it again.
+ */
+export function forgetPlugin(root: string, pluginId: string, scope: string): void {
+  editPluginLocks(root, pluginId, () => null);
+  for (const run of listRuns(root)) {
+    let changed = false;
+    for (const a of run.actions) {
+      if (a.status !== "applied") continue;
+      if (a.undo.some((u) => u.type === "plugin" && u.pluginId === pluginId && u.scope === scope)) {
+        a.status = "rolled-back";
+        changed = true;
+      }
+    }
+    if (changed) writeFileSync(abs(root, `${BACKUPS}/${run.runId}/run.json`), `${JSON.stringify(run, null, 2)}\n`);
+  }
+}
+
+/**
+ * Before the Plugins page uninstalls a plugin: the latest run that installed it at that scope. When the files that
+ * install changed (its settings file) are still as it left them, the returned function puts them back as they were
+ * before it, once the CLI has uninstalled; otherwise null, and the CLI's own edit stays.
+ */
+export function pluginInstallFiles(root: string, pluginId: string, scope: string): (() => void) | null {
+  for (const run of listRuns(root)) {
+    for (const a of run.actions) {
+      if (a.status !== "applied") continue;
+      if (!a.undo.some((u) => u.type === "plugin" && u.pluginId === pluginId && u.scope === scope)) continue;
+      if (changedSince(root, a.files).length) return null;
+      const runDir = abs(root, `${BACKUPS}/${run.runId}`);
+      return () => {
+        restoreFiles(root, runDir, a.files, true);
+      };
+    }
+  }
+  return null;
+}
+
+/** After an update from the Plugins page: the lockfile records the version now installed. */
+export function setPluginVersion(root: string, pluginId: string, version: string): void {
+  editPluginLocks(root, pluginId, (entry) => ({ ...entry, version }));
+}
+
+/** Rewrites (or, with null, removes) the lockfile entries of a plugin, in lock.json and local.json. */
+function editPluginLocks(root: string, pluginId: string, edit: (entry: LockItem) => LockItem | null): void {
+  for (const rel of [LOCK, LOCAL]) {
+    const file = abs(root, rel);
+    if (!existsSync(file)) continue;
+    const lock = readLock(root, "", rel);
+    let changed = false;
+    lock.items = lock.items.flatMap((entry) => {
+      if (lockPluginId(entry) !== pluginId) return [entry];
+      changed = true;
+      const next = edit(entry);
+      return next ? [next] : [];
+    });
+    if (changed) writeFileSync(file, lockText(lock));
+  }
 }
 
 async function applyOne(

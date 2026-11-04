@@ -240,7 +240,10 @@ export function App() {
           setPanelTab("changes");
           setShowFirstChange(true);
         }
-        if ((cfg.open === "setup" || cfg.open === "plan" || cfg.open === "permissions") && first)
+        if (
+          (cfg.open === "setup" || cfg.open === "plan" || cfg.open === "permissions" || cfg.open === "plugins") &&
+          first
+        )
           setSetup({
             cwd: first.cwd,
             model: first.modelAlias,
@@ -1141,6 +1144,7 @@ export function App() {
         ["plan", "Setup plan"],
         ["commands", "Commands"],
         ["agents", "Agents"],
+        ["plugins", "Plugins"],
         ["permissions", "Permissions"],
         ["workflows", "Workflows"],
         ["deploy", "Deploy"],

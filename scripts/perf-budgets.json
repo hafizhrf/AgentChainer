@@ -1,0 +1,7 @@
+{
+  "$comment": "X-07 budgets, checked by scripts/perf-budgets.mjs on a debug build; docs/PERFORMANCE.md says how they were set. Stream latency (p95 of sidecar-to-UI deltas) is checked per release with scripts/selftest-latency.mjs against streamP95Ms.",
+  "default": { "startupMs": 6000, "idleMemoryMb": 600, "streamP95Ms": 50 },
+  "win32": { "startupMs": 6000, "idleMemoryMb": 600, "streamP95Ms": 50 },
+  "linux": { "startupMs": 6000, "idleMemoryMb": 850, "streamP95Ms": 50 },
+  "darwin": { "startupMs": 6000, "idleMemoryMb": 400, "streamP95Ms": 50 }
+}

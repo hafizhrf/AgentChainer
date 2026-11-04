@@ -222,7 +222,19 @@ export function App() {
       .then(async ([loaded, checked]) => {
         applySettings(loaded);
         const cfg = await readSelftestConfig();
-        if (!cfg || !checked.ready || selftestStarted) return;
+        if (!cfg || selftestStarted) return;
+        // Performance budgets (X-07): when Home is ready, how long that took, then idle for the memory sample. It
+        // needs no CLI or login, so it runs whether or not the readiness check passed (CI runners have no CLI).
+        if (cfg.bench === "startup") {
+          selftestStarted = true;
+          const uiReadyMs = Math.round(performance.now());
+          await request("debug.log", {
+            message: JSON.stringify({ selftest: { startup: { uiReadyMs, ready: checked.ready } } }),
+          });
+          setTimeout(() => void quitApp(), ((cfg.idleSeconds ?? 30) + 10) * 1000);
+          return;
+        }
+        if (!checked.ready) return;
         selftestStarted = true;
         if (cfg.bench) return setBench(cfg);
         setCwd(cfg.cwd);

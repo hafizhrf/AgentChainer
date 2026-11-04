@@ -1945,7 +1945,18 @@ first.
       - The first two runs hit GitHub's incident that day: an internal error creating the report job, then a
         GraphQL error in `gh issue create`. Each `gh` call in the report job now gets three tries.
 - [ ] **X-06** E2E with `tauri-driver` on Linux and Windows. macOS uses a manual checklist (verify WebDriver support).
-- [ ] **X-07** Performance budgets for startup time, idle memory and stream latency, tracked every release.
+- [x] **X-07** Performance budgets for startup time, idle memory and stream latency, tracked every release.
+      — evidence: [PERFORMANCE.md](PERFORMANCE.md).
+  - **Budgets** (`scripts/perf-budgets.json`): startup 6 s; idle memory 600 MB (850 MB on Linux, where WebKitGTK runs
+    partly in the app; 400 MB on macOS, where the WebView isn't counted); stream p95 50 ms.
+  - **Measuring:** `scripts/perf-budgets.mjs` measures startup and idle memory through a new `startup` self-test
+    bench, with no model call. `selftest-latency.mjs` now fails over the latency budget.
+  - **Tracking:**
+    - CI measures startup and idle memory on all three OSes on every run (not blocking) and keeps `perf-<OS>.json`;
+    - RELEASING.md checks all three before a release.
+  - **Windows 11 baseline** (debug build, 2026-11-05):
+    - startup 1.6–1.7 s warm, 3.7 s cold;
+    - idle memory 475–486 MB (WebView2 about 355, sidecar about 73, app about 42).
 
 ### Compatibility
 

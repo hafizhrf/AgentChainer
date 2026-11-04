@@ -8,6 +8,7 @@
 // macOS/Linux only (uses `ps`). The WebView's own processes are not children of the app on macOS, so their CPU is
 // not included.
 import { execFileSync, spawn } from "node:child_process";
+import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { createInterface } from "node:readline";
 import { parseArgs } from "node:util";
@@ -125,7 +126,13 @@ function summarize(code) {
     (report.resume?.historyUserMessages >= 1 &&
       report.resume.subtype === "success" &&
       /resumed/i.test(report.resume.reply ?? ""));
-  const ok = report.deltaLatencyMs?.count > 0 && report.subtype === "success" && resumed;
-  console.log(ok ? "OK: self-test completed" : "FAIL: no deltas measured or the turn failed");
+  // The stream latency budget (X-07, scripts/perf-budgets.json): p95 of the sidecar-to-UI deltas.
+  const budgets = JSON.parse(readFileSync(new URL("./perf-budgets.json", import.meta.url), "utf8"));
+  const maxP95 = (budgets[process.platform] ?? budgets.default).streamP95Ms;
+  const p95 = report.deltaLatencyMs?.p95;
+  const inBudget = typeof p95 === "number" && p95 <= maxP95;
+  console.log(`stream p95   ${inBudget ? "ok  " : "OVER"} ${p95} ms (budget ${maxP95} ms)`);
+  const ok = report.deltaLatencyMs?.count > 0 && report.subtype === "success" && resumed && inBudget;
+  console.log(ok ? "OK: self-test completed" : "FAIL: no deltas measured, the turn failed, or over the latency budget");
   process.exit(ok ? 0 : 1);
 }

@@ -488,7 +488,7 @@ agentchainer/
 | UI | `node:test` for pure logic (transcript reducer, tabs, diff, fuzzy) and for the RPC client over a fake transport (`rpc-client.test.ts`) replaying the sidecar's event snapshots of recorded fixtures; Vitest + Testing Library once DOM component tests are needed | No live model calls in CI |
 | Protocol | Generated-type compile checks + schema round-trip tests | Rust ⇄ TS stay in sync |
 | E2E | `tauri-driver` (WebDriver) on Linux and Windows | macOS WKWebView has no WebDriver **(verify)**; use a manual checklist there |
-| Contract drift | Weekly CI job against the latest SDK + CLI | Opens an issue on mismatch (X-05) |
+| Contract drift | Weekly CI job against the latest SDK + CLI (`.github/workflows/drift.yml`): the SDK through typecheck and the recorded-fixture tests, the CLI through the commands and flags in `cli-contract.ts` | Opens an issue on mismatch and closes it on the next pass (X-05) |
 | Live smoke | `spike-host` scenarios with the maintainer's own login: `basic`, `mode`, `interrupt`, `guard`, `auto`, `subagents`, `sessions`, `approvals`, `plan`, `fixtures`, `image`, and `exit` (M1 exit criteria E1–E5 on `fixtures/sample-app`) | Never in PR CI |
 
 ## 13. Observability of the app

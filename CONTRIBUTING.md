@@ -83,6 +83,14 @@ Troubleshooting:
   3. **Never commit a raw recording.**
 - Spike harnesses (`packages/sidecar/scripts/spike-*.ts`) make real model calls with **your own** Claude login. Use
   `--model haiku` and a scratch folder.
+- **The SDK and the CLI move fast.**
+  - The weekly **Drift** workflow tries the newest of both and opens an issue when something the app relies on
+    breaks (X-05).
+  - When you bump the SDK, run `node packages/sidecar/scripts/pin-sdk.ts` and update the pin in
+    [COMPATIBILITY.md](docs/COMPATIBILITY.md). The same goes for `MIN_CLAUDE_VERSION`. CI's
+    `scripts/check-compatibility.mjs` fails until they match.
+  - When the app starts running a new `claude` command or flag, add it to `packages/sidecar/src/cli-contract.ts`. Its
+    test fails when a call in `installer.ts` is missing from it.
 
 ## Code style
 

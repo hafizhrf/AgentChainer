@@ -60,7 +60,8 @@ Prerequisites:
 | Fast debug build, no installers | `pnpm --filter @agentchainer/desktop tauri build --debug --no-bundle` |
 | Build the sidecar single executable (Node SEA; needed before `cargo clippy/test`, done automatically by `pnpm dev/build`) | `pnpm --filter @agentchainer/sidecar build:sea [--force]` |
 | Packaged sidecar smoke: first-run SDK download + verify, then cache | `node scripts/sidecar-smoke.mjs` |
-| Re-pin the Agent SDK after bumping it (updates `sdk-pin.json` from the lockfile) | `node packages/sidecar/scripts/pin-sdk.ts` |
+| Re-pin the Agent SDK after bumping it (updates `sdk-pin.json` from the lockfile; then update the pin in `docs/COMPATIBILITY.md`) | `node packages/sidecar/scripts/pin-sdk.ts` |
+| Check a `claude` CLI still has every command and flag the app runs (X-05; no login, no model calls) / the compatibility page matches the code (X-08) | `node packages/sidecar/scripts/cli-contract.ts [--claude <path>]` / `node scripts/check-compatibility.mjs` |
 | Regenerate the protocol JSON Schema after changing `packages/protocol/src/index.ts` | `pnpm --filter @agentchainer/protocol export-schema` |
 | Typecheck all TS packages | `pnpm typecheck` |
 | Rust check / lint / format | `cargo check --workspace` · `cargo clippy --workspace` · `cargo fmt --all` |

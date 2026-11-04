@@ -1863,13 +1863,36 @@ first.
 ### Quality & performance
 
 - [ ] **X-05** Weekly CI job runs the latest Agent SDK and CLI against the recorded-fixture contract tests, and opens an issue on drift.
+      - Built (2026-11-04): `.github/workflows/drift.yml`, every Monday and on demand.
+        - **The `sdk` job** moves the sidecar to the newest SDK that pnpm accepts (the release-age rule stays on), then
+          runs `pnpm typecheck` and the sidecar tests, with the recorded-fixture contract tests.
+        - **The `cli` job** installs the newest CLI's binary package (no install scripts) and runs
+          `scripts/cli-contract.ts`. It checks:
+          - every command and flag in `src/cli-contract.ts` (12 commands), against `--help`;
+          - the minimum version;
+          - that `auth status --json` still parses.
+        - **The `report` job** opens one issue on a failure (or comments on it), and closes it on the next pass.
+      - Checked by hand the same day:
+        - SDK 0.3.317 (the pin is 0.3.311): typecheck and 486 sidecar tests pass;
+        - CLI 2.1.293 and 2.1.318: all 12 commands and their flags pass.
+      - Ticked after the first dispatched runs: one plain, one with `simulate: cli` to show the issue opening and then
+        closing.
 - [ ] **X-06** E2E with `tauri-driver` on Linux and Windows. macOS uses a manual checklist (verify WebDriver support).
 - [ ] **X-07** Performance budgets for startup time, idle memory and stream latency, tracked every release.
 
 ### Compatibility
 
 - [ ] **X-14** Test the packaged app behind an HTTP proxy (`NODE_USE_ENV_PROXY=1` is set; spike S1).
-- [ ] **X-08** Compatibility matrix in the docs (OS versions, CLI versions, SDK version). The health check enforces the minimum CLI version.
+- [x] **X-08** Compatibility matrix in the docs (OS versions, CLI versions, SDK version). The health check enforces the minimum CLI version.
+      — evidence: [COMPATIBILITY.md](COMPATIBILITY.md), covering:
+      - OS and WebView, with what was checked by hand and in CI;
+      - the CLI minimum and the versions used;
+      - the SDK pin, and the weekly checks of both;
+      - other tools, and building from source.
+
+      `scripts/check-compatibility.mjs`, in CI's Checks job, fails when the page's CLI minimum or SDK pin differs from
+      `MIN_CLAUDE_VERSION` or `sdk-pin.json`. Readiness enforces the minimum: an older CLI shows "Version older than
+      2.1.293" with `claude update`, and the app isn't ready.
 
 ### Docs & community
 

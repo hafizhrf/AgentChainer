@@ -12,7 +12,7 @@ The budgets live in [`scripts/perf-budgets.json`](../scripts/perf-budgets.json),
 | Measure | What it covers | Budget | How it's measured |
 |---|---|---|---|
 | **Startup** | From the process starting to Home being ready: the window, the UI, the sidecar's handshake, and the readiness check (CLI, login, git) | **6 s** | `scripts/perf-budgets.mjs`, debug build, no model call |
-| **Idle memory** | Resident memory of the app's whole process tree (the app, the sidecar, the WebView's processes) after 20 s idle on Home | **600 MB** on Windows and Linux; **400 MB** on macOS, where the WebView's processes aren't the app's children and aren't counted (verify) | `scripts/perf-budgets.mjs` |
+| **Idle memory** | Resident memory of the app's whole process tree (the app, the sidecar, the WebView's processes) after 20 s idle on Home | **600 MB** on Windows; **850 MB** on Linux, where WebKitGTK runs partly inside the app; **400 MB** on macOS, where the WebView's processes aren't the app's children and aren't counted (verify) | `scripts/perf-budgets.mjs` |
 | **Stream latency** | p95 of the time from the sidecar sending a text delta to the UI receiving it, over one real turn | **50 ms** | `scripts/selftest-latency.mjs`, one haiku turn (macOS and Linux; it reads CPU with `ps`) |
 
 ## How they were set
@@ -32,14 +32,17 @@ Each budget leaves room for slower machines and hosted CI runners:
 
 The first CI figures (PR #120, debug build, no Claude CLI on the runner, so readiness didn't pass):
 - **Windows** (`windows-latest`): startup 1.2 s; idle memory 419 MB (WebView2 298, sidecar 74, app 41).
-- **Ubuntu 22.04 under Xvfb:** startup **31 s** and idle memory **691 MB**, both over budget.
-  - The UI was ready 226 ms after its page started loading, so the 31 s went before the WebView loaded anything. A
-    likely cause is an environment timeout on the runner, such as GTK waiting for an accessibility bus that Xvfb
-    doesn't run (verify).
-  - The script now prints the app's log with timings when startup is over budget, to tell where it went.
+- **Ubuntu 22.04 under Xvfb:** startup **31–32 s** and idle memory **666–691 MB**.
+  - The startup was the runner's, not the app's. The app's log shows `AT-SPI: Error retrieving accessibility bus
+    address` at 85 ms, then nothing until the app's own first line at 30.8 s: GTK waited for an accessibility bus that
+    Xvfb doesn't run. A desktop has one.
+  - CI's Linux step now sets `NO_AT_BRIDGE=1`, which skips that wait.
+  - Memory splits as the app 173 MB (WebKitGTK runs partly in-process), the WebView 378 MB, and the sidecar 115 MB.
+    The Linux budget is 850 MB: about a quarter above that, as for Windows.
+  - The script prints the app's log with timings whenever startup is over budget.
 - **macOS:** not measured yet. The hosted macOS runners couldn't be acquired at the time.
 
-Adjust the Ubuntu and macOS budgets once a few runs are in, or fix what's slow.
+Adjust the macOS budget once a few runs are in, and the others when releases show a trend.
 
 ## Running them
 

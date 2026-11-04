@@ -1947,8 +1947,8 @@ first.
 - [ ] **X-06** E2E with `tauri-driver` on Linux and Windows. macOS uses a manual checklist (verify WebDriver support).
 - [x] **X-07** Performance budgets for startup time, idle memory and stream latency, tracked every release.
       — evidence: [PERFORMANCE.md](PERFORMANCE.md).
-  - **Budgets** (`scripts/perf-budgets.json`): startup 6 s; idle memory 600 MB (400 MB on macOS, where the WebView
-    isn't counted); stream p95 50 ms.
+  - **Budgets** (`scripts/perf-budgets.json`): startup 6 s; idle memory 600 MB (850 MB on Linux, where WebKitGTK runs
+    partly in the app; 400 MB on macOS, where the WebView isn't counted); stream p95 50 ms.
   - **Measuring:** `scripts/perf-budgets.mjs` measures startup and idle memory through a new `startup` self-test
     bench, with no model call. `selftest-latency.mjs` now fails over the latency budget.
   - **Tracking:**

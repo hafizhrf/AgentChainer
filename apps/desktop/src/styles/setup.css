@@ -1052,6 +1052,18 @@ button.chip:hover {
   align-items: flex-start;
 }
 
+.plugin-scope .check input {
+  flex-shrink: 0;
+  margin: 3px 0 0;
+}
+
+.plugin-command {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  margin: 0;
+}
+
 .plain-list {
   margin: 0;
   padding-left: var(--space-4);

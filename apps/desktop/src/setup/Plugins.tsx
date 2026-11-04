@@ -391,7 +391,12 @@ function PluginDetails({
   const link = p ? sourceLink(p.source) : null;
   const vendor = p ? vendorOf(p) : null;
   const inv = details?.inventory;
-  const runsCode = inv ? [...inv.hooks.map(() => "hook"), ...inv.mcpServers.map(() => "MCP server")] : [];
+  const runsCode = inv
+    ? [
+        inv.hooks.length ? plural(inv.hooks.length, "hook") : null,
+        inv.mcpServers.length ? plural(inv.mcpServers.length, "MCP server") : null,
+      ].filter(Boolean)
+    : [];
   return (
     <div className="action-details">
       <div className="action-head">
@@ -410,7 +415,7 @@ function PluginDetails({
             ? `In the AgentChainer catalog, but still waiting for its reviews (${r.reviews.length} so far).`
             : "Not reviewed by AgentChainer."}{" "}
           A plugin runs inside your Claude sessions in this workspace: its skills, hooks and MCP servers can run
-          commands with your permissions. Look at its source before you install it.
+          commands with your permissions.{i ? "" : " Look at its source before you install it."}
         </p>
       )}
       {i?.update && (
@@ -500,15 +505,15 @@ function PluginDetails({
             <p className="plugin-counts">
               {(
                 [
-                  ["skills", inv.skills],
-                  ["agents", inv.agents],
-                  ["hooks", inv.hooks],
-                  ["MCP servers", inv.mcpServers],
-                  ["LSP servers", inv.lspServers],
+                  ["skill", inv.skills],
+                  ["agent", inv.agents],
+                  ["hook", inv.hooks],
+                  ["MCP server", inv.mcpServers],
+                  ["LSP server", inv.lspServers],
                 ] as const
-              ).map(([label, names]) => (
-                <span key={label} className="chip" title={names.join(", ")}>
-                  {names.length} {label}
+              ).map(([noun, names]) => (
+                <span key={noun} className="chip" title={names.join(", ")}>
+                  {plural(names.length, noun)}
                 </span>
               ))}
               {details?.alwaysOnTokens !== undefined && (
@@ -516,7 +521,7 @@ function PluginDetails({
               )}
             </p>
           )}
-          {runsCode.length > 0 && <p className="callout">Runs code on your machine: {summarize(runsCode)}.</p>}
+          {runsCode.length > 0 && <p className="callout">Runs code on your machine: {runsCode.join(", ")}.</p>}
           {details && (
             <details>
               <summary className="muted">The CLI's details</summary>
@@ -524,7 +529,9 @@ function PluginDetails({
             </details>
           )}
           <p className="field-help">
-            Settings, if it has any, are set in a terminal so they never pass through AgentChainer:{" "}
+            Settings, if it has any, are set in a terminal, so they never pass through AgentChainer:
+          </p>
+          <p className="plugin-command">
             <code>claude plugin configure {id}</code> <CopyButton text={`claude plugin configure ${id}`} />
           </p>
         </section>
@@ -580,10 +587,7 @@ function WebLink({ href, children }: { href: string; children: ReactNode }) {
   );
 }
 
-const summarize = (kinds: string[]) =>
-  [...new Set(kinds)]
-    .map((k) => `${kinds.filter((x) => x === k).length} ${k}${kinds.filter((x) => x === k).length === 1 ? "" : "s"}`)
-    .join(", ");
+const plural = (n: number, noun: string) => `${n} ${noun}${n === 1 ? "" : "s"}`;
 
 function DeclaredCommand({ command }: { command: string }) {
   return (

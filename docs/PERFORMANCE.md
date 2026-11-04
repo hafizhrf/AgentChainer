@@ -31,12 +31,21 @@ Each budget leaves room for slower machines and hosted CI runners:
 - **Stream latency:** an order of magnitude above S2. Past it, delays start to be visible while text streams.
 
 The first CI figures (PR #120, debug build, no Claude CLI on the runner, so readiness didn't pass):
-- **Windows** (`windows-latest`): startup 1.2 s; idle memory 419 MB (WebView2 298, sidecar 74, app 41).
+- **Windows** (`windows-latest`): startup 1.2 s; idle memory 418–419 MB (WebView2 about 300, sidecar 72–74, app
+  38–41).
+- **macOS** (`macos-latest`, arm64): startup 2.1 s; idle memory 221 MB (app 106, sidecar 115). The WebView's
+  processes aren't counted, as said above.
 - **Ubuntu 22.04 under Xvfb:** startup **31–32 s** and idle memory **666–691 MB**.
-  - The startup was the runner's, not the app's. The app's log shows `AT-SPI: Error retrieving accessibility bus
-    address` at 85 ms, then nothing until the app's own first line at 30.8 s: GTK waited for an accessibility bus that
-    Xvfb doesn't run. A desktop has one.
-  - CI's Linux step now sets `NO_AT_BRIDGE=1`, which skips that wait.
+  - **The 30 s is before the app's own code.** The app's log shows nothing until its first line, `[core] AgentChainer
+    … starting`, at about 30.7 s. That line comes from `setup`, which runs once the window system, the WebView and the
+    plugins are up. The UI itself was ready 0.2–0.5 s after its page started loading.
+  - **It isn't the notification plugin (M8-05):** the launch smoke test's screenshot, taken at 15 s, is black both
+    before and after that plugin came in.
+  - **It isn't GTK's accessibility bus either.** The first run logged `AT-SPI: Error retrieving accessibility bus
+    address`. CI's Linux step now sets `NO_AT_BRIDGE=1`, which removed the warning but not the wait.
+  - **The cause is open:** it's in GTK, WebKitGTK or a plugin's start on the Xvfb runner. It needs checking on an
+    Ubuntu desktop, with the Ubuntu click-through (verify). Until then, Linux startup on CI doesn't count against the
+    budget.
   - Memory splits as the app 173 MB (WebKitGTK runs partly in-process), the WebView 378 MB, and the sidecar 115 MB.
     The Linux budget is 850 MB: about a quarter above that, as for Windows.
   - The script prints the app's log with timings whenever startup is over budget.

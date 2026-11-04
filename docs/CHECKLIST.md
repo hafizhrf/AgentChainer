@@ -1862,7 +1862,7 @@ first.
 
 ### Quality & performance
 
-- [ ] **X-05** Weekly CI job runs the latest Agent SDK and CLI against the recorded-fixture contract tests, and opens an issue on drift.
+- [x] **X-05** Weekly CI job runs the latest Agent SDK and CLI against the recorded-fixture contract tests, and opens an issue on drift.
       - Built (2026-11-04): `.github/workflows/drift.yml`, every Monday and on demand.
         - **The `sdk` job** moves the sidecar to the newest SDK that pnpm accepts (the release-age rule stays on), then
           runs `pnpm typecheck` and the sidecar tests, with the recorded-fixture contract tests.
@@ -1875,8 +1875,15 @@ first.
       - Checked by hand the same day:
         - SDK 0.3.317 (the pin is 0.3.311): typecheck and 486 sidecar tests pass;
         - CLI 2.1.293 and 2.1.318: all 12 commands and their flags pass.
-      - Ticked after the first dispatched runs: one plain, one with `simulate: cli` to show the issue opening and then
-        closing.
+      - Evidence, from dispatched runs on 2026-11-04 (#114, and the retries below):
+        - [41820133570](https://github.com/hafizhrf/AgentChainer/actions/runs/41820133570): no drift. SDK 0.3.317
+          and CLI 2.1.318 both pass.
+        - [41821297123](https://github.com/hafizhrf/AgentChainer/actions/runs/41821297123), with `simulate: cli`:
+          it opened [#115](https://github.com/hafizhrf/AgentChainer/issues/115).
+        - [41821511002](https://github.com/hafizhrf/AgentChainer/actions/runs/41821511002): it passed again,
+          commented on #115 and closed it.
+      - The first two runs hit GitHub's incident that day: an internal error creating the report job, then a
+        GraphQL error in `gh issue create`. Each `gh` call in the report job now gets three tries.
 - [ ] **X-06** E2E with `tauri-driver` on Linux and Windows. macOS uses a manual checklist (verify WebDriver support).
 - [ ] **X-07** Performance budgets for startup time, idle memory and stream latency, tracked every release.
 

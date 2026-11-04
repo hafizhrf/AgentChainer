@@ -150,7 +150,8 @@ jobs:
         run: node scripts/perf-budgets.mjs --binary ${{ matrix.binary }} --json perf-${{ matrix.name }}.json --warn-only
       - name: Performance budgets (tracked, Xvfb)
         if: runner.os == 'Linux'
-        # Xvfb runs no accessibility bus, and GTK waits about 30 s for one at startup; a desktop has one.
+        # Xvfb runs no accessibility bus, which GTK otherwise warns about. (Startup on this runner still takes ~30 s
+        # before the app's own code runs; docs/PERFORMANCE.md tracks it.)
         env:
           NO_AT_BRIDGE: "1"
         run: xvfb-run -a -s "-screen 0 1440x900x24" node scripts/perf-budgets.mjs --binary ${{ matrix.binary }} --json perf-${{ matrix.name }}.json --warn-only

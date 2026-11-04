@@ -99,13 +99,15 @@ jobs:
           CLI_VERSION: ${{ needs.cli.outputs.version }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
+          # GitHub's API has bad minutes too: each call gets three tries before the job fails.
+          retry() { for wait in 20 40 0; do "$@" && return 0; [ "$wait" = 0 ] || sleep "$wait"; done; return 1; }
           title="Drift: the latest Agent SDK or Claude Code CLI breaks a contract"
-          open=$(gh issue list --state open --search "\"$title\" in:title" --json number --jq '.[0].number // empty')
+          open=$(retry gh issue list --state open --search "\"$title\" in:title" --json number --jq '.[0].number // empty')
           versions="Agent SDK ${SDK_VERSION:-unknown} ($SDK_RESULT), Claude Code CLI ${CLI_VERSION:-unknown} ($CLI_RESULT)"
           if [ "$SDK_RESULT" = success ] && [ "$CLI_RESULT" = success ]; then
             if [ -n "$open" ]; then
-              gh issue comment "$open" --body "Passes again with $versions: $RUN_URL"
-              gh issue close "$open"
+              retry gh issue comment "$open" --body "Passes again with $versions: $RUN_URL"
+              retry gh issue close "$open"
             fi
             echo "No drift: $versions"
             exit 0
@@ -115,7 +117,7 @@ jobs:
             "Run: $RUN_URL" \
             "Reproduce: the \`sdk\` job bumps the SDK and runs \`pnpm typecheck\` and the sidecar tests; the \`cli\` job runs \`node packages/sidecar/scripts/cli-contract.ts\`. Fix the app or the contract, or hold the pin, then dispatch the Drift workflow again to close this.")
           if [ -n "$open" ]; then
-            gh issue comment "$open" --body "$body"
+            retry gh issue comment "$open" --body "$body"
           else
-            gh issue create --title "$title" --body "$body"
+            retry gh issue create --title "$title" --body "$body"
           fi

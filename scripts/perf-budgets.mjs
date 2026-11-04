@@ -50,16 +50,20 @@ function processes() {
       name: p.Name,
     }));
   }
-  const out = execFileSync("ps", ["-A", "-o", "pid=,ppid=,rss=,comm="], { encoding: "utf8" });
+  // `args`, not `comm`: Linux cuts `comm` to 15 characters ("agentchainer-si…"). The name is the program's file name.
+  const out = execFileSync("ps", ["-A", "-o", "pid=,ppid=,rss=,args="], {
+    encoding: "utf8",
+    maxBuffer: 64 * 1024 * 1024,
+  });
   return out
     .trim()
     .split("\n")
     .map((l) => l.trim().split(/\s+/))
-    .map(([pid, ppid, rss, ...name]) => ({
+    .map(([pid, ppid, rss, program = ""]) => ({
       pid: Number(pid),
       ppid: Number(ppid),
       bytes: Number(rss) * 1024,
-      name: name.join(" ").split("/").pop(),
+      name: program.split("/").pop(),
     }));
 }
 
@@ -106,8 +110,12 @@ const started = performance.now();
 const app = spawn(resolve(values.binary), [], { env, stdio: ["ignore", "ignore", "pipe"] });
 let startup = null;
 let reportedAt = 0;
+/** The app's log up to the report, each line with the time since launch: where a slow start went. */
+const log = [];
 
 createInterface({ input: app.stderr }).on("line", (line) => {
+  if (!startup && log.length < 200)
+    log.push(`${String(Math.round(performance.now() - started)).padStart(6)} ms  ${line}`);
   const at = line.indexOf("ui: ");
   if (at < 0 || startup) return;
   try {
@@ -122,6 +130,7 @@ const deadline = Date.now() + Number(values.timeout) * 1000;
 while (!startup && Date.now() < deadline && app.exitCode === null) await sleep(100);
 if (!startup) {
   console.error(`FAIL: no startup report within ${values.timeout} s (exit code ${app.exitCode})`);
+  console.error(log.join("\n"));
   app.kill();
   process.exit(1);
 }
@@ -152,6 +161,7 @@ for (const [name, value, max, unit] of checks) {
 }
 console.log(`idle memory by process: ${JSON.stringify(memory.parts)}`);
 if (memory.others.length) console.log(`other processes: ${memory.others.join(", ")}`);
+if (startupMs > b.startupMs) console.log(`the app's log until it was ready:\n${log.join("\n")}`);
 if (values.json) writeFileSync(values.json, `${JSON.stringify(result, null, 2)}\n`);
 const over = checks.filter(([, value, max]) => value > max);
 if (over.length && !values["warn-only"]) process.exit(1);

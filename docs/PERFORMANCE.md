@@ -30,7 +30,16 @@ Each budget leaves room for slower machines and hosted CI runners:
 - **Idle memory:** about a quarter above the measured total.
 - **Stream latency:** an order of magnitude above S2. Past it, delays start to be visible while text streams.
 
-Ubuntu's and macOS's first figures come from CI's artifacts (below). Adjust their budgets once a few runs are in.
+The first CI figures (PR #120, debug build, no Claude CLI on the runner, so readiness didn't pass):
+- **Windows** (`windows-latest`): startup 1.2 s; idle memory 419 MB (WebView2 298, sidecar 74, app 41).
+- **Ubuntu 22.04 under Xvfb:** startup **31 s** and idle memory **691 MB**, both over budget.
+  - The UI was ready 226 ms after its page started loading, so the 31 s went before the WebView loaded anything. A
+    likely cause is an environment timeout on the runner, such as GTK waiting for an accessibility bus that Xvfb
+    doesn't run (verify).
+  - The script now prints the app's log with timings when startup is over budget, to tell where it went.
+- **macOS:** not measured yet. The hosted macOS runners couldn't be acquired at the time.
+
+Adjust the Ubuntu and macOS budgets once a few runs are in, or fix what's slow.
 
 ## Running them
 

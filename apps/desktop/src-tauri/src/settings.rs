@@ -9,6 +9,8 @@ use tauri::{AppHandle, Manager};
 pub const MAX_RECENT_WORKSPACES: usize = 8;
 /// Named multi-folder workspaces kept (M8-01); far more than anyone keeps.
 pub const MAX_WORKSPACES: usize = 32;
+/// Multi-folder sessions whose folders are remembered (M8-07), most recent first.
+pub const MAX_SESSION_FOLDERS: usize = 200;
 
 /// A named set of folders (M8-01): sessions run in `primary` and also reach `folders`. Absolute paths on this computer,
 /// so it lives here rather than in a repository.
@@ -18,6 +20,15 @@ pub struct WorkspaceDef {
     pub id: String,
     pub name: String,
     pub primary: String,
+    pub folders: Vec<String>,
+}
+
+/// The other folders a multi-folder session reached (M8-07), so resuming or forking it reaches them again. Its session
+/// id from the SDK, and absolute paths on this computer.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", default)]
+pub struct SessionFolders {
+    pub session_id: String,
     pub folders: Vec<String>,
 }
 
@@ -48,6 +59,8 @@ pub struct Settings {
     pub recent_workspaces: Vec<String>,
     /// Named multi-folder workspaces (M8-01), as the New workspace dialog saved them.
     pub workspaces: Vec<WorkspaceDef>,
+    /// Multi-folder sessions' other folders (M8-07), most recent first.
+    pub session_folders: Vec<SessionFolders>,
 }
 
 impl Settings {
@@ -102,6 +115,28 @@ impl Settings {
             })
             .collect();
         self.workspaces.truncate(MAX_WORKSPACES);
+        let mut sessions: Vec<String> = Vec::new();
+        self.session_folders = std::mem::take(&mut self.session_folders)
+            .into_iter()
+            .filter_map(|s| {
+                let session_id = s.session_id.trim().to_string();
+                let folders: Vec<String> = s
+                    .folders
+                    .into_iter()
+                    .map(|f| f.trim().to_string())
+                    .filter(|f| !f.is_empty())
+                    .collect();
+                if session_id.is_empty() || folders.is_empty() || sessions.contains(&session_id) {
+                    return None;
+                }
+                sessions.push(session_id.clone());
+                Some(SessionFolders {
+                    session_id,
+                    folders,
+                })
+            })
+            .collect();
+        self.session_folders.truncate(MAX_SESSION_FOLDERS);
         self
     }
 }
@@ -182,6 +217,7 @@ mod tests {
                 .chain([" ".into()])
                 .collect(),
             workspaces: Vec::new(),
+            session_folders: Vec::new(),
         }
         .normalized();
         assert_eq!(s.claude_path, None);
@@ -276,5 +312,37 @@ mod tests {
         std::fs::write(&file, "").expect("temp file");
         assert_eq!(claude_path_problem(&file.to_string_lossy()), None);
         let _ = std::fs::remove_file(&file);
+    }
+
+    #[test]
+    fn keeps_each_sessions_folders_once_newest_first_and_drops_empty_ones() {
+        let entry = |id: &str, folders: &[&str]| SessionFolders {
+            session_id: id.into(),
+            folders: folders.iter().map(|f| f.to_string()).collect(),
+        };
+        let s = Settings {
+            session_folders: vec![
+                entry(" a ", &[" /api ", ""]),
+                entry("a", &["/old"]),
+                entry("b", &[" "]),
+                entry("", &["/x"]),
+            ]
+            .into_iter()
+            .chain((0..MAX_SESSION_FOLDERS + 5).map(|i| entry(&format!("s{i}"), &["/f"])))
+            .collect(),
+            ..Settings::default()
+        }
+        .normalized();
+        assert_eq!(
+            s.session_folders[0],
+            entry("a", &["/api"]),
+            "the newest entry wins"
+        );
+        assert!(
+            !s.session_folders
+                .iter()
+                .any(|e| e.session_id == "b" || e.session_id.is_empty())
+        );
+        assert_eq!(s.session_folders.len(), MAX_SESSION_FOLDERS);
     }
 }

@@ -38,7 +38,15 @@ import { SettingsDialog } from "./SettingsDialog.tsx";
 import { FLEET, Sidebar } from "./Sidebar.tsx";
 import { notify as notifyOs, scheduledRunEnded } from "./schedules.ts";
 import { quitApp, readSelftestConfig, runSelftest, type SelftestConfig } from "./selftest.ts";
-import { loadSettings, type Settings, saveSettings, type WorkspaceDef, withRecent } from "./settings.ts";
+import {
+  foldersFor,
+  loadSettings,
+  type Settings,
+  saveSettings,
+  type WorkspaceDef,
+  withRecent,
+  withSessionFolders,
+} from "./settings.ts";
 import type { SetupView } from "./setup/SetupPage.tsx";
 import { connect, isRpcError, onExit, onReady, request, requestWithTimeout, subscribe } from "./sidecar.ts";
 import { TitleBar } from "./TitleBar.tsx";
@@ -482,8 +490,11 @@ export function App() {
     return path;
   }
 
-  async function rememberWorkspace(dir: string) {
-    if (settings) setSettings(await saveSettings(withRecent(settings, dir)));
+  /** Moves `dir` to the front of the recent list; with a session, also remembers its other folders (M8-07). */
+  async function rememberWorkspace(dir: string, session?: { id: string; folders: string[] }) {
+    if (!settings) return;
+    const recent = withRecent(settings, dir);
+    setSettings(await saveSettings(session ? withSessionFolders(recent, session.id, session.folders) : recent));
   }
 
   /** Effort and budget for a new or resumed session, from settings (M1-15/M1-32). */
@@ -575,7 +586,8 @@ export function App() {
       ]);
       setActive(sessionId);
       setRuntimeNotice(null);
-      await rememberWorkspace(dir);
+      // A multi-folder chat's folders are remembered, so resuming it later reaches them again (M8-07).
+      await rememberWorkspace(dir, { id: sessionId, folders });
       return sessionId;
     } catch (err) {
       setRuntimeNotice(String(err));
@@ -584,13 +596,15 @@ export function App() {
   }
 
   /** Resumes a stored session into a tab: replaces its ended tab, or opens a new one (M1-22). */
-  async function resume(sessionId: string, dir: string, title: string, modelAlias = model) {
+  async function resume(sessionId: string, dir: string, title: string, modelAlias = model, known?: string[]) {
     const mode = asMode(settings?.defaultMode);
     try {
       const { effort, budgetUsd, showThinking } = sessionOptions(mode);
       const { events, times } = await request("session.history", { cwd: dir, sessionId });
-      // A chat of a multi-folder workspace resumes across the same folders (M8-01).
-      const folders = tabs.find((t) => t.sessionId === sessionId)?.folders ?? [];
+      // A chat of a multi-folder workspace resumes across the same folders (M8-01): its tab's, or else the ones recorded
+      // when it ran, or its named workspace's (M8-07), e.g. opened from the sidebar after a restart, or a fork.
+      const folders =
+        known ?? tabs.find((t) => t.sessionId === sessionId)?.folders ?? foldersFor(settings, sessionId, dir);
       // …and as the same agent profile (M8-04), when its tab still knows it.
       const asProfile = tabs.find((t) => t.sessionId === sessionId)?.profile;
       await request("session.start", {
@@ -624,7 +638,7 @@ export function App() {
       });
       setTabs((ts) => (ts.some((t) => t.sessionId === sessionId) ? updateTab(ts, sessionId, () => tab) : [...ts, tab]));
       setActive(sessionId);
-      await rememberWorkspace(dir);
+      await rememberWorkspace(dir, { id: sessionId, folders });
     } catch (err) {
       setRuntimeNotice(String(err));
     }
@@ -935,7 +949,8 @@ export function App() {
     if (!tab) return;
     try {
       const forked = await request("session.fork", { cwd: tab.cwd, sessionId });
-      await resume(forked.sessionId, tab.cwd, `${tab.title} (fork)`, tab.modelAlias);
+      // The fork has no tab yet: it takes the original's folders (M8-07).
+      await resume(forked.sessionId, tab.cwd, `${tab.title} (fork)`, tab.modelAlias, tab.folders ?? []);
     } catch (err) {
       addNotice(sessionId, `Couldn't fork: ${err}`);
     }

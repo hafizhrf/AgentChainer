@@ -1,3 +1,4 @@
+import { folderKey } from "@agentchainer/protocol";
 import { invoke } from "@tauri-apps/api/core";
 
 /** Mirrors `settings.rs` (M1-07). No secrets: auth stays in the user's own Claude CLI (ADR-0002). */
@@ -22,6 +23,8 @@ export type Settings = {
   recentWorkspaces: string[];
   /** Named multi-folder workspaces (M8-01), as the New workspace dialog saved them. */
   workspaces: WorkspaceDef[];
+  /** Multi-folder sessions' other folders (M8-07), most recent first. */
+  sessionFolders: { sessionId: string; folders: string[] }[];
 };
 
 /** A named set of folders (M8-01): sessions run in `primary` and also reach `folders`. Mirrors `settings.rs`. */
@@ -35,4 +38,24 @@ export const saveSettings = (settings: Settings) => invoke<Settings>("settings_s
 /** Moves `dir` to the front of the recent workspaces. */
 export function withRecent(settings: Settings, dir: string): Settings {
   return { ...settings, recentWorkspaces: [dir, ...settings.recentWorkspaces.filter((d) => d !== dir)] };
+}
+
+/**
+ * Remembers a session's other folders (M8-07), most recent first, so resuming or forking it reaches them again. A
+ * single-folder session has no entry.
+ */
+export function withSessionFolders(settings: Settings, sessionId: string, folders: string[]): Settings {
+  const rest = (settings.sessionFolders ?? []).filter((s) => s.sessionId !== sessionId);
+  return { ...settings, sessionFolders: folders.length ? [{ sessionId, folders }, ...rest] : rest };
+}
+
+/**
+ * The folders a stored session reaches besides `cwd` (M8-07): what was recorded when it ran, or else the named
+ * workspace whose primary folder it ran in; none for a single-folder session.
+ */
+export function foldersFor(settings: Settings | null, sessionId: string, cwd: string): string[] {
+  const recorded = settings?.sessionFolders?.find((s) => s.sessionId === sessionId);
+  if (recorded) return recorded.folders;
+  const named = settings?.workspaces.find((w) => folderKey(w.primary) === folderKey(cwd));
+  return named?.folders ?? [];
 }

@@ -21,14 +21,14 @@
 | [M0](#m0--foundations--spikes) | — | Foundations & spikes | ◐ Exit criteria met. Owner items left: M0-01, M0-05, M0-07, M0-13, M0-14, M0-22 |
 | [M1](#m1--agent-session-core-v01-a) | v0.1 | Agent session core | ◐ Built. E1–E5 pass on macOS and Windows, and in the app on Windows; left: Ubuntu, E6 by hand, the click-through on macOS and Ubuntu |
 | [M2](#m2--workspace-bootstrap-v01-b) | v0.1 | Workspace bootstrap | ◐ Built. E1, E3, E4 pass; E2 (real repositories) deferred by the owner |
-| [UX](#ux--product-design--ui-polish-before-r1) | v0.1 | Product design & UI polish (after M1/M2 work functionally) | ◐ Design system done; desktop shell, panels and setup page in place |
+| [UX](#ux--product-design--ui-polish-before-r1) | v0.1 | Product design & UI polish (after M1/M2 work functionally) | ◐ Design system, shell, chat room (UX-12), tasks as chats (UX-13), live flows (UX-14), icon (UX-16) and canvas (UX-17) in; title bar (UX-15) built, not yet ticked; left: research, click-throughs, usability tests |
 | [R1](#r1--v01-release) | v0.1 | Packaging & release | ◐ Pipeline, updater, security review and docs in place; publishing waits for M0-01 and M0-22 |
 | [M3](#m3--adaptive-planner--task-contracts-v02) | v0.2 | Adaptive planner, contracts, evidence | ◐ Every tier (S, M, L, XL) runs live on macOS and Windows, with gates, evidence and accepted risk (preview); left: the owner's click-through and the exit runs |
 | [M4](#m4--agent-observability-v02v03) | v0.2–0.3 | Agent observability graph | ◐ Agent tree, graph, drawer, stop, timeline, replay, background tasks and agent library in; E2 frame times left |
 | [M5](#m5--git-workflow-pr--quality-gates-v03) | v0.3 | Git workflow, PRs, gates | ◐ Done for GitHub ([git-workflow.md](design/git-workflow.md)): worktrees, PRs, CI and Fix CI, merge gates, human merge; E1 passed on Windows. GitLab (M5-06, optional) left |
-| [M6](#m6--deployment--workflow-canvas-v04) | v0.4 | Deploy adapters, workflow canvas | ◐ Design approved ([deploy-and-canvas.md](design/deploy-and-canvas.md)); Vercel preview + smoke built; Cloudflare next |
-| [M7](#m7--evals--analytics-v05) | v0.5 | Evals & analytics | ☐ Not started |
-| [M8](#m8--multi-folder-workspaces--agent-fleet-proposed) | later | Multi-folder workspaces, agent fleet | ☐ Proposed (owner, 2026-10-30) |
+| [M6](#m6--deployment--workflow-canvas-v04) | v0.4 | Deploy adapters, workflow canvas | ◐ Built ([deploy-and-canvas.md](design/deploy-and-canvas.md)): Vercel, Cloudflare Workers, Firebase, Fly.io and Docker adapters, production with typed confirmation and rollback, the workflow canvas; left: live deploys with the owner's logins (E1), canvas Import/Export by hand |
+| [M7](#m7--evals--analytics-v05) | v0.5 | Evals & analytics | ◐ Metrics, the eval benchmark and the CI report check in ([evals.md](design/evals.md)); OpenTelemetry deferred; E1 ticks with the first PR that changes a workflow |
+| [M8](#m8--multi-folder-workspaces--agent-fleet-proposed) | later | Multi-folder workspaces, agent fleet | ✓ All six built: multi-folder workspaces, the fleet view, supervisor and worker sessions, agent profiles, scheduled runs, lessons |
 | [X](#cross-cutting-tracks-ongoing) | all | Security, quality, compatibility, docs, a11y | ☐ Ongoing |
 
 ---

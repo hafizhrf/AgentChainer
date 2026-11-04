@@ -1842,7 +1842,7 @@ first.
     - Workspace settings → History → Roll back removed it.
   - **Bug fixed along the way:** dismissing the rest used to change `.agentchainer/.gitignore` after the run was
     recorded, which stopped that run from rolling back cleanly. The entry is now written first.
-- [ ] **M8-07** Bug (owner report, 2026-11-04): a multi-folder workspace's chat resumes as a single-folder session in
+- [x] **M8-07** Bug (owner report, 2026-11-04): a multi-folder workspace's chat resumes as a single-folder session in
       its main folder.
   - **Cause:** `resume()` (`App.tsx`) takes the folders from the session's open tab only
     (`tabs.find(…)?.folders ?? []`). Two paths have no such tab:
@@ -1857,6 +1857,20 @@ first.
     - The resumed tab shows the folder switcher as before.
   - **Check:** a unit test for the lookup. In the app: start a chat in a two-folder workspace, quit, reopen, resume
     it from the sidebar, and see Claude list both folders; then fork it.
+  Note: done.
+  - **Storage:** `settings.json` keeps `sessionFolders` (`settings.rs`): each multi-folder session's other folders,
+    newest first, at most 200, normalized like the workspaces.
+  - **Recording:** `startSession` records them, and so does every resume.
+  - **Lookup:** `resume` takes the tab's folders, else the record, else the named workspace whose primary folder it
+    is (`foldersFor`). A fork passes the original's folders.
+  - **Tests:** `settings.test.ts` (3) and a Rust normalization test.
+  - **Checked in the app over CDP (Windows), on haiku:**
+    - a chat in a two-folder scratch workspace listed both folders;
+    - after quitting and reopening the app, resuming it from Home's previous sessions showed "+1 folder" and read
+      `ROUTES.txt` in the second folder;
+    - its fork showed "+1 folder" and the folder switcher.
+
+    The settings were restored afterwards.
 - **Not adopted from CAO:**
   - other providers' CLIs (PRD §7 non-goal);
   - tmux terminal backends (the app has its own terminal and sessions);

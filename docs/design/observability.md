@@ -94,8 +94,12 @@ sessions, background work, and a manager for the project's agent definitions.
   - Above 200 nodes, completed subtrees fold first.
 - **Edges:** a spawn from parent to child. Hand-offs, such as a result returned to the parent, show as the child's
   completion on the edge, not as extra edges.
-- **Performance (E2):** 60 fps with 200 nodes on the slowest supported WebView (WebKitGTK on Ubuntu). This uses
-  memoized custom nodes, `onlyRenderVisibleElements`, and status updates that patch node data without a re-layout.
+- **Performance (E2):** 60 fps with 200 nodes on the slowest supported WebView (WebKitGTK on Ubuntu). This uses:
+  - memoized custom nodes, `onlyRenderVisibleElements`, and status updates that patch node data without a re-layout;
+  - a CSS dot grid that the compositor moves and scales (`DotGrid.tsx`), not React Flow's `<Background>`, an SVG
+    pattern that WebKit repaints on every frame;
+  - below zoom 0.4, nodes drawn as plain boxes, without their text.
+
   A synthetic 200-node scene is measured in the app.
 
 ## 5. Node drawer (M4-03)
@@ -265,8 +269,10 @@ What shipped:
 - **E2:** the synthetic 200-node scene (`graph/benchScene.ts`), with frame times measured in the app on each OS.
   - Run it with `scripts/graph-bench.mjs`. This is the self-test's `bench: "graph"` mode: no model calls and no
     workspace.
-  - It drives React Flow's viewport on every frame and records the animation frames.
-  - It passes at ≥ 55 fps with ≤ 5% dropped frames.
+  - It drives React Flow's viewport on every frame and records the animation frames: fitted to the window, then
+    close up at zoom 1.
+  - It passes at ≥ 55 fps with ≤ 5% dropped frames in all four phases. A first second with nothing moving must hold
+    55 fps too, or the window was covered and the run doesn't count.
 
 ## 15. Delivery
 

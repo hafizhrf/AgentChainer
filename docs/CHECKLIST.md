@@ -23,8 +23,8 @@
 | [M2](#m2--workspace-bootstrap-v01-b) | v0.1 | Workspace bootstrap | ◐ Built. E1, E3, E4 pass; E2 (real repositories) deferred by the owner |
 | [UX](#ux--product-design--ui-polish-before-r1) | v0.1 | Product design & UI polish (after M1/M2 work functionally) | ◐ Design system, shell, chat room (UX-12), tasks as chats (UX-13), live flows (UX-14), icon (UX-16) and canvas (UX-17) in; title bar (UX-15) built, not yet ticked; left: research, click-throughs, usability tests |
 | [R1](#r1--v01-release) | v0.1 | Packaging & release | ◐ Pipeline, updater, security review and docs in place; publishing waits for M0-01 and M0-22 |
-| [M3](#m3--adaptive-planner--task-contracts-v02) | v0.2 | Adaptive planner, contracts, evidence | ◐ Every tier (S, M, L, XL) runs live on macOS and Windows, with gates, evidence and accepted risk (preview); left: the owner's click-through and the exit runs |
-| [M4](#m4--agent-observability-v02v03) | v0.2–0.3 | Agent observability graph | ◐ Agent tree, graph, drawer, stop, timeline, replay, background tasks and agent library in; E2 frame times left |
+| [M3](#m3--adaptive-planner--task-contracts-v02) | v0.2 | Adaptive planner, contracts, evidence | ◐ Every tier (S, M, L, XL) runs live on macOS and Windows, with gates, evidence and accepted risk (preview); E2 passes; left: the owner's click-through and E1 (benchmark labels) |
+| [M4](#m4--agent-observability-v02v03) | v0.2–0.3 | Agent observability graph | ◐ Agent tree, graph, drawer, stop, timeline, replay, background tasks and agent library in; E2 frame times pass on Windows and, after the canvas fix, on an Intel Mac; Ubuntu not run |
 | [M5](#m5--git-workflow-pr--quality-gates-v03) | v0.3 | Git workflow, PRs, gates | ◐ Done for GitHub ([git-workflow.md](design/git-workflow.md)): worktrees, PRs, CI and Fix CI, merge gates, human merge; E1 passed on Windows. GitLab (M5-06, optional) left |
 | [M6](#m6--deployment--workflow-canvas-v04) | v0.4 | Deploy adapters, workflow canvas | ◐ Built ([deploy-and-canvas.md](design/deploy-and-canvas.md)): Vercel, Cloudflare Workers, Firebase, Fly.io and Docker adapters, production with typed confirmation and rollback, the workflow canvas; left: live deploys with the owner's logins (E1), canvas Import/Export by hand |
 | [M7](#m7--evals--analytics-v05) | v0.5 | Evals & analytics | ◐ Metrics, the eval benchmark and the CI report check in ([evals.md](design/evals.md)); OpenTelemetry deferred; E1 ticks with the first PR that changes a workflow |
@@ -1372,9 +1372,19 @@ Decisions: [ADR-0009](adr/0009-release-signing-and-updates.md). Maintainer steps
       - First baseline (2026-10-30), against the author's suggested tiers, not yet human labels: 20/24 (83%), about
         $0.02.
       - Remaining: the owner labels the tasks (`label`), then the real baseline and tuning.
-- [ ] **M3-E2** Every completed task has an evidence report whose gate results match the actual command outputs.
+- [x] **M3-E2** Every completed task has an evidence report whose gate results match the actual command outputs.
       - `live-task.ts` re-runs the last round's commands by hand and compares the report's gate runs with the
-        recorded ones; a unit test checks the same (`evidence.test.ts`). Remaining: the run over benchmark tasks.
+        recorded ones; a unit test checks the same (`evidence.test.ts`).
+      - The eval benchmark checks every run it makes (`src/evals/run-case.ts`): the report's gate runs must be the
+        recorded ones, and the last round's commands, run again by hand before the hidden files go in, must give the
+        recorded exit codes. Its report has an "Evidence (M3-E2)" section.
+      - Run (2026-11-04, macOS, `benchmark.ts -n 2`, the app's workflows on haiku, ≈$0.27): 14 tasks over the 7-case
+        suite.
+        - 14/14 reports held exactly their run's recorded gate runs.
+        - 26/26 last-round gate commands gave the recorded exit code again.
+        - This includes the 4 Go runs that ended Failed because `make lint` needs golangci-lint, which this computer
+          doesn't have. Their reports recorded that failure, and the re-run failed the same way.
+      - Evidence: the PR that adds the check, with the run's report in its body.
 
 ---
 
@@ -1443,12 +1453,34 @@ Decisions: [ADR-0009](adr/0009-release-signing-and-updates.md). Maintainer steps
       session reopened with the same agents, nesting and times (step-4 PR).
 - [ ] **M4-E2** Pan and zoom hold 60 fps with 200 nodes on the slowest supported WebView.
       How to run, after a debug build: `node scripts/graph-bench.mjs`. It pans, then zooms, a synthetic 200-node
-      session graph for 4 s each, with no model calls.
+      session graph for 4 s each, with no model calls: fitted to the window, then close up at zoom 1. A second with
+      nothing moving comes first; when even that is below 55 fps, the window was covered and the run doesn't count.
       - Windows (2026-11-01): passed. WebView2 (Edge 156), 144 Hz display, 1280×780:
         - pan: 143 fps, p95 7.1 ms, 0.3% dropped;
         - zoom: 144 fps, p95 7.2 ms, 0% dropped.
-      - Still to run, by the owner: macOS (WKWebView) and Ubuntu (WebKitGTK, likely the slowest). The box is ticked
-        once both pass, and M4-02 with it.
+        - That ran before the canvas fix below, which only takes paint work away; the next Windows run checks it
+          again, with the close-up phases.
+      - macOS (2026-11-04): passed after a fix.
+        - Hardware: an Intel MacBook Pro 16" (2019) with UHD 630 and Radeon Pro 5300M, the built-in Retina display at
+          60 Hz, a 1280×800 window @2x.
+        - Build: a debug build (`tauri build --debug`; the UI is Vite's production bundle).
+        - Conditions: Low Power Mode off, on AC. The app's window was the frontmost on screen for the whole run
+          (sampled every 1.5 s, other apps hidden), so WebKit wasn't throttling a hidden window.
+        - Before: pan 22–23 fps (p50 43 ms), zoom 34–41 fps.
+        - Cause, from runs with parts of the graph left out (idle frames ran at 60 fps throughout):
+          - React Flow's `<Background>` is an SVG pattern the size of the canvas, repainted on every frame. Without
+            it, pan rose to 45 fps;
+          - the nodes' text and icons at zoom 0.1, where it can't be read;
+          - script was about 1 ms a frame, and the edges cost nothing measurable.
+        - Fix:
+          - a CSS dot grid (`graph/DotGrid.tsx`) that the compositor moves and scales, repainted only when the zoom
+            crosses a quarter octave, and not drawn when its dots would be under half a pixel;
+          - below zoom 0.4, nodes are drawn as plain boxes.
+        - After, two runs:
+          - fitted (zoom 0.1): pan 59.8 and 59.9 fps, zoom 59.9 and 59.9 fps, p95 18 ms, ≤ 0.4% dropped;
+          - close up (zoom 1): pan 59.7 and 59.7 fps, zoom 59.9 and 59.1 fps, p95 18 ms, ≤ 1.7% dropped.
+      - Still to run: Ubuntu (WebKitGTK, likely the slowest). The box is ticked once macOS and Ubuntu pass, and M4-02
+        with it.
 
 ---
 

@@ -1,6 +1,5 @@
 import "@xyflow/react/dist/base.css";
 import {
-  Background,
   Controls,
   type Edge,
   Handle,
@@ -9,11 +8,13 @@ import {
   Position,
   ReactFlow,
   type ReactFlowInstance,
+  useStore,
 } from "@xyflow/react";
 import { Bot, Loader2, Sparkles, Wrench } from "lucide-react";
 import { type KeyboardEvent, memo, useEffect, useMemo, useRef, useState } from "react";
 import type { Item } from "../transcript.ts";
 import { agentGraph, type GraphNode, MAIN_ID, moveFocus, structureKey } from "./agentGraph.ts";
+import { DotGrid } from "./DotGrid.tsx";
 import { layoutGraph, NODE_SIZE } from "./layout.ts";
 import { StatusIcon } from "./StatusIcon.tsx";
 import { useNow } from "./useNow.ts";
@@ -53,6 +54,7 @@ export default function SessionGraph({
   const now = useNow(running, 2000);
   const [expanded, setExpanded] = useState<ReadonlySet<string>>(new Set());
   const [focused, setFocused] = useState<string | null>(null);
+  const [far, setFar] = useState(false);
   const flow = useRef<ReactFlowInstance<FlowNode> | null>(null);
 
   const graph = useMemo(
@@ -127,6 +129,7 @@ export default function SessionGraph({
       onKeyDown={onKeyDown}
     >
       <ReactFlow<FlowNode>
+        className={far ? "far" : undefined}
         nodes={nodes}
         edges={edges}
         nodeTypes={NODE_TYPES}
@@ -148,12 +151,23 @@ export default function SessionGraph({
         onlyRenderVisibleElements
         proOptions={{ hideAttribution: true }}
       >
-        <Background gap={20} size={1} />
+        <DotGrid />
+        <ZoomedOut below={FAR_ZOOM} onChange={setFar} />
         <Controls showInteractive={false} />
       </ReactFlow>
       {!hasAgents && <p className="graph-empty muted">No subagents in this session yet.</p>}
     </div>
   );
+}
+
+/** Below this zoom a node's text is too small to read, so nodes are drawn as plain boxes (M4-E2). */
+const FAR_ZOOM = 0.4;
+
+/** Tells whether the graph is zoomed out below `below`; it has to sit inside React Flow to read the zoom. */
+function ZoomedOut({ below, onChange }: { below: number; onChange: (far: boolean) => void }) {
+  const far = useStore((s) => s.transform[2] < below);
+  useEffect(() => onChange(far), [far, onChange]);
+  return null;
 }
 
 const Handles = () => (

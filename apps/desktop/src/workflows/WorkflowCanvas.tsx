@@ -1,6 +1,5 @@
 import "@xyflow/react/dist/base.css";
 import {
-  Background,
   BaseEdge,
   Controls,
   type Edge,
@@ -16,6 +15,7 @@ import {
 } from "@xyflow/react";
 import { CircleCheck, CircleDashed, CircleMinus, CircleX, LoaderCircle } from "lucide-react";
 import { memo, useEffect, useMemo, useRef } from "react";
+import { DotGrid } from "../graph/DotGrid.tsx";
 import type { NodeState, NodeStatus } from "./flowStatus.ts";
 import type { WorkflowEdge, WorkflowNode } from "./workflowGraph.ts";
 
@@ -279,7 +279,7 @@ export function WorkflowCanvas({
         elementsSelectable={false}
         proOptions={{ hideAttribution: true }}
       >
-        <Background gap={20} size={1} />
+        <DotGrid />
         <Controls showInteractive={false} />
       </ReactFlow>
       {!nodes.length && <p className="graph-empty muted">Nothing to draw: the YAML isn't a workflow yet.</p>}

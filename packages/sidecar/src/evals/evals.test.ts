@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
-import { existsSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { after, describe, it } from "node:test";
@@ -21,7 +21,7 @@ import {
   summarize,
   wilson,
 } from "./report.ts";
-import { type CaseRun, runCase } from "./run-case.ts";
+import { type CaseRun, reportMatchesRun, runCase } from "./run-case.ts";
 import { type EvalCase, parseVariant, readSuite, type Variant } from "./suite.ts";
 
 after(() => removeFixtureCopies());
@@ -36,7 +36,12 @@ const close = (a: number, b: number) => Math.abs(a - b) < 1e-4;
  * A stand-in for the sidecar: the run "ends" Done after `work` changes the workspace, the way an agent would. Every
  * request is recorded.
  */
-function fakeClient(work: (cwd: string) => void, cost = 0.05) {
+function fakeClient(
+  work: (cwd: string) => void,
+  cost = 0.05,
+  opts: { run?: Partial<NonNullable<Task["run"]>>; report?: (run: NonNullable<Task["run"]>) => unknown } = {},
+) {
+  const run = { gates: [], baseline: [], fixRounds: 1, ...opts.run } as unknown as NonNullable<Task["run"]>;
   const calls: { method: string; params: Record<string, unknown> }[] = [];
   const listeners = new Set<(t: Task) => void>();
   const task = (cwd: string, over: Partial<Task>) => ({ id: "t-1", costUsd: cost, cwd, ...over }) as unknown as Task;
@@ -65,9 +70,17 @@ function fakeClient(work: (cwd: string) => void, cost = 0.05) {
         work(cwd);
         setImmediate(() => {
           for (const f of listeners) {
-            f(task(cwd, { state: "done", run: { gates: [], fixRounds: 1 } as unknown as Task["run"] }));
+            f(task(cwd, { state: "done", run }));
           }
         });
+      }
+      if (method === "task.evidence") {
+        // The report as the sidecar stores it: evidence.json next to evidence.md, in the task's folder.
+        const dir = path.join(cwd, ".agentchainer", "tasks", "t-1");
+        mkdirSync(dir, { recursive: true });
+        const stored = opts.report?.(run) ?? { gates: { baseline: run.baseline, runs: run.gates } };
+        writeFileSync(path.join(dir, "evidence.json"), JSON.stringify(stored));
+        return { markdown: "", path: path.join(dir, "evidence.md") };
       }
       return task(cwd, { state: "draft" });
     },
@@ -161,6 +174,67 @@ describe("eval suite (M7-02)", () => {
     });
     assert.equal(seen, variant.workflows["s.yaml"]);
     assert.equal(client.calls.find((c) => c.method === "task.start")?.params.model, "sonnet");
+  });
+});
+
+describe("evidence check (M3-E2)", () => {
+  const gate = (exitCode: number) => ({
+    kind: "test",
+    command: `node -e "process.exit(${exitCode})"`,
+    package: ".",
+    exitCode,
+    timedOut: false,
+    durationMs: 5,
+    tail: "",
+    round: 1,
+    at: "2026-11-04T00:00:00.000Z",
+  });
+
+  it("finds the report holding the recorded runs, and the last round's commands giving the same exit codes", async () => {
+    const run = { gates: [{ ...gate(1), round: 0 }, gate(3)], baseline: [{ ...gate(1), round: 0 }] };
+    const client = fakeClient(() => undefined, 0.05, { run: run as Partial<NonNullable<Task["run"]>> });
+    const row = await runCase(client as unknown as SidecarClient, caseOf("sample-quantity"), app, {
+      root,
+      cancelAbove: 5,
+    });
+    assert.deepEqual(row.evidence, {
+      reportMatches: true,
+      rerun: [{ gate: 'test `node -e "process.exit(3)"`', recorded: 3, now: 3 }],
+    });
+  });
+
+  it("notices a report whose gate runs aren't the run's", async () => {
+    const client = fakeClient(() => undefined, 0.05, {
+      run: { gates: [gate(0)] } as Partial<NonNullable<Task["run"]>>,
+      report: () => ({ gates: { baseline: [], runs: [{ ...gate(0), exitCode: 1 }] } }),
+    });
+    const row = await runCase(client as unknown as SidecarClient, caseOf("sample-quantity"), app, {
+      root,
+      cancelAbove: 5,
+    });
+    assert.equal(row.evidence?.reportMatches, false);
+    assert.equal(reportMatchesRun({ run: { gates: [], baseline: [] } } as unknown as Task, null), false);
+  });
+
+  it("adds an Evidence section only to reports whose runs checked it", () => {
+    const base = JSON.parse(readFileSync(path.join(evalsDir, "report.json"), "utf8")) as EvalReport;
+    assert.doesNotMatch(renderMarkdown(base), /## Evidence/, "the committed report renders as it was");
+    const [first, ...rest] = base.runs;
+    if (!first) throw new Error("no runs");
+    const checked = {
+      ...base,
+      runs: [
+        { ...first, evidence: { reportMatches: true, rerun: [{ gate: "test `npm test`", recorded: 0, now: 0 }] } },
+        ...rest.map((x) => ({
+          ...x,
+          evidence: { reportMatches: true, rerun: [{ gate: "test", recorded: 1, now: 0 }] },
+        })),
+      ],
+    };
+    const md = renderMarkdown(checked);
+    assert.match(md, new RegExp(`- ${base.runs.length}/${base.runs.length} reports hold exactly`));
+    assert.match(md, new RegExp(`- 1/${base.runs.length} last-round gate commands`));
+    assert.match(md, /recorded 1, again 0\./);
   });
 });
 

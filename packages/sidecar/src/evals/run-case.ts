@@ -1,5 +1,5 @@
-import { execFileSync } from "node:child_process";
-import { cpSync, existsSync, mkdirSync, writeFileSync } from "node:fs";
+import { execFileSync, execSync } from "node:child_process";
+import { cpSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import type { Task } from "@agentchainer/protocol";
 import { copyFixture } from "../detect/fixture-copy.ts";
@@ -23,9 +23,30 @@ export type CaseRun = {
   durationMs: number;
   fixRounds: number;
   checks: { name: string; exitCode: number }[];
+  /** M3-E2: the task's evidence report against its run, for a run that ended. */
+  evidence?: EvidenceCheck;
   /** Why the run didn't get as far as the checks, if it didn't. */
   error?: string;
 };
+
+/**
+ * M3-E2: a finished task's evidence report against what happened. `reportMatches` when the report's gate runs (the
+ * baseline and every round) are exactly the run's records; `rerun` has the last round's commands with the exit code
+ * recorded and the one they give when run again by hand, in the same folder.
+ */
+export type EvidenceCheck = {
+  reportMatches: boolean;
+  rerun: { gate: string; recorded: number | null; now: number }[];
+};
+
+/** Whether a stored report (`evidence.json`) holds exactly the run's recorded gate runs. */
+export function reportMatchesRun(task: Task, stored: unknown): boolean {
+  const gates = (stored as { gates?: { baseline?: unknown; runs?: unknown } } | null)?.gates;
+  return (
+    JSON.stringify(gates?.runs ?? null) === JSON.stringify(task.run?.gates ?? []) &&
+    JSON.stringify(gates?.baseline ?? null) === JSON.stringify(task.run?.baseline ?? [])
+  );
+}
 
 /** How long one acceptance check may take. */
 const CHECK_TIMEOUT_MS = 180_000;
@@ -106,6 +127,8 @@ export async function runCase(
     });
     row.durationMs = Date.now() - t0;
     const code = codeFolder(cwd, end);
+    // Before the hidden files go in, so the gates see what the task left.
+    if (end.run && end.state !== "cancelled") row.evidence = await checkEvidence(client, cwd, end, code);
     if (c.hidden) cpSync(path.join(opts.root, "hidden", c.id), code, { recursive: true });
     row.checks = c.checks.map((check) => ({ name: check.name, exitCode: runCheck(check.argv, code) }));
     row.passed = row.checks.every((k) => k.exitCode === 0);
@@ -116,6 +139,35 @@ export async function runCase(
     stop();
   }
   return row;
+}
+
+async function checkEvidence(client: SidecarClient, cwd: string, task: Task, code: string): Promise<EvidenceCheck> {
+  const { path: report } = await client.request("task.evidence", { cwd, id: task.id });
+  const stored: unknown = JSON.parse(readFileSync(report.replace(/\.md$/, ".json"), "utf8"));
+  const gates = task.run?.gates ?? [];
+  const last = Math.max(-1, ...gates.map((g) => g.round));
+  return {
+    reportMatches: reportMatchesRun(task, stored),
+    // A gate that timed out has no exit code to compare.
+    rerun: gates
+      .filter((g) => g.round === last && !g.timedOut)
+      .map((g) => ({
+        gate: `${g.kind} \`${g.command}\``,
+        recorded: g.exitCode,
+        now: runShell(g.command, g.package === "." ? code : path.join(code, ...g.package.split("/"))),
+      })),
+  };
+}
+
+/** A gate's command again, through the shell as the gates run it. */
+function runShell(command: string, cwd: string): number {
+  const { NODE_TEST_CONTEXT: _runner, ...env } = process.env;
+  try {
+    execSync(command, { cwd, stdio: "ignore", timeout: CHECK_TIMEOUT_MS, env: { ...env, CI: "1" } });
+    return 0;
+  } catch (err) {
+    return (err as { status?: number | null }).status ?? -1;
+  }
 }
 
 function lastRoundFailures(task: Task): string[] {

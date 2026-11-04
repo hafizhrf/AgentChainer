@@ -135,6 +135,18 @@ pub fn load(app: &AppHandle) -> Settings {
 }
 
 /// Writes atomically (temp file + rename), so a crash never leaves a half-written file.
+/// Why `path` can't be the Claude CLI, or `None`: it must be an absolute path to an existing file (X-02).
+pub fn claude_path_problem(path: &str) -> Option<String> {
+    let p = std::path::Path::new(path);
+    if !p.is_absolute() {
+        Some(format!("The Claude CLI path must be absolute: {path}"))
+    } else if !p.is_file() {
+        Some(format!("No file at the Claude CLI path: {path}"))
+    } else {
+        None
+    }
+}
+
 pub fn save(app: &AppHandle, settings: Settings) -> Result<Settings, String> {
     let settings = settings.normalized();
     let target = path(app)?;
@@ -251,5 +263,18 @@ mod tests {
     fn reads_settings_without_workspaces() {
         let s: Settings = serde_json::from_str(r#"{"recentWorkspaces":["/w/app"]}"#).unwrap();
         assert!(s.workspaces.is_empty());
+    }
+
+    #[test]
+    fn a_claude_path_must_be_an_existing_file_at_an_absolute_path() {
+        assert!(claude_path_problem("claude").is_some_and(|p| p.contains("absolute")));
+        let dir = std::env::temp_dir();
+        assert!(claude_path_problem(&dir.to_string_lossy()).is_some_and(|p| p.contains("No file")));
+        let missing = dir.join("ac-no-such-claude");
+        assert!(claude_path_problem(&missing.to_string_lossy()).is_some());
+        let file = dir.join(format!("ac-claude-{}", std::process::id()));
+        std::fs::write(&file, "").expect("temp file");
+        assert_eq!(claude_path_problem(&file.to_string_lossy()), None);
+        let _ = std::fs::remove_file(&file);
     }
 }

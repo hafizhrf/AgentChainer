@@ -1,4 +1,5 @@
 import type { DeployRecord, DeployTarget, Task } from "@agentchainer/protocol";
+import { redactSecrets } from "@agentchainer/protocol";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { CircleCheck, CircleX, ExternalLink, Loader2, RefreshCw, Rocket } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
@@ -99,11 +100,11 @@ export function DeployCard({ task, cwd, onChanged }: { task: Task; cwd: string; 
               <span className="deploy-what">
                 {d.env} · {d.adapter} · <code>{d.commit.slice(0, 7)}</code> · {new Date(d.startedAt).toLocaleString()}
               </span>
-              <span className="grow muted deploy-detail" title={d.error ?? d.smoke?.detail}>
+              <span className="grow muted deploy-detail" title={redactSecrets(d.error ?? d.smoke?.detail ?? "")}>
                 {d.status === "failed"
-                  ? d.error
+                  ? redactSecrets(d.error ?? "")
                   : d.smoke
-                    ? `Smoke test ${d.smoke.ok ? "passed" : "failed"}: ${d.smoke.detail}`
+                    ? `Smoke test ${d.smoke.ok ? "passed" : "failed"}: ${redactSecrets(d.smoke.detail)}`
                     : ""}
               </span>
               {d.url && (

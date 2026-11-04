@@ -4,6 +4,7 @@ import {
   type PermissionMode,
   type PermissionRequest,
   RpcErrorCode,
+  redactSecrets,
   type StepRun,
   type Task,
   type TaskContract,
@@ -1710,7 +1711,7 @@ function GateList({ runs, before }: { runs: GateRun[]; before?: ReadonlySet<stri
                 {g.kind === "format" ? "Formatted" : "Reverted changes to"}: {g.changed.join(", ")}
               </p>
             ) : null}
-            <pre className="task-gate-log">{g.tail || "(no output)"}</pre>
+            <pre className="task-gate-log">{redactSecrets(g.tail) || "(no output)"}</pre>
           </details>
         </li>
       ))}

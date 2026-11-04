@@ -1,0 +1,93 @@
+{
+  "about": "Input and expected output for redactSecrets (no home) and redactForLog (with home). Run by packages/protocol/src/redact.test.ts and by the Rust core's diagnostics tests.",
+  "cases": [
+    {
+      "name": "an Anthropic key in an env line",
+      "in": "export ANTHROPIC_API_KEY=sk-ant-api03-abcdefghijklmnop",
+      "out": "export ANTHROPIC_API_KEY=[redacted key]"
+    },
+    {
+      "name": "a short value behind a secret-sounding name",
+      "in": "ANTHROPIC_API_KEY=sk-live-1234 \"password\": \"hunter2\"",
+      "out": "ANTHROPIC_API_KEY=[redacted] \"password\": \"[redacted]\""
+    },
+    {
+      "name": "GitHub tokens, classic and fine-grained",
+      "in": "ghp_0123456789abcdefghijABCD and github_pat_11ABCDEFG0123456789_abcdefghijklmnopqrstuvwxyz",
+      "out": "[redacted token] and [redacted token]"
+    },
+    {
+      "name": "a bearer header",
+      "in": "Authorization: Bearer abc.def-ghi",
+      "out": "Authorization: Bearer [redacted]"
+    },
+    {
+      "name": "AWS, Google and Slack keys",
+      "in": "AKIAABCDEFGHIJKLMNOP AIzaBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB xoxb-1234567890-abcdef",
+      "out": "[redacted key] [redacted key] [redacted token]"
+    },
+    {
+      "name": "Stripe and npm",
+      "in": "sk_live_51Habcdefghijklmnop npm_a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1",
+      "out": "[redacted key] [redacted token]"
+    },
+    {
+      "name": "a JWT",
+      "in": "cookie=eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.dozjgNryP4J3jVmNHl0w5N_XgL0n3I9PlFUP0THsR8U;",
+      "out": "cookie=[redacted token];"
+    },
+    {
+      "name": "a private key block",
+      "in": "before\n-----BEGIN OPENSSH PRIVATE KEY-----\nb3BlbnNzaC1rZXktdjEAAAAA\nAAAABG5vbmUAAAAEbm9uZQ==\n-----END OPENSSH PRIVATE KEY-----\nafter",
+      "out": "before\n[redacted private key]\nafter"
+    },
+    {
+      "name": "a private key cut off by truncation",
+      "in": "-----BEGIN RSA PRIVATE KEY-----\nMIIEowIBAAKCAQEA1234+/abc=",
+      "out": "[redacted private key]"
+    },
+    {
+      "name": "credentials in a URL",
+      "in": "DATABASE_URL=postgres://admin:hunter2@db.example.com:5432/app",
+      "out": "DATABASE_URL=postgres://[redacted]@db.example.com:5432/app"
+    },
+    {
+      "name": "a private key variable",
+      "in": "DEPLOY_PRIVATE_KEY=abc123xyz",
+      "out": "DEPLOY_PRIVATE_KEY=[redacted]"
+    },
+    {
+      "name": "an email address",
+      "in": "committed by me@example.com",
+      "out": "committed by [email]"
+    },
+    {
+      "name": "text that's already masked stays as it is",
+      "in": "export ANTHROPIC_API_KEY=[redacted key] and \"token\": \"[redacted token]\"",
+      "out": "export ANTHROPIC_API_KEY=[redacted key] and \"token\": \"[redacted token]\""
+    },
+    {
+      "name": "ordinary text",
+      "in": "sidecar ready (protocol v2, node v24.18.0); tokens=1200 in; 485 tests pass; key: 42",
+      "out": "sidecar ready (protocol v2, node v24.18.0); tokens=1200 in; 485 tests pass; key: 42"
+    },
+    {
+      "name": "the home folder on macOS",
+      "home": "/Users/me",
+      "in": "crash log written to /Users/me/Library/Logs/x.log",
+      "out": "crash log written to ~/Library/Logs/x.log"
+    },
+    {
+      "name": "the home folder on Windows, plain and JSON-escaped",
+      "home": "C:\\Users\\me",
+      "in": "C:\\Users\\me\\app {\"msg\":\"C:\\\\Users\\\\me\\\\app\"}",
+      "out": "~\\app {\"msg\":\"~\\\\app\"}"
+    },
+    {
+      "name": "the home folder on Windows, escaped twice in a log line that's JSON",
+      "home": "C:\\Users\\me",
+      "in": "{\"msg\":\"{\\\"cwd\\\":\\\"C:\\\\\\\\Users\\\\\\\\me\\\\\\\\app\\\"}\"}",
+      "out": "{\"msg\":\"{\\\"cwd\\\":\\\"~\\\\\\\\app\\\"}\"}"
+    }
+  ]
+}

@@ -1,4 +1,5 @@
 import type { DeployPlan, DeployRecord, DeployTarget } from "@agentchainer/protocol";
+import { redactSecrets } from "@agentchainer/protocol";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { CircleCheck, CircleX, ExternalLink, Loader2, RefreshCw, Rocket, Undo2 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
@@ -199,11 +200,11 @@ function DeployRow({
         {live && <strong> · live</strong>}
         {d.rolledBackBy && <span className="muted"> · rolled back</span>}
       </span>
-      <span className="grow muted deploy-detail" title={d.error ?? d.smoke?.detail}>
+      <span className="grow muted deploy-detail" title={redactSecrets(d.error ?? d.smoke?.detail ?? "")}>
         {d.status === "failed"
-          ? d.error
+          ? redactSecrets(d.error ?? "")
           : d.smoke
-            ? `Smoke test ${d.smoke.ok ? "passed" : "failed"}: ${d.smoke.detail}`
+            ? `Smoke test ${d.smoke.ok ? "passed" : "failed"}: ${redactSecrets(d.smoke.detail)}`
             : d.adapter === "docker" && d.deploymentId
               ? `Pushed ${d.deploymentId}`
               : ""}

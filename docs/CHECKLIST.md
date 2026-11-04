@@ -1854,11 +1854,42 @@ first.
 ### Security & privacy
 
 - [ ] **X-01** Threat model doc (`docs/THREAT_MODEL.md`), updated every milestone.
-      - Written for v0.1 (R1-06). Next review: end of M3.
-- [ ] **X-02** Least-privilege Tauri capabilities, a sidecar argument allowlist, and IPC validation on both ends.
+      - Written for v0.1 (R1-06).
+      - Reviewed 2026-11-04 (THREAT_MODEL "Security review of 2026-11-04"):
+        - a read-only review of what the 2026-10-29 audit didn't reach, each finding checked against the code, with
+          9 findings fixed;
+        - entries for the surfaces added since: the drawer, replay, session management, M7, on-demand actionlint;
+        - the full command table.
+      - Next review: end of R1. The box stays open: the review repeats every milestone.
+- [x] **X-02** Least-privilege Tauri capabilities, a sidecar argument allowlist, and IPC validation on both ends.
       Replace the scaffold's `"csp": null` (Tauri template default) with a strict Content Security Policy.
-- [ ] **X-03** Secrets never appear in logs or the UI: a redaction filter covers logs, displayed tool output and diagnostics.
-- [ ] **X-04** No telemetry by default. Any future telemetry is opt-in and documented.
+      — evidence: the 2026-11-04 security pass.
+      - **Capabilities:** one capability file, with no file-system or shell plugin. The command table in THREAT_MODEL
+        covers all commands and their input checks.
+      - **The sidecar** takes no arguments, and release builds always run their own bundled one:
+        `AGENTCHAINER_SIDECAR_BIN` and `AGENTCHAINER_SELFTEST` work in debug builds only, with a unit test of the
+        switch.
+      - **IPC:** zod checks params and results in the sidecar (`rpc.ts`) and results and notifications in the UI
+        (`rpc-client.ts`).
+      - **CSP:** strict, now with `object-src 'none'`, `base-uri 'self'` and `form-action 'none'`.
+      - **The Claude CLI path setting** must be an absolute path to an existing file.
+- [x] **X-03** Secrets never appear in logs or the UI: a redaction filter covers logs, displayed tool output and diagnostics.
+      — evidence: the 2026-11-04 security pass.
+      - **One pattern file** (`packages/protocol/src/redact-patterns.json`), read by the UI, the sidecar and the Rust
+        core.
+      - **Shared vectors** (`test/redact-vectors.json`) run in both TS and Rust, with 17 cases: new key and token
+        formats, private keys, URL credentials, already-masked text, and Windows home paths in JSON.
+      - **Logs:** the app log and crash logs are masked line by line as they're written; diagnostics are masked as a
+        whole.
+      - **The UI** masks tool input and output, the drawer, gate tails, and deploy and smoke details. The approval
+        dialog's editable input is left as it runs.
+      - **Lessons** with a secret are refused.
+      - PRIVACY "Secrets on screen".
+- [x] **X-04** No telemetry by default. Any future telemetry is opt-in and documented.
+      — evidence: the 2026-11-04 security pass found no telemetry, analytics or crash-reporting code or dependencies.
+      The app's own network calls are the ones PRIVACY lists. Settings says "AgentChainer sends no telemetry".
+      PRIVACY now also notes that the `claude` CLI's own data settings are the user's, and which deploy CLIs get
+      their telemetry turned off.
 
 ### Quality & performance
 

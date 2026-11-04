@@ -46,13 +46,17 @@ impl Watchers {
             return Err(format!("not a folder: {cwd}"));
         }
         let (tx, rx) = mpsc::channel::<PathBuf>();
-        let mut watcher = notify::recommended_watcher(move |res: notify::Result<notify::Event>| {
-            if let Ok(event) = res {
-                for path in event.paths {
-                    let _ = tx.send(path);
+        // Links aren't followed: a repo's `x -> /` would otherwise watch the whole disk (security review, 2026-11-04).
+        let mut watcher = RecommendedWatcher::new(
+            move |res: notify::Result<notify::Event>| {
+                if let Ok(event) = res {
+                    for path in event.paths {
+                        let _ = tx.send(path);
+                    }
                 }
-            }
-        })
+            },
+            notify::Config::default().with_follow_symlinks(false),
+        )
         .map_err(|e| e.to_string())?;
         add_watches(&mut watcher, &root)?;
 
@@ -105,7 +109,9 @@ fn add_watches(watcher: &mut RecommendedWatcher, root: &Path) -> Result<(), Stri
     {
         let path = entry.path();
         let name = entry.file_name();
-        if path.is_dir() && name != ".git" && !NOISE.iter().any(|n| name == *n) {
+        // `file_type` doesn't follow links, unlike `is_dir`.
+        let dir = entry.file_type().is_ok_and(|t| t.is_dir());
+        if dir && name != ".git" && !NOISE.iter().any(|n| name == *n) {
             let _ = watcher.watch(&path, RecursiveMode::Recursive);
         }
     }

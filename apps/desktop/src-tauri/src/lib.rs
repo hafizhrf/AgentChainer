@@ -4,6 +4,7 @@ mod editor;
 mod history;
 mod menu;
 mod pty;
+mod redact;
 mod settings;
 mod shell_env;
 mod sidecar;
@@ -54,6 +55,19 @@ fn settings_get(app: AppHandle) -> Settings {
 /// Saves and returns the normalized settings.
 #[tauri::command]
 fn settings_set(app: AppHandle, settings: Settings) -> Result<Settings, String> {
+    // The CLI path is run as the user's `claude` (X-02): a new one must be an existing file at an absolute path. One
+    // saved earlier stays even if it's gone since, so other settings can still be saved.
+    let wanted = settings
+        .claude_path
+        .as_deref()
+        .map(str::trim)
+        .filter(|p| !p.is_empty());
+    if let Some(path) = wanted
+        && settings::load(&app).claude_path.as_deref() != Some(path)
+        && let Some(problem) = settings::claude_path_problem(path)
+    {
+        return Err(problem);
+    }
     settings::save(&app, settings)
 }
 
@@ -94,12 +108,16 @@ fn open_in_editor(
         Some(mut cmd) => cmd.spawn().map(|_| ()).map_err(|e| {
             format!("couldn't start {editor}: {e}. Is its command-line launcher installed?")
         }),
-        None => {
-            editor::check_openable(&file)?;
-            app.opener()
+        None => match editor::check_openable(&file)? {
+            editor::Opening::Default => app
+                .opener()
                 .open_path(&file, None::<&str>)
-                .map_err(|e| e.to_string())
-        }
+                .map_err(|e| e.to_string()),
+            editor::Opening::AsText => editor::text_command(&file)
+                .spawn()
+                .map(|_| ())
+                .map_err(|e| format!("couldn't open it as text: {e}")),
+        },
     }
 }
 
@@ -206,10 +224,19 @@ impl HistoryState {
 }
 
 /// Dev-only self-test (spike S2): `AGENTCHAINER_SELFTEST` holds JSON `{cwd, model, prompt}`. When set, the UI runs
-/// one turn on its own, reports latency through `debug.log`, and quits via `quit_app`.
+/// one turn on its own, reports latency through `debug.log`, and quits via `quit_app`. Release builds ignore it (X-02):
+/// an environment variable must not make an installed app run turns by itself.
 #[tauri::command]
 fn selftest_config() -> Option<String> {
-    std::env::var("AGENTCHAINER_SELFTEST").ok()
+    dev_only(
+        std::env::var("AGENTCHAINER_SELFTEST").ok(),
+        cfg!(debug_assertions),
+    )
+}
+
+/// A developer switch's value in a debug build, and nothing in a release build (X-02).
+pub(crate) fn dev_only<T>(value: Option<T>, debug_build: bool) -> Option<T> {
+    value.filter(|_| debug_build)
 }
 
 #[tauri::command]
@@ -300,6 +327,12 @@ pub fn run() {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn developer_switches_do_nothing_in_a_release_build() {
+        assert_eq!(super::dev_only(Some("x"), true), Some("x"));
+        assert_eq!(super::dev_only(Some("x"), false), None);
+    }
 
     #[test]
     fn app_info_reports_the_package_version() {

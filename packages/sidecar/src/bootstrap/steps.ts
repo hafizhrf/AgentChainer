@@ -1,6 +1,5 @@
-import { existsSync, readFileSync } from "node:fs";
-import path from "node:path";
 import type { Item } from "../catalog/schema.ts";
+import { readWorkspaceText } from "../workspace-files.ts";
 import { type HookFile, hookChanges, hookScope, hookSetup } from "./git-hooks.ts";
 import { binaryName, toolPath } from "./tools.ts";
 
@@ -50,8 +49,7 @@ export function itemChanges(root: string, item: Item, env: { toolsDir: string | 
       out.commands.push(["claude", "mcp", "add", "--scope", item.install.scope, server, "--", ...argv(command)]);
     } else if ("merge-json" in step) {
       const rel = step["merge-json"].path;
-      const file = path.join(root, ...rel.split("/"));
-      const before = existsSync(file) ? readFileSync(file, "utf8") : "";
+      const before = readWorkspaceText(root, rel);
       try {
         out.files.push({ path: rel, before, after: mergeJson(before, step["merge-json"].value, rel) });
       } catch (err) {

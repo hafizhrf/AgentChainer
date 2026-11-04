@@ -6,7 +6,8 @@ import type { Catalog, Item } from "../catalog/schema.ts";
 import { auditWorkspace } from "../detect/audit.ts";
 import { detectWorkspace } from "../detect/detect.ts";
 import type { CliResult } from "../installer.ts";
-import { git } from "../workspace.ts";
+import { git, literal } from "../workspace.ts";
+import { readWorkspaceText, refuseLinks } from "../workspace-files.ts";
 import { type Check, GENERATORS, type Proposal } from "./generate.ts";
 import { type FetchTree, fetchGitHubTree, listFiles, readLicense, treeHash } from "./git-source.ts";
 import { buildPlan, type PlanEnv } from "./plan.ts";
@@ -157,6 +158,7 @@ class Tracker {
     let rec = records.find((r) => r.path === rel);
     if (!rec) {
       const file = insideRoot(this.root, rel);
+      refuseLinks(this.root, rel);
       const existed = existsSync(file);
       rec = { path: rel, existed, afterSha256: null };
       if (existed) {
@@ -250,6 +252,7 @@ export function applyFileEdits(
 ): string {
   const runId = `${now.toISOString().replace(/[:.]/g, "-")}-${randomBytes(3).toString("hex")}`;
   const runDir = abs(root, `${BACKUPS}/${runId}`);
+  refuseLinks(root, BACKUPS);
   mkdirSync(runDir, { recursive: true });
   const tracker = new Tracker(root, runDir);
   const rec: ActionRecord = { ...action, status: "applied", warnings: [], files: [], undo: [] };
@@ -307,6 +310,7 @@ export async function applyActions(
   const started = now();
   const runId = `${started.toISOString().replace(/[:.]/g, "-")}-${randomBytes(3).toString("hex")}`;
   const runDir = abs(root, `${BACKUPS}/${runId}`);
+  refuseLinks(root, BACKUPS);
   mkdirSync(runDir, { recursive: true });
   const tracker = new Tracker(root, runDir);
   const run: RunRecord = {
@@ -407,6 +411,7 @@ export async function recordPluginInstall(
 ): Promise<string | null> {
   const runId = `${now.toISOString().replace(/[:.]/g, "-")}-${randomBytes(3).toString("hex")}`;
   const runDir = abs(root, `${BACKUPS}/${runId}`);
+  refuseLinks(root, BACKUPS);
   mkdirSync(runDir, { recursive: true });
   const tracker = new Tracker(root, runDir);
   const rec: ActionRecord = {
@@ -497,6 +502,7 @@ function editPluginLocks(root: string, pluginId: string, edit: (entry: LockItem)
   for (const rel of [LOCK, LOCAL]) {
     const file = abs(root, rel);
     if (!existsSync(file)) continue;
+    refuseLinks(root, rel);
     const lock = readLock(root, "", rel);
     let changed = false;
     lock.items = lock.items.flatMap((entry) => {
@@ -544,7 +550,7 @@ async function applyOne(
     if (action.id === "fix:untrack-env" && action.preview.type === "commands") {
       const argv = action.preview.commands[0] ?? [];
       const paths = argv.slice(argv.indexOf("--") + 1);
-      run(root, ["git", "rm", "--cached", "-q", "--", ...paths]);
+      run(root, ["git", "rm", "--cached", "-q", "--", ...paths.map(literal)]);
       rec.undo.push({ type: "git-unstage-removal", paths });
       fixRecord(paths);
       return;
@@ -556,8 +562,8 @@ async function applyOne(
     const proposal = ctx.proposals?.get(name);
     if (!proposal) throw new Error("Generate a proposal first.");
     for (const f of proposal.files) {
-      const file = insideRoot(root, f.path);
-      const current = existsSync(file) ? readFileSync(file, "utf8") : "";
+      insideRoot(root, f.path);
+      const current = readWorkspaceText(root, f.path);
       if (current !== f.before) throw new Error(`${f.path} changed since the proposal was made. Generate it again.`);
     }
     for (const f of proposal.files) tracker.write(rec.files, f.path, f.after);
@@ -767,7 +773,7 @@ function undoAction(
       const res = ctx.cli?.removeMcp(u.name, u.scope);
       if (!res?.ok) kept.push(`MCP server ${u.name} (remove it with: claude mcp remove --scope ${u.scope} ${u.name})`);
     } else if (u.type === "git-unstage-removal") {
-      const r = git(["reset", "-q", "--", ...u.paths], root);
+      const r = git(["reset", "-q", "--", ...u.paths.map(literal)], root);
       if (r.status !== 0) kept.push(`index entries for ${u.paths.join(", ")}`);
     } else if (u.type === "git-init") {
       // Only an empty repository is removed: once it has commits, deleting .git would lose history.
@@ -797,6 +803,8 @@ function restoreFiles(root: string, runDir: string, files: FileRecord[], force: 
   }
   for (const rec of [...files].reverse()) {
     const file = abs(root, rec.path);
+    // A link planted since the run would send the restore somewhere else.
+    refuseLinks(root, rec.path);
     if (rec.existed && rec.backup) {
       mkdirSync(path.dirname(file), { recursive: true });
       writeFileSync(file, readFileSync(path.join(runDir, ...rec.backup.split("/"))));

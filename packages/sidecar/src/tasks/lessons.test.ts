@@ -212,6 +212,15 @@ describe("lessons in CLAUDE.md (M8-06)", () => {
     assert.throws(() => previewLessons(root, id, ["x"], "t"), /home-folder path/);
     one("Use the key ghp_abcdefghijklmnopqrstuvwxyz0123456789.");
     assert.throws(() => previewLessons(root, id, ["x"], "t"), /key or token/);
+    // The shared redaction patterns (X-03): fine-grained tokens, URL credentials and private-key variables too.
+    for (const text of [
+      "Push with github_pat_11ABCDEFG0123456789_abcdefghijklmnopqrstuvwxyz.",
+      "The test database is postgres://admin:hunter2@localhost/app.",
+      "Set DEPLOY_PRIVATE_KEY=abc123xyz before deploying.",
+    ]) {
+      one(text);
+      assert.throws(() => previewLessons(root, id, ["x"], "t"), /key or token/, text);
+    }
     assert.equal(existsSync(path.join(root, ".agentchainer", "lessons.json")), true);
   });
 });

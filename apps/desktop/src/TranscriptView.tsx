@@ -1,3 +1,4 @@
+import { redactSecrets, redactValue } from "@agentchainer/protocol";
 import {
   Bot,
   Brain,
@@ -246,20 +247,23 @@ const GUARD = "Blocked by AgentChainer guard: ";
 
 const ToolView = memo(function ToolView({ tool, onOpenFile }: { tool: ToolItem; onOpenFile: OpenFile }) {
   const cwd = useContext(Workspace);
-  const guardAt = tool.output?.indexOf(GUARD) ?? -1;
+  // Shown with secrets masked (X-03); the input itself, and Open in editor, stay as they were.
+  const input = useMemo(() => redactValue(tool.input), [tool.input]);
+  const output = useMemo(() => (tool.output === undefined ? undefined : redactSecrets(tool.output)), [tool.output]);
+  const guardAt = output?.indexOf(GUARD) ?? -1;
   const blocked = guardAt >= 0;
-  const reason = blocked ? tool.output?.slice(guardAt + GUARD.length).split("\n")[0] : undefined;
+  const reason = blocked ? output?.slice(guardAt + GUARD.length).split("\n")[0] : undefined;
   const file = (tool.input as { file_path?: unknown } | null)?.file_path;
-  const diffs = editDiffs(tool.name, tool.input);
+  const diffs = editDiffs(tool.name, input);
   const { added, removed } = diffs ? diffStat(diffs) : { added: 0, removed: 0 };
   // A Team chat's tools (M8-03) read as what they do to which worker.
-  const team = teamTool(tool.name, tool.input);
+  const team = teamTool(tool.name, input);
   return (
     <details className={`tool ${tool.status}`} open={blocked}>
       <summary>
         {team ? <Users size={14} className="tool-icon" aria-hidden /> : <ToolIcon name={tool.name} />}
         <span className="tool-name">{team?.label ?? tool.name}</span>
-        <code className="tool-arg">{team ? team.detail : toolSummary(tool.input, cwd)}</code>
+        <code className="tool-arg">{team ? team.detail : toolSummary(input, cwd)}</code>
         {team?.access && <span className={`badge${team.access === "write" ? " risk-medium" : ""}`}>{team.access}</span>}
         {diffs && (
           <span className="diffstat">
@@ -280,8 +284,8 @@ const ToolView = memo(function ToolView({ tool, onOpenFile }: { tool: ToolItem; 
           Open in editor
         </button>
       )}
-      {diffs ? <InlineDiff diffs={diffs} /> : <pre>{JSON.stringify(tool.input, null, 2)}</pre>}
-      {tool.output !== undefined && <pre className="tool-output">{tool.output}</pre>}
+      {diffs ? <InlineDiff diffs={diffs} /> : <pre>{JSON.stringify(input, null, 2)}</pre>}
+      {output !== undefined && <pre className="tool-output">{output}</pre>}
     </details>
   );
 });

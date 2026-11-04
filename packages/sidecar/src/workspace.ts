@@ -28,13 +28,42 @@ type GitResult = { status: number | null; stdout: string; stderr: string };
  */
 const READ = ["--no-optional-locks"];
 
+/**
+ * The `git` to run. On Windows a bare program name is also looked up in the child's working folder before PATH, so a
+ * repository could ship its own `git.exe` and have it run when the folder opens. There, git runs by its absolute path
+ * from PATH's absolute folders (security review, 2026-11-04). Elsewhere a bare name only searches PATH.
+ */
+export function gitBinary(env: NodeJS.ProcessEnv = process.env, platform = process.platform): string {
+  if (platform !== "win32") return "git";
+  if (cachedGit && env === process.env) return cachedGit;
+  const exts = (env.PATHEXT ?? ".COM;.EXE;.BAT;.CMD").split(";").filter((e) => /^\.(com|exe)$/i.test(e));
+  const dirs = (env.PATH ?? env.Path ?? "").split(";").filter((d) => path.win32.isAbsolute(d));
+  let found = "git";
+  for (const d of dirs) {
+    const hit = exts.map((e) => path.win32.join(d, `git${e.toLowerCase()}`)).find((f) => existsSync(f));
+    if (hit) {
+      found = hit;
+      break;
+    }
+  }
+  if (env === process.env) cachedGit = found;
+  return found;
+}
+let cachedGit: string | undefined;
+
+/**
+ * A file path as a git pathspec that means only that file: names like `*`, `[id]` or `:!x` are otherwise patterns,
+ * and a revert or checkout of one would reach other files too (security review, 2026-11-04).
+ */
+export const literal = (file: string) => `:(literal)${file}`;
+
 export function git(
   args: string[],
   cwd: string,
   input?: string,
   opts: { env?: Record<string, string>; timeoutMs?: number } = {},
 ): GitResult {
-  const r = spawnSync("git", args, {
+  const r = spawnSync(gitBinary(), args, {
     cwd,
     encoding: "utf8",
     ...(opts.env ? { env: { ...process.env, ...opts.env } } : {}),
@@ -51,7 +80,11 @@ export function gitAsync(
   cwd: string,
   opts: { env?: Record<string, string>; timeoutMs?: number } = {},
 ): Promise<RunResult> {
-  return runAsync("git", args, { cwd, timeoutMs: opts.timeoutMs ?? 30_000, ...(opts.env ? { env: opts.env } : {}) });
+  return runAsync(gitBinary(), args, {
+    cwd,
+    timeoutMs: opts.timeoutMs ?? 30_000,
+    ...(opts.env ? { env: opts.env } : {}),
+  });
 }
 
 export function gitOrThrow(args: string[], cwd: string, input?: string): string {
@@ -202,7 +235,10 @@ export function fileDiff(cwd: string, rel: string): FileDiff {
     text && original !== null && entry?.status !== "renamed"
       ? // Plumbing: porcelain `git diff HEAD` rewrites the index even with --no-optional-locks. Same hunks as the revert's.
         parseHunks(
-          gitOrThrow([...READ, "diff-index", "-p", "--no-color", "--no-ext-diff", "-U0", "HEAD", "--", rel], cwd),
+          gitOrThrow(
+            [...READ, "diff-index", "-p", "--no-color", "--no-ext-diff", "-U0", "HEAD", "--", literal(rel)],
+            cwd,
+          ),
         )
       : [];
   return {
@@ -218,7 +254,7 @@ export function fileDiff(cwd: string, rel: string): FileDiff {
 
 /** The file's content at HEAD, or null when it isn't in HEAD (new file, or a repo without commits). */
 function showHead(cwd: string, rel: string): Buffer | null {
-  const r = spawnSync("git", [...READ, "show", `HEAD:./${rel.split(path.sep).join("/")}`], {
+  const r = spawnSync(gitBinary(), [...READ, "show", `HEAD:./${rel.split(path.sep).join("/")}`], {
     cwd,
     timeout: 30_000,
     maxBuffer: 64 * 1024 * 1024,
@@ -266,7 +302,7 @@ export function revert(cwd: string, rel: string, hunk?: number): void {
   if (!entry) throw new RpcFailure(RpcErrorCode.invalidParams, `${rel} has no changes to revert.`);
 
   if (hunk !== undefined) {
-    const diff = gitOrThrow(["diff", "--no-color", "--no-ext-diff", "-U0", "HEAD", "--", rel], cwd);
+    const diff = gitOrThrow(["diff", "--no-color", "--no-ext-diff", "-U0", "HEAD", "--", literal(rel)], cwd);
     const target = parseHunks(diff)[hunk];
     if (!target) throw new RpcFailure(RpcErrorCode.invalidParams, "That change no longer exists. Refresh the diff.");
     const header = diff.slice(0, diff.indexOf("\n@@") + 1);
@@ -281,14 +317,15 @@ export function revert(cwd: string, rel: string, hunk?: number): void {
       rmSync(abs, { force: true });
       return;
     case "added":
-      gitOrThrow(["rm", "-f", "-q", "--", rel], cwd);
+      gitOrThrow(["rm", "-f", "-q", "--", literal(rel)], cwd);
       return;
     case "renamed":
-      if (entry.origPath) gitOrThrow(["restore", "--source=HEAD", "--staged", "--worktree", "--", entry.origPath], cwd);
-      gitOrThrow(["rm", "-f", "-q", "--", rel], cwd);
+      if (entry.origPath)
+        gitOrThrow(["restore", "--source=HEAD", "--staged", "--worktree", "--", literal(entry.origPath)], cwd);
+      gitOrThrow(["rm", "-f", "-q", "--", literal(rel)], cwd);
       return;
     default:
-      gitOrThrow(["restore", "--source=HEAD", "--staged", "--worktree", "--", rel], cwd);
+      gitOrThrow(["restore", "--source=HEAD", "--staged", "--worktree", "--", literal(rel)], cwd);
   }
 }
 

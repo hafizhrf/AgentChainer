@@ -234,6 +234,17 @@ fn selftest_config() -> Option<String> {
     )
 }
 
+/// Dev-only pseudo-locale (X-13): with `AGENTCHAINER_PSEUDO_LOCALE=1`, the UI renders every catalog message accented
+/// and in brackets, so text outside the catalogs stands out. Release builds ignore it (X-02).
+#[tauri::command]
+fn pseudo_locale() -> bool {
+    dev_only(
+        std::env::var("AGENTCHAINER_PSEUDO_LOCALE").ok(),
+        cfg!(debug_assertions),
+    )
+    .is_some_and(|v| v == "1")
+}
+
 /// What wry passes to WebView2 when an app sets no arguments of its own.
 const WRY_DEFAULT_BROWSER_ARGS: &str =
     "--disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection";
@@ -316,6 +327,7 @@ pub fn run() {
             settings_set,
             open_terminal,
             selftest_config,
+            pseudo_locale,
             quit_app,
             menu_select,
             workspace_watch,

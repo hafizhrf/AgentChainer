@@ -3,6 +3,9 @@
 //! and every other item reaches the UI as a `menu` event carrying the item id, for the matching action
 //! (`src/useMenuCommands.ts`).
 
+use std::collections::HashMap;
+use std::sync::OnceLock;
+
 #[cfg(target_os = "macos")]
 use tauri::menu::AboutMetadata;
 use tauri::menu::{Menu, MenuBuilder, MenuEvent, MenuItem, MenuItemBuilder, SubmenuBuilder};
@@ -37,13 +40,28 @@ fn help_url(id: &str) -> Option<String> {
     }
 }
 
+/// The menu's labels, from the UI's catalog (X-13): the title bar on Windows and Linux shows the same ones.
+fn labels() -> &'static HashMap<String, String> {
+    static L: OnceLock<HashMap<String, String>> = OnceLock::new();
+    L.get_or_init(|| {
+        serde_json::from_str(include_str!("../../src/i18n/locales/en/menu.json"))
+            .expect("valid menu.json")
+    })
+}
+
+/// The label for `key` ("menu.…"), with `{{app}}` filled in.
+fn label(key: &str, app_name: &str) -> String {
+    labels()
+        .get(key)
+        .map_or_else(|| key.to_string(), |text| text.replace("{{app}}", app_name))
+}
+
 fn item<R: Runtime>(
     app: &AppHandle<R>,
     id: &str,
-    text: &str,
     accelerator: Option<&str>,
 ) -> tauri::Result<MenuItem<R>> {
-    let builder = MenuItemBuilder::with_id(id, text);
+    let builder = MenuItemBuilder::with_id(id, label(&format!("menu.{id}"), ""));
     match accelerator {
         Some(keys) => builder.accelerator(keys),
         None => builder,
@@ -55,74 +73,55 @@ fn item<R: Runtime>(
 /// session instead.
 #[cfg_attr(not(target_os = "macos"), allow(dead_code))]
 pub fn build<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
-    let settings = item(app, "settings", "Settings…", Some("CmdOrCtrl+Comma"))?;
-    let new_session = item(app, "new-session", "New Session", Some("CmdOrCtrl+N"))?;
+    let name = app.package_info().name.clone();
+    let l = |key: &str| label(key, &name);
+    let settings = item(app, "settings", Some("CmdOrCtrl+Comma"))?;
+    let new_session = item(app, "new-session", Some("CmdOrCtrl+N"))?;
     // Only acts when the Tasks preview is on (Settings); the UI ignores it otherwise.
-    let new_task = item(app, "new-task", "New Task", Some("CmdOrCtrl+Shift+N"))?;
-    let open_folder = item(app, "open-folder", "Open Folder…", Some("CmdOrCtrl+O"))?;
-    let close_session = item(app, "close-session", "Close Session", Some("CmdOrCtrl+W"))?;
+    let new_task = item(app, "new-task", Some("CmdOrCtrl+Shift+N"))?;
+    let open_folder = item(app, "open-folder", Some("CmdOrCtrl+O"))?;
+    let close_session = item(app, "close-session", Some("CmdOrCtrl+W"))?;
 
-    let file = SubmenuBuilder::new(app, "File")
+    let file = SubmenuBuilder::new(app, l("menu.file"))
         .item(&new_session)
         .item(&new_task)
         .item(&open_folder)
         .separator()
         .item(&close_session);
     #[cfg(not(target_os = "macos"))]
-    let file = file.separator().item(&settings).separator().quit();
+    let file = file
+        .separator()
+        .item(&settings)
+        .separator()
+        .quit_with_text(l("menu.exit"));
     let file = file.build()?;
 
-    let edit = SubmenuBuilder::new(app, "Edit")
-        .undo()
-        .redo()
+    let edit = SubmenuBuilder::new(app, l("menu.edit"))
+        .undo_with_text(l("menu.undo"))
+        .redo_with_text(l("menu.redo"))
         .separator()
-        .cut()
-        .copy()
-        .paste()
-        .select_all()
+        .cut_with_text(l("menu.cut"))
+        .copy_with_text(l("menu.copy"))
+        .paste_with_text(l("menu.paste"))
+        .select_all_with_text(l("menu.select-all"))
         .build()?;
 
-    let view = SubmenuBuilder::new(app, "View")
-        .item(&item(
-            app,
-            "command-palette",
-            "Command Palette…",
-            Some("CmdOrCtrl+Shift+P"),
-        )?)
+    let view = SubmenuBuilder::new(app, l("menu.view"))
+        .item(&item(app, "command-palette", Some("CmdOrCtrl+Shift+P"))?)
         .separator()
-        .item(&item(
-            app,
-            "toggle-sidebar",
-            "Toggle Sidebar",
-            Some("CmdOrCtrl+Backslash"),
-        )?)
-        .item(&item(
-            app,
-            "toggle-right-panel",
-            "Toggle Workspace Panel",
-            Some("CmdOrCtrl+B"),
-        )?)
-        .item(&item(
-            app,
-            "toggle-terminal",
-            "Toggle Terminal",
-            Some("CmdOrCtrl+J"),
-        )?);
+        .item(&item(app, "toggle-sidebar", Some("CmdOrCtrl+Backslash"))?)
+        .item(&item(app, "toggle-right-panel", Some("CmdOrCtrl+B"))?)
+        .item(&item(app, "toggle-terminal", Some("CmdOrCtrl+J"))?);
     #[cfg(target_os = "macos")]
-    let view = view.separator().fullscreen();
+    let view = view.separator().fullscreen_with_text(l("menu.fullscreen"));
     let view = view.build()?;
 
-    let help = SubmenuBuilder::new(app, "Help")
-        .item(&item(app, "help-getting-started", "Getting Started", None)?)
-        .item(&item(app, "help-report-issue", "Report an Issue", None)?)
+    let help = SubmenuBuilder::new(app, l("menu.help"))
+        .item(&item(app, "help-getting-started", None)?)
+        .item(&item(app, "help-report-issue", None)?)
         .separator()
-        .item(&item(
-            app,
-            "export-diagnostics",
-            "Export Diagnostics…",
-            None,
-        )?)
-        .item(&item(app, "check-updates", "Check for Updates…", None)?)
+        .item(&item(app, "export-diagnostics", None)?)
+        .item(&item(app, "check-updates", None)?)
         .build()?;
 
     let menu = MenuBuilder::new(app);
@@ -137,21 +136,21 @@ pub fn build<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
             ..Default::default()
         };
         let app_menu = SubmenuBuilder::new(app, &pkg.name)
-            .about(Some(about))
+            .about_with_text(l("menu.about"), Some(about))
             .separator()
             .item(&settings)
             .separator()
-            .services()
+            .services_with_text(l("menu.services"))
             .separator()
-            .hide()
-            .hide_others()
-            .show_all()
+            .hide_with_text(l("menu.hide"))
+            .hide_others_with_text(l("menu.hide-others"))
+            .show_all_with_text(l("menu.show-all"))
             .separator()
-            .quit()
+            .quit_with_text(l("menu.quit"))
             .build()?;
-        let window = SubmenuBuilder::new(app, "Window")
-            .minimize()
-            .maximize()
+        let window = SubmenuBuilder::new(app, l("menu.window"))
+            .minimize_with_text(l("menu.minimize"))
+            .maximize_with_text(l("menu.zoom"))
             .build()?;
         menu.items(&[&app_menu, &file, &edit, &view, &window, &help])
     };
@@ -188,6 +187,17 @@ mod tests {
             assert!(!UI_COMMANDS.contains(&id));
         }
         assert_eq!(help_url("new-session"), None);
+    }
+
+    #[test]
+    fn every_item_has_a_label() {
+        let ids = UI_COMMANDS
+            .iter()
+            .chain(&["help-getting-started", "help-report-issue"]);
+        for id in ids {
+            assert!(labels().contains_key(&format!("menu.{id}")), "menu.{id}");
+        }
+        assert_eq!(label("menu.about", "AgentChainer"), "About AgentChainer");
     }
 
     #[test]

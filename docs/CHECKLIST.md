@@ -2128,6 +2128,14 @@ first.
         - **Bundle:** all JS grows 2.0% raw and 1.3% gzipped. The catalogs load with the main chunk.
         - **Extraction:** four agents in separate worktrees, one area each. Each checked its slice for lint, literal
           props, typecheck and tests before the merge.
+        - **Evidence:** CI run [41999892534](https://github.com/hafizhrf/AgentChainer/actions/runs/41999892534)
+          (#131), on Ubuntu and on Windows:
+          - X-06: 5/5;
+          - X-12: 8/8;
+          - the pseudo-locale phase: 5/5.
+
+          The run before found one unmarked string, "git version …" on the setup check. It's `git --version` output,
+          so the test now treats it as data.
       - **Part 2, still open:**
         - the sidecar's prose: findings, plan reasons, run outcomes, about 290 error sites;
         - the protocol's shared texts: approval reasons, `agentProblems`, `folderProblems`, `cadenceText`;

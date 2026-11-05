@@ -64,7 +64,8 @@ mkdirSync(configDir, { recursive: true });
 const settingsFile = path.join(configDir, "settings.json");
 writeFileSync(settingsFile, JSON.stringify({ recentWorkspaces: [workspace] }, null, 2));
 
-const env = { ...process.env, ...dirs };
+// A debug build reads its settings from AGENTCHAINER_CONFIG_DIR (Windows takes its config folder from the system).
+const env = { ...process.env, ...dirs, AGENTCHAINER_CONFIG_DIR: configDir };
 const windows = process.platform === "win32";
 
 // Linux: tauri-driver starts the app through WebKitWebDriver. Windows: the app starts here with WebView2's debugging

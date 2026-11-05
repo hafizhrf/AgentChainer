@@ -152,6 +152,14 @@ fn dir_key(dir: &str, windows: bool) -> String {
 }
 
 fn path(app: &AppHandle) -> Result<PathBuf, String> {
+    // The end-to-end tests (X-06) keep their settings apart: on Windows the config folder comes from the system, not
+    // from an environment variable a test could set. Debug builds only (X-02).
+    if let Some(dir) = crate::dev_only(
+        std::env::var_os("AGENTCHAINER_CONFIG_DIR"),
+        cfg!(debug_assertions),
+    ) {
+        return Ok(PathBuf::from(dir).join("settings.json"));
+    }
     let dir = app
         .path()
         .app_config_dir()

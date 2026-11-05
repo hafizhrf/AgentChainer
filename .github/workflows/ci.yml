@@ -128,7 +128,7 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y libwebkit2gtk-4.1-dev libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev xvfb imagemagick
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev xvfb imagemagick webkit2gtk-driver
       - name: Install Rust toolchain (from rust-toolchain.toml)
         run: rustup toolchain install && rustc --version
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
@@ -155,6 +155,19 @@ jobs:
         env:
           NO_AT_BRIDGE: "1"
         run: xvfb-run -a -s "-screen 0 1440x900x24" node scripts/perf-budgets.mjs --binary ${{ matrix.binary }} --json perf-${{ matrix.name }}.json --warn-only
+      # End-to-end tests (X-06): tauri-driver drives the debug app through WebDriver. macOS has none for its WebView;
+      # docs/guides/MANUAL_CHECKS.md covers it. rust-cache keeps ~/.cargo/bin, so the install is quick after the first.
+      - name: Install tauri-driver
+        if: runner.os != 'macOS'
+        run: cargo install tauri-driver --version 2.1.0 --locked
+      - name: End-to-end tests
+        if: runner.os == 'Windows'
+        run: node scripts/e2e/run.mjs --binary ${{ matrix.binary }} --artifacts e2e-artifacts
+      - name: End-to-end tests (Xvfb)
+        if: runner.os == 'Linux'
+        env:
+          NO_AT_BRIDGE: "1"
+        run: xvfb-run -a -s "-screen 0 1440x900x24" node scripts/e2e/run.mjs --binary ${{ matrix.binary }} --artifacts e2e-artifacts
       - name: Upload debug build and screenshot
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -164,5 +177,6 @@ jobs:
             ${{ matrix.binary }}
             screenshot-${{ matrix.name }}.png
             perf-${{ matrix.name }}.json
+            e2e-artifacts/
           if-no-files-found: warn
           retention-days: 14

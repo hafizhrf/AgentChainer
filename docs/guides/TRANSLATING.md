@@ -44,11 +44,16 @@ and the same keys. `pnpm test` fails when one is missing, extra, empty, or chang
 These are what Indonesian developers say. They're written lowercase inside a sentence and capitalized at its start:
 
 > workspace, session, task, sub-task, commit, branch, PR, pull request, merge, diff, repo, plugin, marketplace, hook,
-> MCP, MCP server, token, context window, worktree, prompt, agent, subagent, worker, supervisor, fleet, gate, deploy,
-> deployment, rollback, smoke test, lint, typecheck, build, CI, workflow, tier, effort, terminal, editor, chat, fork,
-> file, folder, setup.
+> skill, MCP, MCP server, token, context window, worktree, prompt, agent, subagent, worker, supervisor, fleet, gate,
+> guard, checkpoint, deploy, deployment, production, rollback, smoke test, test, lint, typecheck, build, CI, workflow,
+> tier, effort, terminal, editor, chat, fork, file, folder, path, setup, run (the noun), API key, secret,
+> environment, exit code, output, log.
+>
+> git's verbs and places: push, pull, fetch, stage, unstage, checkout, fast-forward, stash, rebase, squash, remote,
+> upstream, working tree, HEAD.
 
-Indonesian grammar goes around them: "Session baru", "Tutup session", "di-deploy", "di-commit", "Rencana setup".
+Indonesian grammar goes around them: "Session baru", "Tutup session", "di-deploy", "di-commit", "Sudah di-push",
+"Rencana setup", "Rollback run".
 
 ### Standard translations
 
@@ -101,5 +106,33 @@ Indonesian grammar goes around them: "Session baru", "Tutup session", "di-deploy
 | Loading… / Saving… / Checking… / Working… | Memuat… / Menyimpan… / Memeriksa… / Bekerja… |
 | Generating… / Scanning… / Stopping… | Membuat… / Memindai… / Menghentikan… |
 | s / min / h (durations) | dtk / mnt / jam |
+| Turn (of a chat) | Giliran |
+| Queue / Queued / Queue message | Antrean / Dalam antrean / Antrekan pesan |
+| Composer | Kotak pesan |
+| Graph / Timeline | Graf / Linimasa |
+| Project / Preview / Provider | Proyek / Pratinjau / Penyedia |
+| Triage | Triase |
+| Split (a task) / Split (a workflow step's kind) | Pecah / Pemecahan |
+| Draft (a contract) | Susun draf |
+| Continue (an XL run) | Teruskan (Resume stays Lanjutkan) |
+| Step / Round / Fix round / Flow | Langkah / Putaran / Putaran perbaikan / Alur |
+| Criterion / Reviewer / A review | Kriteria / Peninjau / Tinjauan |
+| Reviewed / Not reviewed | Ditinjau / Belum ditinjau |
+| Installed / On / Off / Turn on / Turn off | Terpasang / Aktif / Nonaktif / Aktifkan / Nonaktifkan |
+| Interrupted / Not verified / Accepted with risk | Terinterupsi / Belum diverifikasi / Diterima dengan risiko |
+| Skipped / Cancelled / Not run (a skipped step) | Dilewati / Dibatalkan / Tidak dijalankan |
+| Deployed / Deploying… | Ter-deploy / Men-deploy… |
+| Publish (a branch) | Terbitkan |
+| Revert (a file, a hunk) | Kembalikan |
+| Sign in / Signed in / Not signed in | Masuk / Sudah masuk / Belum masuk |
+| Appearance / Options / Limits / About | Tampilan / Opsi / Batas / Tentang |
+| Restart / Later / Not now | Mulai ulang / Nanti / Nanti saja |
+| Minimize / Maximize / Restore (a window) | Perkecil / Maksimalkan / Pulihkan |
+| Read-only | Hanya baca |
+| Confidence / Signals | Keyakinan / Sinyal |
+| Generate / Regenerate | Buat / Buat ulang |
+| Self-test / Screenshot | Uji mandiri / Tangkapan layar |
+| Repository | Repositori |
+| e.g. | mis. |
 
 When a term isn't here, translate it the way the nearest entry does, then add it to this table in the same PR.

@@ -86,7 +86,7 @@
   "workflows.canvas.statusDone": "Selesai",
   "workflows.canvas.statusFailed": "Gagal",
   "workflows.canvas.statusCancelled": "Dihentikan",
-  "workflows.canvas.statusSkipped": "Belum dijalankan",
+  "workflows.canvas.statusSkipped": "Tidak dijalankan",
   "workflows.canvas.turns_other": "{{count}} turn",
   "workflows.canvas.stepTitle": "{{kind}}: {{label}}",
   "workflows.canvas.stepTitleWithStatus": "{{kind}}: {{label}} ({{status}})",

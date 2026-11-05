@@ -34,10 +34,9 @@
   "shell.options.effortHigh": "Effort tinggi",
   "shell.options.effortXhigh": "Effort sangat tinggi",
   "shell.options.effortMax": "Effort maksimum",
-
   "shell.sidebar.label": "Session dan workspace",
   "shell.sidebar.brand": "AgentChainer",
-  "shell.sidebar.newTitle": "Chat baru; untuk task, pilih Task di kolom pesannya ({{keys}})",
+  "shell.sidebar.newTitle": "Chat baru; untuk task, pilih Task di kotak pesan ({{keys}})",
   "shell.sidebar.newSession": "Baru",
   "shell.sidebar.fleet": "Fleet",
   "shell.sidebar.waitingTitle": "Menunggu Anda",
@@ -68,7 +67,6 @@
   "shell.sidebar.settings": "Pengaturan",
   "shell.sidebar.endedTitle": "Berakhir: buka untuk melanjutkan",
   "shell.sidebar.ended": "berakhir",
-
   "shell.sessionList.title": "Session sebelumnya",
   "shell.sessionList.loading": "Memuat…",
   "shell.sessionList.empty": "Belum ada session di folder ini. Session yang dimulai di terminal juga muncul di sini.",
@@ -93,23 +91,18 @@
   "shell.sessionList.retention": "Claude Code menghapus session setelah {{days}} hari tanpa aktivitas ({{source}}). Untuk menyimpannya lebih lama, naikkan <code>{{setting}}</code> di <code>{{file}}</code>.",
   "shell.sessionList.retentionDefault": "default",
   "shell.sessionList.retentionSetIn": "diatur di pengaturan {{source}} Anda",
-
   "shell.titleBar.minimize": "Perkecil",
   "shell.titleBar.maximize": "Maksimalkan",
   "shell.titleBar.restore": "Pulihkan",
   "shell.titleBar.close": "Tutup",
-
   "shell.dialog.close": "Tutup",
   "shell.dialog.cancel": "Batal",
-
   "shell.modeHelp.label": "Arti tiap profil",
   "shell.modeHelp.title": "Profil izin",
   "shell.modeHelp.thisSession": "· session ini",
   "shell.modeHelp.guard": "Pengaman AgentChainer memblokir perintah berbahaya di setiap profil.",
-
   "shell.gitInit.notRepo": "Folder ini bukan repositori git, jadi Anda tidak akan bisa meninjau atau mengembalikan perubahan agent.",
   "shell.gitInit.init": "Inisialisasi git di sini",
-
   "shell.workspacesCard.title": "Workspace",
   "shell.workspacesCard.hint": "Beberapa folder dalam satu session, mis. aplikasi dan API-nya",
   "shell.workspacesCard.new": "Workspace baru…",
@@ -117,7 +110,6 @@
   "shell.workspacesCard.actions": "Tindakan {{name}}",
   "shell.workspacesCard.edit": "Edit…",
   "shell.workspacesCard.remove": "Hapus",
-
   "shell.workspaceDialog.newTitle": "Workspace baru",
   "shell.workspaceDialog.editTitle": "Edit workspace",
   "shell.workspaceDialog.description": "Sekumpulan folder dengan satu nama, mis. aplikasi dan API-nya: satu session bekerja di semuanya.",
@@ -132,14 +124,11 @@
   "shell.workspaceDialog.addFolder": "Tambah folder…",
   "shell.workspaceDialog.choosePrimary": "Pilih folder utama…",
   "shell.workspaceDialog.help": "Claude dapat membaca dan mengubah setiap folder di sini, dengan persetujuan dan pengaman yang sama seperti di satu folder. Hanya CLAUDE.md, pengaturan proyek, hook, dan skill dari folder utama yang berlaku: CLI tidak memuatnya dari folder lain (diperiksa di CLI 2.1.314).",
-
   "shell.copyButton.copy": "Salin",
   "shell.copyButton.copied": "Disalin",
-
   "shell.editableList.add": "Tambah",
   "shell.editableList.row": "{{label}} {{n}}",
   "shell.editableList.remove": "Hapus {{label}} {{n}}",
-
   "shell.treeRow.outside": "{{path}} (di luar workspace)",
   "shell.treeRow.modified": "diubah",
   "shell.treeRow.added": "ditambahkan",

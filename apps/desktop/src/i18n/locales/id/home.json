@@ -67,7 +67,7 @@
   "home.settings.theme": "Tema",
   "home.settings.language": "Bahasa",
   "home.settings.restartTitle": "Mulai ulang untuk mengganti bahasa?",
-  "home.settings.restartBody": "AgentChainer dimulai ulang dalam {{language}}. Session yang berjalan akan berhenti; Anda dapat melanjutkannya. Pilih Batal untuk mengganti bahasa saat AgentChainer dibuka berikutnya.",
+  "home.settings.restartBody": "Bahasa tampilan menjadi {{language}} setelah AgentChainer dimulai ulang. Session yang berjalan akan berhenti; Anda dapat melanjutkannya. Pilih Batal untuk mengganti bahasa saat AgentChainer dibuka berikutnya.",
   "home.settings.restartNow": "Mulai ulang sekarang",
   "home.settings.newSessions": "Session baru",
   "home.settings.model": "Model",

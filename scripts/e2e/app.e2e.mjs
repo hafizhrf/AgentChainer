@@ -21,6 +21,8 @@ async function flow(name, body) {
   } catch (err) {
     const png = await app.screenshot().catch(() => null);
     if (png) writeFileSync(path.join(artifacts, `${name}.png`), png);
+    // Close whatever dialog or palette the failed flow left open, so the next flow starts clean.
+    await app.chord(KEY.escape).catch(() => undefined);
     throw err;
   }
 }
@@ -49,8 +51,9 @@ describe("AgentChainer end to end (X-06)", () => {
 
   it("opens the recent workspace from the sidebar, then its settings", () =>
     flow("2-workspace", async () => {
+      // By the folder's name: the title is the full path, whose form differs between platforms.
       const recent = await app.find(
-        `//nav[@aria-label='Sessions and workspaces']//button[@title=${xpathString(workspace)}]`,
+        `//nav[@aria-label='Sessions and workspaces']//button[contains(@class, 'workspace')][.//*[normalize-space(.)=${xpathString(path.basename(workspace))}]]`,
       );
       await recent.click();
       // Shown once the runtime is connected and the folder is known.

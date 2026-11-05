@@ -8,7 +8,7 @@
 // Everything the app writes goes to temporary folders: its settings (seeded with one recent workspace), data, logs, and
 // the workspace itself, a git copy of fixtures/sample-app. Nothing of yours is read or changed.
 import { execFileSync, spawn } from "node:child_process";
-import { cpSync, existsSync, mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, mkdtempSync, realpathSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { parseArgs } from "node:util";
@@ -51,7 +51,8 @@ const logDir = path.join(
 );
 
 // The workspace: a git repository copied from the fixture.
-const workspace = path.join(home, "sample-app");
+// The long form of the path: Windows runners' temp folder is an 8.3 short name (RUNNER~1), which the app shows as is.
+const workspace = path.join(realpathSync.native(home), "sample-app");
 cpSync(path.join(repo, "fixtures", "sample-app"), workspace, { recursive: true });
 const git = (...args) =>
   execFileSync("git", ["-c", "user.name=e2e", "-c", "user.email=e2e@example.invalid", ...args], { cwd: workspace });

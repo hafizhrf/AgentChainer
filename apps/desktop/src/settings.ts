@@ -16,6 +16,8 @@ export type Settings = {
   showThinking: boolean | null;
   /** "light" or "dark"; null follows the OS (UX-02). */
   theme: string | null;
+  /** The UI's language (X-13): "id" for Bahasa Indonesia; null is English. Takes effect after a restart. */
+  language: string | null;
   /** Apply safe setup before each new session (M2-18); null means off. */
   autoApply: boolean | null;
   /** Show "New task" (M3 contract and triage) before tasks can run; null means off. */

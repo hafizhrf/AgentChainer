@@ -12,8 +12,8 @@ import workflows from "./locales/en/workflows.json" with { type: "json" };
 
 /**
  * The UI's text (X-13, ADR-0011). Every string a person reads lives in `locales/<language>/<area>.json`, as flat keys
- * in the i18next JSON v4 conventions: `{{name}}` for values, `_one` / `_other` suffixes for plurals. English is the
- * only language so far. Dates and numbers keep the system's regional format (`format.ts`).
+ * in the i18next JSON v4 conventions: `{{name}}` for values, `_one` / `_other` suffixes for plurals. English is built
+ * in; Bahasa Indonesia loads on demand. Dates and numbers keep the system's regional format (`format.ts`).
  */
 export const CATALOGS = { common, menu, app, session, panel, shell, home, graph, tasks, setup, workflows };
 
@@ -34,20 +34,33 @@ type PluralBase<K> = K extends `${infer B}_one` | `${infer B}_other` ? B : never
 export type MessageKey = RawKey | PluralBase<RawKey>;
 export type Params = Record<string, string | number>;
 
+/** The languages the UI speaks, each named in itself (Settings → Language). */
+export const LANGUAGES = { en: "English", id: "Bahasa Indonesia" } as const;
+export type Language = keyof typeof LANGUAGES;
+export const asLanguage = (value: unknown): Language => (value === "id" ? "id" : "en");
+const TAGS: Record<Language, string> = { en: "en-US", id: "id-ID" };
+
 const english: Record<string, string> = Object.assign({}, ...Object.values(CATALOGS));
-let locale = "en";
+let language: Language = "en";
 let messages = english;
-let rules = new Intl.PluralRules(locale);
+let rules = new Intl.PluralRules(TAGS.en);
 let pseudo = false;
 
-/** Switches the language. Only English exists; a second language registers its catalogs here. */
-export function setLocale(next: string) {
-  locale = next;
-  messages = english;
-  rules = new Intl.PluralRules(locale);
+/**
+ * Switches the language, before the UI is drawn: a change in Settings restarts the app (ADR-0011). English is built
+ * in; another language loads its own chunk and covers English key by key.
+ */
+export async function setLocale(next: Language) {
+  const extra = next === "id" ? (await import("./locales/id/index.ts")).default : {};
+  language = next;
+  messages = { ...english, ...extra };
+  rules = new Intl.PluralRules(TAGS[next]);
   const doc = (globalThis as { document?: { documentElement: { lang: string } } }).document;
-  if (doc) doc.documentElement.lang = locale;
+  if (doc) doc.documentElement.lang = next;
 }
+
+/** The language's BCP 47 tag, for `Intl` words such as weekday names: "en-US" or "id-ID". */
+export const currentLocale = () => TAGS[language];
 
 /**
  * Debug builds only (`AGENTCHAINER_PSEUDO_LOCALE=1`): every message renders accented and in ⟦brackets⟧, so text that

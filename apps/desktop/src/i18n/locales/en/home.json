@@ -17,7 +17,6 @@
   "home.view.profileYours": "Yours",
   "home.view.profileProject": "This project",
   "home.view.start": "Start session",
-
   "home.workspace.title": "Workspace",
   "home.workspace.done": "Done",
   "home.workspace.enterPath": "Enter a path",
@@ -31,7 +30,6 @@
   "home.workspace.open": "Open folder…",
   "home.workspace.homeWarning": "That's your whole home folder. Pick a single project folder so the agent stays inside it.",
   "home.workspace.recent": "Recent",
-
   "home.readiness.label": "Setup check",
   "home.readiness.checking": "Checking your setup…",
   "home.readiness.waiting": "Waiting for the agent runtime…",
@@ -60,7 +58,6 @@
   "home.readiness.authSubscription": "Claude subscription",
   "home.readiness.authApiKey": "API key",
   "home.readiness.authCloud": "cloud provider: {{provider}}",
-
   "home.settings.title": "Settings",
   "home.settings.saving": "Saving…",
   "home.settings.save": "Save",
@@ -68,6 +65,10 @@
   "home.settings.exportFailed": "Export failed: {{error}}",
   "home.settings.appearance": "Appearance",
   "home.settings.theme": "Theme",
+  "home.settings.language": "Language",
+  "home.settings.restartTitle": "Restart to switch the language?",
+  "home.settings.restartBody": "AgentChainer restarts in {{language}}. Running sessions stop; you can resume them. Choose Cancel to switch the next time it starts.",
+  "home.settings.restartNow": "Restart now",
   "home.settings.newSessions": "New sessions",
   "home.settings.model": "Model",
   "home.settings.defaultModel": "Default model",
@@ -99,7 +100,6 @@
   "home.settings.checkUpdates": "Check for updates…",
   "home.settings.exportDiagnostics": "Export diagnostics…",
   "home.settings.diagnosticsHelp": "Diagnostics hold versions, settings, the setup check and recent logs, for bug reports. No credentials or account details. AgentChainer sends no telemetry; see the <link>privacy statement</link>.",
-
   "home.update.title": "Check for updates",
   "home.update.checkFailed": "Couldn't check for updates: {{error}}",
   "home.update.downloadFailed": "The download failed: {{error}}",

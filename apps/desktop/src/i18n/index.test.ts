@@ -1,9 +1,13 @@
 import assert from "node:assert/strict";
 import { afterEach, test } from "node:test";
+import { whenText } from "../schedules.ts";
 import { compactDuration, megabytes, minutesSeconds, thousands } from "./format.ts";
-import { richParts, setPseudo, t } from "./index.ts";
+import { currentLocale, richParts, setLocale, setPseudo, t } from "./index.ts";
 
-afterEach(() => setPseudo(false));
+afterEach(async () => {
+  setPseudo(false);
+  await setLocale("en");
+});
 
 test("fills in values and leaves unknown ones visible", () => {
   assert.equal(t("common.format.minutesSeconds", { m: 3, s: 4 }), "3 min 4 s");
@@ -40,4 +44,19 @@ test("the pseudo-locale accents letters and brackets every message, but not the 
   const parts = richParts("menu.undo");
   assert.equal(parts[0]?.text, "⟦");
   assert.equal(parts.at(-1)?.text, "⟧");
+});
+
+test("Bahasa Indonesia loads on demand, and day names and times follow it", async () => {
+  await setLocale("id");
+  assert.equal(currentLocale(), "id-ID");
+  assert.equal(t("menu.quit", { app: "AgentChainer" }), "Keluar dari AgentChainer");
+  assert.equal(t("common.format.minutesSeconds", { m: 3, s: 4 }), "3 mnt 4 dtk");
+  const friday = new Date(2026, 10, 6, 2, 0);
+  assert.equal(
+    whenText(friday, new Date(2026, 10, 3, 9, 0)),
+    t("graph.schedules.dayTime", { day: "Jum", time: "02.00" }),
+  );
+  await setLocale("en");
+  assert.equal(t("menu.quit", { app: "AgentChainer" }), "Quit AgentChainer");
+  assert.equal(whenText(friday, new Date(2026, 10, 3, 9, 0)), "Fri 02:00");
 });

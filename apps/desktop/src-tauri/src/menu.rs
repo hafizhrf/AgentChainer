@@ -40,19 +40,28 @@ fn help_url(id: &str) -> Option<String> {
     }
 }
 
-/// The menu's labels, from the UI's catalog (X-13): the title bar on Windows and Linux shows the same ones.
-fn labels() -> &'static HashMap<String, String> {
-    static L: OnceLock<HashMap<String, String>> = OnceLock::new();
-    L.get_or_init(|| {
-        serde_json::from_str(include_str!("../../src/i18n/locales/en/menu.json"))
-            .expect("valid menu.json")
-    })
+/// The menu's labels in English and in Bahasa Indonesia, from the UI's catalogs (X-13): the title bar on Windows and
+/// Linux shows the same ones.
+fn labels(language: Option<&str>) -> &'static HashMap<String, String> {
+    static EN: OnceLock<HashMap<String, String>> = OnceLock::new();
+    static ID: OnceLock<HashMap<String, String>> = OnceLock::new();
+    match language {
+        Some("id") => ID.get_or_init(|| {
+            serde_json::from_str(include_str!("../../src/i18n/locales/id/menu.json"))
+                .expect("valid id/menu.json")
+        }),
+        _ => EN.get_or_init(|| {
+            serde_json::from_str(include_str!("../../src/i18n/locales/en/menu.json"))
+                .expect("valid en/menu.json")
+        }),
+    }
 }
 
-/// The label for `key` ("menu.…"), with `{{app}}` filled in.
-fn label(key: &str, app_name: &str) -> String {
-    labels()
+/// The label for `key` ("menu.…") in `language`, English where it has none, with `{{app}}` filled in.
+fn label(key: &str, app_name: &str, language: Option<&str>) -> String {
+    labels(language)
         .get(key)
+        .or_else(|| labels(None).get(key))
         .map_or_else(|| key.to_string(), |text| text.replace("{{app}}", app_name))
 }
 
@@ -60,8 +69,9 @@ fn item<R: Runtime>(
     app: &AppHandle<R>,
     id: &str,
     accelerator: Option<&str>,
+    language: Option<&str>,
 ) -> tauri::Result<MenuItem<R>> {
-    let builder = MenuItemBuilder::with_id(id, label(&format!("menu.{id}"), ""));
+    let builder = MenuItemBuilder::with_id(id, label(&format!("menu.{id}"), "", language));
     match accelerator {
         Some(keys) => builder.accelerator(keys),
         None => builder,
@@ -69,18 +79,18 @@ fn item<R: Runtime>(
     .build(app)
 }
 
-/// Builds the native menu bar, used on macOS only (UX-15). There's no predefined "Close Window" item: ⌘W closes the
-/// session instead.
+/// Builds the native menu bar in the UI's language, used on macOS only (UX-15). There's no predefined "Close Window"
+/// item: ⌘W closes the session instead. A new language takes effect when the app restarts.
 #[cfg_attr(not(target_os = "macos"), allow(dead_code))]
-pub fn build<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
+pub fn build<R: Runtime>(app: &AppHandle<R>, language: Option<&str>) -> tauri::Result<Menu<R>> {
     let name = app.package_info().name.clone();
-    let l = |key: &str| label(key, &name);
-    let settings = item(app, "settings", Some("CmdOrCtrl+Comma"))?;
-    let new_session = item(app, "new-session", Some("CmdOrCtrl+N"))?;
+    let l = |key: &str| label(key, &name, language);
+    let settings = item(app, "settings", Some("CmdOrCtrl+Comma"), language)?;
+    let new_session = item(app, "new-session", Some("CmdOrCtrl+N"), language)?;
     // Only acts when the Tasks preview is on (Settings); the UI ignores it otherwise.
-    let new_task = item(app, "new-task", Some("CmdOrCtrl+Shift+N"))?;
-    let open_folder = item(app, "open-folder", Some("CmdOrCtrl+O"))?;
-    let close_session = item(app, "close-session", Some("CmdOrCtrl+W"))?;
+    let new_task = item(app, "new-task", Some("CmdOrCtrl+Shift+N"), language)?;
+    let open_folder = item(app, "open-folder", Some("CmdOrCtrl+O"), language)?;
+    let close_session = item(app, "close-session", Some("CmdOrCtrl+W"), language)?;
 
     let file = SubmenuBuilder::new(app, l("menu.file"))
         .item(&new_session)
@@ -107,21 +117,41 @@ pub fn build<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
         .build()?;
 
     let view = SubmenuBuilder::new(app, l("menu.view"))
-        .item(&item(app, "command-palette", Some("CmdOrCtrl+Shift+P"))?)
+        .item(&item(
+            app,
+            "command-palette",
+            Some("CmdOrCtrl+Shift+P"),
+            language,
+        )?)
         .separator()
-        .item(&item(app, "toggle-sidebar", Some("CmdOrCtrl+Backslash"))?)
-        .item(&item(app, "toggle-right-panel", Some("CmdOrCtrl+B"))?)
-        .item(&item(app, "toggle-terminal", Some("CmdOrCtrl+J"))?);
+        .item(&item(
+            app,
+            "toggle-sidebar",
+            Some("CmdOrCtrl+Backslash"),
+            language,
+        )?)
+        .item(&item(
+            app,
+            "toggle-right-panel",
+            Some("CmdOrCtrl+B"),
+            language,
+        )?)
+        .item(&item(
+            app,
+            "toggle-terminal",
+            Some("CmdOrCtrl+J"),
+            language,
+        )?);
     #[cfg(target_os = "macos")]
     let view = view.separator().fullscreen_with_text(l("menu.fullscreen"));
     let view = view.build()?;
 
     let help = SubmenuBuilder::new(app, l("menu.help"))
-        .item(&item(app, "help-getting-started", None)?)
-        .item(&item(app, "help-report-issue", None)?)
+        .item(&item(app, "help-getting-started", None, language)?)
+        .item(&item(app, "help-report-issue", None, language)?)
         .separator()
-        .item(&item(app, "export-diagnostics", None)?)
-        .item(&item(app, "check-updates", None)?)
+        .item(&item(app, "export-diagnostics", None, language)?)
+        .item(&item(app, "check-updates", None, language)?)
         .build()?;
 
     let menu = MenuBuilder::new(app);
@@ -190,14 +220,24 @@ mod tests {
     }
 
     #[test]
-    fn every_item_has_a_label() {
+    fn every_item_has_a_label_in_each_language() {
         let ids = UI_COMMANDS
             .iter()
             .chain(&["help-getting-started", "help-report-issue"]);
         for id in ids {
-            assert!(labels().contains_key(&format!("menu.{id}")), "menu.{id}");
+            for language in [None, Some("id")] {
+                let key = format!("menu.{id}");
+                assert!(labels(language).contains_key(&key), "{language:?} {key}");
+            }
         }
-        assert_eq!(label("menu.about", "AgentChainer"), "About AgentChainer");
+        assert_eq!(
+            label("menu.about", "AgentChainer", None),
+            "About AgentChainer"
+        );
+        assert_eq!(
+            label("menu.quit", "AgentChainer", Some("id")),
+            "Keluar dari AgentChainer"
+        );
     }
 
     #[test]

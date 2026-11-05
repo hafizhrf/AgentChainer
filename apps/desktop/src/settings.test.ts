@@ -11,6 +11,7 @@ const base: Settings = {
   budgetUsd: null,
   showThinking: null,
   theme: null,
+  language: null,
   autoApply: null,
   tasksPreview: null,
   recentWorkspaces: [],

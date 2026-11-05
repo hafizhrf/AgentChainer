@@ -123,8 +123,8 @@ Troubleshooting:
 
 ### Text in the UI
 
-Every string a person reads goes through a catalog ([ADR-0011](docs/adr/0011-ui-text-catalogs.md), X-13). Only English
-exists so far.
+Every string a person reads goes through a catalog ([ADR-0011](docs/adr/0011-ui-text-catalogs.md), X-13), in English
+and in Bahasa Indonesia.
 - **Where:** `apps/desktop/src/i18n/locales/en/<area>.json`, in the area of the file you're editing: `app`, `session`,
   `panel`, `shell`, `home`, `graph`, `tasks`, `setup`, `workflows`, `menu`.
   - Keys are flat, `<area>.<component>.<purpose>`, e.g. `setup.plugins.searchPlaceholder`.
@@ -145,10 +145,11 @@ exists so far.
   - `pnpm test` fails on a literal `label`, `title`, `placeholder` or `aria-label`, on an unused key, and on a key in
     the wrong file.
   - Running a debug build with `AGENTCHAINER_PSEUDO_LOCALE=1` shows anything you missed: it's the text without ⟦⟧.
-- **Adding a language:**
-  1. Copy `locales/en/` to `locales/<code>/` and translate the values.
-  2. Register it in `i18n/index.ts`.
-  3. Add the Language setting that comes with the second language (ADR-0011).
+- **Every key in every language:** a new English key needs its Bahasa Indonesia too (`locales/id/`), and
+  `pnpm test` fails until it has one, with the same `{{values}}` and tags. Follow
+  [TRANSLATING.md](docs/guides/TRANSLATING.md). If you don't speak Indonesian, say so in the PR and a maintainer
+  adds it.
+- **Adding a language:** see [TRANSLATING.md](docs/guides/TRANSLATING.md).
 - Docs are in English. Mark unverified external facts **(verify)** and link sources.
 
 ## Reporting security issues

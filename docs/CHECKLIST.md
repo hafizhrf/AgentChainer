@@ -2136,6 +2136,34 @@ first.
 
           The run before found one unmarked string, "git version …" on the setup check. It's `git --version` output,
           so the test now treats it as data.
+      - **Bahasa Indonesia for the UI (2026-11-05):** the owner chose Indonesian as the second language, in formal
+        "Anda", with developers' English terms kept.
+        - **The setting:** Settings → Appearance → Language, with English (the default) or Bahasa Indonesia. Saving a new
+          language asks to restart the app, or applies at the next start.
+          - `main.tsx` loads it from the Rust core before the first render.
+          - The macOS menu is built in it.
+          - Weekday names and the time separator follow it ("Jum 02.00").
+        - **The catalogs:** `locales/id/`, 1,763 keys (English plurals' `_one` forms aren't needed). They load in their
+          own chunk, 29 kB gzipped; the main chunk doesn't grow.
+        - **How it was translated:** a glossary came first ([TRANSLATING.md](guides/TRANSLATING.md)). Then four agents
+          each translated one area, and a consistency pass unified the terms they chose, which went into the glossary.
+        - **Guards:**
+          - `i18n/catalog.test.ts` fails when Indonesian misses or adds a key, has an empty value, or changes a
+            `{{value}}` or a tag.
+          - An E2E phase starts the app in Indonesian: `<html lang="id">`, labels from the catalog, the Language
+            select, axe on Home, Settings, Workspace settings and the palette, and `id-*.png` screenshots.
+        - **macOS:** [MANUAL_CHECKS](guides/MANUAL_CHECKS.md) checks 9–10 switch the language and read the menu bar.
+        - **Evidence:** CI run [42014564019](https://github.com/hafizhrf/AgentChainer/actions/runs/42014564019)
+          (#132), on Ubuntu and on Windows:
+          - X-06: 5/5;
+          - X-12: 8/8;
+          - the pseudo-locale: 5/5;
+          - Bahasa Indonesia: 4/4, with no serious or critical axe violation.
+
+          The Windows run's `id-home.png` and `id-settings.png` show the Indonesian UI.
+          - **The run before** found that the runner skipped a phase after a failed one, which is fixed.
+          - It also flagged the language names in Settings in the pseudo-locale. They're named in themselves on
+            purpose, so they're data.
       - **Part 2, still open:**
         - the sidecar's prose: findings, plan reasons, run outcomes, about 290 error sites;
         - the protocol's shared texts: approval reasons, `agentProblems`, `folderProblems`, `cadenceText`;

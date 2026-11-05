@@ -294,7 +294,9 @@ pub fn run() {
         .plugin(tauri_plugin_clipboard_manager::init());
     // The native menu bar on macOS only; Windows and Linux get the UI's title bar with its menus (UX-15).
     #[cfg(target_os = "macos")]
-    let app = app.menu(menu::build).on_menu_event(menu::on_event);
+    let app = app
+        .menu(|app| menu::build(app, settings::load(app).language.as_deref()))
+        .on_menu_event(menu::on_event);
     let app = app
         .setup(|app| {
             if let Ok(dir) = app.path().app_log_dir() {

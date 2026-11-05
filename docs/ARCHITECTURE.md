@@ -487,7 +487,7 @@ agentchainer/
 | Sidecar | `node:test` (+ built-in coverage) | Normalizer against recorded fixtures; guard; CLI parsing; installers and rollback on temp dirs |
 | UI | `node:test` for pure logic (transcript reducer, tabs, diff, fuzzy) and for the RPC client over a fake transport (`rpc-client.test.ts`) replaying the sidecar's event snapshots of recorded fixtures; Vitest + Testing Library once DOM component tests are needed | No live model calls in CI |
 | Protocol | Generated-type compile checks + schema round-trip tests | Rust ⇄ TS stay in sync |
-| E2E | `tauri-driver` (WebDriver) on Linux and Windows | macOS WKWebView has no WebDriver **(verify)**; use a manual checklist there |
+| E2E | `tauri-driver` (WebDriver) on Linux and Windows: `scripts/e2e/` in CI's Build & launch jobs, flows that need no Claude login | macOS WKWebView has no WebDriver **(verify)**; [MANUAL_CHECKS.md](guides/MANUAL_CHECKS.md) instead |
 | Contract drift | Weekly CI job against the latest SDK + CLI (`.github/workflows/drift.yml`): the SDK through typecheck and the recorded-fixture tests, the CLI through the commands and flags in `cli-contract.ts` | Opens an issue on mismatch and closes it on the next pass (X-05) |
 | Live smoke | `spike-host` scenarios with the maintainer's own login: `basic`, `mode`, `interrupt`, `guard`, `auto`, `subagents`, `sessions`, `approvals`, `plan`, `fixtures`, `image`, and `exit` (M1 exit criteria E1–E5 on `fixtures/sample-app`) | Never in PR CI |
 

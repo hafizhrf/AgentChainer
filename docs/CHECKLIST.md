@@ -28,7 +28,7 @@
 | [M5](#m5--git-workflow-pr--quality-gates-v03) | v0.3 | Git workflow, PRs, gates | ◐ Done for GitHub ([git-workflow.md](design/git-workflow.md)): worktrees, PRs, CI and Fix CI, merge gates, human merge; E1 passed on Windows. GitLab (M5-06, optional) left |
 | [M6](#m6--deployment--workflow-canvas-v04) | v0.4 | Deploy adapters, workflow canvas | ◐ Built ([deploy-and-canvas.md](design/deploy-and-canvas.md)): Vercel, Cloudflare Workers, Firebase, Fly.io and Docker adapters, production with typed confirmation and rollback, the workflow canvas; left: live deploys with the owner's logins (E1), canvas Import/Export by hand |
 | [M7](#m7--evals--analytics-v05) | v0.5 | Evals & analytics | ◐ Metrics, the eval benchmark and the CI report check in ([evals.md](design/evals.md)); OpenTelemetry deferred; E1 ticks with the first PR that changes a workflow |
-| [M8](#m8--multi-folder-workspaces--agent-fleet-proposed) | later | Multi-folder workspaces, agent fleet | ◐ All six built: multi-folder workspaces, the fleet view, supervisor and worker sessions, agent profiles, scheduled runs, lessons; open: M8-07, resuming a multi-folder chat loses its other folders |
+| [M8](#m8--multi-folder-workspaces--agent-fleet-proposed) | later | Multi-folder workspaces, agent fleet | ◐ All six built: multi-folder workspaces, the fleet view, supervisor and worker sessions, agent profiles, scheduled runs, lessons; M8-07 (resuming a multi-folder chat) fixed in #119 |
 | [X](#cross-cutting-tracks-ongoing) | all | Security, quality, compatibility, docs, a11y | ☐ Ongoing |
 
 ---
@@ -1945,6 +1945,21 @@ first.
       - The first two runs hit GitHub's incident that day: an internal error creating the report job, then a
         GraphQL error in `gh issue create`. Each `gh` call in the report job now gets three tries.
 - [ ] **X-06** E2E with `tauri-driver` on Linux and Windows. macOS uses a manual checklist (verify WebDriver support).
+      - Built (2026-11-05):
+        - **The tests:** `scripts/e2e/`, a WebDriver client over `fetch` (no new dependency), with `node:test` flows
+          that need no Claude login:
+          1. the setup check;
+          2. opening the recent workspace, then Workspace settings;
+          3. the "Ignore env and secret files" fix applied, checked on disk, and rolled back from History;
+          4. the command palette opening a section;
+          5. Settings saving the dark theme.
+        - **Isolation:** each run uses temporary settings, data and a git copy of `fixtures/sample-app`. A failing
+          flow saves a screenshot and the app log.
+        - **CI:** the Build & launch jobs run the tests on Ubuntu (WebKitWebDriver under Xvfb) and Windows (the
+          runner's msedgedriver), with `tauri-driver` 2.1.0.
+        - **macOS:** [MANUAL_CHECKS.md](guides/MANUAL_CHECKS.md), linked from RELEASING.
+      - Locally, in the Ubuntu 22.04 image (`scripts/e2e/Dockerfile`), 5/5 flows pass in about 7–9 s, twice in a
+        row. With one assertion broken on purpose, that flow failed and left its screenshot and log.
 - [x] **X-07** Performance budgets for startup time, idle memory and stream latency, tracked every release.
       — evidence: [PERFORMANCE.md](PERFORMANCE.md).
   - **Budgets** (`scripts/perf-budgets.json`): startup 6 s; idle memory 600 MB (850 MB on Linux, where WebKitGTK runs

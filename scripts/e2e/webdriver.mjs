@@ -36,7 +36,14 @@ export class WebDriver {
   /** Starts the app under test. */
   async start(application) {
     const value = await this.call("POST", "/session", {
-      capabilities: { alwaysMatch: { browserName: "wry", "tauri:options": { application } } },
+      capabilities: {
+        alwaysMatch: {
+          browserName: "wry",
+          // On Windows, msedgedriver attaches to the app's WebView2 only when webviewOptions is there; tauri-driver 2.1
+          // passes it on but no longer adds it, and without it the app is launched as if it were Edge.
+          "tauri:options": { application, ...(process.platform === "win32" ? { webviewOptions: {} } : {}) },
+        },
+      },
     });
     this.session = value.sessionId;
   }

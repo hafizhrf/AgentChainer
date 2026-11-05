@@ -1,7 +1,9 @@
 # Contributing to AgentChainer
 
-Thanks for your interest! AgentChainer is pre-alpha (milestone M0). The design docs in [`docs/`](docs/) are the source of
-truth, and [`docs/CHECKLIST.md`](docs/CHECKLIST.md) is the work plan.
+Thanks for your interest! AgentChainer is preparing its first release, v0.1 (phase R1); later milestones are built
+behind previews. The design docs in [`docs/`](docs/) are the source of truth, and
+[`docs/CHECKLIST.md`](docs/CHECKLIST.md) is the work plan. New here? The [tour of the code](#a-tour-of-the-code) and
+[GOOD_FIRST_ISSUES.md](docs/GOOD_FIRST_ISSUES.md) are good places to start.
 
 ## Before you start
 
@@ -45,6 +47,50 @@ Troubleshooting:
   - Put `C:\Program Files\Git\bin` on your PATH, so `sh` is found by the tests and by `scripts/smoke.sh` gates.
   - Turn on Developer Mode (`start ms-settings:developers`); one test creates a symlink, which Windows otherwise
     refuses.
+
+## A tour of the code
+
+### Where things live
+
+| Path | What's there |
+|---|---|
+| `apps/desktop/src/` | The React UI. `App.tsx` holds the shell and the open tabs; `HomeView`, `SessionView`, `TranscriptView`, `Composer`, `WorkspacePanel` and `FleetView` are the main screens. Subfolders: `tasks/` (a task's thread), `setup/` (Workspace settings), `graph/` (Graph and Timeline), `workflows/` (the workflow canvas), `ui/` (Radix-based building blocks), `styles/` (CSS tokens and files, no Tailwind, [ADR-0008](docs/adr/0008-ui-components-and-styling.md)), `i18n/` (the text catalogs). |
+| `apps/desktop/src-tauri/src/` | The Rust core: `sidecar.rs` starts and supervises the sidecar and relays its frames; `settings.rs` (the settings file); `menu.rs` (the native menu); `pty.rs` and `terminal.rs` (the terminal); `watcher.rs` (file changes); `history.rs` (the cost history in SQLite); `diagnostics.rs` and `redact.rs` (Export diagnostics). |
+| `packages/protocol/src/index.ts` | Every IPC method and event as a zod schema. The TypeScript types on both sides are inferred from it. |
+| `packages/sidecar/src/` | The agent runtime, in Node. `main.ts` wires each method to its handler; `rpc.ts` reads and writes the frames; `session.ts` runs a chat through the Agent SDK; `normalize.ts` turns SDK messages into the app's events; `guard.ts` blocks dangerous commands; `permissions.ts` brokers approvals; `team.ts`, `agents.ts`, `profiles.ts` (M8). Subfolders: `detect/` (what a project has), `bootstrap/` (the setup plan, apply, rollback, generators), `catalog/`, `tasks/` (contracts, triage, the runner, gates, evidence, XL, schedules, lessons), `deploy/`, `evals/`. |
+| `catalog/` | The reviewed catalog: `items/` (skills, plugins, MCP servers, tools), `profiles/`, and `workflows/` (one YAML per task tier). `build-catalog.ts` compiles it into the snapshot the app ships. |
+| `agents/` | The role prompts a task's steps run as (`ac-implementer.md`, `ac-independent-reviewer.md`, …). |
+| `skills/` | AgentChainer's own skills, used by the setup generators. |
+| `fixtures/` | Sample projects for the detector, the setup plan and the live scripts. `packages/sidecar/test/fixtures/` holds recorded SDK streams. |
+| `scripts/` | Release, smoke, E2E, performance and proxy scripts; the commands table in [`CLAUDE.md`](CLAUDE.md#commands) lists them all. |
+
+### How a request travels
+
+Take **Start session**:
+1. The UI calls `request("session.start", params)` (`apps/desktop/src/sidecar.ts`, built on `rpc-client.ts`). The
+   method's zod schema in `packages/protocol` types the params, and the client checks the result against it when it
+   comes back.
+2. The frame goes to the Rust core with the `sidecar_send` command (`src-tauri/src/lib.rs`), which writes it to the
+   sidecar's stdin as one line of JSON-RPC. Rust doesn't look inside frames.
+3. `rpc.ts` in the sidecar validates the params again and calls the handler in `main.ts`, which calls the module that
+   does the work (`session.ts`). The result is validated before it's sent back.
+4. While the session runs, the sidecar sends **notifications**: the SDK's messages, normalized into `AgentEvent`s
+   (`normalize.ts`). They come back through Rust as `sidecar://frame` events, and the UI folds them into the
+   transcript (`transcript.ts`).
+5. When the SDK asks to use a tool, `canUseTool` in `session.ts` runs the guard and the permission profile. If you
+   must decide, a `permission.request` notification opens the approval dialog, and your answer goes back as a
+   `permission.respond` request.
+
+The sidecar's stdout carries frames only; logs go to stderr ([ADR-0003](docs/adr/0003-agent-runtime-and-ipc.md)). To
+add a method, follow `.claude/skills/add-ipc-method/SKILL.md`: the schema, the handler, the UI call, tests and the
+IPC table in [ARCHITECTURE](docs/ARCHITECTURE.md) §4.
+
+### Where to start
+
+- [GOOD_FIRST_ISSUES.md](docs/GOOD_FIRST_ISSUES.md) lists small, self-contained changes by area, each with the files
+  to read and when it's done.
+- [The user guide](docs/guides/user/README.md) shows what each part of the app does.
+- The design notes in [`docs/design/`](docs/design/) explain the bigger features, one page each.
 
 ## Making a change
 
@@ -108,6 +154,9 @@ Troubleshooting:
   Last, the run starts the app again in the pseudo-locale (X-13, `i18n.e2e.mjs`), where every catalog message is
   accented and in ⟦brackets⟧. It fails on any visible text in the app's own chrome that didn't come from a catalog,
   and saves `pseudo-*.png` screenshots of the main screens.
+- **Performance budgets** (X-07): startup time, idle memory and stream latency have budgets per platform in
+  `scripts/perf-budgets.json`. CI measures the first two on every PR without failing on them yet; see
+  [PERFORMANCE.md](docs/PERFORMANCE.md) to measure locally.
 - **The SDK and the CLI move fast.**
   - The weekly **Drift** workflow tries the newest of both and opens an issue when something the app relies on
     breaks (X-05).

@@ -45,9 +45,11 @@ describe("Bahasa Indonesia (X-13)", () => {
     await app.find(
       `//*[@aria-label=${xpathString(t("home.settings.language"))}][contains(., ${xpathString(LANGUAGES.id)})]`,
     );
-    assert.deepEqual(await look("settings"), []);
+    const found = await look("settings");
+    // Closed before the check, so a failure here doesn't block the next screens.
     await app.chord(KEY.escape);
     await waitFor(async () => (await app.findAll("//*[@role='dialog']")).length === 0, { what: "Settings to close" });
+    assert.deepEqual(found, []);
   });
 
   it("opens Workspace settings in Indonesian", async () => {

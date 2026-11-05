@@ -6,7 +6,7 @@ import assert from "node:assert/strict";
 import { writeFileSync } from "node:fs";
 import path from "node:path";
 import { after, before, describe, it } from "node:test";
-import { setPseudo, t } from "../../apps/desktop/src/i18n/index.ts";
+import { LANGUAGES, setPseudo, t } from "../../apps/desktop/src/i18n/index.ts";
 import { KEY, WebDriver, waitFor, xpathString } from "./webdriver.mjs";
 
 const binary = process.env.AC_E2E_BINARY ?? "";
@@ -48,8 +48,9 @@ async function shot(name) {
 }
 
 describe("pseudo-locale (X-13)", () => {
-  // Data, not the app's text: the workspace, the product name, and what `git --version` says on the setup check.
-  const data = [path.basename(workspace), workspace, "AgentChainer", "git version "];
+  // Not the app's text: the workspace, the product name, what `git --version` says on the setup check, and the
+  // languages in Settings, each named in itself.
+  const data = [path.basename(workspace), workspace, "AgentChainer", "git version ", ...Object.values(LANGUAGES)];
 
   before(async () => {
     assert.ok(binary && workspace, "run through scripts/e2e/run.mjs");
@@ -74,9 +75,11 @@ describe("pseudo-locale (X-13)", () => {
     await (await app.button(t("shell.sidebar.settings"))).click();
     await app.find("//*[@role='dialog']");
     await shot("settings");
-    assert.deepEqual(await unmarked("[role=dialog]", data), []);
+    const found = await unmarked("[role=dialog]", data);
+    // Closed before the check, so a failure here doesn't block the next screens.
     await app.chord(KEY.escape);
     await waitFor(async () => (await app.findAll("//*[@role='dialog']")).length === 0, { what: "Settings to close" });
+    assert.deepEqual(found, []);
   });
 
   it("shows only catalog text in Workspace settings' navigation", async () => {

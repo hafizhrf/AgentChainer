@@ -90,7 +90,9 @@ const PHASES = [
 
 let code = 0;
 for (const phase of PHASES) {
-  code ||= await runPhase(phase);
+  // Every phase runs, whatever the one before did.
+  const failed = await runPhase(phase);
+  code ||= failed;
 }
 // The app log, for a failed run's artifacts.
 if (code !== 0 && existsSync(logDir)) cpSync(logDir, path.join(artifacts, "logs"), { recursive: true });

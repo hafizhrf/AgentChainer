@@ -82,7 +82,7 @@ Prerequisites:
 | Plugin/MCP install spike (installs and removes again, in a throwaway project) | `node packages/sidecar/scripts/spike-install.ts --cwd <empty scratch dir>` |
 | Release asset script tests (collect, SHA256SUMS, latest.json) | `node --test scripts/release-assets.test.mjs` |
 | Launch smoke test (after a debug build) | `node scripts/smoke-launch.mjs target/debug/agentchainer [--seconds N]` |
-| End-to-end tests (X-06; Linux and Windows, after a debug build; needs `tauri-driver` and the platform's WebDriver; no login, no model calls). On macOS, run `docs/guides/MANUAL_CHECKS.md` by hand; for Linux from a Mac, see the Docker lines in `scripts/e2e/Dockerfile` | `node scripts/e2e/run.mjs --binary target/debug/agentchainer` (Linux under `xvfb-run -a`) |
+| End-to-end tests (X-06; Linux and Windows, after a debug build; Linux needs `tauri-driver` and WebKitWebDriver, Windows an `msedgedriver` in `EDGEWEBDRIVER`; no login, no model calls). On macOS, run `docs/guides/MANUAL_CHECKS.md` by hand; for Linux from a Mac, see the Docker lines in `scripts/e2e/Dockerfile` | `node scripts/e2e/run.mjs --binary target/debug/agentchainer` (Linux under `xvfb-run -a`) |
 | Streaming latency + CPU self-test (after a debug build; one real haiku turn, opens a window briefly) | `node scripts/selftest-latency.mjs --cwd <empty scratch dir> [--resume]` |
 | Graph frame-time bench, exit criterion M4-E2 (after a debug build; 200 synthetic nodes, no model calls, opens a window for ~10 s) | `node scripts/graph-bench.mjs` |
 

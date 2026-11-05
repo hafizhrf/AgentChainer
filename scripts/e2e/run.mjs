@@ -1,12 +1,15 @@
-// X-06: runs the end-to-end tests against a debug build through tauri-driver (WebDriver), on Linux and Windows. macOS has
-// no WebDriver for its WebView: use docs/guides/MANUAL_CHECKS.md there.
+// X-06: runs the end-to-end tests against a debug build through WebDriver, on Linux and Windows. macOS has no WebDriver
+// for its WebView: use docs/guides/MANUAL_CHECKS.md there.
 //
 // Usage: node scripts/e2e/run.mjs --binary target/debug/agentchainer [--artifacts e2e-artifacts]
-// Linux needs WebKitWebDriver (apt: webkit2gtk-driver) and a display (xvfb-run); Windows needs msedgedriver, found on
-// PATH or in EDGEWEBDRIVER (GitHub's Windows runners have it). Both need tauri-driver (cargo install tauri-driver).
+// - Linux: tauri-driver (cargo install tauri-driver --version 2.1.0 --locked) with WebKitWebDriver (apt:
+//   webkit2gtk-driver), and a display (xvfb-run -a).
+// - Windows: msedgedriver matching the WebView2 runtime, in the folder EDGEWEBDRIVER names (GitHub's Windows runners
+//   have it). The app starts here with WebView2's debugging port open and msedgedriver attaches to it.
 //
-// Everything the app writes goes to temporary folders: its settings (seeded with one recent workspace), data, logs, and
-// the workspace itself, a git copy of fixtures/sample-app. Nothing of yours is read or changed.
+// A debug build is required: it takes its settings from AGENTCHAINER_CONFIG_DIR and passes
+// WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS on, which release builds ignore. The settings (seeded with one recent
+// workspace), Linux's data and logs, and the workspace itself (a git copy of fixtures/sample-app) are all temporary.
 import { execFileSync, spawn } from "node:child_process";
 import { cpSync, existsSync, mkdirSync, mkdtempSync, realpathSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";

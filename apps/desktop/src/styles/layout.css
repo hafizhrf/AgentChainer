@@ -404,6 +404,14 @@
   pointer-events: none;
 }
 
+/* xyflow sets an inline `visibility: visible` on each node once it's measured, which beats the hidden tab's inherited
+   `visibility: hidden`: a graph's nodes would show through whatever page is in front. */
+.session[hidden] .react-flow__node,
+.task-thread[hidden] .react-flow__node {
+  /* biome-ignore lint/complexity/noImportantStyles: only !important beats xyflow's inline style. */
+  visibility: hidden !important;
+}
+
 /* ---------- Home ---------- */
 
 .home {

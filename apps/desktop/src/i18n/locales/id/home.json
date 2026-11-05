@@ -80,7 +80,7 @@
   "home.settings.autoApply": "Terapkan setup aman secara otomatis sebelum session baru",
   "home.settings.autoApplyHelp": "Hanya item katalog pihak pertama dan resmi yang sudah ditinjau, serta perbaikan yang hanya menambah baris (aturan env di .gitignore, impor AGENTS.md). Tidak pernah generator, perubahan git, atau item vendor dan komunitas. Yang diterapkan tampil di session, dan dapat di-rollback dari Pengaturan workspace → Riwayat.",
   "home.settings.tasksPreview": "Task <muted>(pratinjau)</muted>",
-  "home.settings.tasksPreviewHelp": "Menambahkan Task baru ({{keys}}): Claude menyusun draf kontrak untuk pekerjaannya, triase mengusulkan tier, dan Anda menyetujui keduanya. Menjalankan task hadir di pembaruan berikutnya.",
+  "home.settings.tasksPreviewHelp": "Menambahkan Task baru ({{keys}}): Claude menyusun draf kontrak untuk pekerjaannya, triase mengusulkan tier, dan Anda menyetujui keduanya sebelum task berjalan. Pemeriksaan proyek Anda sendiri lalu memverifikasi hasilnya.",
   "home.settings.limits": "Batas",
   "home.settings.budget": "Batas anggaran per session (USD)",
   "home.settings.budgetHelp": "Kosongkan jika tanpa batas. Profil Otonom memerlukannya. Berlaku untuk session yang dimulai setelah disimpan.",

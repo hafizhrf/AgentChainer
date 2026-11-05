@@ -1,0 +1,10 @@
+{
+  "common.format.seconds": "{{n}} dtk",
+  "common.format.minutes": "{{n}} mnt",
+  "common.format.hours": "{{n}} jam",
+  "common.format.minutesSeconds": "{{m}} mnt {{s}} dtk",
+  "common.format.compactSeconds": "{{n}}d",
+  "common.format.compactMinutesSeconds": "{{m}}m {{s}}d",
+  "common.format.thousands": "{{n}}k",
+  "common.format.megabytes": "{{n}} MB"
+}

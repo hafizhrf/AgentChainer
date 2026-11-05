@@ -51,6 +51,8 @@ pub struct Settings {
     pub show_thinking: Option<bool>,
     /// `light`, `dark` or `system` (UX-02). `None` follows the OS.
     pub theme: Option<String>,
+    /// The UI's language (X-13): `id` for Bahasa Indonesia. `None` is English.
+    pub language: Option<String>,
     /// Apply safe setup (first-party and official items, low-risk fixes) before each new session (M2-18). Off unless set.
     pub auto_apply: Option<bool>,
     /// Show "New task" (M3, contract and triage) before tasks can run. Off unless set.
@@ -73,6 +75,7 @@ impl Settings {
         self.editor = clean(self.editor);
         self.default_effort = clean(self.default_effort);
         self.theme = clean(self.theme).filter(|t| t == "light" || t == "dark");
+        self.language = clean(self.language).filter(|l| l == "id");
         self.budget_usd = self.budget_usd.filter(|b| b.is_finite() && *b > 0.0);
         let mut seen: Vec<String> = Vec::new();
         for dir in self.recent_workspaces {
@@ -218,6 +221,7 @@ mod tests {
             budget_usd: Some(-1.0),
             show_thinking: None,
             theme: Some(" dark ".into()),
+            language: Some(" id ".into()),
             auto_apply: None,
             tasks_preview: None,
             recent_workspaces: (0..12)
@@ -233,6 +237,16 @@ mod tests {
         assert_eq!(s.editor.as_deref(), Some("vscode"));
         assert_eq!(s.budget_usd, None, "a non-positive budget means no cap");
         assert_eq!(s.theme.as_deref(), Some("dark"));
+        assert_eq!(s.language.as_deref(), Some("id"));
+        let unknown = Settings {
+            language: Some("fr".into()),
+            ..Settings::default()
+        };
+        assert_eq!(
+            unknown.normalized().language,
+            None,
+            "only a language the UI has"
+        );
         assert_eq!(s.recent_workspaces.len(), MAX_RECENT_WORKSPACES);
         assert_eq!(s.recent_workspaces[0], "/p/0");
     }

@@ -1,7 +1,7 @@
 import { type Cadence, nextRun, type Schedule, type Task } from "@agentchainer/protocol";
 import { isPermissionGranted, requestPermission, sendNotification } from "@tauri-apps/plugin-notification";
 import { approxUsd } from "./i18n/format.ts";
-import { t } from "./i18n/index.ts";
+import { currentLocale, t } from "./i18n/index.ts";
 
 /**
  * Scheduled flows in the UI (M8-05, docs/design/scheduled-flows.md): what the person is told about scheduled runs, as
@@ -72,16 +72,18 @@ export function lastRunText(s: Schedule, now = new Date()): string {
 
 /** "today 02:00", "tomorrow 02:00", "Fri 02:00", or a date further out. */
 export function whenText(at: Date, now = new Date()): string {
-  const time = `${String(at.getHours()).padStart(2, "0")}:${String(at.getMinutes()).padStart(2, "0")}`;
+  // Words and the time's separator follow the UI's language: "Fri 02:00", "Jum 02.00".
+  const locale = currentLocale();
+  const time = at.toLocaleTimeString(locale, { hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
   const day = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
   const diff = Math.round((day(at) - day(now)) / 86_400_000);
   if (diff === 0) return t("graph.schedules.today", { time });
   if (diff === 1) return t("graph.schedules.tomorrow", { time });
   if (diff === -1) return t("graph.schedules.yesterday", { time });
   if (diff > 1 && diff < 7)
-    return t("graph.schedules.dayTime", { day: at.toLocaleDateString("en-US", { weekday: "short" }), time });
+    return t("graph.schedules.dayTime", { day: at.toLocaleDateString(locale, { weekday: "short" }), time });
   return t("graph.schedules.dayTime", {
-    day: at.toLocaleDateString("en-US", { month: "short", day: "numeric" }),
+    day: at.toLocaleDateString(locale, { month: "short", day: "numeric" }),
     time,
   });
 }

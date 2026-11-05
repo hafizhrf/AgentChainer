@@ -61,6 +61,34 @@ Predefined items get their text from it too.
 - files written into the user's repository, and PR text;
 - prose the sidecar or the Rust core returns, until their own round.
 
+### Addendum (2026-11-05): Bahasa Indonesia, the second language
+
+**The setting:** Settings → Appearance → Language offers English and Bahasa Indonesia. English stays the default
+(owner decision).
+- **Storage:** the choice is `language` in the app's settings; `"id"`, or nothing for English.
+- **Loading:** `main.tsx` reads it from the Rust core before the first render, so nothing is drawn in the wrong
+  language. Indonesian loads in its own chunk and covers English key by key.
+
+**Switching restarts the app** (`relaunch`, after a confirmation), or applies at the next start.
+- **Why not reload the window:** a reload would leave the sidecar's running sessions without a UI. Re-rendering in
+  place would miss text already built into state.
+- **The macOS menu** is built at startup in the saved language. Its Indonesian follows macOS's own Indonesian menus.
+
+**Words follow the language, regional formats follow the system:**
+- Weekday and month names, and the time separator ("Jum 02.00"), come from `Intl` with the language's tag
+  (`currentLocale()`).
+- Dates and grouped numbers elsewhere keep the system's regional format, as before.
+
+**Style:** formal "Anda", with developers' English terms kept. The glossary is in
+[TRANSLATING.md](../guides/TRANSLATING.md).
+
+**Guards:** `i18n/catalog.test.ts` fails when Indonesian:
+- misses an English key, or has an extra one;
+- has an empty value;
+- changes a `{{value}}` or a `<tag>`.
+
+**Still English:** text the sidecar and the Rust core return (X-13 part 2).
+
 ## Alternatives considered
 
 | Option | Pros | Cons | Why not chosen |

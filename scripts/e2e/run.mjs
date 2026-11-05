@@ -13,7 +13,7 @@
 // WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS on, which release builds ignore. The settings (seeded with one recent
 // workspace), Linux's data and logs, and the workspace itself (a git copy of fixtures/sample-app) are all temporary.
 import { execFileSync, spawn } from "node:child_process";
-import { cpSync, existsSync, mkdirSync, mkdtempSync, realpathSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { parseArgs } from "node:util";
@@ -84,6 +84,8 @@ const driverBin = windows ? path.join(process.env.EDGEWEBDRIVER ?? "", "msedgedr
 const PHASES = [
   { files: ["app.e2e.mjs", "a11y.e2e.mjs"], env: {}, port: 9222 },
   { files: ["i18n.e2e.mjs"], env: { AGENTCHAINER_PSEUDO_LOCALE: "1" }, port: 9223 },
+  // X-13: the app in Bahasa Indonesia, chosen in its settings.
+  { files: ["i18n-id.e2e.mjs"], env: {}, settings: { language: "id" }, port: 9224 },
 ];
 
 let code = 0;
@@ -94,8 +96,12 @@ for (const phase of PHASES) {
 if (code !== 0 && existsSync(logDir)) cpSync(logDir, path.join(artifacts, "logs"), { recursive: true });
 process.exit(code);
 
-async function runPhase({ files, env: extra, port }) {
+async function runPhase({ files, env: extra, settings, port }) {
   const phaseEnv = { ...env, ...extra };
+  if (settings) {
+    const saved = JSON.parse(readFileSync(settingsFile, "utf8"));
+    writeFileSync(settingsFile, JSON.stringify({ ...saved, ...settings }, null, 2));
+  }
   const started = windows
     ? spawn(binary, [], {
         env: { ...phaseEnv, WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS: `--remote-debugging-port=${port}` },

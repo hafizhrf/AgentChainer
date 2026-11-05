@@ -3,16 +3,15 @@
 // keyboard-only flows: the palette by its shortcut, Tab through the sidebar with a visible focus ring, and a dialog
 // that keeps focus inside. Run by scripts/e2e/run.mjs after app.e2e.mjs, in its own app session.
 import assert from "node:assert/strict";
-import { readFileSync, writeFileSync } from "node:fs";
-import { createRequire } from "node:module";
+import { writeFileSync } from "node:fs";
 import path from "node:path";
 import { after, before, describe, it } from "node:test";
+import { axeViolations } from "./axe.mjs";
 import { KEY, WebDriver, waitFor, xpathString } from "./webdriver.mjs";
 
 const binary = process.env.AC_E2E_BINARY ?? "";
 const workspace = process.env.AC_E2E_WORKSPACE ?? "";
 const artifacts = process.env.AC_E2E_ARTIFACTS ?? ".";
-const axeSource = readFileSync(createRequire(import.meta.url).resolve("axe-core/axe.min.js"), "utf8");
 
 const app = new WebDriver();
 /** Every audit's violations, by screen and theme. */
@@ -22,7 +21,6 @@ const blocking = [];
 /** Audits the current screen in both themes, then puts the theme back. */
 async function audit(screen) {
   const saved = await app.execute("return document.documentElement.dataset.theme ?? '';");
-  if (!(await app.execute("return typeof window.axe === 'object';"))) await app.execute(`${axeSource}; return true;`);
   report[screen] = {};
   for (const theme of ["light", "dark"]) {
     // Contrast is measured at the end state: fade-ins and colour transitions are finished first (WebKitGTK under Xvfb
@@ -32,15 +30,7 @@ async function audit(screen) {
       for (const a of document.getAnimations()) try { a.finish(); } catch {}`,
       [theme],
     );
-    const violations = await app.execute(`
-      return window.axe
-        .run(document, { runOnly: { type: "tag", values: ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"] }, resultTypes: ["violations"] })
-        .then((r) => r.violations.map((v) => ({
-          id: v.id,
-          impact: v.impact,
-          help: v.help,
-          nodes: v.nodes.slice(0, 8).map((n) => ({ target: n.target.join(" "), summary: n.failureSummary })),
-        })));`);
+    const violations = await axeViolations(app);
     report[screen][theme] = violations;
     for (const v of violations) {
       if (v.impact === "serious" || v.impact === "critical") blocking.push(`${screen} (${theme}): ${v.id} ${v.help}`);

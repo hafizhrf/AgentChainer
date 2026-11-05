@@ -40,4 +40,13 @@ VoiceOver reads them, and that the keyboard paths work in WKWebView.
 
 Turn VoiceOver off again (⌘F5).
 
+## Bahasa Indonesia
+
+The end-to-end run checks the Indonesian UI on Linux and Windows. Only macOS has the native menu bar.
+
+| # | Do | Expect |
+|---|---|---|
+| 9 | Open Settings, set Language to Bahasa Indonesia, click Save, then **Restart now**. | The app restarts in Indonesian. The menu bar reads **File, Edit, Tampilan, Jendela, Bantuan**, and the app menu ends with **Keluar dari AgentChainer**. |
+| 10 | Open Pengaturan and set Bahasa back to English, then save and restart. | The app and the menu bar are in English again. |
+
 Write down the date, the macOS version and the build in the release notes or the checklist entry you're checking.

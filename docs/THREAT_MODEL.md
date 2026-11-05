@@ -88,7 +88,7 @@ Nothing else. In particular, there is no file-system or shell plugin.
 | `open_terminal` | Folder | Must be a folder. On Windows it's passed as the working directory, never on cmd's command line. |
 | `workspace_watch` | Folder | Watches only, without following links; emits change events. |
 | `diagnostics_export` | Path | Only a `.json` file in an existing folder, chosen in a save dialog. |
-| `settings_set` | Settings | Normalized on save; typed fields only. A new Claude CLI path must be an absolute path to an existing file. |
+| `settings_set` | Settings | Normalized on save; typed fields only. A new Claude CLI path must be an absolute path to an existing file. `language` keeps only a language the UI has (`id`). |
 | `settings_get`, `app_info`, `updater_ready` | — | Read only. |
 | `sidecar_restart` | — | Restarts the app's own runtime. |
 | `workspace_unwatch` | Folder | Stops a watcher. |

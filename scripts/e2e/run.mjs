@@ -33,7 +33,8 @@ mkdirSync(artifacts, { recursive: true });
 const home = mkdtempSync(path.join(tmpdir(), "ac-e2e-"));
 const dirs =
   process.platform === "win32"
-    ? { APPDATA: path.join(home, "roaming"), LOCALAPPDATA: path.join(home, "local") }
+    ? // Only the settings move on Windows: WebView2 and msedgedriver keep their data under LOCALAPPDATA.
+      { APPDATA: path.join(home, "roaming") }
     : {
         XDG_CONFIG_HOME: path.join(home, "config"),
         XDG_DATA_HOME: path.join(home, "data"),
@@ -44,7 +45,7 @@ const configDir = path.join(
   "io.github.hafizhrf.agentchainer",
 );
 const logDir = path.join(
-  process.platform === "win32" ? dirs.LOCALAPPDATA : dirs.XDG_DATA_HOME,
+  process.platform === "win32" ? (process.env.LOCALAPPDATA ?? home) : dirs.XDG_DATA_HOME,
   "io.github.hafizhrf.agentchainer",
   "logs",
 );

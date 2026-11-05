@@ -1,7 +1,7 @@
 // X-06: a small W3C WebDriver client over fetch, for tauri-driver (http://127.0.0.1:4444). No dependencies: the
 // end-to-end tests need sessions, finding elements, clicks, typing, keys, scripts and screenshots, nothing more.
 
-const ELEMENT = "element-6066-11e4-a52f-4f735466cecf";
+const ELEMENT = "element-6066-11e4-a52e-4f735466cecf";
 export const KEY = { enter: "", escape: "", control: "", shift: "" };
 
 export class WebDriver {
@@ -51,7 +51,7 @@ export class WebDriver {
   async findAll(query) {
     const using = query.startsWith("/") || query.startsWith("(") ? "xpath" : "css selector";
     const found = await this.sessionCall("POST", "/elements", { using, value: query });
-    return found.map((e) => new Element(this, e[ELEMENT]));
+    return found.map((e) => new Element(this, e[ELEMENT] ?? Object.values(e)[0]));
   }
 
   /** Waits until `query` finds a visible element, and returns the first one. */

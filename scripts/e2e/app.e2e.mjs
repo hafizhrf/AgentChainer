@@ -39,7 +39,8 @@ describe("AgentChainer end to end (X-06)", () => {
   it("starts and shows the setup check", () =>
     flow("1-start", async () => {
       // The Linux runner can take ~30 s before the app's own code runs (docs/PERFORMANCE.md).
-      const check = await app.find("//section[@aria-label='Setup check']", { timeout: 120_000 });
+      // The setup check is one card on Home, compact while it checks.
+      const check = await app.find("//section[contains(@class, 'readiness')]", { timeout: 120_000 });
       await waitFor(async () => (await check.text()).includes("Claude Code CLI"), {
         timeout: 60_000,
         what: "the Claude CLI row of the setup check",

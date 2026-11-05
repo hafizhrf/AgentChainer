@@ -84,15 +84,17 @@ export type RichPart = { text: string; tag?: string };
  * `<Rich>` to render. Tags don't nest.
  */
 export function richParts(key: MessageKey, params?: Params): RichPart[] {
-  const text = interpolate(template(key, params), params);
+  // Tags come from the message, values are filled in afterwards: a value is never read as markup.
+  const text = template(key, params);
+  const fill = (part: string) => interpolate(part, params);
   const parts: RichPart[] = [];
   let at = 0;
   for (const m of text.matchAll(/<(\w+)>(.*?)<\/\1>/g)) {
-    if (m.index > at) parts.push({ text: text.slice(at, m.index) });
-    parts.push({ text: m[2] ?? "", tag: m[1] ?? "" });
+    if (m.index > at) parts.push({ text: fill(text.slice(at, m.index)) });
+    parts.push({ text: fill(m[2] ?? ""), tag: m[1] ?? "" });
     at = m.index + m[0].length;
   }
-  if (at < text.length) parts.push({ text: text.slice(at) });
+  if (at < text.length) parts.push({ text: fill(text.slice(at)) });
   if (pseudo) {
     parts.unshift({ text: "⟦" });
     parts.push({ text: "⟧" });

@@ -24,9 +24,13 @@ test("the formatters keep the shapes the UI showed before the catalogs", () => {
   assert.equal(megabytes(1_500_000), "1.5 MB");
 });
 
-test("splits a message with markup into text and tagged parts", () => {
-  assert.deepEqual(richParts("menu.about", { app: "<b>X</b>" }), [{ text: "About " }, { text: "X", tag: "b" }]);
-  assert.deepEqual(richParts("menu.undo"), [{ text: "Undo" }]);
+test("splits a message with markup into text and tagged parts, and never reads a value as markup", () => {
+  assert.deepEqual(richParts("tasks.contractView.savedIn", { path: ".agentchainer/tasks/1/" }), [
+    { text: "The task is saved in " },
+    { text: ".agentchainer/tasks/1/", tag: "code" },
+    { text: "." },
+  ]);
+  assert.deepEqual(richParts("menu.about", { app: "<b>X</b>" }), [{ text: "About <b>X</b>" }]);
 });
 
 test("the pseudo-locale accents letters and brackets every message, but not the values", () => {

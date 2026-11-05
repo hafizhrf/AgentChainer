@@ -234,6 +234,26 @@ fn selftest_config() -> Option<String> {
     )
 }
 
+/// What wry passes to WebView2 when an app sets no arguments of its own.
+const WRY_DEFAULT_BROWSER_ARGS: &str =
+    "--disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection";
+
+/// The app's context. A debug build hands `WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS` on to its windows (X-06): WebView2
+/// ignores the variable once an app sets arguments of its own, which wry always does, so WebDriver could never open
+/// the WebView's debugging port for the end-to-end tests on Windows. Release builds never do (X-02).
+fn context() -> tauri::Context<tauri::Wry> {
+    let mut context = tauri::generate_context!();
+    if let Some(extra) = dev_only(
+        std::env::var("WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS").ok(),
+        cfg!(debug_assertions),
+    ) {
+        for window in &mut context.config_mut().app.windows {
+            window.additional_browser_args = Some(format!("{WRY_DEFAULT_BROWSER_ARGS} {extra}"));
+        }
+    }
+    context
+}
+
 /// A developer switch's value in a debug build, and nothing in a release build (X-02).
 pub(crate) fn dev_only<T>(value: Option<T>, debug_build: bool) -> Option<T> {
     value.filter(|_| debug_build)
@@ -312,7 +332,7 @@ pub fn run() {
             updater_ready,
             update_prepare
         ])
-        .build(tauri::generate_context!())
+        .build(context())
         .expect("error while building tauri application");
 
     app.run(|handle, event| {

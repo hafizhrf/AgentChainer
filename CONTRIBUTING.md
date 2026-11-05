@@ -83,6 +83,18 @@ Troubleshooting:
   3. **Never commit a raw recording.**
 - Spike harnesses (`packages/sidecar/scripts/spike-*.ts`) make real model calls with **your own** Claude login. Use
   `--model haiku` and a scratch folder.
+- **End-to-end tests** (`scripts/e2e/`, X-06) drive the debug app through `tauri-driver` on Linux and Windows: the
+  setup check, opening a workspace, a setup fix applied and rolled back, the command palette and Settings. CI runs
+  them in the Build & launch jobs. Locally:
+  - **Linux:** install `webkit2gtk-driver`, then `cargo install tauri-driver --version 2.1.0 --locked`, and run
+    `xvfb-run -a node scripts/e2e/run.mjs --binary target/debug/agentchainer`.
+  - **Windows:** point `EDGEWEBDRIVER` at a folder with the `msedgedriver.exe` that matches your WebView2 runtime,
+    and run `node scripts/e2e/run.mjs --binary target/debug/agentchainer.exe`. The run attaches to the app through
+    WebView2's debugging port, which only debug builds open.
+  - **macOS:** there's no WebDriver for WKWebView. Use the Docker image in `scripts/e2e/Dockerfile` for the Linux
+    run, and [MANUAL_CHECKS.md](docs/guides/MANUAL_CHECKS.md) for macOS itself.
+
+  A failing flow saves a screenshot and the app log in `e2e-artifacts/`.
 - **The SDK and the CLI move fast.**
   - The weekly **Drift** workflow tries the newest of both and opens an issue when something the app relies on
     breaks (X-05).

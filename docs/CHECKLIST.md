@@ -28,7 +28,7 @@
 | [M5](#m5--git-workflow-pr--quality-gates-v03) | v0.3 | Git workflow, PRs, gates | ◐ Done for GitHub ([git-workflow.md](design/git-workflow.md)): worktrees, PRs, CI and Fix CI, merge gates, human merge; E1 passed on Windows. GitLab (M5-06, optional) left |
 | [M6](#m6--deployment--workflow-canvas-v04) | v0.4 | Deploy adapters, workflow canvas | ◐ Built ([deploy-and-canvas.md](design/deploy-and-canvas.md)): Vercel, Cloudflare Workers, Firebase, Fly.io and Docker adapters, production with typed confirmation and rollback, the workflow canvas; left: live deploys with the owner's logins (E1), canvas Import/Export by hand |
 | [M7](#m7--evals--analytics-v05) | v0.5 | Evals & analytics | ◐ Metrics, the eval benchmark and the CI report check in ([evals.md](design/evals.md)); OpenTelemetry deferred; E1 ticks with the first PR that changes a workflow |
-| [M8](#m8--multi-folder-workspaces--agent-fleet-proposed) | later | Multi-folder workspaces, agent fleet | ◐ All six built: multi-folder workspaces, the fleet view, supervisor and worker sessions, agent profiles, scheduled runs, lessons; open: M8-07, resuming a multi-folder chat loses its other folders |
+| [M8](#m8--multi-folder-workspaces--agent-fleet-proposed) | later | Multi-folder workspaces, agent fleet | ◐ All six built: multi-folder workspaces, the fleet view, supervisor and worker sessions, agent profiles, scheduled runs, lessons; M8-07 (resuming a multi-folder chat) fixed in #119 |
 | [X](#cross-cutting-tracks-ongoing) | all | Security, quality, compatibility, docs, a11y | ☐ Ongoing |
 
 ---
@@ -1944,7 +1944,34 @@ first.
           commented on #115 and closed it.
       - The first two runs hit GitHub's incident that day: an internal error creating the report job, then a
         GraphQL error in `gh issue create`. Each `gh` call in the report job now gets three tries.
-- [ ] **X-06** E2E with `tauri-driver` on Linux and Windows. macOS uses a manual checklist (verify WebDriver support).
+- [x] **X-06** E2E with `tauri-driver` on Linux and Windows. macOS uses a manual checklist (verify WebDriver support).
+      - Built (2026-11-05):
+        - **The tests:** `scripts/e2e/`, a WebDriver client over `fetch` (no new dependency), with `node:test` flows
+          that need no Claude login:
+          1. the setup check;
+          2. opening the recent workspace, then Workspace settings;
+          3. the "Ignore env and secret files" fix applied, checked on disk, and rolled back from History;
+          4. the command palette opening a section;
+          5. Settings saving the dark theme.
+        - **Isolation:** each run uses temporary settings, data and a git copy of `fixtures/sample-app`. A failing
+          flow saves a screenshot and the app log.
+        - **CI:** the Build & launch jobs run the tests.
+          - **Ubuntu:** `tauri-driver` 2.1.0 with WebKitWebDriver, under Xvfb.
+          - **Windows:** the runner's msedgedriver (156.0.4314.50, the same as its WebView2 runtime) attaches to the
+            app through WebView2's debugging port.
+        - **What it took on Windows:** WebView2 ignores `WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS` once an app sets
+          arguments of its own, which wry always does. So msedgedriver couldn't reach a Tauri app it launched
+          ("DevToolsActivePort file doesn't exist").
+          - A debug build now passes the variable on to its windows itself.
+          - A debug build reads its settings from `AGENTCHAINER_CONFIG_DIR`, because Windows takes the config folder
+            from the system.
+          - Release builds ignore both (X-02, THREAT_MODEL).
+        - **macOS:** [MANUAL_CHECKS.md](guides/MANUAL_CHECKS.md), linked from RELEASING.
+      - **Evidence:**
+        - CI run [41973492480](https://github.com/hafizhrf/AgentChainer/actions/runs/41973492480) (#127): 5/5 on
+          Ubuntu and 5/5 on Windows.
+        - Locally, in the Ubuntu 22.04 image (`scripts/e2e/Dockerfile`), 5/5 pass in 6–21 s, run after run. With one
+          assertion broken on purpose, that flow failed and left its screenshot and log.
 - [x] **X-07** Performance budgets for startup time, idle memory and stream latency, tracked every release.
       — evidence: [PERFORMANCE.md](PERFORMANCE.md).
   - **Budgets** (`scripts/perf-budgets.json`): startup 6 s; idle memory 600 MB (850 MB on Linux, where WebKitGTK runs

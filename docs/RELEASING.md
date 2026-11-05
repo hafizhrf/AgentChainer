@@ -78,6 +78,8 @@ Windows signing needs `bundle.windows.signCommand` in `tauri.conf.json` once a c
 - [ ] Performance budgets ([PERFORMANCE.md](PERFORMANCE.md), X-07): on a debug build of the release commit, run
       `node scripts/perf-budgets.mjs` and `node scripts/selftest-latency.mjs --cwd <empty dir>`. Put the numbers in
       the release notes. An exceeded budget is fixed first, or changed in PERFORMANCE.md with a reason.
+- [ ] The end-to-end tests (X-06) passed on the release commit in CI's Ubuntu and Windows jobs. On macOS, which has
+      no WebDriver, run [MANUAL_CHECKS.md](guides/MANUAL_CHECKS.md) on the build by hand.
 - [ ] The release notes read well. They are also shown in the app's update dialog.
 
 Publish from the release page. The updater then finds `latest.json` at `releases/latest/download/latest.json`.

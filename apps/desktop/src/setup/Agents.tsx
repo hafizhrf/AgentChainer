@@ -8,6 +8,8 @@ import {
 import { Bot, Copy, Pencil, Plus, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import type { Confirm } from "../Dialog.tsx";
+import { t } from "../i18n/index.ts";
+import { Rich } from "../i18n/Rich.tsx";
 import { request } from "../sidecar.ts";
 import { Field } from "../ui/Field.tsx";
 import { IconButton } from "../ui/IconButton.tsx";
@@ -26,21 +28,34 @@ import {
   withOtherTools,
 } from "./agentDraft.ts";
 
-const MODELS = [
-  { value: "", label: "Default", hint: "The CLI's default for subagents" },
-  { value: "inherit", label: "Same as the session" },
-  { value: "haiku", label: "Haiku" },
-  { value: "sonnet", label: "Sonnet" },
-  { value: "opus", label: "Opus" },
+const models = () => [
+  { value: "", label: t("setup.agents.modelDefault"), hint: t("setup.agents.modelDefaultHint") },
+  { value: "inherit", label: t("setup.agents.modelInherit") },
+  { value: "haiku", label: t("setup.agents.modelHaiku") },
+  { value: "sonnet", label: t("setup.agents.modelSonnet") },
+  { value: "opus", label: t("setup.agents.modelOpus") },
 ];
 
 const GROUPS: Record<keyof typeof KNOWN_TOOLS, string> = {
-  read: "Read",
-  edit: "Edit",
-  shell: "Shell",
-  web: "Web",
-  other: "Other",
+  get read() {
+    return t("setup.agents.groupRead");
+  },
+  get edit() {
+    return t("setup.agents.groupEdit");
+  },
+  get shell() {
+    return t("setup.agents.groupShell");
+  },
+  get web() {
+    return t("setup.agents.groupWeb");
+  },
+  get other() {
+    return t("setup.agents.groupOther");
+  },
 };
+
+const code = (s: string) => <code>{s}</code>;
+const strong = (s: string) => <strong>{s}</strong>;
 
 const where = (scope: Draft["scope"]) => (scope === "user" ? "~/.claude/agents/" : ".claude/agents/");
 
@@ -84,14 +99,17 @@ export function Agents({ cwd, confirm, onChanged }: { cwd: string; confirm: Conf
     if (!draft) return;
     if (draft.scope === "user" && draft.previous === undefined) {
       const ok = await confirm({
-        title: `Save ${draft.name} for all your projects?`,
+        title: t("setup.agents.saveUserTitle", { name: draft.name }),
         body: (
           <p>
-            It's written to <code>~/.claude/agents/{draft.name}.md</code>, outside this workspace, so History can't roll
-            it back. You can still edit or delete it here.
+            <Rich
+              k="setup.agents.saveUserBody"
+              params={{ file: `~/.claude/agents/${draft.name}.md` }}
+              tags={{ code }}
+            />
           </p>
         ),
-        confirmLabel: "Save agent",
+        confirmLabel: t("setup.agents.saveAgent"),
       });
       if (!ok) return;
     }
@@ -116,17 +134,15 @@ export function Agents({ cwd, confirm, onChanged }: { cwd: string; confirm: Conf
   async function remove(a: AgentDefinition) {
     const name = a.file.split("/").pop()?.replace(/\.md$/, "") ?? a.name;
     const ok = await confirm({
-      title: `Delete ${a.name}?`,
+      title: t("setup.agents.deleteTitle", { name: a.name }),
       body: (
         <p>
-          <code>{a.file}</code> is deleted.{" "}
-          {a.scope === "user"
-            ? "It's your own agent, outside this workspace, so History can't bring it back."
-            : "You can bring it back from History with Roll back."}
-          {a.role ? " The setup plan will offer to install this task role again." : ""}
+          <Rich k="setup.agents.deleteBody" params={{ file: a.file }} tags={{ code }} />{" "}
+          {a.scope === "user" ? t("setup.agents.deleteUserNote") : t("setup.agents.deleteProjectNote")}
+          {a.role ? ` ${t("setup.agents.deleteRoleNote")}` : ""}
         </p>
       ),
-      confirmLabel: "Delete agent",
+      confirmLabel: t("setup.agents.deleteAgent"),
     });
     if (!ok) return;
     try {
@@ -181,31 +197,28 @@ export function Agents({ cwd, confirm, onChanged }: { cwd: string; confirm: Conf
   return (
     <div className="setup-scroll">
       <p className="muted">
-        Agents Claude can hand work to, and profiles to run a chat or a Team worker as. <strong>Auto</strong> ones say
-        “use proactively”, so Claude may start them on its own when a task fits; <strong>manual</strong> ones run when
-        you or a prompt ask for them. When the app runs one, only the tools it lists are there. Changes apply to
-        sessions started afterwards.
+        <Rich k="setup.agents.intro" tags={{ strong }} />
       </p>
       {error && <p className="warn">{error}</p>}
-      {!agents && !error && <p className="muted">Loading…</p>}
+      {!agents && !error && <p className="muted">{t("setup.agents.loading")}</p>}
 
       {agents && (
         <section className="card agents-card">
           <div className="card-title">
-            <h2>This project</h2>
-            <code className="muted">.claude/agents/</code>
+            <h2>{t("setup.agents.thisProject")}</h2>
+            <code className="muted">{where("project")}</code>
             <span className="grow" />
             {!draft && (
               <button type="button" className="secondary small" onClick={() => setDraft(blankDraft())}>
                 <Plus size={13} />
-                New agent
+                {t("setup.agents.newAgent")}
               </button>
             )}
           </div>
-          <p className="field-help">Each change is a run in History, so it can be rolled back.</p>
+          <p className="field-help">{t("setup.agents.projectHelp")}</p>
           {draft && draft.previous === undefined && form(draft)}
           {project.length === 0 && !(draft && draft.previous === undefined) && (
-            <EmptyState icon={<Bot size={14} />}>No project agents yet.</EmptyState>
+            <EmptyState icon={<Bot size={14} />}>{t("setup.agents.noProjectAgents")}</EmptyState>
           )}
           {rows(project)}
         </section>
@@ -214,17 +227,11 @@ export function Agents({ cwd, confirm, onChanged }: { cwd: string; confirm: Conf
       {agents && (
         <section className="card agents-card">
           <div className="card-title">
-            <h2>Yours, in every project</h2>
-            <code className="muted">~/.claude/agents/</code>
+            <h2>{t("setup.agents.yours")}</h2>
+            <code className="muted">{where("user")}</code>
           </div>
-          <p className="field-help">
-            Your own agents. They're outside this workspace, so History doesn't cover them: a change is saved in place.
-          </p>
-          {user.length === 0 && (
-            <EmptyState icon={<Bot size={14} />}>
-              None yet. To add one, pick “All my projects” in a new agent's form.
-            </EmptyState>
-          )}
+          <p className="field-help">{t("setup.agents.userHelp")}</p>
+          {user.length === 0 && <EmptyState icon={<Bot size={14} />}>{t("setup.agents.noUserAgents")}</EmptyState>}
           {rows(user)}
         </section>
       )}
@@ -248,34 +255,40 @@ function AgentRow({
       <div className="agent-row-head">
         <Bot size={14} aria-hidden />
         <strong>{a.name}</strong>
-        {!a.error && <span className={`chip${a.auto ? " on" : ""}`}>{a.auto ? "Auto" : "Manual"}</span>}
-        {a.role && <span className="chip">Task role</span>}
+        {!a.error && (
+          <span className={`chip${a.auto ? " on" : ""}`}>
+            {a.auto ? t("setup.agents.auto") : t("setup.agents.manual")}
+          </span>
+        )}
+        {a.role && <span className="chip">{t("setup.agents.taskRole")}</span>}
         {a.model && <span className="chip">{a.model}</span>}
         <span className="grow" />
         {onEdit && (
-          <IconButton label={`Edit ${a.name}`} onClick={onEdit}>
+          <IconButton label={t("setup.agents.edit", { name: a.name })} onClick={onEdit}>
             <Pencil size={13} />
           </IconButton>
         )}
         {onClone && (
-          <IconButton label={`Clone ${a.name}`} onClick={onClone}>
+          <IconButton label={t("setup.agents.clone", { name: a.name })} onClick={onClone}>
             <Copy size={13} />
           </IconButton>
         )}
         {onDelete && (
-          <IconButton label={`Delete ${a.name}`} onClick={onDelete}>
+          <IconButton label={t("setup.agents.delete", { name: a.name })} onClick={onDelete}>
             <Trash2 size={13} />
           </IconButton>
         )}
       </div>
       {a.error ? (
         <p className="warn">
-          <code>{a.file}</code> can't be read as an agent: {a.error}
+          <Rich k="setup.agents.unreadable" params={{ file: a.file }} tags={{ code }} /> {a.error}
         </p>
       ) : (
         <>
           <p className="agent-row-desc">{a.description}</p>
-          <p className="field-help">{a.tools ? `Tools: ${a.tools}` : "All tools"}</p>
+          <p className="field-help">
+            {a.tools ? t("setup.agents.toolsList", { tools: a.tools }) : t("setup.agents.allTools")}
+          </p>
         </>
       )}
     </div>
@@ -305,19 +318,23 @@ function AgentForm({
 }) {
   const set = (patch: Partial<Draft>) => onChange({ ...draft, ...patch });
   const isNew = draft.previous === undefined;
-  const models =
-    draft.model && !MODELS.some((m) => m.value === draft.model)
-      ? [...MODELS, { value: draft.model, label: draft.model }]
-      : MODELS;
+  const known = models();
+  const modelOptions =
+    draft.model && !known.some((m) => m.value === draft.model)
+      ? [...known, { value: draft.model, label: draft.model }]
+      : known;
   const problems = draftProblems(draft, taken);
   const [others, setOthers] = useState(otherTools(draft.tools));
   const [start, setStart] = useState("");
   const starts = [
-    { value: "", label: "Blank" },
-    ...templates.map((t) => ({
-      value: t.id,
-      label: `${t.source === "role" ? "Task role" : "Starter"}: ${t.name}`,
-      hint: t.description,
+    { value: "", label: t("setup.agents.blank") },
+    ...templates.map((tpl) => ({
+      value: tpl.id,
+      label:
+        tpl.source === "role"
+          ? t("setup.agents.fromRole", { name: tpl.name })
+          : t("setup.agents.fromStarter", { name: tpl.name }),
+      hint: tpl.description,
     })),
   ];
   return (
@@ -330,23 +347,23 @@ function AgentForm({
     >
       {isNew && (
         <div className="field-row">
-          <Field label="Start from" help="A shipped task role or a starter fills in the form; nothing is saved yet.">
+          <Field label={t("setup.agents.startFrom")} help={t("setup.agents.startFromHelp")}>
             <Select
-              label="Start from"
+              label={t("setup.agents.startFrom")}
               value={start}
               options={starts}
               onChange={(id) => {
                 setStart(id);
-                const t = templates.find((x) => x.id === id);
-                const next = t ? templateDraft(t, draft.scope, allTaken(draft.scope)) : { ...draft };
+                const tpl = templates.find((x) => x.id === id);
+                const next = tpl ? templateDraft(tpl, draft.scope, allTaken(draft.scope)) : { ...draft };
                 onChange(next);
                 setOthers(otherTools(next.tools));
               }}
             />
           </Field>
-          <Field label="Save to">
+          <Field label={t("setup.agents.saveTo")}>
             <fieldset className="segmented">
-              <legend className="sr-only">Save to</legend>
+              <legend className="sr-only">{t("setup.agents.saveTo")}</legend>
               {(["project", "user"] as const).map((s) => (
                 <button
                   key={s}
@@ -356,20 +373,21 @@ function AgentForm({
                   title={where(s)}
                   onClick={() => set({ scope: s })}
                 >
-                  {s === "project" ? "This project" : "All my projects"}
+                  {s === "project" ? t("setup.agents.thisProject") : t("setup.agents.allMyProjects")}
                 </button>
               ))}
             </fieldset>
           </Field>
         </div>
       )}
-      <Field
-        label="Name"
-        help={`Lowercase letters, digits and hyphens. It is also the file name, in ${where(draft.scope)}`}
-      >
-        <input value={draft.name} onChange={(e) => set({ name: e.target.value })} placeholder="code-reviewer" />
+      <Field label={t("setup.agents.name")} help={t("setup.agents.nameHelp", { dir: where(draft.scope) })}>
+        <input
+          value={draft.name}
+          onChange={(e) => set({ name: e.target.value })}
+          placeholder={t("setup.agents.namePlaceholder")}
+        />
       </Field>
-      <Field label="Description" help="When Claude should use it. Claude reads this to pick an agent.">
+      <Field label={t("setup.agents.description")} help={t("setup.agents.descriptionHelp")}>
         <textarea rows={2} value={draft.description} onChange={(e) => set({ description: e.target.value })} />
       </Field>
       <label className="check">
@@ -379,15 +397,19 @@ function AgentForm({
           onChange={(e) => set({ description: withAutoWording(draft.description, e.target.checked) })}
         />
         <span>
-          Auto: Claude may start it on its own{" "}
-          <span className="muted">(adds “Use proactively.” to the description)</span>
+          {t("setup.agents.autoCheck")} <span className="muted">{t("setup.agents.autoCheckNote")}</span>
         </span>
       </label>
-      <Field label="Model">
-        <Select label="Model" value={draft.model} options={models} onChange={(model) => set({ model })} />
+      <Field label={t("setup.agents.model")}>
+        <Select
+          label={t("setup.agents.model")}
+          value={draft.model}
+          options={modelOptions}
+          onChange={(model) => set({ model })}
+        />
       </Field>
       <fieldset className="tool-picker">
-        <legend className="field-label">Tools</legend>
+        <legend className="field-label">{t("setup.agents.tools")}</legend>
         <div className="segmented">
           <button
             type="button"
@@ -395,7 +417,7 @@ function AgentForm({
             aria-pressed={!draft.limited}
             onClick={() => set({ limited: false })}
           >
-            All tools
+            {t("setup.agents.allTools")}
           </button>
           <button
             type="button"
@@ -403,7 +425,7 @@ function AgentForm({
             aria-pressed={draft.limited}
             onClick={() => set({ limited: true })}
           >
-            Only these
+            {t("setup.agents.onlyThese")}
           </button>
         </div>
         {draft.limited && (
@@ -416,7 +438,7 @@ function AgentForm({
                     <label key={tool} className="check">
                       <input
                         type="checkbox"
-                        checked={draft.tools.split(",").some((t) => t.trim() === tool)}
+                        checked={draft.tools.split(",").some((x) => x.trim() === tool)}
                         onChange={(e) => set({ tools: toggleTool(draft.tools, tool, e.target.checked) })}
                       />
                       <span>{tool}</span>
@@ -425,26 +447,21 @@ function AgentForm({
                 </div>
               ))}
             </div>
-            <Field
-              label="MCP tools"
-              help="Comma-separated: mcp__server for all its tools, or mcp__server__tool. Without any, the agent gets no MCP tools when the app runs it."
-            >
+            <Field label={t("setup.agents.mcpTools")} help={t("setup.agents.mcpToolsHelp")}>
               <input
                 value={others}
                 onChange={(e) => setOthers(e.target.value)}
                 onBlur={() => set({ tools: withOtherTools(draft.tools, others) })}
-                placeholder="mcp__github__*"
+                placeholder={t("setup.agents.mcpToolsPlaceholder")}
               />
             </Field>
           </>
         )}
         <span className="field-help">
-          {draft.limited
-            ? "When the app runs this agent (a chat or a Team worker), only these tools are there, still with approvals."
-            : "Every tool the session has. Approvals and the guard still apply."}
+          {draft.limited ? t("setup.agents.limitedHelp") : t("setup.agents.allToolsHelp")}
         </span>
       </fieldset>
-      <Field label="Prompt" help="The agent's system prompt.">
+      <Field label={t("setup.agents.prompt")} help={t("setup.agents.promptHelp")}>
         <textarea rows={8} value={draft.prompt} onChange={(e) => set({ prompt: e.target.value })} />
       </Field>
       {problems.length > 0 && (
@@ -458,10 +475,10 @@ function AgentForm({
       )}
       <div className="agent-form-actions">
         <button type="submit" className="primary small" disabled={problems.length > 0 || saving}>
-          {saving ? "Saving…" : isNew ? "Create agent" : "Save agent"}
+          {saving ? t("setup.agents.saving") : isNew ? t("setup.agents.createAgent") : t("setup.agents.saveAgent")}
         </button>
         <button type="button" className="secondary small" onClick={onCancel}>
-          Cancel
+          {t("setup.agents.cancel")}
         </button>
       </div>
     </form>

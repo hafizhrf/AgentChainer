@@ -2,26 +2,48 @@ import type { Methods, RuleScope } from "@agentchainer/protocol";
 import { ShieldCheck, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import type { Confirm } from "../Dialog.tsx";
+import { t } from "../i18n/index.ts";
+import { Rich } from "../i18n/Rich.tsx";
 import { request } from "../sidecar.ts";
 import { IconButton } from "../ui/IconButton.tsx";
 import { EmptyState, Section } from "../ui/Section.tsx";
 
 type Behavior = "allow" | "ask" | "deny";
 type Rules = Methods["permissions.list"]["result"];
-const BEHAVIOR_LABEL: Record<Behavior, string> = { allow: "Always allowed", ask: "Always ask", deny: "Always denied" };
+const BEHAVIOR_LABEL: Record<Behavior, string> = {
+  get allow() {
+    return t("setup.permissions.allow");
+  },
+  get ask() {
+    return t("setup.permissions.ask");
+  },
+  get deny() {
+    return t("setup.permissions.deny");
+  },
+};
 
 const FILES: Record<RuleScope, { title: string; file: string; note: string }> = {
   workspace: {
-    title: "Just me",
+    get title() {
+      return t("setup.permissions.workspaceTitle");
+    },
     file: ".claude/settings.local.json",
-    note: "Kept out of git, so only you have these.",
+    get note() {
+      return t("setup.permissions.workspaceNote");
+    },
   },
   team: {
-    title: "Shared with the team",
+    get title() {
+      return t("setup.permissions.teamTitle");
+    },
     file: ".claude/settings.json",
-    note: "Committed with the project, so everyone who opens it gets these.",
+    get note() {
+      return t("setup.permissions.teamNote");
+    },
   },
 };
+
+const code = (s: string) => <code>{s}</code>;
 
 /**
  * Permission rules (M1-20, UX-05) as a section of Workspace settings: the workspace's own rules for this user, and the
@@ -48,19 +70,16 @@ export function Permissions({ cwd, confirm }: { cwd: string; confirm: Confirm })
   async function remove(scope: RuleScope, behavior: Behavior, rule: string) {
     const { file } = FILES[scope];
     const ok = await confirm({
-      title: "Remove this rule?",
+      title: t("setup.permissions.removeTitle"),
       body: (
         <>
           <p>
-            <code>{rule}</code> is removed from <code>{file}</code>. Claude will ask again for it, certainly in new
-            sessions.
+            <Rich k="setup.permissions.removeBody" params={{ rule, file }} tags={{ code }} />
           </p>
-          {scope === "team" && (
-            <p className="warn">This file is committed: once you commit the change, it applies to your whole team.</p>
-          )}
+          {scope === "team" && <p className="warn">{t("setup.permissions.teamWarning")}</p>}
         </>
       ),
-      confirmLabel: "Remove rule",
+      confirmLabel: t("setup.permissions.removeRule"),
     });
     if (!ok) return;
     try {
@@ -77,12 +96,11 @@ export function Permissions({ cwd, confirm }: { cwd: string; confirm: Confirm })
   return (
     <div className="setup-scroll">
       <p className="muted">
-        Choosing <strong>Always allow</strong> on an approval saves a rule here, for you only or for your team.
-        Session-only rules end with the session and aren't listed.
+        <Rich k="setup.permissions.intro" tags={{ strong: (s) => <strong>{s}</strong> }} />
       </p>
       {error && <p className="warn">{error}</p>}
-      {!rules && !error && <p className="muted">Loading…</p>}
-      {empty && <EmptyState icon={<ShieldCheck size={14} />}>No saved rules yet.</EmptyState>}
+      {!rules && !error && <p className="muted">{t("setup.permissions.loading")}</p>}
+      {empty && <EmptyState icon={<ShieldCheck size={14} />}>{t("setup.permissions.empty")}</EmptyState>}
       {(["workspace", "team"] as const)
         .filter((scope) => behaviors(scope).length > 0)
         .map((scope) => (
@@ -100,7 +118,7 @@ export function Permissions({ cwd, confirm }: { cwd: string; confirm: Confirm })
                       {rule}
                     </code>
                     <span className="tree-actions">
-                      <IconButton label="Remove rule" onClick={() => void remove(scope, b, rule)}>
+                      <IconButton label={t("setup.permissions.removeRule")} onClick={() => void remove(scope, b, rule)}>
                         <Trash2 size={13} />
                       </IconButton>
                     </span>

@@ -19,6 +19,8 @@ import {
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { Confirm } from "../Dialog.tsx";
 import { InlineDiff } from "../InlineDiff.tsx";
+import { approxUsd } from "../i18n/format.ts";
+import { t } from "../i18n/index.ts";
 import { request } from "../sidecar.ts";
 import { lineDiff } from "../textdiff.ts";
 import { Field } from "../ui/Field.tsx";
@@ -108,7 +110,7 @@ export function WorkflowEditor({
   // The app's workflow is saved as the project's even unchanged: that's how a project starts its own.
   const canSave = text !== null && problem === null && (dirty || loaded?.source === "app");
 
-  function apply(change: (t: string) => string, select?: string | null) {
+  function apply(change: (yaml: string) => string, select?: string | null) {
     if (text === null) return;
     try {
       setText(change(text));
@@ -124,6 +126,7 @@ export function WorkflowEditor({
     const place = node ? placeOf(node.path.slice(0, 2)) : null;
     const index = place ? place.index + 1 : steps.length;
     const writers = steps.slice(0, index).filter((s) => s.access === "write" && typeof s.id === "string");
+    // Written into the workflow's YAML, like the app's own workflows' labels: stays English (X-13).
     const step =
       kind === "agent"
         ? {
@@ -140,25 +143,25 @@ export function WorkflowEditor({
             gates: ["test"],
             fix: { step: (writers.at(-1)?.id as string | undefined) ?? "implement", maxRounds: 1, maxBudgetUsd: 0.5 },
           };
-    apply((t) => insertAt(t, ["steps"], index, step), keyOf(["steps", index]));
+    apply((yaml) => insertAt(yaml, ["steps"], index, step), keyOf(["steps", index]));
   }
 
   function move(delta: number) {
     const place = node && placeOf(node.path);
     if (!place) return;
-    apply((t) => moveAt(t, place.list, place.index, delta), keyOf([...place.list, place.index + delta]));
+    apply((yaml) => moveAt(yaml, place.list, place.index, delta), keyOf([...place.list, place.index + delta]));
   }
 
   async function remove() {
     const place = node && placeOf(node.path);
     if (!place || !node) return;
     const ok = await confirm({
-      title: `Remove ${node.label}?`,
-      body: "The step goes from the YAML, with any comment above it. Steps whose fix rounds name it will need another.",
-      confirmLabel: "Remove",
+      title: t("workflows.editor.removeTitle", { label: node.label }),
+      body: t("workflows.editor.removeBody"),
+      confirmLabel: t("workflows.editor.remove"),
       danger: true,
     });
-    if (ok) apply((t) => removeAt(t, place.list, place.index), null);
+    if (ok) apply((yaml) => removeAt(yaml, place.list, place.index), null);
   }
 
   async function act(name: string, work: () => Promise<void>) {
@@ -177,7 +180,14 @@ export function WorkflowEditor({
     act("generate", async () => {
       if (!gen || text === null || tier === "XL") return;
       const r = await request("workflow.generate", { cwd, tier, description: gen.description.trim(), current: text });
-      if (!r.yaml) throw new Error(`${r.error ?? "Nothing came back."} (≈$${r.costUsd.toFixed(3)} spent)`);
+      if (!r.yaml) {
+        throw new Error(
+          t("workflows.editor.generateFailed", {
+            error: r.error ?? t("workflows.editor.nothingCameBack"),
+            cost: approxUsd(r.costUsd, 3),
+          }),
+        );
+      }
       setGen({ ...gen, result: { yaml: r.yaml, summary: r.summary, costUsd: r.costUsd } });
     });
 
@@ -191,9 +201,9 @@ export function WorkflowEditor({
 
   const reset = async () => {
     const ok = await confirm({
-      title: `Use the app's ${tier} workflow again?`,
-      body: `${loaded?.file} is removed from the workspace, and ${tier} tasks run the app's workflow. Runs under way keep the copy they started with.`,
-      confirmLabel: "Reset",
+      title: t("workflows.editor.resetTitle", { tier }),
+      body: t("workflows.editor.resetBody", { file: String(loaded?.file), tier }),
+      confirmLabel: t("workflows.editor.reset"),
       danger: true,
     });
     if (ok)
@@ -207,7 +217,10 @@ export function WorkflowEditor({
 
   const importFile = () =>
     act("import", async () => {
-      const file = await open({ multiple: false, filters: [{ name: "Workflow", extensions: ["yaml", "yml"] }] });
+      const file = await open({
+        multiple: false,
+        filters: [{ name: t("workflows.editor.fileFilter"), extensions: ["yaml", "yml"] }],
+      });
       if (typeof file !== "string") return;
       setText((await request("workflow.import", { path: file })).yaml);
       setSelected(null);
@@ -218,7 +231,7 @@ export function WorkflowEditor({
       if (text === null) return;
       const file = await save({
         defaultPath: `${tier.toLowerCase()}.yaml`,
-        filters: [{ name: "Workflow", extensions: ["yaml"] }],
+        filters: [{ name: t("workflows.editor.fileFilter"), extensions: ["yaml"] }],
       });
       if (file) await request("workflow.export", { path: file, yaml: text });
     });
@@ -226,9 +239,9 @@ export function WorkflowEditor({
   async function close() {
     if (dirty) {
       const ok = await confirm({
-        title: "Leave without saving?",
-        body: "The changes to this workflow are lost.",
-        confirmLabel: "Leave",
+        title: t("workflows.editor.leaveTitle"),
+        body: t("workflows.editor.leaveBody"),
+        confirmLabel: t("workflows.editor.leave"),
         danger: true,
       });
       if (!ok) return;
@@ -242,22 +255,22 @@ export function WorkflowEditor({
       <header className="workflow-toolbar">
         <button type="button" className="ghost small" onClick={() => void close()}>
           <ArrowLeft size={14} />
-          Workflows
+          {t("workflows.editor.back")}
         </button>
-        <strong>{tier} workflow</strong>
+        <strong>{t("workflows.editor.title", { tier })}</strong>
         {loaded && (
           <span className={`chip${loaded.source === "project" ? " on" : ""}`}>
-            {loaded.source === "project" ? loaded.file : "the app's (not saved in the project)"}
+            {loaded.source === "project" ? loaded.file : t("workflows.editor.appsCopy")}
           </span>
         )}
-        {dirty && <span className="muted">· edited</span>}
+        {dirty && <span className="muted">{t("workflows.editor.edited")}</span>}
         <span className="grow" />
-        <fieldset className="segmented" aria-label="View">
+        <fieldset className="segmented" aria-label={t("workflows.editor.view")}>
           <button type="button" aria-pressed={view === "canvas"} onClick={() => setView("canvas")}>
-            <Network size={13} /> Canvas
+            <Network size={13} /> {t("workflows.editor.canvas")}
           </button>
           <button type="button" aria-pressed={view === "yaml"} onClick={() => setView("yaml")}>
-            <Code size={13} /> YAML
+            <Code size={13} /> {t("workflows.editor.yaml")}
           </button>
         </fieldset>
         {tier !== "XL" && (
@@ -269,14 +282,14 @@ export function WorkflowEditor({
             aria-expanded={gen !== null}
           >
             <Sparkles size={13} />
-            Generate with AI
+            {t("workflows.editor.generateWithAi")}
           </button>
         )}
-        <IconButton label="Import a workflow file" disabled={busy !== null} onClick={() => void importFile()}>
+        <IconButton label={t("workflows.editor.import")} disabled={busy !== null} onClick={() => void importFile()}>
           <Upload size={15} />
         </IconButton>
         <IconButton
-          label="Export as a file"
+          label={t("workflows.editor.export")}
           disabled={busy !== null || text === null}
           onClick={() => void exportFile()}
         >
@@ -285,48 +298,45 @@ export function WorkflowEditor({
         {loaded?.source === "project" && (
           <button type="button" className="secondary small" disabled={busy !== null} onClick={() => void reset()}>
             <RotateCcw size={13} />
-            Reset to the app's
+            {t("workflows.editor.resetToApps")}
           </button>
         )}
         <button type="button" className="small" disabled={!canSave || busy !== null} onClick={() => void saveFile()}>
           {busy === "save" ? <Loader2 size={13} className="spin" /> : <Save size={13} />}
-          Save
+          {t("workflows.editor.save")}
         </button>
       </header>
 
       <div className={`workflow-status${problem ? " bad" : ""}`} role="status">
         {problem === undefined ? (
           <span className="muted">
-            <Loader2 size={13} className="spin" /> Checking…
+            <Loader2 size={13} className="spin" /> {t("workflows.editor.checking")}
           </span>
         ) : problem === null ? (
           <span>
-            <CircleCheck size={13} className="ok" /> Valid: a {tier} run can use it as written.
+            <CircleCheck size={13} className="ok" /> {t("workflows.editor.valid", { tier })}
           </span>
         ) : (
-          <pre>{parsed.yamlError ? `YAML: ${parsed.yamlError}` : problem}</pre>
+          <pre>{parsed.yamlError ? t("workflows.editor.yamlError", { error: parsed.yamlError }) : problem}</pre>
         )}
       </div>
       {error && <p className="warn workflow-error">{error}</p>}
       {gen && (
-        <section className="workflow-generate" aria-label="Generate with AI">
+        <section className="workflow-generate" aria-label={t("workflows.editor.generateWithAi")}>
           {!gen.result ? (
             <>
-              <Field
-                label="Describe the flow you want"
-                help="Claude rewrites this workflow from your description, starting from what's in the editor. It's checked like one you write; nothing is saved until you keep it and Save."
-              >
+              <Field label={t("workflows.editor.describeLabel")} help={t("workflows.editor.describeHelp")}>
                 <textarea
                   rows={3}
                   value={gen.description}
-                  placeholder="e.g. Plan with the architect, have a test planner list the tests first, then implement, then a security review before the gates."
+                  placeholder={t("workflows.editor.describePlaceholder")}
                   onChange={(e) => setGen({ ...gen, description: e.target.value })}
                 />
               </Field>
               <div className="workflow-generate-actions">
                 <span className="grow" />
                 <button type="button" className="secondary small" onClick={() => setGen(null)}>
-                  Cancel
+                  {t("workflows.editor.cancel")}
                 </button>
                 <button
                   type="button"
@@ -335,15 +345,17 @@ export function WorkflowEditor({
                   onClick={() => void generate()}
                 >
                   {busy === "generate" ? <Loader2 size={13} className="spin" /> : <Sparkles size={13} />}
-                  {busy === "generate" ? "Generating…" : "Generate"}
+                  {busy === "generate" ? t("workflows.editor.generating") : t("workflows.editor.generate")}
                 </button>
               </div>
             </>
           ) : (
             <>
               <p className="flow-text">
-                <strong>Claude's flow:</strong> {gen.result.summary}{" "}
-                <span className="muted">(≈${gen.result.costUsd.toFixed(3)}, passes the checks)</span>
+                <strong>{t("workflows.editor.generatedFlow")}</strong> {gen.result.summary}{" "}
+                <span className="muted">
+                  {t("workflows.editor.generatedCost", { cost: approxUsd(gen.result.costUsd, 3) })}
+                </span>
               </p>
               <div className="workflow-generate-diff">
                 <InlineDiff diffs={[lineDiff(text ?? "", gen.result.yaml)]} />
@@ -351,7 +363,7 @@ export function WorkflowEditor({
               <div className="workflow-generate-actions">
                 <span className="grow" />
                 <button type="button" className="secondary small" onClick={() => setGen(null)}>
-                  Discard
+                  {t("workflows.editor.discard")}
                 </button>
                 <button
                   type="button"
@@ -362,7 +374,7 @@ export function WorkflowEditor({
                     setGen(null);
                   }}
                 >
-                  Keep it in the editor
+                  {t("workflows.editor.keep")}
                 </button>
               </div>
             </>
@@ -371,25 +383,25 @@ export function WorkflowEditor({
       )}
 
       {text === null ? (
-        <p className="muted setup-pad">Loading the workflow…</p>
+        <p className="muted setup-pad">{t("workflows.editor.loading")}</p>
       ) : view === "yaml" ? (
         <textarea
           className="workflow-yaml"
           value={text}
           onChange={(e) => setText(e.target.value)}
           spellCheck={false}
-          aria-label={`${tier} workflow YAML`}
+          aria-label={t("workflows.editor.yamlLabel", { tier })}
         />
       ) : (
         <div className="workflow-body">
           <WorkflowCanvas nodes={graph.nodes} edges={graph.edges} selected={selected} onSelect={setSelected} />
-          <aside className="workflow-side" aria-label="Step">
-            <Field label="Step">
+          <aside className="workflow-side" aria-label={t("workflows.editor.step")}>
+            <Field label={t("workflows.editor.step")}>
               <Select
-                label="Step to edit"
+                label={t("workflows.editor.stepToEdit")}
                 value={selected ?? ""}
                 options={[
-                  { value: "", label: "Select a step…" },
+                  { value: "", label: t("workflows.editor.selectStep") },
                   ...graph.nodes.map((n) => ({
                     value: n.id,
                     label: n.kind === "member" ? `  ↳ ${n.label}` : n.label,
@@ -406,7 +418,7 @@ export function WorkflowEditor({
                   disabled={parsed.data === null}
                   onClick={() => add("agent")}
                 >
-                  <Plus size={13} /> Agent step
+                  <Plus size={13} /> {t("workflows.editor.addAgent")}
                 </button>
                 <button
                   type="button"
@@ -414,17 +426,17 @@ export function WorkflowEditor({
                   disabled={parsed.data === null}
                   onClick={() => add("gates")}
                 >
-                  <Plus size={13} /> Gates
+                  <Plus size={13} /> {t("workflows.editor.addGates")}
                 </button>
                 <span className="grow" />
-                <IconButton label="Move up" disabled={!movable} onClick={() => move(-1)}>
+                <IconButton label={t("workflows.editor.moveUp")} disabled={!movable} onClick={() => move(-1)}>
                   <ArrowUp size={14} />
                 </IconButton>
-                <IconButton label="Move down" disabled={!movable} onClick={() => move(1)}>
+                <IconButton label={t("workflows.editor.moveDown")} disabled={!movable} onClick={() => move(1)}>
                   <ArrowDown size={14} />
                 </IconButton>
                 <IconButton
-                  label="Remove the step"
+                  label={t("workflows.editor.removeStep")}
                   disabled={!node || placeOf(node.path) === null}
                   onClick={() => void remove()}
                 >
@@ -434,14 +446,16 @@ export function WorkflowEditor({
             )}
             {node ? (
               <div className="workflow-form">
-                <StepForm node={node} data={parsed.data} onSet={(path, value) => apply((t) => setAt(t, path, value))} />
+                <StepForm
+                  node={node}
+                  data={parsed.data}
+                  onSet={(path, value) => apply((yaml) => setAt(yaml, path, value))}
+                />
               </div>
             ) : (
               <p className="muted">
-                Select a step on the canvas or in the list to edit it.{" "}
-                {isXl
-                  ? "XL's split, sub-tasks and integration gates are fixed in shape."
-                  : "New steps go after the selected one."}
+                {t("workflows.editor.selectHint")}{" "}
+                {isXl ? t("workflows.editor.xlFixed") : t("workflows.editor.newStepsAfter")}
               </p>
             )}
           </aside>

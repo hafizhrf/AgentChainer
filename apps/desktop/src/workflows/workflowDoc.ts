@@ -1,4 +1,5 @@
 import { type Document, isCollection, isMap, isScalar, isSeq, type Node, parseDocument, type YAMLSeq } from "yaml";
+import { t } from "../i18n/index.ts";
 
 /**
  * Edits to a workflow's YAML through the `yaml` Document API (M6-04, design §9), so the file's comments and layout
@@ -11,7 +12,7 @@ export type Path = (string | number)[];
 /** The workflow the text holds, or the YAML syntax error that stops it from being read. */
 export function readWorkflow(text: string): { data: Record<string, unknown> | null; yamlError: string | null } {
   const doc = parseDocument(text);
-  if (doc.errors.length) return { data: null, yamlError: doc.errors[0]?.message ?? "Invalid YAML." };
+  if (doc.errors.length) return { data: null, yamlError: doc.errors[0]?.message ?? t("workflows.doc.invalidYaml") };
   const data = doc.toJS() as unknown;
   return {
     data: data && typeof data === "object" && !Array.isArray(data) ? (data as Record<string, unknown>) : null,
@@ -21,7 +22,10 @@ export function readWorkflow(text: string): { data: Record<string, unknown> | nu
 
 function edit(text: string, change: (doc: Document) => void): string {
   const doc = parseDocument(text);
-  if (doc.errors.length) throw new Error(`Fix the YAML first: ${doc.errors[0]?.message ?? "it doesn't parse"}`);
+  if (doc.errors.length)
+    throw new Error(
+      t("workflows.doc.fixYamlFirst", { error: doc.errors[0]?.message ?? t("workflows.doc.doesNotParse") }),
+    );
   change(doc);
   return doc.toString();
 }
@@ -57,7 +61,7 @@ export function setAt(text: string, path: Path, value: unknown): string {
 
 function stepsOf(doc: Document, path: Path): YAMLSeq {
   const seq = doc.getIn(path, true);
-  if (!isSeq(seq)) throw new Error("The workflow has no list of steps there.");
+  if (!isSeq(seq)) throw new Error(t("workflows.doc.noStepList"));
   // A comment above the first item belongs to the list in the Document; give it to the item, so it moves with it.
   const first = seq.items[0];
   if (seq.commentBefore && first && (isMap(first) || isScalar(first) || isSeq(first))) {

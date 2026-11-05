@@ -1,26 +1,24 @@
 import type { MetricsSummary, MetricsTask, TierWorkflow } from "@agentchainer/protocol";
 import { BarChart3, RefreshCw } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { compactDuration, percent, usd } from "../i18n/format.ts";
+import { t } from "../i18n/index.ts";
 import { request } from "../sidecar.ts";
 import { IconButton } from "../ui/IconButton.tsx";
 import { Select } from "../ui/Select.tsx";
 
 const message = (err: unknown) => (err instanceof Error ? err.message : String(err));
-const pct = (r: number | null) => (r === null ? "—" : `${Math.round(r * 100)}%`);
-const usd = (n: number | null) => (n === null ? "—" : n < 1 ? `$${n.toFixed(3)}` : `$${n.toFixed(2)}`);
-const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
-function duration(ms: number): string {
-  const s = Math.round(ms / 1000);
-  return s < 60 ? `${s}s` : `${Math.floor(s / 60)}m ${String(s % 60).padStart(2, "0")}s`;
-}
+const pct = (r: number | null) => (r === null ? "—" : percent(r));
+const money = (n: number | null) => (n === null ? "—" : usd(n, n < 1 ? 3 : 2));
+const duration = (ms: number) => compactDuration(Math.round(ms / 1000));
 
-const RANGES = [
-  { value: "7", label: "Last 7 days" },
-  { value: "30", label: "Last 30 days" },
-  { value: "", label: "All time" },
+const ranges = () => [
+  { value: "7", label: t("setup.metrics.last7Days") },
+  { value: "30", label: t("setup.metrics.last30Days") },
+  { value: "", label: t("setup.metrics.allTime") },
 ];
-const TIERS: { value: "" | TierWorkflow["tier"]; label: string }[] = [
-  { value: "", label: "All tiers" },
+const tiers = (): { value: "" | TierWorkflow["tier"]; label: string }[] => [
+  { value: "", label: t("setup.metrics.allTiers") },
   { value: "S", label: "S" },
   { value: "M", label: "M" },
   { value: "L", label: "L" },
@@ -29,12 +27,37 @@ const TIERS: { value: "" | TierWorkflow["tier"]; label: string }[] = [
 
 /** Which tasks a tile lists when it's selected. */
 type Focus = "all" | "gates" | "success" | "retried" | "person";
-const FOCUS: Record<Focus, { title: string; keep: (t: MetricsTask) => boolean }> = {
-  all: { title: "All tasks in range", keep: () => true },
-  gates: { title: "Tasks whose latest run didn't pass its gates", keep: (t) => t.gatesPassed === false },
-  success: { title: "Successful tasks", keep: (t) => t.success },
-  retried: { title: "Tasks with retries or fix rounds", keep: (t) => t.runs > 1 || t.fixRounds > 0 || t.ciFixes > 0 },
-  person: { title: "Tasks that needed a person", keep: (t) => t.neededPerson },
+const FOCUS: Record<Focus, { title: string; keep: (task: MetricsTask) => boolean }> = {
+  all: {
+    get title() {
+      return t("setup.metrics.focusAll");
+    },
+    keep: () => true,
+  },
+  gates: {
+    get title() {
+      return t("setup.metrics.focusGates");
+    },
+    keep: (task) => task.gatesPassed === false,
+  },
+  success: {
+    get title() {
+      return t("setup.metrics.focusSuccess");
+    },
+    keep: (task) => task.success,
+  },
+  retried: {
+    get title() {
+      return t("setup.metrics.focusRetried");
+    },
+    keep: (task) => task.runs > 1 || task.fixRounds > 0 || task.ciFixes > 0,
+  },
+  person: {
+    get title() {
+      return t("setup.metrics.focusPerson");
+    },
+    keep: (task) => task.neededPerson,
+  },
 };
 
 function Tile({
@@ -96,67 +119,91 @@ export function Metrics({ cwd }: { cwd: string }) {
   return (
     <div className="setup-scroll">
       <div className="metrics-filters">
-        <p className="muted grow">How this workspace's tasks went, from their records on this computer.</p>
-        <Select compact label="Time range" value={range} options={RANGES} onChange={setRange} />
-        <Select compact label="Tier" value={tier} options={TIERS} onChange={(v) => setTier(v as typeof tier)} />
-        <IconButton label="Refresh" onClick={() => void load()}>
+        <p className="muted grow">{t("setup.metrics.intro")}</p>
+        <Select compact label={t("setup.metrics.timeRange")} value={range} options={ranges()} onChange={setRange} />
+        <Select
+          compact
+          label={t("setup.metrics.tier")}
+          value={tier}
+          options={tiers()}
+          onChange={(v) => setTier(v as typeof tier)}
+        />
+        <IconButton label={t("setup.metrics.refresh")} onClick={() => void load()}>
           <RefreshCw size={14} />
         </IconButton>
       </div>
       {error && <p className="warn">{error}</p>}
-      {!m && !error && <p className="muted">Adding up the tasks…</p>}
+      {!m && !error && <p className="muted">{t("setup.metrics.adding")}</p>}
       {m && m.tasks === 0 && (
         <p className="empty-state">
-          <BarChart3 size={14} /> No task has run in this range yet.
+          <BarChart3 size={14} /> {t("setup.metrics.noTasks")}
         </p>
       )}
       {m && m.tasks > 0 && (
         <>
           <div className="metric-tiles">
             <Tile
-              label="Gate pass rate"
+              label={t("setup.metrics.gatePassRate")}
               value={pct(m.gatePass.rate)}
-              detail={`${plural(m.gatePass.judged, "run", "runs")}${m.gatePass.unjudged ? `, ${m.gatePass.unjudged} ran no gate` : ""}`}
+              detail={
+                m.gatePass.unjudged
+                  ? t("setup.metrics.gateDetailUnjudged", {
+                      runs: t("setup.metrics.runs", { count: m.gatePass.judged }),
+                      unjudged: m.gatePass.unjudged,
+                    })
+                  : t("setup.metrics.runs", { count: m.gatePass.judged })
+              }
               focus="gates"
               current={focus}
               onFocus={setFocus}
             />
             <Tile
-              label="Cost per task"
-              value={usd(m.costUsd.perTask)}
-              detail={`${usd(m.costUsd.total)} over ${plural(m.tasks, "task", "tasks")}`}
+              label={t("setup.metrics.costPerTask")}
+              value={money(m.costUsd.perTask)}
+              detail={t("setup.metrics.costDetail", {
+                total: money(m.costUsd.total),
+                tasks: t("setup.metrics.tasks", { count: m.tasks }),
+              })}
               focus="all"
               current={focus}
               onFocus={setFocus}
             />
             <Tile
-              label="Cost per successful task"
-              value={usd(m.costUsd.perSuccess)}
-              detail={`${m.costUsd.successes} of ${m.tasks} succeeded; failures' cost counts`}
+              label={t("setup.metrics.costPerSuccess")}
+              value={money(m.costUsd.perSuccess)}
+              detail={t("setup.metrics.successDetail", { successes: m.costUsd.successes, tasks: m.tasks })}
               focus="success"
               current={focus}
               onFocus={setFocus}
             />
             <Tile
-              label="Run time"
+              label={t("setup.metrics.runTime")}
               value={m.durationMs ? duration(m.durationMs.p50) : "—"}
-              detail={m.durationMs ? `median; 90% under ${duration(m.durationMs.p90)}` : "no finished run"}
+              detail={
+                m.durationMs
+                  ? t("setup.metrics.runTimeDetail", { p90: duration(m.durationMs.p90) })
+                  : t("setup.metrics.noFinishedRun")
+              }
               focus="all"
               current={focus}
               onFocus={setFocus}
             />
             <Tile
-              label="Retries"
+              label={t("setup.metrics.retries")}
               value={String(m.retries.extraRuns + m.retries.fixRounds + m.retries.ciFixes)}
-              detail={`${plural(m.retries.extraRuns, "run", "runs")} again, ${plural(m.retries.fixRounds, "fix round", "fix rounds")}, ${m.retries.ciFixes} Fix CI`}
+              detail={t("setup.metrics.retriesDetail", {
+                runs: t("setup.metrics.runs", { count: m.retries.extraRuns }),
+                fixRounds: t("setup.metrics.fixRounds", { count: m.retries.fixRounds }),
+                ciFixes: m.retries.ciFixes,
+              })}
               focus="retried"
               current={focus}
               onFocus={setFocus}
             />
             <Tile
-              label="Needed a person"
+              label={t("setup.metrics.neededPerson")}
               value={pct(m.humanFix.rate)}
-              detail={`${plural(m.humanFix.tasks, "task", "tasks")}; hand edits after Done aren't measured`}
+              detail={t("setup.metrics.personDetail", { tasks: t("setup.metrics.tasks", { count: m.humanFix.tasks }) })}
               focus="person"
               current={focus}
               onFocus={setFocus}
@@ -165,34 +212,34 @@ export function Metrics({ cwd }: { cwd: string }) {
 
           <div className="metrics-tables">
             <table className="metrics-table">
-              <caption>By tier</caption>
+              <caption>{t("setup.metrics.byTier")}</caption>
               <thead>
                 <tr>
-                  <th scope="col">Tier</th>
-                  <th scope="col">Tasks</th>
-                  <th scope="col">Succeeded</th>
-                  <th scope="col">Cost</th>
+                  <th scope="col">{t("setup.metrics.tier")}</th>
+                  <th scope="col">{t("setup.metrics.colTasks")}</th>
+                  <th scope="col">{t("setup.metrics.colSucceeded")}</th>
+                  <th scope="col">{t("setup.metrics.colCost")}</th>
                 </tr>
               </thead>
               <tbody>
-                {m.byTier.map((t) => (
-                  <tr key={t.tier}>
-                    <th scope="row">{t.tier}</th>
-                    <td>{t.tasks}</td>
-                    <td>{pct(t.tasks ? t.successes / t.tasks : null)}</td>
-                    <td>{usd(t.costUsd)}</td>
+                {m.byTier.map((row) => (
+                  <tr key={row.tier}>
+                    <th scope="row">{row.tier}</th>
+                    <td>{row.tasks}</td>
+                    <td>{pct(row.tasks ? row.successes / row.tasks : null)}</td>
+                    <td>{money(row.costUsd)}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
             <table className="metrics-table">
-              <caption>By workflow</caption>
+              <caption>{t("setup.metrics.byWorkflow")}</caption>
               <thead>
                 <tr>
-                  <th scope="col">Workflow</th>
-                  <th scope="col">Runs</th>
-                  <th scope="col">Gates passed</th>
-                  <th scope="col">Cost</th>
+                  <th scope="col">{t("setup.metrics.colWorkflow")}</th>
+                  <th scope="col">{t("setup.metrics.colRuns")}</th>
+                  <th scope="col">{t("setup.metrics.colGatesPassed")}</th>
+                  <th scope="col">{t("setup.metrics.colCost")}</th>
                 </tr>
               </thead>
               <tbody>
@@ -203,7 +250,7 @@ export function Metrics({ cwd }: { cwd: string }) {
                     </th>
                     <td>{w.runs}</td>
                     <td>{pct(w.gatePassRate)}</td>
-                    <td>{usd(w.costUsd)}</td>
+                    <td>{money(w.costUsd)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -216,17 +263,15 @@ export function Metrics({ cwd }: { cwd: string }) {
               <span className="muted">{listed.length}</span>
             </div>
             <ul className="deploy-list metrics-tasks">
-              {listed.map((t) => (
-                <li key={t.id}>
-                  <span className="chip">{t.tier ?? "—"}</span>
-                  <span className="grow deploy-detail" title={t.request}>
-                    {t.request}
+              {listed.map((task) => (
+                <li key={task.id}>
+                  <span className="chip">{task.tier ?? "—"}</span>
+                  <span className="grow deploy-detail" title={task.request}>
+                    {task.request}
                   </span>
-                  <span className="muted">{t.state}</span>
-                  <span className="muted">
-                    {t.runs} {t.runs === 1 ? "run" : "runs"}
-                  </span>
-                  <span>{usd(t.costUsd)}</span>
+                  <span className="muted">{task.state}</span>
+                  <span className="muted">{t("setup.metrics.runs", { count: task.runs })}</span>
+                  <span>{money(task.costUsd)}</span>
                 </li>
               ))}
             </ul>

@@ -1,6 +1,7 @@
 import type { Methods } from "@agentchainer/protocol";
 import { ArrowRight, CircleCheck } from "lucide-react";
 import { useEffect, useState } from "react";
+import { t } from "../i18n/index.ts";
 import { request } from "../sidecar.ts";
 import { gapsOf, STATUS_ICON } from "./Overview.tsx";
 
@@ -22,20 +23,20 @@ export function SetupSummary({ cwd, onOpen }: { cwd: string; onOpen: () => void 
   }, [cwd]);
 
   if (error) return <p className="warn">{error}</p>;
-  if (!scan) return <p className="muted">Scanning…</p>;
+  if (!scan) return <p className="muted">{t("setup.summary.scanning")}</p>;
   const gaps = gapsOf(scan.findings);
   const { profile } = scan;
   return (
     <div className="setup-summary">
       <p className="muted">
-        {profile.stacks.length ? profile.stacks.join(", ") : "No known stack"}
-        {profile.monorepo ? ` · monorepo (${profile.monorepo})` : ""}
-        {profile.ci.length ? ` · CI: ${profile.ci.join(", ")}` : ""}
+        {profile.stacks.length ? profile.stacks.join(", ") : t("setup.summary.noStack")}
+        {profile.monorepo ? ` · ${t("setup.summary.monorepo", { name: profile.monorepo })}` : ""}
+        {profile.ci.length ? ` · ${t("setup.summary.ci", { list: profile.ci.join(", ") })}` : ""}
       </p>
       <div className={`summary-main${gaps.length ? " has-gaps" : ""}`}>
         {gaps.length === 0 && <CircleCheck size={18} />}
         <strong>
-          {gaps.length === 0 ? "Ready for agent work" : `${gaps.length} thing${gaps.length > 1 ? "s" : ""} to fix`}
+          {gaps.length === 0 ? t("setup.overview.ready") : t("setup.overview.thingsToFix", { count: gaps.length })}
         </strong>
       </div>
       {gaps.length > 0 && (
@@ -52,16 +53,14 @@ export function SetupSummary({ cwd, onOpen }: { cwd: string; onOpen: () => void 
               </li>
             );
           })}
-          {gaps.length > 3 && <li className="muted">and {gaps.length - 3} more</li>}
+          {gaps.length > 3 && <li className="muted">{t("setup.summary.andMore", { n: gaps.length - 3 })}</li>}
         </ul>
       )}
       <button type="button" onClick={onOpen}>
-        Open workspace settings
+        {t("setup.summary.open")}
         <ArrowRight size={14} />
       </button>
-      <p className="muted small-print">
-        Review the readiness report, the bootstrap plan with exact previews, detected commands and past runs.
-      </p>
+      <p className="muted small-print">{t("setup.summary.smallPrint")}</p>
     </div>
   );
 }

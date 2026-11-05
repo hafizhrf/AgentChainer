@@ -1,5 +1,7 @@
 import type { BootstrapRun } from "@agentchainer/protocol";
 import { CircleCheck, CircleX, History as HistoryIcon, Undo2 } from "lucide-react";
+import { dateTime } from "../i18n/format.ts";
+import { t } from "../i18n/index.ts";
 import { EmptyState } from "../ui/Section.tsx";
 import { Checks, OutcomeList } from "./PlanView.tsx";
 import type { Bootstrap } from "./useBootstrap.tsx";
@@ -16,19 +18,15 @@ export function History({ bootstrap: b }: { bootstrap: Bootstrap }) {
   return (
     <div className="setup-scroll">
       {b.outcome && <OutcomeList outcome={b.outcome} onDismiss={b.clearOutcome} />}
-      {b.runs.length === 0 && (
-        <EmptyState icon={<HistoryIcon size={14} />}>
-          Nothing applied yet. Each apply is recorded here and can be rolled back.
-        </EmptyState>
-      )}
+      {b.runs.length === 0 && <EmptyState icon={<HistoryIcon size={14} />}>{t("setup.history.empty")}</EmptyState>}
       <ol className="timeline">
         {b.runs.map((r) => {
           const live = r.actions.some((a) => a.status === "applied");
           return (
             <li key={r.runId} className="run">
               <header className="run-head">
-                <strong>{new Date(r.startedAt).toLocaleString()}</strong>
-                <span className="muted">catalog {r.catalogVersion}</span>
+                <strong>{dateTime(r.startedAt)}</strong>
+                <span className="muted">{t("setup.history.catalog", { version: r.catalogVersion })}</span>
                 <span className="grow" />
                 {live && conflict && (
                   <button
@@ -37,7 +35,7 @@ export function History({ bootstrap: b }: { bootstrap: Bootstrap }) {
                     disabled={b.busy}
                     onClick={() => void b.undo(r.runId, undefined, true)}
                   >
-                    Force rollback
+                    {t("setup.history.forceRollback")}
                   </button>
                 )}
                 {live && (
@@ -48,7 +46,7 @@ export function History({ bootstrap: b }: { bootstrap: Bootstrap }) {
                     onClick={() => void b.undo(r.runId)}
                   >
                     <Undo2 size={13} />
-                    Roll back run
+                    {t("setup.history.rollBackRun")}
                   </button>
                 )}
               </header>
@@ -75,7 +73,7 @@ export function History({ bootstrap: b }: { bootstrap: Bootstrap }) {
                           disabled={b.busy}
                           onClick={() => void b.undo(r.runId, a.id)}
                         >
-                          Roll back
+                          {t("setup.history.rollBack")}
                         </button>
                       )}
                     </li>

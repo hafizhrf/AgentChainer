@@ -17,6 +17,7 @@ import {
 import { type ReactNode, useCallback, useEffect, useState } from "react";
 import type { Confirm } from "../Dialog.tsx";
 import { FolderSwitcher } from "../FolderSwitcher.tsx";
+import { t } from "../i18n/index.ts";
 import { request } from "../sidecar.ts";
 import { folderName } from "../tabs.ts";
 import { IconButton } from "../ui/IconButton.tsx";
@@ -104,23 +105,33 @@ export function SetupPage({
 
   const gaps = scan ? gapsOf(scan.findings).length : null;
   const nav: { id: SetupView; label: string; icon: ReactNode; count?: number | null }[] = [
-    { id: "overview", label: "Overview", icon: <ListChecks size={16} className="nav-icon" />, count: gaps || null },
+    {
+      id: "overview",
+      label: t("setup.page.navOverview"),
+      icon: <ListChecks size={16} className="nav-icon" />,
+      count: gaps || null,
+    },
     {
       id: "plan",
-      label: "Setup plan",
+      label: t("setup.page.navPlan"),
       icon: <ClipboardList size={16} className="nav-icon" />,
       count: bootstrap.selected.size || null,
     },
-    { id: "commands", label: "Commands", icon: <Terminal size={16} className="nav-icon" /> },
-    { id: "agents", label: "Agents", icon: <Bot size={16} className="nav-icon" /> },
-    { id: "plugins", label: "Plugins", icon: <Puzzle size={16} className="nav-icon" />, count: pluginUpdates || null },
-    { id: "permissions", label: "Permissions", icon: <ShieldCheck size={16} className="nav-icon" /> },
-    { id: "workflows", label: "Workflows", icon: <Workflow size={16} className="nav-icon" /> },
-    { id: "deploy", label: "Deploy", icon: <Rocket size={16} className="nav-icon" /> },
-    { id: "metrics", label: "Metrics", icon: <BarChart3 size={16} className="nav-icon" /> },
+    { id: "commands", label: t("setup.page.navCommands"), icon: <Terminal size={16} className="nav-icon" /> },
+    { id: "agents", label: t("setup.page.navAgents"), icon: <Bot size={16} className="nav-icon" /> },
+    {
+      id: "plugins",
+      label: t("setup.page.navPlugins"),
+      icon: <Puzzle size={16} className="nav-icon" />,
+      count: pluginUpdates || null,
+    },
+    { id: "permissions", label: t("setup.page.navPermissions"), icon: <ShieldCheck size={16} className="nav-icon" /> },
+    { id: "workflows", label: t("setup.page.navWorkflows"), icon: <Workflow size={16} className="nav-icon" /> },
+    { id: "deploy", label: t("setup.page.navDeploy"), icon: <Rocket size={16} className="nav-icon" /> },
+    { id: "metrics", label: t("setup.page.navMetrics"), icon: <BarChart3 size={16} className="nav-icon" /> },
     {
       id: "history",
-      label: "History",
+      label: t("setup.page.navHistory"),
       icon: <HistoryIcon size={16} className="nav-icon" />,
       count: bootstrap.runs.length || null,
     },
@@ -135,7 +146,7 @@ export function SetupPage({
           {backLabel}
         </button>
         <div className="setup-title">
-          <h1>Workspace settings</h1>
+          <h1>{t("setup.page.title")}</h1>
           {folders.length > 1 && onFolderChange ? (
             <FolderSwitcher folders={folders} current={cwd} onChange={onFolderChange} />
           ) : (
@@ -150,22 +161,21 @@ export function SetupPage({
               {s}
             </span>
           ))}
-          {profile?.monorepo && <span className="chip">monorepo · {profile.monorepo}</span>}
+          {profile?.monorepo && (
+            <span className="chip">{t("setup.page.monorepoChip", { name: profile.monorepo })}</span>
+          )}
           {profile?.ci.map((c) => (
             <span key={c} className="chip">
-              CI · {c}
+              {t("setup.page.ciChip", { name: c })}
             </span>
           ))}
         </div>
         <span className="grow" />
-        <IconButton
-          label="Save profile (.agentchainer/profile.json, kept out of git)"
-          onClick={() => void saveProfile()}
-        >
+        <IconButton label={t("setup.page.saveProfile")} onClick={() => void saveProfile()}>
           <Save size={15} />
         </IconButton>
         <IconButton
-          label="Rescan"
+          label={t("setup.page.rescan")}
           onClick={() => {
             void rescan();
             void bootstrap.load();
@@ -176,12 +186,12 @@ export function SetupPage({
       </header>
       {saved && (
         <p className="banner">
-          <span className="grow">Saved the profile to {saved} (ignored by git).</span>
+          <span className="grow">{t("setup.page.savedProfile", { path: saved })}</span>
         </p>
       )}
 
       <div className="setup-body">
-        <nav className="setup-nav" aria-label="Setup sections">
+        <nav className="setup-nav" aria-label={t("setup.page.sections")}>
           {nav.map((n) => (
             <button
               key={n.id}
@@ -198,7 +208,7 @@ export function SetupPage({
         </nav>
         <main className="setup-content">
           {error && <p className="warn setup-pad">{error}</p>}
-          {!scan && !error && <p className="muted setup-pad">Scanning…</p>}
+          {!scan && !error && <p className="muted setup-pad">{t("setup.page.scanning")}</p>}
           {scan && view === "overview" && (
             <Overview
               scan={scan}

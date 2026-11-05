@@ -1,6 +1,7 @@
 import type { Methods } from "@agentchainer/protocol";
 import { Check, Copy } from "lucide-react";
 import { useState } from "react";
+import { t } from "../i18n/index.ts";
 import { FileIcon } from "../ui/FileIcon.tsx";
 import { EmptyState } from "../ui/Section.tsx";
 
@@ -20,13 +21,13 @@ const MANIFEST: Record<Profile["packages"][number]["stack"], string> = {
 export function Commands({ profile }: { profile: Profile }) {
   return (
     <div className="setup-scroll">
-      {profile.packages.length === 0 && <EmptyState>No package manifests found.</EmptyState>}
+      {profile.packages.length === 0 && <EmptyState>{t("setup.commands.empty")}</EmptyState>}
       {profile.packages.map((p) => (
         <section key={`${p.path}-${p.stack}`} className="card package-card">
           <header className="package-head">
             <FileIcon path={MANIFEST[p.stack]} size={18} />
             <div>
-              <strong>{p.path === "." ? "Workspace root" : p.path}</strong>
+              <strong>{p.path === "." ? t("setup.commands.workspaceRoot") : p.path}</strong>
               <span className="muted">
                 {p.stack} · {p.packageManager}
                 {p.frameworks.length > 0 && ` · ${p.frameworks.join(", ")}`}
@@ -40,9 +41,13 @@ export function Commands({ profile }: { profile: Profile }) {
                   <tr key={kind}>
                     <th scope="row">{kind}</th>
                     <td>
-                      <code title={`From ${c.source}`}>{c.run}</code>
+                      <code title={t("setup.commands.from", { source: c.source })}>{c.run}</code>
                     </td>
-                    <td>{c.confidence !== "high" && <span className="badge">{c.confidence} confidence</span>}</td>
+                    <td>
+                      {c.confidence !== "high" && (
+                        <span className="badge">{t("setup.commands.confidence", { confidence: c.confidence })}</span>
+                      )}
+                    </td>
                     <td>
                       <CopyButton text={c.run} />
                     </td>
@@ -63,8 +68,8 @@ function CopyButton({ text }: { text: string }) {
     <button
       type="button"
       className="ghost icon"
-      aria-label={copied ? "Copied" : `Copy ${text}`}
-      title={copied ? "Copied" : "Copy"}
+      aria-label={copied ? t("setup.commands.copied") : t("setup.commands.copyText", { text })}
+      title={copied ? t("setup.commands.copied") : t("setup.commands.copy")}
       onClick={() =>
         void navigator.clipboard.writeText(text).then(() => {
           setCopied(true);

@@ -99,7 +99,7 @@ Nothing else. In particular, there is no file-system or shell plugin.
 | `update_prepare` | — | Stops the runtime and terminals before an update installs. |
 | `menu_select` | A menu item id | Runs the same item as the native menu (UX-15): an id the UI handles is sent back as a `menu` event, a Help id opens its fixed page, anything else is ignored. |
 
-**The runtime itself:** release builds always run their own bundled sidecar, with no arguments (`AGENTCHAINER_SIDECAR_BIN` works in debug builds only). It inherits the login shell's environment, because the user's CLI needs it for its own sign-in, provider settings (API key, Bedrock, Vertex) and proxy. Only JSON lines from its stdout reach the UI.
+**The runtime itself:** release builds always run their own bundled sidecar, with no arguments (`AGENTCHAINER_SIDECAR_BIN` works in debug builds only). Debug builds also pass `WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS` on to their windows, so the end-to-end tests can open WebView2's debugging port on Windows (X-06). Release builds ignore it, so no environment variable can open a debugging port into an installed app. It inherits the login shell's environment, because the user's CLI needs it for its own sign-in, provider settings (API key, Bedrock, Vertex) and proxy. Only JSON lines from its stdout reach the UI.
 
 **Other surfaces, reviewed 2026-11-04:**
 - **Agent drawer and replay (M4-03, M4-08):** subagent transcripts come from the SDK's session APIs (ADR-0004) and are shown with secrets masked. Nothing is written.

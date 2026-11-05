@@ -13,6 +13,14 @@ pin here differs from the code, so a bump updates this page too.
 
 You don't need Node.js: the app ships its runtime as a single executable (spike S1).
 
+**Behind an HTTP proxy:** the app's own downloads follow `HTTPS_PROXY`, `HTTP_PROXY` and `NO_PROXY` from your login
+shell. CI checks this on all three OSes with `scripts/proxy-smoke.mjs`:
+- through a proxy, the download works;
+- with a dead proxy, it fails, so nothing goes around the proxy;
+- `NO_PROXY` is honoured.
+
+See [INSTALL](guides/INSTALL.md#behind-a-proxy).
+
 ## Claude Code CLI
 
 AgentChainer drives your own `claude` CLI, signed in by you ([AUTH_SETUP](guides/AUTH_SETUP.md)).

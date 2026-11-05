@@ -137,6 +137,8 @@ jobs:
         run: pnpm --filter @agentchainer/desktop tauri build --debug --no-bundle
       - name: Packaged sidecar smoke (first-run SDK download + integrity check, then cache)
         run: node scripts/sidecar-smoke.mjs
+      - name: Packaged sidecar behind an HTTP proxy (X-14)
+        run: node scripts/proxy-smoke.mjs
       - name: Launch smoke test
         if: runner.os != 'Linux'
         run: node scripts/smoke-launch.mjs ${{ matrix.binary }} --screenshot screenshot-${{ matrix.name }}.png

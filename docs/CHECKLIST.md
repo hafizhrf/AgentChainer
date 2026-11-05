@@ -2041,11 +2041,18 @@ first.
           - **Focus return:** the palette and every Modal left focus on the page body when they closed, because
             Radix only gives it back to a Dialog.Trigger. `useReturnFocus` now gives it back to the opener, unless
             something else took it meanwhile.
+          - **Scrolling (Windows only):** in the runner's smaller window, the Setup plan's detail pane scrolls but held
+            nothing focusable, so the keyboard couldn't scroll it. That pane and the Plugins one are now focusable
+            regions named "Details".
           - **Focus rings:** the title bar's menu triggers hid their ring. The resize handles had neither a ring nor a
             name; they're now "Resize the sidebar", "Resize the terminal" and "Resize the right panel".
-        - **After the fixes,** axe reports no violations of any impact on the audited screens, in either theme. The
-          audit finishes running animations first: WebKitGTK under Xvfb is slow enough that axe once measured the
-          palette mid fade-in.
+        - **After the fixes,** axe reports no violations of any impact on the audited screens, in either theme.
+        - **Test notes:**
+          - The audit finishes running animations first: WebKitGTK under Xvfb is slow enough that axe once measured
+            the palette mid fade-in.
+          - The Tab flow starts at the page's first control, because Chromium keeps tabbing from the last focused
+            element after `blur()`.
+          - `run.mjs` runs the X-06 file first, on its own: `node --test` sorts the files it's given.
         - **macOS:** a VoiceOver and keyboard spot check in [MANUAL_CHECKS.md](guides/MANUAL_CHECKS.md) (checks 6–8).
         - **Not covered yet:** a session with a transcript (it needs a model call), the session graph and the right
           panel's tabs.

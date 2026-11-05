@@ -235,7 +235,8 @@ export function Plugins({
               })}
             </Tabs.Content>
           </div>
-          <div className="plan-detail">
+          {/* biome-ignore lint/a11y/noNoninteractiveTabindex: focusable, so the keyboard can scroll it (PlanView). */}
+          <section className="plan-detail" aria-label="Details" tabIndex={0}>
             {selected ? (
               <PluginDetails
                 cwd={cwd}
@@ -277,7 +278,7 @@ export function Plugins({
                   : "Pick an installed plugin to update, turn off or uninstall it."}
               </EmptyState>
             )}
-          </div>
+          </section>
         </div>
       )}
 

@@ -144,7 +144,10 @@ describe("accessibility (X-12)", () => {
   });
 
   it("reaches the sidebar by Tab, with a visible focus ring on each stop", async () => {
-    await app.execute("document.activeElement?.blur(); document.body.focus();");
+    // From the top of the page. blur() isn't enough: Chromium (WebView2) goes on tabbing from where focus was.
+    await app.execute(
+      `document.querySelector("button, a[href], input, select, textarea, [tabindex]:not([tabindex='-1'])")?.focus();`,
+    );
     const stops = [];
     for (let i = 0; i < 25; i++) {
       await app.chord(KEY.tab);

@@ -94,18 +94,12 @@ let code = 1;
 try {
   await waitForDriver();
   if (windows) await waitForDebugPort();
-  code = await new Promise((resolve) => {
-    const tests = spawn(
-      process.execPath,
-      // One file at a time: they drive the same app (on Windows, the same running instance).
-      [
-        "--test",
-        "--test-concurrency=1",
-        "--test-reporter=spec",
-        path.join(import.meta.dirname, "app.e2e.mjs"),
-        path.join(import.meta.dirname, "a11y.e2e.mjs"),
-      ],
-      {
+  // One file at a time, in this order: the X-06 flows expect the app as it starts, and on Windows both files drive the
+  // same running instance. (node --test sorts the files it's given, so each gets its own run.)
+  code = 0;
+  for (const file of ["app.e2e.mjs", "a11y.e2e.mjs"]) {
+    const exit = await new Promise((resolve) => {
+      const tests = spawn(process.execPath, ["--test", "--test-reporter=spec", path.join(import.meta.dirname, file)], {
         env: {
           ...env,
           AC_E2E_BINARY: binary,
@@ -115,10 +109,11 @@ try {
           ...(windows ? { AC_E2E_DEBUGGER: `127.0.0.1:${DEBUG_PORT}` } : {}),
         },
         stdio: "inherit",
-      },
-    );
-    tests.on("exit", (c) => resolve(c ?? 1));
-  });
+      });
+      tests.on("exit", (c) => resolve(c ?? 1));
+    });
+    code ||= exit;
+  }
 } finally {
   driver.kill();
   started?.kill();

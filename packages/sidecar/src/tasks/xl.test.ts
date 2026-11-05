@@ -68,6 +68,8 @@ function fakeWorld(
     integration?: GateRun[];
     setupFails?: boolean;
     slow?: Record<string, number>;
+    /** Sub-tasks that end only once the log has this line, however slow the machine is. */
+    until?: Record<string, string>;
     /** Worktrees that can't be removed yet, as on Windows while a process still runs in them. */
     busy?: string[];
   } = {},
@@ -145,7 +147,12 @@ function fakeWorld(
           store.set(child.id, ended);
           resolve(ended);
         };
-        const t = setTimeout(() => end(opts.ends?.[child.id] ?? "done"), opts.slow?.[child.id] ?? 5);
+        const wait = opts.until?.[child.id];
+        const tick = () => {
+          if (wait && !log.includes(wait)) t = setTimeout(tick, 5);
+          else end(opts.ends?.[child.id] ?? "done");
+        };
+        let t = setTimeout(tick, opts.slow?.[child.id] ?? 5);
         stop = () => {
           clearTimeout(t);
           cancelled.push(name(child.id));
@@ -168,7 +175,7 @@ const timeline = (t: Task) => t.run?.steps.map((s) => `${s.id}:${s.status}`);
 
 describe("XL runs", () => {
   it("runs sub-tasks in dependency order, two at once, merges each, then the integration gates", async () => {
-    const f = fakeWorld([task(A), task(B), task(C, { dependsOn: [A] })], { slow: { [B]: 30 } });
+    const f = fakeWorld([task(A), task(B), task(C, { dependsOn: [A] })], { until: { [B]: "remove C" } });
     const { o } = orchestrate(parent(), f.world);
     const done = await o.run();
     assert.equal(done.state, "done", done.run?.outcome);

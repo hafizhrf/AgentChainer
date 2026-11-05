@@ -106,7 +106,8 @@ export function PlanView({
               ),
           )}
         </div>
-        <div className="plan-detail">
+        {/* biome-ignore lint/a11y/noNoninteractiveTabindex: focusable, so the keyboard can scroll it when it's taller than the window. */}
+        <section className="plan-detail" aria-label="Details" tabIndex={0}>
           {focused ? (
             <ActionDetails
               action={focused}
@@ -119,7 +120,7 @@ export function PlanView({
           ) : (
             <EmptyState>Nothing to set up here.</EmptyState>
           )}
-        </div>
+        </section>
       </div>
 
       <footer className="plan-footer">

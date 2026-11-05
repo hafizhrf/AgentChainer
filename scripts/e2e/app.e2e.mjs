@@ -32,7 +32,7 @@ const confirmIn = (label) =>
 describe("AgentChainer end to end (X-06)", () => {
   before(async () => {
     assert.ok(binary && workspace && settingsFile, "run through scripts/e2e/run.mjs");
-    await app.start(binary);
+    await app.start(binary, process.env.AC_E2E_DEBUGGER);
   });
   after(() => app.stop());
 

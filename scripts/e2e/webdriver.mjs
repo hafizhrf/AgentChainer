@@ -33,18 +33,16 @@ export class WebDriver {
     return this.call(method, `/session/${this.session}${path}`, body);
   }
 
-  /** Starts the app under test. */
-  async start(application) {
-    const value = await this.call("POST", "/session", {
-      capabilities: {
-        alwaysMatch: {
-          browserName: "wry",
-          // On Windows, msedgedriver attaches to the app's WebView2 only when webviewOptions is there; tauri-driver 2.1
-          // passes it on but no longer adds it, and without it the app is launched as if it were Edge.
-          "tauri:options": { application, ...(process.platform === "win32" ? { webviewOptions: {} } : {}) },
-        },
-      },
-    });
+  /**
+   * Starts the app under test through tauri-driver (Linux), or, with `debuggerAddress`, attaches msedgedriver to an
+   * app that's already running with its WebView2 debugging port open (Windows: msedgedriver doesn't find the
+   * DevToolsActivePort file of a Tauri app it launches itself).
+   */
+  async start(application, debuggerAddress) {
+    const alwaysMatch = debuggerAddress
+      ? { browserName: "webview2", "ms:edgeOptions": { debuggerAddress } }
+      : { browserName: "wry", "tauri:options": { application } };
+    const value = await this.call("POST", "/session", { capabilities: { alwaysMatch } });
     this.session = value.sessionId;
   }
 

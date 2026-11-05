@@ -64,19 +64,31 @@ const settingsFile = path.join(configDir, "settings.json");
 writeFileSync(settingsFile, JSON.stringify({ recentWorkspaces: [workspace] }, null, 2));
 
 const env = { ...process.env, ...dirs };
-const nativeDriver =
-  process.platform === "win32" && process.env.EDGEWEBDRIVER
-    ? ["--native-driver", path.join(process.env.EDGEWEBDRIVER, "msedgedriver.exe")]
-    : [];
-const driver = spawn("tauri-driver", nativeDriver, { env, stdio: ["ignore", "inherit", "inherit"] });
+const windows = process.platform === "win32";
+
+// Linux: tauri-driver starts the app through WebKitWebDriver. Windows: the app starts here with WebView2's debugging
+// port open, and msedgedriver attaches to it (debuggerAddress); launched by msedgedriver itself, a Tauri app's
+// DevToolsActivePort file isn't where msedgedriver looks.
+const DEBUG_PORT = 9222;
+const started = windows
+  ? spawn(binary, [], {
+      env: { ...env, WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS: `--remote-debugging-port=${DEBUG_PORT}` },
+      stdio: ["ignore", "inherit", "inherit"],
+    })
+  : null;
+const driverBin = windows ? path.join(process.env.EDGEWEBDRIVER ?? "", "msedgedriver.exe") : "tauri-driver";
+const driver = spawn(driverBin, windows ? ["--port=4444"] : [], { env, stdio: ["ignore", "inherit", "inherit"] });
 driver.on("error", (err) => {
-  console.error(`couldn't start tauri-driver: ${err.message}. Install it with: cargo install tauri-driver`);
+  console.error(
+    `couldn't start ${driverBin}: ${err.message}. ${windows ? "Set EDGEWEBDRIVER to msedgedriver's folder." : "Install it with: cargo install tauri-driver"}`,
+  );
   process.exit(1);
 });
 
 let code = 1;
 try {
   await waitForDriver();
+  if (windows) await waitForDebugPort();
   code = await new Promise((resolve) => {
     const tests = spawn(
       process.execPath,
@@ -88,6 +100,7 @@ try {
           AC_E2E_WORKSPACE: workspace,
           AC_E2E_SETTINGS: settingsFile,
           AC_E2E_ARTIFACTS: artifacts,
+          ...(windows ? { AC_E2E_DEBUGGER: `127.0.0.1:${DEBUG_PORT}` } : {}),
         },
         stdio: "inherit",
       },
@@ -96,6 +109,7 @@ try {
   });
 } finally {
   driver.kill();
+  started?.kill();
   // The app log, for a failed run's artifacts.
   if (code !== 0 && existsSync(logDir)) cpSync(logDir, path.join(artifacts, "logs"), { recursive: true });
 }
@@ -112,5 +126,19 @@ async function waitForDriver() {
     }
     await new Promise((r) => setTimeout(r, 250));
   }
-  throw new Error("tauri-driver didn't start listening on 127.0.0.1:4444");
+  throw new Error("the WebDriver server didn't start listening on 127.0.0.1:4444");
+}
+
+async function waitForDebugPort() {
+  const deadline = Date.now() + 120_000;
+  while (Date.now() < deadline) {
+    try {
+      const res = await fetch(`http://127.0.0.1:${DEBUG_PORT}/json/version`);
+      if (res.ok) return;
+    } catch {
+      // the WebView isn't up yet
+    }
+    await new Promise((r) => setTimeout(r, 500));
+  }
+  throw new Error(`the app's WebView2 didn't open its debugging port ${DEBUG_PORT} within 120 s`);
 }

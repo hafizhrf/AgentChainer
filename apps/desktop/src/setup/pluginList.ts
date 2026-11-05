@@ -1,5 +1,6 @@
 import type { InstalledPlugin, MarketPlugin } from "@agentchainer/protocol";
 import { fuzzyScore } from "../fuzzy.ts";
+import { t } from "../i18n/index.ts";
 
 /** Rows the Plugins page shows before "Show more": the marketplaces list thousands. */
 export const PAGE = 100;
@@ -54,16 +55,14 @@ export type ReviewBadge = { label: string; tone: "ok" | "warn"; title: string };
 export function reviewBadge(p: MarketPlugin | undefined): ReviewBadge {
   const r = p?.review;
   if (r?.approved) {
-    const n = r.reviews.length;
     return {
-      label: "Reviewed",
+      label: t("setup.plugins.reviewed"),
       tone: "ok",
-      title: `Reviewed by AgentChainer: ${r.tier}, ${n} review${n === 1 ? "" : "s"}`,
+      title: t("setup.plugins.reviewedTitle", { tier: r.tier, count: r.reviews.length }),
     };
   }
-  if (r)
-    return { label: "Not reviewed", tone: "warn", title: "In the AgentChainer catalog, still waiting for reviews" };
-  return { label: "Not reviewed", tone: "warn", title: "Not reviewed by AgentChainer" };
+  if (r) return { label: t("setup.plugins.notReviewed"), tone: "warn", title: t("setup.plugins.waitingTitle") };
+  return { label: t("setup.plugins.notReviewed"), tone: "warn", title: t("setup.plugins.notReviewedTitle") };
 }
 
 /** A link to the plugin's source: on GitHub, the folder at the commit its marketplace pins. */
@@ -78,7 +77,7 @@ export function sourceLink(source: MarketPlugin["source"]): string | null {
 /** Who publishes it, as far as the listing tells: Anthropic's own folder, or the source's GitHub owner. */
 export function vendorOf(p: MarketPlugin): string | null {
   if (p.official && p.marketplace === "claude-plugins-official" && p.source.path?.startsWith("plugins/")) {
-    return "Anthropic";
+    return t("setup.plugins.anthropic");
   }
   const owner = /^https:\/\/github\.com\/([^/]+)\//.exec(p.source.url ?? "")?.[1];
   return owner ?? null;

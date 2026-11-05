@@ -21,6 +21,9 @@ import {
 } from "lucide-react";
 import { createContext, memo, useCallback, useContext, useMemo, useRef, useState } from "react";
 import { diffStat, editDiffs, InlineDiff } from "./InlineDiff.tsx";
+import { count, dateTime, seconds, timeOfDay } from "./i18n/format.ts";
+import { t } from "./i18n/index.ts";
+import { Rich } from "./i18n/Rich.tsx";
 import { Markdown } from "./Markdown.tsx";
 import { teamTool } from "./team.ts";
 import {
@@ -69,7 +72,7 @@ export function TranscriptView({
     <Workspace.Provider value={cwd}>
       {hidden > 0 && (
         <button type="button" className="link show-earlier" onClick={() => setShown((n) => n + WINDOW)}>
-          Show {Math.min(hidden, WINDOW)} earlier of {hidden} hidden
+          {t("session.transcript.showEarlier", { shown: Math.min(hidden, WINDOW), hidden })}
         </button>
       )}
       {rows.map((row) =>
@@ -96,8 +99,8 @@ type OpenFile = ((file: string) => void) | undefined;
 function MsgTime({ at }: { at: number }) {
   const d = new Date(at);
   return (
-    <time className="msg-time" dateTime={d.toISOString()} title={d.toLocaleString()}>
-      {d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+    <time className="msg-time" dateTime={d.toISOString()} title={dateTime(d)}>
+      {timeOfDay(d, { hour: "2-digit", minute: "2-digit" })}
     </time>
   );
 }
@@ -121,14 +124,12 @@ const ItemView = memo(function ItemView({
               <div className="attachments">
                 {item.images.map((src, i) => (
                   // biome-ignore lint/suspicious/noArrayIndexKey: a message's images never reorder.
-                  <img key={i} src={src} alt={`Attachment ${i + 1}`} />
+                  <img key={i} src={src} alt={t("session.transcript.attachment", { n: i + 1 })} />
                 ))}
               </div>
             )}
             {!item.images && item.imageCount ? (
-              <div className="muted">
-                [{item.imageCount} image{item.imageCount > 1 ? "s" : ""}]
-              </div>
+              <div className="muted">{t("session.transcript.images", { count: item.imageCount })}</div>
             ) : null}
             {item.text}
           </div>
@@ -138,11 +139,11 @@ const ItemView = memo(function ItemView({
               <button
                 type="button"
                 className="ghost small rewind"
-                title="Restore files the agent edited since this message"
+                title={t("session.transcript.rewindTitle")}
                 onClick={() => onRewind(messageId)}
               >
                 <RotateCcw size={12} />
-                Rewind files to here
+                {t("session.transcript.rewind")}
               </button>
             )}
           </div>
@@ -156,7 +157,7 @@ const ItemView = memo(function ItemView({
           {!item.open && (
             <div className="msg-meta">
               {item.at !== undefined && <MsgTime at={item.at} />}
-              <CopyButton text={item.text} label="Copy message" />
+              <CopyButton text={item.text} label={t("session.transcript.copyMessage")} />
             </div>
           )}
         </div>
@@ -166,7 +167,7 @@ const ItemView = memo(function ItemView({
         <details className="thinking-block">
           <summary>
             <Brain size={14} aria-hidden />
-            {item.open ? "Thinking…" : "Thought"}
+            {item.open ? t("session.transcript.thinking") : t("session.transcript.thought")}
           </summary>
           <div>{item.text}</div>
         </details>
@@ -179,9 +180,13 @@ const ItemView = memo(function ItemView({
           <div className="worker-report-head">
             <Users size={14} aria-hidden />
             <span>
-              Report from worker <strong>{item.name}</strong>
+              <Rich
+                k="session.transcript.workerReport"
+                params={{ name: item.name }}
+                tags={{ strong: (s) => <strong>{s}</strong> }}
+              />
             </span>
-            {item.isError && <span className="badge danger">stopped</span>}
+            {item.isError && <span className="badge danger">{t("session.transcript.workerStopped")}</span>}
           </div>
           <Markdown text={item.text} />
           <div className="msg-meta">{item.at !== undefined && <MsgTime at={item.at} />}</div>
@@ -203,8 +208,8 @@ const ItemView = memo(function ItemView({
 /** "Read ×3 · Bash · Edit": the tools of a group, in first-use order. */
 function toolCounts(tools: ToolItem[]): string {
   const counts = new Map<string, number>();
-  for (const t of tools) {
-    const name = teamTool(t.name, t.input)?.label ?? t.name;
+  for (const tool of tools) {
+    const name = teamTool(tool.name, tool.input)?.label ?? tool.name;
     counts.set(name, (counts.get(name) ?? 0) + 1);
   }
   return [...counts].map(([name, n]) => (n > 1 ? `${name} ×${n}` : name)).join(" · ");
@@ -217,16 +222,18 @@ function toolCounts(tools: ToolItem[]): string {
 const ToolGroupView = memo(
   function ToolGroupView({ group, onOpenFile }: { group: ToolGroup; onOpenFile: OpenFile }) {
     const tools = group.members.filter((m): m is ToolItem => m.kind === "tool");
-    const running = tools.some((t) => t.status === "running");
-    const failed = tools.filter((t) => t.status === "error").length;
+    const running = tools.some((tool) => tool.status === "running");
+    const failed = tools.filter((tool) => tool.status === "error").length;
     const status = running ? "running" : failed ? "error" : "done";
     return (
       <details className={`tool-group ${status}`} open={running || failed > 0}>
         <summary>
           <Layers size={14} className="tool-icon" aria-hidden />
-          <span className="tool-name">{running ? "Running tools" : `Ran ${tools.length} tools`}</span>
+          <span className="tool-name">
+            {running ? t("session.transcript.runningTools") : t("session.transcript.ranTools", { count: tools.length })}
+          </span>
           <span className="tool-arg">{toolCounts(tools)}</span>
-          {failed > 0 && <span className="badge danger">{failed} failed</span>}
+          {failed > 0 && <span className="badge danger">{t("session.transcript.failed", { n: failed })}</span>}
           <StatusIcon status={status} />
         </summary>
         <div className="tool-group-body">
@@ -243,6 +250,7 @@ const ToolGroupView = memo(
     a.group.members.every((m, i) => m === b.group.members[i]),
 );
 
+/** The guard's marker in a blocked tool's output, as the sidecar writes it (not UI text). */
 const GUARD = "Blocked by AgentChainer guard: ";
 
 const ToolView = memo(function ToolView({ tool, onOpenFile }: { tool: ToolItem; onOpenFile: OpenFile }) {
@@ -267,21 +275,23 @@ const ToolView = memo(function ToolView({ tool, onOpenFile }: { tool: ToolItem; 
         {team?.access && <span className={`badge${team.access === "write" ? " risk-medium" : ""}`}>{team.access}</span>}
         {diffs && (
           <span className="diffstat">
-            <span className="add">+{added}</span> <span className="del">−{removed}</span>
+            <span className="add">+{added}</span> <span className="del">{`−${removed}`}</span>
           </span>
         )}
         {blocked && (
           <span className="badge danger" title={reason}>
-            blocked by guard
+            {t("session.transcript.blockedBadge")}
           </span>
         )}
-        {tool.durationMs !== undefined && <span className="tool-time">{(tool.durationMs / 1000).toFixed(1)} s</span>}
+        {tool.durationMs !== undefined && (
+          <span className="tool-time">{seconds((tool.durationMs / 1000).toFixed(1))}</span>
+        )}
         <StatusIcon status={tool.status} />
       </summary>
-      {reason && <p className="warn guard-reason">Blocked by AgentChainer's guard: {reason}</p>}
+      {reason && <p className="warn guard-reason">{t("session.transcript.guardReason", { reason })}</p>}
       {onOpenFile && typeof file === "string" && (
         <button type="button" className="link open-file" onClick={() => onOpenFile(file)}>
-          Open in editor
+          {t("session.transcript.openInEditor")}
         </button>
       )}
       {diffs ? <InlineDiff diffs={diffs} /> : <pre>{JSON.stringify(input, null, 2)}</pre>}
@@ -295,15 +305,15 @@ const AgentView = memo(function AgentView({ agent, onOpenFile }: { agent: AgentI
   const duration = agentDuration(agent);
   const meta = [
     agent.agentType,
-    live && agent.lastTool ? `using ${agent.lastTool}` : null,
-    duration !== undefined ? `${(duration / 1000).toFixed(1)} s` : null,
-    agent.tokens !== undefined ? `${agent.tokens.toLocaleString()} tokens` : null,
+    live && agent.lastTool ? t("session.transcript.agentUsing", { tool: agent.lastTool }) : null,
+    duration !== undefined ? seconds((duration / 1000).toFixed(1)) : null,
+    agent.tokens !== undefined ? t("session.transcript.agentTokens", { tokens: count(agent.tokens) }) : null,
   ].filter(Boolean);
   return (
     <details className={`agent ${agent.status}`} open={agent.status === "running"}>
       <summary>
         <Bot size={14} className="tool-icon" aria-hidden />
-        <span className="tool-name">Subagent</span>
+        <span className="tool-name">{t("session.transcript.subagent")}</span>
         <span className="tool-arg">{agent.description}</span>
         {meta.length > 0 && <span className="tool-time">{meta.join(" · ")}</span>}
         <StatusIcon status={agent.status} />
@@ -356,11 +366,15 @@ function repeatsLastText(agent: AgentItem): boolean {
 }
 
 function StatusIcon({ status }: { status: AgentStatus }) {
-  if (status === "running") return <Loader2 size={14} className="tool-status spin" aria-label="Running" />;
-  if (status === "done") return <Check size={14} className="tool-status" aria-label="Done" />;
-  if (status === "stopped") return <Square size={14} className="tool-status" aria-label="Stopped" />;
-  if (status === "paused") return <Pause size={14} className="tool-status" aria-label="Paused" />;
-  return <X size={14} className="tool-status" aria-label="Failed" />;
+  if (status === "running")
+    return <Loader2 size={14} className="tool-status spin" aria-label={t("session.transcript.statusRunning")} />;
+  if (status === "done")
+    return <Check size={14} className="tool-status" aria-label={t("session.transcript.statusDone")} />;
+  if (status === "stopped")
+    return <Square size={14} className="tool-status" aria-label={t("session.transcript.statusStopped")} />;
+  if (status === "paused")
+    return <Pause size={14} className="tool-status" aria-label={t("session.transcript.statusPaused")} />;
+  return <X size={14} className="tool-status" aria-label={t("session.transcript.statusFailed")} />;
 }
 
 const TOOL_ICONS: Record<string, LucideIcon> = {

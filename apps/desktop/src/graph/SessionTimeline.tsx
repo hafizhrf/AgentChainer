@@ -1,5 +1,6 @@
 import { Bot, ChevronLeft, ChevronRight, Sparkles } from "lucide-react";
 import { type KeyboardEvent, useMemo, useState } from "react";
+import { t } from "../i18n/index.ts";
 import type { Wait } from "../tabs.ts";
 import type { Item } from "../transcript.ts";
 import { IconButton } from "../ui/IconButton.tsx";
@@ -33,19 +34,21 @@ export function SessionTimeline({
   const latest = index === all.length - 1;
   const now = useNow(running && latest, 1000);
   const turn = all[index] ?? [];
-  const t = useMemo(() => timeline(turn, waits, { now }), [turn, waits, now]);
+  const tl = useMemo(() => timeline(turn, waits, { now }), [turn, waits, now]);
 
   const nav =
     all.length > 1 ? (
       <div className="timeline-nav">
-        <IconButton label="Earlier turn" disabled={index === 0} onClick={() => setPicked(index - 1)}>
+        <IconButton
+          label={t("graph.sessionTimeline.earlier")}
+          disabled={index === 0}
+          onClick={() => setPicked(index - 1)}
+        >
           <ChevronLeft size={14} />
         </IconButton>
-        <span>
-          Turn {index + 1} of {all.length}
-        </span>
+        <span>{t("graph.sessionTimeline.turn", { n: index + 1, total: all.length })}</span>
         <IconButton
-          label="Later turn"
+          label={t("graph.sessionTimeline.later")}
           disabled={latest}
           onClick={() => setPicked(index + 1 === all.length - 1 ? null : index + 1)}
         >
@@ -55,22 +58,22 @@ export function SessionTimeline({
       </div>
     ) : null;
 
-  if (!t) {
+  if (!tl) {
     return (
       <div className="session-timeline">
         {nav}
         <p className="timeline-empty muted">
           {turn.some((i) => i.kind === "agent" || i.kind === "tool")
-            ? "This session's stored messages carry no times, so there is no timeline to draw; the graph shows the same agents in order."
-            : "Nothing has run in this session yet."}
+            ? t("graph.sessionTimeline.noTimes")
+            : t("graph.sessionTimeline.empty")}
         </p>
       </div>
     );
   }
 
-  const span = t.end - t.start;
+  const span = tl.end - tl.start;
   const pct = (ms: number) => `${(ms / span) * 100}%`;
-  const place = (s: Span) => ({ left: pct(s.start - t.start), width: pct(Math.max(s.end - s.start, 0)) });
+  const place = (s: Span) => ({ left: pct(s.start - tl.start), width: pct(Math.max(s.end - s.start, 0)) });
 
   const onKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
     if (e.key !== "ArrowDown" && e.key !== "ArrowUp") return;
@@ -97,16 +100,16 @@ export function SessionTimeline({
           ))}
         </span>
       </div>
-      <ul className="timeline-rows" aria-label="Agent timeline">
-        {t.rows.map((r) => (
+      <ul className="timeline-rows" aria-label={t("graph.sessionTimeline.label")}>
+        {tl.rows.map((r) => (
           <li key={r.id}>
             <Row row={r} selected={selected === r.id} place={place} onSelect={onSelect} />
           </li>
         ))}
       </ul>
-      {t.rows.some((r) => r.waits.length) && (
+      {tl.rows.some((r) => r.waits.length) && (
         <p className="timeline-legend muted">
-          <span className="timeline-wait-swatch" /> Waiting for your approval
+          <span className="timeline-wait-swatch" /> {t("graph.sessionTimeline.waiting")}
         </p>
       )}
     </div>
@@ -125,10 +128,11 @@ function Row({
   onSelect: (agentId: string | null) => void;
 }) {
   const waited = r.waits.reduce((sum, w) => sum + (w.end - w.start), 0);
+  const ran = clock(r.bar.end - r.bar.start);
   const facts = [
-    `ran ${clock(r.bar.end - r.bar.start)}${r.live ? " so far" : ""}`,
-    waited ? `waited ${clock(waited)} for approval` : null,
-    r.pausedMs ? `paused ${clock(r.pausedMs)}` : null,
+    r.live ? t("graph.sessionTimeline.ranSoFar", { time: ran }) : t("graph.sessionTimeline.ran", { time: ran }),
+    waited ? t("graph.sessionTimeline.waited", { time: clock(waited) }) : null,
+    r.pausedMs ? t("graph.sessionTimeline.paused", { time: clock(r.pausedMs) }) : null,
   ].filter(Boolean);
   const content = (
     <>
@@ -145,7 +149,7 @@ function Row({
       </span>
     </>
   );
-  const title = `${r.label}: ${facts.join(", ")}`;
+  const title = t("graph.sessionTimeline.rowTitle", { label: r.label, facts: facts.join(", ") });
   if (r.id === MAIN_ID) {
     return (
       <div className="timeline-row main" title={title}>

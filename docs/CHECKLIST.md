@@ -2106,3 +2106,41 @@ first.
         - Locally, in the Ubuntu 22.04 image (`scripts/e2e/Dockerfile`): 13/13 pass at 1440×900 and at 1024×768.
           With one icon button's label removed on purpose, the gate failed with `button-name` on every screen.
 - [ ] **X-13** i18n-ready strings: English first, Indonesian next.
+      - **Part 1, the UI (2026-11-05):** all of the UI's text is in catalogs, still in English (owner decision: no
+        second language, and no Language setting, until one is wanted).
+        - **The catalogs:** 1,785 keys in 11 area files under `apps/desktop/src/i18n/locales/en/`, read by a small
+          module ([ADR-0011](adr/0011-ui-text-catalogs.md)), with no new dependency. The wording is unchanged, byte
+          for byte.
+        - **What moved:**
+          - every string a person reads in the React UI;
+          - the macOS menu: Rust reads `menu.json`, which the Windows and Linux title bar and the palette also use,
+            so the three copies of the labels are now one;
+          - nine cost helpers and three plural helpers, replaced by `format.ts` and `_one`/`_other` keys.
+        - **Display text no longer drives logic:** "New session" marked a fresh tab, and is now an `untitled` flag.
+          `/mode` accepts the mode's id as well as its name.
+        - **Guards:**
+          - Biome's `noJsxLiterals` at error level: 741 findings, now 0;
+          - `i18n/catalog.test.ts`: no literal `label`, `title`, `placeholder` or `aria-label`, no unused key, every key
+            in its area's file;
+          - a debug-only pseudo-locale (`AGENTCHAINER_PSEUDO_LOCALE=1`), and an E2E phase (`i18n.e2e.mjs`) that fails
+            on unmarked text in the title bar, sidebar, setup check, Settings, Workspace settings' navigation and the
+            palette.
+        - **Bundle:** all JS grows 2.0% raw and 1.3% gzipped. The catalogs load with the main chunk.
+        - **Extraction:** four agents in separate worktrees, one area each. Each checked its slice for lint, literal
+          props, typecheck and tests before the merge.
+        - **Evidence:** CI run [41999892534](https://github.com/hafizhrf/AgentChainer/actions/runs/41999892534)
+          (#131), on Ubuntu and on Windows:
+          - X-06: 5/5;
+          - X-12: 8/8;
+          - the pseudo-locale phase: 5/5.
+
+          The run before found one unmarked string, "git version …" on the setup check. It's `git --version` output,
+          so the test now treats it as data.
+      - **Part 2, still open:**
+        - the sidecar's prose: findings, plan reasons, run outcomes, about 290 error sites;
+        - the protocol's shared texts: approval reasons, `agentProblems`, `folderProblems`, `cadenceText`;
+        - the catalog YAML's prose;
+        - the Rust commands' errors.
+        - Also: weekday names in `schedules.ts` stay `en-US`, and enum values shown as words (risk, scope, state)
+          arrive as received.
+        - Then a second language, with its Language setting.

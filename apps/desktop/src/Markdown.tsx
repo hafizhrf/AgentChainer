@@ -3,6 +3,7 @@ import { memo } from "react";
 import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { CodeBlock } from "./CodeBlock.tsx";
+import { t } from "./i18n/index.ts";
 
 /** Only web links open, in the user's browser; anything else (file:, javascript:, app-relative) does nothing. */
 const WEB = /^https?:\/\//i;
@@ -22,7 +23,7 @@ const components: Components = {
     </a>
   ),
   // No remote loads from model output (tracking pixels, local file probes): show images as text.
-  img: ({ alt, src }) => <span className="muted">[image: {alt || String(src ?? "")}]</span>,
+  img: ({ alt, src }) => <span className="muted">{t("panel.markdown.image", { alt: alt || String(src ?? "") })}</span>,
   // Fenced blocks become highlighted code blocks with a copy button (UX-04); inline code stays as it is.
   pre: ({ children }) => <>{children}</>,
   code: ({ className, children }) => {

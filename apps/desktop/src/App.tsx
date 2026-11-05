@@ -30,6 +30,8 @@ import { useConfirm } from "./Dialog.tsx";
 import { FleetView, type ScheduleAction } from "./FleetView.tsx";
 import { joinPath } from "./files.ts";
 import { HomeView, pickFolder } from "./HomeView.tsx";
+import { approxUsd, count, usd as dollars } from "./i18n/format.ts";
+import { t } from "./i18n/index.ts";
 import { MODE_NAMES, modelChoices, rememberModels, THEMES } from "./options.ts";
 import { type PermissionAnswer, PermissionDialog } from "./PermissionDialog.tsx";
 import { PANEL_TAB_LABEL, PANEL_TABS, type PanelTab, parseHidden, serializeHidden, toggleHidden } from "./panelTabs.ts";
@@ -76,6 +78,8 @@ import { WorkspaceDialog, WorkspacesCard } from "./WorkspaceDialog.tsx";
 
 // The setup page shares the file-type icon set with the workspace panel; both load on first use.
 const REPO = "https://github.com/hafizhrf/AgentChainer";
+/** The product's name: never translated. */
+const APP_NAME = "AgentChainer";
 const SetupPage = lazy(() => import("./setup/SetupPage.tsx").then((m) => ({ default: m.SetupPage })));
 const TaskPage = lazy(() => import("./tasks/TaskPage.tsx").then((m) => ({ default: m.TaskPage })));
 // The M4-E2 bench is dev-only; it loads only when a self-test asks for it.
@@ -86,7 +90,6 @@ let selftestStarted = false;
 
 const PING_EVERY_MS = 20_000;
 const PING_TIMEOUT_MS = 5_000;
-const NEW_TITLE = "New session";
 
 // App shell (M1-01…M1-07, UX-03): sidebar, then Home or the active session. One live session per tab (M1-06/M1-08),
 // stored sessions (M1-21…M1-24), and the native menu's commands (UX-07).
@@ -196,21 +199,21 @@ export function App() {
   const onTaskChange = useCallback((task: Task, busy: boolean, ids: string[]) => {
     setShownTasks((all) => ({ ...all, [task.id]: ids }));
     setTaskTabs((all) =>
-      all.map((t) =>
-        t.id === task.id
+      all.map((x) =>
+        x.id === task.id
           ? {
-              ...t,
+              ...x,
               title: (task.title ?? task.request).slice(0, 60),
               state: task.state,
               busy: busy || task.state === "running",
             }
-          : t,
+          : x,
       ),
     );
   }, []);
 
   const addNotice = (sessionId: string, text: string) =>
-    patchTab(sessionId, (t) => ({ ...t, items: [...closeAssistant(t.items), notice(text)] }));
+    patchTab(sessionId, (tab) => ({ ...tab, items: [...closeAssistant(tab.items), notice(text)] }));
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: subscribe once on mount; the handlers only call state setters, which are stable.
   useEffect(() => {
@@ -245,8 +248,8 @@ export function App() {
           close: async (sessionId) => {
             await request("session.close", { sessionId });
           },
-          resume: (sessionId, dir, modelAlias) => resume(sessionId, dir, "Self-test", modelAlias),
-          tab: (sessionId) => tabsRef.current.find((t) => t.sessionId === sessionId),
+          resume: (sessionId, dir, modelAlias) => resume(sessionId, dir, t("app.selftest.title"), modelAlias),
+          tab: (sessionId) => tabsRef.current.find((x) => x.sessionId === sessionId),
         }).catch((err: unknown) => ({ error: String(err) }));
         await request("debug.log", { message: JSON.stringify({ selftest: report }) });
         if (!cfg.stay) return quitApp();
@@ -279,29 +282,29 @@ export function App() {
     const offExit = onExit((exit) => {
       alive.current = false;
       setTabs((ts) =>
-        ts.map((t) =>
-          t.ended
-            ? t
+        ts.map((tab) =>
+          tab.ended
+            ? tab
             : {
-                ...t,
+                ...tab,
                 ended: true,
                 running: false,
                 permissions: [],
-                waits: closeWaits(t.waits, Date.now()),
+                waits: closeWaits(tab.waits, Date.now()),
                 background: [],
-                items: [...closeAssistant(t.items), notice("The agent runtime stopped.")],
+                items: [...closeAssistant(tab.items), notice(t("app.runtime.stoppedNotice"))],
               },
         ),
       );
       setRuntimeNotice(
-        `The agent runtime stopped (${exit.status})${exit.restarting ? " and is restarting…" : "."} Running sessions ended; resume them from their tabs.`,
+        exit.restarting
+          ? t("app.runtime.stoppedRestarting", { status: exit.status })
+          : t("app.runtime.stopped", { status: exit.status }),
       );
     });
     const offReady = onReady(() => {
       void handshake()
-        .then(() =>
-          setRuntimeNotice((n) => (n ? "The agent runtime restarted. Resume your sessions from their tabs." : null)),
-        )
+        .then(() => setRuntimeNotice((n) => (n ? t("app.runtime.restarted") : null)))
         .catch(() => undefined);
     });
     const offEvents = subscribe((n) => {
@@ -310,7 +313,7 @@ export function App() {
         setFleet((f) => ({ ...f, [item.sessionId]: item }));
         // A Team chat's worker ends with its supervisor, or at the team's cap (M8-03): its tab can't send any more.
         if (item.parentId && item.status === "ended")
-          patchTab(item.sessionId, (t) => ({ ...t, ended: true, running: false }));
+          patchTab(item.sessionId, (tab) => ({ ...tab, ended: true, running: false }));
         return;
       }
       if (n.method === "permission.request") {
@@ -319,15 +322,15 @@ export function App() {
         // Nobody may be watching a scheduled run (M8-05): its approvals are told as OS notifications.
         if (task?.scheduled) {
           void notifyOs(
-            `${task.title ?? "A scheduled task"} needs you`,
-            `A scheduled run waits for your approval: ${n.params.toolName}.`,
+            t("app.schedule.needsYou", { title: task.title ?? t("app.schedule.scheduledTask") }),
+            t("app.schedule.waitsForApproval", { tool: n.params.toolName }),
           );
         }
-        if (task && !tabsRef.current.some((t) => t.sessionId === n.params.sessionId)) {
+        if (task && !tabsRef.current.some((x) => x.sessionId === n.params.sessionId)) {
           setTaskApprovals((q) => [...q, n.params]);
           return;
         }
-        patchTab(n.params.sessionId, (t) => permissionAsked(t, n.params, Date.now()));
+        patchTab(n.params.sessionId, (tab) => permissionAsked(tab, n.params, Date.now()));
         return;
       }
       if (n.method === "task.updated") {
@@ -353,7 +356,7 @@ export function App() {
       if (n.method === "session.opened") {
         const { sessionId, parentId, cwd: dir, name, access, profile: workerProfile } = n.params;
         setTabs((ts) => {
-          const parent = ts.find((t) => t.sessionId === parentId);
+          const parent = ts.find((x) => x.sessionId === parentId);
           const tab = newTab(sessionId, dir, {
             title: name,
             mode: "default",
@@ -364,7 +367,9 @@ export function App() {
             ...(parent?.folders?.length ? { folders: parent.folders } : {}),
             items: [
               notice(
-                `Worker started by “${parent?.title ?? "its supervisor"}”, ${access === "write" ? "allowed to edit with your approval" : "read only"}`,
+                t(access === "write" ? "app.worker.startedWrite" : "app.worker.startedRead", {
+                  parent: parent?.title ?? t("app.worker.supervisor"),
+                }),
               ),
             ],
           });
@@ -374,7 +379,7 @@ export function App() {
       }
       const { sessionId, event, task } = n.params;
       if (event.type === "turn.completed") {
-        if (task && !tabsRef.current.some((t) => t.sessionId === sessionId)) recordStepCost(sessionId, event, task.cwd);
+        if (task && !tabsRef.current.some((x) => x.sessionId === sessionId)) recordStepCost(sessionId, event, task.cwd);
         else recordCost(sessionId, event);
       }
       if (event.type === "turn.completed") {
@@ -383,7 +388,7 @@ export function App() {
       }
       // The CLI's model list, kept for the start screen and Settings too (UX-12).
       if (event.type === "models.changed") rememberModels(event.models);
-      patchTab(sessionId, (t) => tabEvent(t, event, Date.now()));
+      patchTab(sessionId, (tab) => tabEvent(tab, event, Date.now()));
     });
     const ping = setInterval(() => {
       if (!alive.current) return;
@@ -403,9 +408,7 @@ export function App() {
   async function handshake(): Promise<EnvCheck> {
     const h = await request("system.hello", { protocolVersion: PROTOCOL_VERSION });
     if (h.protocolVersion !== PROTOCOL_VERSION) {
-      throw new Error(
-        `Protocol mismatch: app v${PROTOCOL_VERSION}, agent runtime v${h.protocolVersion}. Reinstall AgentChainer.`,
-      );
+      throw new Error(t("app.runtime.protocolMismatch", { app: PROTOCOL_VERSION, runtime: h.protocolVersion }));
     }
     setHello(h);
     alive.current = true;
@@ -467,7 +470,7 @@ export function App() {
   }
 
   function recordCost(sessionId: string, e: TurnCompleted) {
-    const tab = tabsRef.current.find((t) => t.sessionId === sessionId);
+    const tab = tabsRef.current.find((x) => x.sessionId === sessionId);
     if (!tab) return;
     const prevTokens = tab.cost.totalTokens;
     const tokens = e.usage
@@ -514,7 +517,7 @@ export function App() {
     const effort = EFFORTS.find((e) => e === settings?.defaultEffort) ?? null;
     const budgetUsd = settings?.budgetUsd ?? null;
     if (mode === "auto" && budgetUsd === null) {
-      throw new Error("The Autonomous profile needs a budget cap. Set one in Settings, or pick another profile.");
+      throw new Error(t("app.session.autonomousNeedsCap"));
     }
     return { effort, budgetUsd, showThinking: settings?.showThinking !== false };
   }
@@ -531,15 +534,18 @@ export function App() {
       const titles = new Map(runs.find((r) => r.runId === runId)?.actions.map((a) => [a.id, a.title]) ?? []);
       const applied = results.filter((r) => r.status === "applied").map((r) => titles.get(r.id) ?? r.id);
       return [
-        ...(applied.length
-          ? [`Applied automatically: ${applied.join(", ")}. Roll back in Workspace settings → History.`]
-          : []),
+        ...(applied.length ? [t("app.autoApply.applied", { actions: applied.join(", ") })] : []),
         ...results
           .filter((r) => r.status === "failed")
-          .map((r) => `Auto-apply couldn't apply ${titles.get(r.id) ?? r.id}: ${r.message ?? "unknown error"}`),
+          .map((r) =>
+            t("app.autoApply.failed", {
+              action: titles.get(r.id) ?? r.id,
+              error: r.message ?? t("app.unknownError"),
+            }),
+          ),
       ];
     } catch (err) {
-      return [`Auto-apply didn't run: ${err}`];
+      return [t("app.autoApply.didntRun", { error: String(err) })];
     }
   }
 
@@ -568,24 +574,16 @@ export function App() {
         ...(team ? { team } : {}),
         ...(agentProfile ? { profile: agentProfile } : {}),
       });
-      const also = folders.length ? `, with ${folders.map(folderName).join(", ")}` : "";
       const items = [
-        notice(
-          `Session started in ${folderName(dir)}${also}${agentProfile ? `, as the agent profile ${agentProfile}` : ""}`,
-        ),
-        ...(team && budgetUsd
-          ? [
-              notice(
-                `A Team chat: Claude can start worker sessions, each in its own tab, all within a ${usd(budgetUsd)} cap.`,
-              ),
-            ]
-          : []),
+        notice(startedNotice(dir, folders, agentProfile)),
+        ...(team && budgetUsd ? [notice(t("app.session.teamChat", { cap: usd(budgetUsd) }))] : []),
         ...applied.map(notice),
       ];
       setTabs((ts) => [
         ...ts,
         newTab(sessionId, dir, {
-          title: NEW_TITLE,
+          title: t("app.session.newTitle"),
+          untitled: true,
           mode,
           items,
           modelAlias,
@@ -616,9 +614,9 @@ export function App() {
       // A chat of a multi-folder workspace resumes across the same folders (M8-01): its tab's, or else the ones recorded
       // when it ran, or its named workspace's (M8-07), e.g. opened from the sidebar after a restart, or a fork.
       const folders =
-        known ?? tabs.find((t) => t.sessionId === sessionId)?.folders ?? foldersFor(settings, sessionId, dir);
+        known ?? tabs.find((x) => x.sessionId === sessionId)?.folders ?? foldersFor(settings, sessionId, dir);
       // …and as the same agent profile (M8-04), when its tab still knows it.
-      const asProfile = tabs.find((t) => t.sessionId === sessionId)?.profile;
+      const asProfile = tabs.find((x) => x.sessionId === sessionId)?.profile;
       await request("session.start", {
         cwd: dir,
         resume: sessionId,
@@ -634,7 +632,7 @@ export function App() {
         // Stored times rebuild the agents' timing for the graph and the timeline (M4-08).
         events.reduce<Item[]>(
           (acc, e, i) => applyEvent(acc, e, times?.[i] ?? undefined),
-          [notice(`Resumed “${title}” in ${folderName(dir)}`)],
+          [notice(t("app.session.resumed", { title, folder: folderName(dir) }))],
         ),
       );
       const tab = newTab(sessionId, dir, {
@@ -648,7 +646,7 @@ export function App() {
         folders,
         ...(asProfile ? { profile: asProfile } : {}),
       });
-      setTabs((ts) => (ts.some((t) => t.sessionId === sessionId) ? updateTab(ts, sessionId, () => tab) : [...ts, tab]));
+      setTabs((ts) => (ts.some((x) => x.sessionId === sessionId) ? updateTab(ts, sessionId, () => tab) : [...ts, tab]));
       setActive(sessionId);
       await rememberWorkspace(dir, { id: sessionId, folders });
     } catch (err) {
@@ -657,19 +655,20 @@ export function App() {
   }
 
   function openStored(s: SessionInfo) {
-    const open = tabs.find((t) => t.sessionId === s.sessionId);
+    const open = tabs.find((x) => x.sessionId === s.sessionId);
     if (open && !open.ended) setActive(s.sessionId);
     else void resume(s.sessionId, cwd.trim(), s.title);
   }
 
   async function sendText(sessionId: string, text: string, images: Attachment[] = []) {
     const itemId = nextId();
-    patchTab(sessionId, (t) => ({
-      ...t,
+    // A new chat is named by its first message; the flag goes with it.
+    patchTab(sessionId, ({ untitled, ...tab }) => ({
+      ...tab,
       running: true,
-      title: t.title === NEW_TITLE ? text.slice(0, 60) : t.title,
+      title: untitled ? text.slice(0, 60) : tab.title,
       items: [
-        ...closeAssistant(t.items),
+        ...closeAssistant(tab.items),
         {
           kind: "user",
           id: itemId,
@@ -685,29 +684,29 @@ export function App() {
         text,
         ...(images.length ? { images: images.map(({ mediaType, data }) => ({ mediaType, data })) } : {}),
       });
-      patchTab(sessionId, (t) => ({ ...t, items: setMessageId(t.items, itemId, messageId) }));
+      patchTab(sessionId, (tab) => ({ ...tab, items: setMessageId(tab.items, itemId, messageId) }));
     } catch (err) {
-      patchTab(sessionId, (t) => ({
-        ...t,
+      patchTab(sessionId, (tab) => ({
+        ...tab,
         running: false,
-        ended: t.ended || isRpcError(err, RpcErrorCode.noSession),
-        items: [...t.items, notice(String(err))],
+        ended: tab.ended || isRpcError(err, RpcErrorCode.noSession),
+        items: [...tab.items, notice(String(err))],
       }));
     }
   }
 
   async function changeMode(sessionId: string, mode: PermissionMode) {
-    if (mode === "auto" && tabs.find((t) => t.sessionId === sessionId)?.budgetUsd === null) {
-      addNotice(sessionId, "Autonomous needs a budget cap: set one in Settings, then start or resume the session.");
+    if (mode === "auto" && tabs.find((x) => x.sessionId === sessionId)?.budgetUsd === null) {
+      addNotice(sessionId, t("app.mode.autonomousNeedsCap"));
       return;
     }
     // Shown at once, so Shift+Tab pressed quickly walks on from the mode just picked; put back if the switch fails.
-    const before = tabs.find((t) => t.sessionId === sessionId)?.mode;
-    patchTab(sessionId, (t) => ({ ...t, mode, ...(mode !== "plan" ? { planSwitch: null } : {}) }));
+    const before = tabs.find((x) => x.sessionId === sessionId)?.mode;
+    patchTab(sessionId, (tab) => ({ ...tab, mode, ...(mode !== "plan" ? { planSwitch: null } : {}) }));
     try {
       await request("session.setMode", { sessionId, mode });
     } catch (err) {
-      if (before) patchTab(sessionId, (t) => ({ ...t, mode: before }));
+      if (before) patchTab(sessionId, (tab) => ({ ...tab, mode: before }));
       addNotice(sessionId, String(err));
     }
   }
@@ -716,7 +715,7 @@ export function App() {
   async function changeModel(sessionId: string, alias: string) {
     try {
       await request("session.setModel", { sessionId, model: alias });
-      patchTab(sessionId, (t) => ({ ...t, modelAlias: alias }));
+      patchTab(sessionId, (tab) => ({ ...tab, modelAlias: alias }));
     } catch (err) {
       addNotice(sessionId, String(err));
     }
@@ -725,15 +724,15 @@ export function App() {
   async function changeEffort(sessionId: string, effort: Effort | null) {
     try {
       await request("session.setEffort", { sessionId, effort });
-      patchTab(sessionId, (t) => ({ ...t, effort }));
+      patchTab(sessionId, (tab) => ({ ...tab, effort }));
     } catch (err) {
       addNotice(sessionId, String(err));
     }
   }
 
   async function answer(req: PermissionRequest, reply: PermissionAnswer) {
-    patchTab(req.sessionId, (t) => ({
-      ...permissionAnswered(t, req.requestId, Date.now()),
+    patchTab(req.sessionId, (tab) => ({
+      ...permissionAnswered(tab, req.requestId, Date.now()),
       // An approved plan runs in the mode the user picked (M1-16).
       ...(reply.allow && reply.mode && req.toolName === "ExitPlanMode" ? { mode: reply.mode, planSwitch: null } : {}),
     }));
@@ -745,11 +744,11 @@ export function App() {
   }
 
   /** The app's own slash commands (UX-12); anything else typed after `/` went to Claude. */
-  function runCommand(t: Tab, name: AppCommand, arg: string) {
-    const id = t.sessionId;
+  function runCommand(tab: Tab, name: AppCommand, arg: string) {
+    const id = tab.sessionId;
     switch (name) {
       case "clear":
-        void startSession(t.cwd, t.modelAlias, t.mode, t.folders, t.team !== undefined, t.profile);
+        void startSession(tab.cwd, tab.modelAlias, tab.mode, tab.folders, tab.team !== undefined, tab.profile);
         return;
       case "fork":
         void forkTab(id);
@@ -757,50 +756,38 @@ export function App() {
       case "model": {
         const m = arg ? modelFromArg(arg) : null;
         if (m === null) {
-          addNotice(id, `Model: ${t.model ?? "default"}. Switch with /model haiku, sonnet, opus or default.`);
+          addNotice(id, t("app.command.model", { model: tab.model ?? t("app.command.default") }));
         } else void changeModel(id, m);
         return;
       }
       case "mode": {
         const m = arg ? modeFromArg(arg) : null;
         if (m === null) {
-          addNotice(
-            id,
-            `Mode: ${MODE_NAMES[t.mode]}. Switch with /mode safe, standard, plan or autonomous, or Shift+Tab.`,
-          );
+          addNotice(id, t("app.command.mode", { mode: MODE_NAMES[tab.mode] }));
         } else void changeMode(id, m);
         return;
       }
       case "effort": {
         const e = arg ? effortFromArg(arg) : undefined;
         if (e === undefined)
-          addNotice(id, `Effort: ${t.effort ?? "default"}. Switch with /effort ${EFFORTS.join(", ")} or default.`);
+          addNotice(
+            id,
+            t("app.command.effort", { effort: tab.effort ?? t("app.command.default"), efforts: EFFORTS.join(", ") }),
+          );
         else void changeEffort(id, e);
         return;
       }
-      case "usage": {
-        const spent =
-          t.cost.totalUsd === null ? "not known yet for a resumed session" : `≈$${t.cost.totalUsd.toFixed(4)}`;
-        const ctx = t.context
-          ? `; context ${Math.round(t.context.percentage)}% (${t.context.totalTokens.toLocaleString()} of ${t.context.maxTokens.toLocaleString()} tokens)`
-          : "";
-        addNotice(
-          id,
-          `This chat has spent ${spent}${t.budgetUsd !== null ? ` of a $${t.budgetUsd.toFixed(2)} cap` : ""}${ctx}. Estimates.`,
-        );
+      case "usage":
+        addNotice(id, usageNotice(tab));
         return;
-      }
       case "task":
         if (settings?.tasksPreview !== true) {
-          addNotice(id, "Tasks are a preview: turn them on in Settings, then try /task again.");
-        } else if (arg) void makeTask(t, arg);
-        else addNotice(id, "Say what to do after /task, or pick Task in the composer.");
+          addNotice(id, t("app.command.tasksPreviewOff"));
+        } else if (arg) void makeTask(tab, arg);
+        else addNotice(id, t("app.command.taskNeedsText"));
         return;
       case "help":
-        addNotice(
-          id,
-          `App commands: ${APP_COMMANDS.map((c) => `/${c.name}`).join(", ")}. Other / commands go to Claude, e.g. /compact.`,
-        );
+        addNotice(id, t("app.command.help", { commands: APP_COMMANDS.map((c) => `/${c.name}`).join(", ") }));
         return;
     }
   }
@@ -810,7 +797,7 @@ export function App() {
     try {
       await request("permission.respond", { sessionId: req.sessionId, requestId: req.requestId, ...reply });
     } catch (err) {
-      setRuntimeNotice(`Couldn't answer the task step: ${err}`);
+      setRuntimeNotice(t("app.task.answerFailed", { error: String(err) }));
     }
   }
 
@@ -822,7 +809,7 @@ export function App() {
     try {
       await request("task.cancel", { cwd: task.cwd, id: task.id });
     } catch (err) {
-      setRuntimeNotice(`Couldn't stop the task: ${err}`);
+      setRuntimeNotice(t("app.task.stopFailed", { error: String(err) }));
     }
   }
 
@@ -831,21 +818,18 @@ export function App() {
     try {
       const preview = await request("session.rewind", { sessionId, messageId, dryRun: true });
       if (!preview.canRewind) {
-        addNotice(sessionId, `Can't rewind files to this message: ${preview.error ?? "no checkpoint was saved."}`);
+        addNotice(sessionId, t("app.rewind.cant", { reason: preview.error ?? t("app.rewind.noCheckpoint") }));
         return;
       }
       if (preview.filesChanged.length === 0) {
-        addNotice(sessionId, "Nothing to rewind: the files the agent edited already match this point.");
+        addNotice(sessionId, t("app.rewind.nothing"));
         return;
       }
       const ok = await confirm({
-        title: "Rewind files to before this message?",
+        title: t("app.rewind.title"),
         body: (
           <>
-            <p>
-              These files go back to how they were before this message (+{preview.insertions} / −{preview.deletions}{" "}
-              lines):
-            </p>
+            <p>{t("app.rewind.files", { insertions: preview.insertions, deletions: preview.deletions })}</p>
             <ul className="file-list">
               {preview.filesChanged.map((f) => (
                 <li key={f}>
@@ -853,24 +837,21 @@ export function App() {
                 </li>
               ))}
             </ul>
-            <p className="muted">
-              Only edits made with Claude's file tools (Edit, Write) are restored. Changes made by shell commands, and
-              files behind symlinks, are not. The conversation itself is not rewound.
-            </p>
+            <p className="muted">{t("app.rewind.limits")}</p>
           </>
         ),
-        confirmLabel: "Rewind files",
+        confirmLabel: t("app.rewind.confirm"),
         danger: true,
       });
       if (!ok) return;
       const done = await request("session.rewind", { sessionId, messageId });
       // The SDK lists the files only on the dry run (CLI 2.1.314), so the count comes from the preview the user confirmed.
-      const count = done.filesChanged.length || preview.filesChanged.length;
+      const files = done.filesChanged.length || preview.filesChanged.length;
       addNotice(
         sessionId,
         done.canRewind
-          ? `Rewound ${count} file(s) to before that message.`
-          : `Rewind failed: ${done.error ?? "unknown error"}`,
+          ? t("app.rewind.done", { count: files })
+          : t("app.rewind.failed", { error: done.error ?? t("app.unknownError") }),
       );
     } catch (err) {
       addNotice(sessionId, String(err));
@@ -883,17 +864,17 @@ export function App() {
     try {
       await invoke("open_in_editor", { file: abs, line: line ?? null, editor: settings?.editor ?? "system" });
     } catch (err) {
-      addNotice(sessionId, `Couldn't open ${file}: ${err}`);
+      addNotice(sessionId, t("app.openFailed", { file, error: String(err) }));
     }
   }
 
   /** Starts a chat nothing was sent to over as a Team chat, or as a plain one (M8-03): the tools come with the start. */
-  async function setTeam(t: Tab, on: boolean) {
-    if (!isFresh(t)) return;
-    const id = await startSession(t.cwd, t.modelAlias, t.mode, t.folders ?? [], on, t.profile);
+  async function setTeam(tab: Tab, on: boolean) {
+    if (!isFresh(tab)) return;
+    const id = await startSession(tab.cwd, tab.modelAlias, tab.mode, tab.folders ?? [], on, tab.profile);
     if (!id) return;
-    void request("session.close", { sessionId: t.sessionId }).catch(() => undefined);
-    setTabs((ts) => ts.filter((x) => x.sessionId !== t.sessionId));
+    void request("session.close", { sessionId: tab.sessionId }).catch(() => undefined);
+    setTabs((ts) => ts.filter((x) => x.sessionId !== tab.sessionId));
   }
 
   /** A Fleet row's action on a schedule (M8-05). */
@@ -921,23 +902,23 @@ export function App() {
         await request("schedule.runNow", { cwd: s.cwd, id: s.id });
       } else if (
         await confirm({
-          title: `Delete the schedule of “${s.title}”?`,
-          body: <p>The task stays; it just won't run on its own any more.</p>,
-          confirmLabel: "Delete schedule",
+          title: t("app.schedule.deleteTitle", { title: s.title }),
+          body: <p>{t("app.schedule.deleteBody")}</p>,
+          confirmLabel: t("app.schedule.deleteConfirm"),
           danger: true,
         })
       ) {
         await request("schedule.delete", { cwd: s.cwd, id: s.id });
       }
     } catch (err) {
-      setRuntimeNotice(`The schedule: ${err}`);
+      setRuntimeNotice(t("app.schedule.failed", { error: String(err) }));
     }
   }
 
   function closeTab(sessionId: string) {
-    const tab = tabs.find((t) => t.sessionId === sessionId);
+    const tab = tabs.find((x) => x.sessionId === sessionId);
     if (tab && !tab.ended) void request("session.close", { sessionId }).catch(() => undefined);
-    const rest = tabs.filter((t) => t.sessionId !== sessionId);
+    const rest = tabs.filter((x) => x.sessionId !== sessionId);
     setTabs(rest);
     setTerminals((open) => withToggled(open, sessionId, false));
     if (active === sessionId) setActive(rest.at(-1)?.sessionId ?? null);
@@ -945,26 +926,32 @@ export function App() {
 
   /** Renames the session in the SDK's session store too, so the stored list shows the same title (M1-24). */
   async function renameTab(sessionId: string, title: string) {
-    const tab = tabs.find((t) => t.sessionId === sessionId);
+    const tab = tabs.find((x) => x.sessionId === sessionId);
     if (!tab) return;
-    patchTab(sessionId, (t) => ({ ...t, title }));
+    patchTab(sessionId, (x) => ({ ...x, title }));
     try {
       await request("session.rename", { cwd: tab.cwd, sessionId, title });
     } catch (err) {
-      addNotice(sessionId, `The new title is only kept in this window: ${err}`);
+      addNotice(sessionId, t("app.session.renameFailed", { error: String(err) }));
     }
   }
 
   /** Forks a session (M1-24) and opens the copy in a new tab. */
   async function forkTab(sessionId: string) {
-    const tab = tabs.find((t) => t.sessionId === sessionId);
+    const tab = tabs.find((x) => x.sessionId === sessionId);
     if (!tab) return;
     try {
       const forked = await request("session.fork", { cwd: tab.cwd, sessionId });
       // The fork has no tab yet: it takes the original's folders (M8-07).
-      await resume(forked.sessionId, tab.cwd, `${tab.title} (fork)`, tab.modelAlias, tab.folders ?? []);
+      await resume(
+        forked.sessionId,
+        tab.cwd,
+        t("app.session.forkTitle", { title: tab.title }),
+        tab.modelAlias,
+        tab.folders ?? [],
+      );
     } catch (err) {
-      addNotice(sessionId, `Couldn't fork: ${err}`);
+      addNotice(sessionId, t("app.session.forkFailed", { error: String(err) }));
     }
   }
 
@@ -977,14 +964,14 @@ export function App() {
   /** Opens a task in its tab (UX-13); `autoDraft` drafts a new one as soon as it's loaded. */
   function openTask(dir: string, id: string, options: { autoDraft?: boolean; model?: string; title?: string } = {}) {
     setTaskTabs((all) =>
-      all.some((t) => t.id === id)
+      all.some((x) => x.id === id)
         ? all
         : [
             ...all,
             {
               id,
               cwd: dir,
-              title: options.title ?? "Task",
+              title: options.title ?? t("app.task.defaultTitle"),
               state: "draft",
               busy: Boolean(options.autoDraft),
               autoDraft: Boolean(options.autoDraft),
@@ -1006,20 +993,20 @@ export function App() {
    * Makes a task from the composer's Task mode or `/task` (UX-13): an empty chat becomes the task; a chat with history
    * stays, and its last messages go to drafting as context.
    */
-  async function makeTask(t: Tab, text: string) {
+  async function makeTask(tab: Tab, text: string) {
     try {
-      const context = isFresh(t) ? "" : chatContext(t.items);
+      const context = isFresh(tab) ? "" : chatContext(tab.items);
       const created = await request("task.create", {
-        cwd: t.cwd,
+        cwd: tab.cwd,
         request: text,
         ...(context ? { context } : {}),
         // A chat across a workspace's folders makes a task across them (M8-01).
-        ...(t.folders?.length ? { folders: t.folders } : {}),
+        ...(tab.folders?.length ? { folders: tab.folders } : {}),
       });
-      if (isFresh(t)) closeTab(t.sessionId);
-      openTask(t.cwd, created.id, { autoDraft: true, model: t.modelAlias, title: text.slice(0, 60) });
+      if (isFresh(tab)) closeTab(tab.sessionId);
+      openTask(tab.cwd, created.id, { autoDraft: true, model: tab.modelAlias, title: text.slice(0, 60) });
     } catch (err) {
-      addNotice(t.sessionId, `Couldn't make the task: ${err}`);
+      addNotice(tab.sessionId, t("app.task.makeFailed", { error: String(err) }));
     }
   }
 
@@ -1044,16 +1031,16 @@ export function App() {
       setWsDialog(null);
       openWorkspaceDef(def);
     } catch (err) {
-      setRuntimeNotice(`Couldn't save the workspace: ${err}`);
+      setRuntimeNotice(t("app.workspace.saveFailed", { error: String(err) }));
     }
   }
 
   async function deleteWorkspaceDef(def: WorkspaceDef) {
     if (!settings) return;
     const ok = await confirm({
-      title: `Remove the ${def.name} workspace?`,
-      body: <p>Only the list goes: the folders and their files stay as they are.</p>,
-      confirmLabel: "Remove",
+      title: t("app.workspace.removeTitle", { name: def.name }),
+      body: <p>{t("app.workspace.removeBody")}</p>,
+      confirmLabel: t("app.workspace.removeConfirm"),
       danger: true,
     });
     if (!ok) return;
@@ -1069,9 +1056,9 @@ export function App() {
   async function exportFromMenu() {
     try {
       const path = await exportDiagnostics();
-      if (path) setRuntimeNotice(`Diagnostics saved to ${path}. Secrets, emails and your home folder are masked.`);
+      if (path) setRuntimeNotice(t("app.diagnostics.saved", { path }));
     } catch (err) {
-      setRuntimeNotice(`Export failed: ${err}`);
+      setRuntimeNotice(t("app.diagnostics.failed", { error: String(err) }));
     }
   }
 
@@ -1081,10 +1068,10 @@ export function App() {
    */
   async function newTask() {
     if (settings?.tasksPreview !== true) return;
-    const t = tabs.find((x) => x.sessionId === active) ?? taskTabs.find((x) => taskKey(x.id) === active);
-    const dir = t?.cwd ?? cwd.trim();
+    const open = tabs.find((x) => x.sessionId === active) ?? taskTabs.find((x) => taskKey(x.id) === active);
+    const dir = open?.cwd ?? cwd.trim();
     if (!dir) return show(null);
-    const folders = t && "sessionId" in t ? t.folders : t ? [] : homeDef?.folders;
+    const folders = open && "sessionId" in open ? open.folders : open ? [] : homeDef?.folders;
     const id = await startSession(dir, model, mode, folders ?? []);
     if (id) patchTab(id, (x) => ({ ...x, kind: "task" }));
   }
@@ -1107,12 +1094,12 @@ export function App() {
   };
   useMenuCommands(menuHandlers);
 
-  const activeTab = tabs.find((t) => t.sessionId === active);
+  const activeTab = tabs.find((x) => x.sessionId === active);
   // Claude's questions are cards in the thread (UX-12), not this dialog.
   const permission = activeTab?.permissions.find((p) => p.toolName !== "AskUserQuestion");
   // A task step's approval shows when the active session has none waiting.
   // A step's approval shows as a card in its task's thread (UX-13); only one whose task has no open thread is a dialog.
-  const threaded = new Set(taskTabs.flatMap((t) => shownTasks[t.id] ?? [t.id]));
+  const threaded = new Set(taskTabs.flatMap((x) => shownTasks[x.id] ?? [x.id]));
   const stepApproval = permission ? undefined : taskApprovals.find((p) => !p.task || !threaded.has(p.task.id));
   const workspace = cwd.trim();
   // The named workspace picked on Home, while Home's folder is still its primary folder.
@@ -1122,109 +1109,142 @@ export function App() {
 
   /** Everything the command palette offers (UX-07), built from the same actions as the menu and the views. */
   function paletteCommands(): PaletteCommand[] {
-    const t = activeTab;
+    const cur = activeTab;
     const cmds: PaletteCommand[] = [];
     const add = (group: string, id: string, title: string, run: () => void, extra: Partial<PaletteCommand> = {}) =>
       cmds.push({ group, id, title, run, ...extra });
+    const session = t("app.palette.groupSession");
+    const goTo = t("app.palette.groupGoTo");
+    const view = t("app.palette.groupView");
+    const app = t("app.palette.groupApp");
 
-    add("Session", "new-session", "New session", () => show(null), { shortcut: menuShortcut("new-session") });
-    add("Session", "fleet", "Fleet: everything running", () => show(FLEET));
+    add(session, "new-session", t("app.palette.newSession"), () => show(null), {
+      shortcut: menuShortcut("new-session"),
+    });
+    add(session, "fleet", t("app.palette.fleet"), () => show(FLEET));
     if (settings?.tasksPreview === true)
-      add("Session", "new-task", "New task (preview)", newTask, { shortcut: menuShortcut("new-task") });
-    add("Session", "open-folder", "Open folder…", () => void openFolder(), { shortcut: menuShortcut("open-folder") });
-    if (t) {
-      if (t.running)
+      add(session, "new-task", t("app.palette.newTask"), newTask, { shortcut: menuShortcut("new-task") });
+    add(session, "open-folder", t("app.palette.openFolder"), () => void openFolder(), {
+      shortcut: menuShortcut("open-folder"),
+    });
+    if (cur) {
+      if (cur.running)
         add(
-          "Session",
+          session,
           "stop",
-          "Stop the running turn",
-          () => void request("session.interrupt", { sessionId: t.sessionId }),
+          t("app.palette.stop"),
+          () => void request("session.interrupt", { sessionId: cur.sessionId }),
           {
             shortcut: "Esc",
           },
         );
-      if (t.ended) add("Session", "resume", "Resume this session", () => void resume(t.sessionId, t.cwd, t.title));
-      add("Session", "fork", "Fork into a new session", () => void forkTab(t.sessionId));
-      add("Session", "close-session", "Close session", () => closeTab(t.sessionId), {
+      if (cur.ended)
+        add(session, "resume", t("app.palette.resume"), () => void resume(cur.sessionId, cur.cwd, cur.title));
+      add(session, "fork", t("app.palette.fork"), () => void forkTab(cur.sessionId));
+      add(session, "close-session", t("app.palette.closeSession"), () => closeTab(cur.sessionId), {
         shortcut: menuShortcut("close-session"),
       });
-      if (!t.ended) {
+      if (!cur.ended) {
         for (const m of PERMISSION_MODES)
-          if (m !== t.mode)
-            add("Session", `mode-${m}`, `Permission profile: ${MODE_NAMES[m]}`, () => void changeMode(t.sessionId, m));
-        for (const m of modelChoices(t.models.length ? t.models : undefined))
-          if (m.value && m.value !== t.modelAlias)
-            add("Session", `model-${m.value}`, `Model: ${m.label}`, () => void changeModel(t.sessionId, m.value));
+          if (m !== cur.mode)
+            add(
+              session,
+              `mode-${m}`,
+              t("app.palette.mode", { mode: MODE_NAMES[m] }),
+              () => void changeMode(cur.sessionId, m),
+            );
+        for (const m of modelChoices(cur.models.length ? cur.models : undefined))
+          if (m.value && m.value !== cur.modelAlias)
+            add(
+              session,
+              `model-${m.value}`,
+              t("app.palette.model", { model: m.label }),
+              () => void changeModel(cur.sessionId, m.value),
+            );
       }
     }
 
     for (const tab of tabs)
       if (tab.sessionId !== active)
-        add("Go to", `tab-${tab.sessionId}`, tab.title, () => show(tab.sessionId), { hint: folderName(tab.cwd) });
+        add(goTo, `tab-${tab.sessionId}`, tab.title, () => show(tab.sessionId), { hint: folderName(tab.cwd) });
     for (const dir of settings?.recentWorkspaces ?? [])
-      add("Go to", `workspace-${dir}`, `Open workspace: ${folderName(dir)}`, () => openWorkspace(dir), { hint: dir });
+      add(
+        goTo,
+        `workspace-${dir}`,
+        t("app.palette.openWorkspace", { folder: folderName(dir) }),
+        () => openWorkspace(dir),
+        {
+          hint: dir,
+        },
+      );
 
-    const dir = t?.cwd ?? (workspace || null);
+    const dir = cur?.cwd ?? (workspace || null);
     if (dir) {
       const views: [SetupView, string][] = [
-        ["overview", "Overview"],
-        ["plan", "Setup plan"],
-        ["commands", "Commands"],
-        ["agents", "Agents"],
-        ["plugins", "Plugins"],
-        ["permissions", "Permissions"],
-        ["workflows", "Workflows"],
-        ["deploy", "Deploy"],
-        ["metrics", "Metrics"],
-        ["history", "History"],
+        ["overview", t("app.palette.setupOverview")],
+        ["plan", t("app.palette.setupPlan")],
+        ["commands", t("app.palette.setupCommands")],
+        ["agents", t("app.palette.setupAgents")],
+        ["plugins", t("app.palette.setupPlugins")],
+        ["permissions", t("app.palette.setupPermissions")],
+        ["workflows", t("app.palette.setupWorkflows")],
+        ["deploy", t("app.palette.setupDeploy")],
+        ["metrics", t("app.palette.setupMetrics")],
+        ["history", t("app.palette.setupHistory")],
       ];
-      for (const [view, label] of views)
+      for (const [setupView, title] of views)
         add(
-          "Workspace",
-          `setup-${view}`,
-          `Workspace settings: ${label}`,
-          () => setSetup({ cwd: dir, model: t?.modelAlias ?? model, back: t?.sessionId ?? null, view }),
+          t("app.palette.groupWorkspace"),
+          `setup-${setupView}`,
+          title,
+          () => setSetup({ cwd: dir, model: cur?.modelAlias ?? model, back: cur?.sessionId ?? null, view: setupView }),
           { hint: folderName(dir) },
         );
     }
 
-    add("View", "toggle-sidebar", "Toggle sidebar", () => setSidebarOpen((v) => !v), {
+    add(view, "toggle-sidebar", t("app.palette.toggleSidebar"), () => setSidebarOpen((v) => !v), {
       shortcut: menuShortcut("toggle-sidebar"),
     });
-    add("View", "toggle-right-panel", "Toggle workspace panel", () => setRightOpen((v) => !v), {
+    add(view, "toggle-right-panel", t("app.palette.toggleRightPanel"), () => setRightOpen((v) => !v), {
       shortcut: menuShortcut("toggle-right-panel"),
     });
-    if (t)
-      add("View", "toggle-terminal", "Toggle terminal", () => toggleTerminal(t.sessionId), {
+    if (cur)
+      add(view, "toggle-terminal", t("app.palette.toggleTerminal"), () => toggleTerminal(cur.sessionId), {
         shortcut: menuShortcut("toggle-terminal"),
       });
     for (const tab of PANEL_TABS) {
       const hidden = hiddenTabs.includes(tab);
-      add("View", `panel-${tab}`, `${hidden ? "Show" : "Hide"} the ${PANEL_TAB_LABEL[tab]} tab`, () =>
-        setHiddenTabs((h) => toggleHidden(h, tab)),
+      const label = PANEL_TAB_LABEL[tab];
+      add(
+        view,
+        `panel-${tab}`,
+        hidden ? t("app.palette.showTab", { tab: label }) : t("app.palette.hideTab", { tab: label }),
+        () => setHiddenTabs((h) => toggleHidden(h, tab)),
       );
     }
-    if (hiddenTabs.length) add("View", "panel-all", "Show all panel tabs", () => setHiddenTabs(() => []));
+    if (hiddenTabs.length) add(view, "panel-all", t("app.palette.showAllTabs"), () => setHiddenTabs(() => []));
     if (settings)
       for (const theme of THEMES)
         if (asTheme(settings.theme) !== theme.value)
           add(
-            "View",
+            view,
             `theme-${theme.value}`,
-            `Theme: ${theme.label}`,
+            t("app.palette.theme", { theme: theme.label }),
             () => void onSaveSettings({ ...settings, theme: theme.value }),
           );
 
-    add("App", "settings", "Settings…", () => setSettingsOpen(true), { shortcut: menuShortcut("settings") });
-    add("App", "check-updates", "Check for updates…", () => setUpdatesOpen(true));
-    add("App", "export-diagnostics", "Export diagnostics…", () => void exportFromMenu());
+    add(app, "settings", t("app.palette.settings"), () => setSettingsOpen(true), {
+      shortcut: menuShortcut("settings"),
+    });
+    add(app, "check-updates", t("app.palette.checkUpdates"), () => setUpdatesOpen(true));
+    add(app, "export-diagnostics", t("app.palette.exportDiagnostics"), () => void exportFromMenu());
     add(
-      "App",
+      app,
       "getting-started",
-      "Getting started guide",
+      t("app.palette.gettingStarted"),
       () => void openUrl(`${REPO}/blob/main/docs/guides/AUTH_SETUP.md`),
     );
-    add("App", "report-issue", "Report an issue", () => void openUrl(`${REPO}/issues/new`));
+    add(app, "report-issue", t("app.palette.reportIssue"), () => void openUrl(`${REPO}/issues/new`));
     return cmds;
   }
 
@@ -1245,7 +1265,7 @@ export function App() {
     <Tooltip.Provider delayDuration={400}>
       <div className="app">
         <TitleBar
-          title={titleOf(activeTab?.cwd ?? taskTabs.find((t) => taskKey(t.id) === active)?.cwd ?? workspace)}
+          title={titleOf(activeTab?.cwd ?? taskTabs.find((x) => taskKey(x.id) === active)?.cwd ?? workspace)}
           tasks={settings?.tasksPreview === true}
           sidebarOpen={sidebarOpen}
           rightOpen={rightOpen}
@@ -1281,13 +1301,13 @@ export function App() {
               />
             </Panel>
           )}
-          {sidebarOpen && <Separator className="resize-handle" aria-label="Resize the sidebar" />}
+          {sidebarOpen && <Separator className="resize-handle" aria-label={t("app.shell.resizeSidebar")} />}
           <Panel id="main" minSize={480}>
             <main className="main">
               {runtimeNotice && (
                 <div className="banner" role="status">
                   <span className="grow">{runtimeNotice}</span>
-                  <IconButton label="Dismiss" onClick={() => setRuntimeNotice(null)}>
+                  <IconButton label={t("app.shell.dismiss")} onClick={() => setRuntimeNotice(null)}>
                     <X size={14} />
                   </IconButton>
                 </div>
@@ -1304,7 +1324,7 @@ export function App() {
                         item.task
                           ? request("task.cancel", { cwd: item.task.cwd, id: item.task.id })
                           : request("session.interrupt", { sessionId: item.sessionId })
-                      ).catch((err: unknown) => setRuntimeNotice(`Couldn't stop it: ${err}`))
+                      ).catch((err: unknown) => setRuntimeNotice(t("app.fleet.stopFailed", { error: String(err) })))
                     }
                     onClearEnded={() =>
                       setFleet((f) => Object.fromEntries(Object.entries(f).filter(([, i]) => i.status !== "ended")))
@@ -1339,7 +1359,7 @@ export function App() {
                         ...(homeDef ? { folders: [homeDef.primary, ...homeDef.folders] } : {}),
                       })
                     }
-                    openIds={new Set(tabs.filter((t) => !t.ended).map((t) => t.sessionId))}
+                    openIds={new Set(tabs.filter((x) => !x.ended).map((x) => x.sessionId))}
                     onOpenStored={openStored}
                     confirm={confirm}
                   >
@@ -1358,43 +1378,43 @@ export function App() {
                     )}
                   </HomeView>
                 )}
-                {tabs.map((t) => (
+                {tabs.map((tab) => (
                   <SessionView
-                    key={t.sessionId}
-                    tab={t}
-                    hidden={t.sessionId !== active || setup !== null}
+                    key={tab.sessionId}
+                    tab={tab}
+                    hidden={tab.sessionId !== active || setup !== null}
                     panelTab={panelTab}
                     hiddenTabs={hiddenTabs}
                     onHiddenTabsChange={(next) => setHiddenTabs(() => next)}
                     showFirstChange={showFirstChange}
                     rightOpen={rightOpen}
-                    terminalOpen={terminals.has(t.sessionId)}
+                    terminalOpen={terminals.has(tab.sessionId)}
                     onToggleRight={() => setRightOpen((v) => !v)}
-                    onToggleTerminal={() => toggleTerminal(t.sessionId)}
-                    onSend={(text, images) => void sendText(t.sessionId, text, images)}
-                    {...(settings?.tasksPreview === true ? { onTask: (text: string) => void makeTask(t, text) } : {})}
-                    onTeam={(on) => void setTeam(t, on)}
-                    onCommand={(name, arg) => runCommand(t, name, arg)}
+                    onToggleTerminal={() => toggleTerminal(tab.sessionId)}
+                    onSend={(text, images) => void sendText(tab.sessionId, text, images)}
+                    {...(settings?.tasksPreview === true ? { onTask: (text: string) => void makeTask(tab, text) } : {})}
+                    onTeam={(on) => void setTeam(tab, on)}
+                    onCommand={(name, arg) => runCommand(tab, name, arg)}
                     onAnswer={(req, reply) => void answer(req, reply)}
-                    onInterrupt={() => void request("session.interrupt", { sessionId: t.sessionId })}
+                    onInterrupt={() => void request("session.interrupt", { sessionId: tab.sessionId })}
                     onStopAgent={async (taskId) => {
-                      await request("session.stopAgent", { sessionId: t.sessionId, taskId });
+                      await request("session.stopAgent", { sessionId: tab.sessionId, taskId });
                     }}
-                    onModeChange={(m) => void changeMode(t.sessionId, m)}
-                    onModelChange={(alias) => void changeModel(t.sessionId, alias)}
-                    onEffortChange={(effort) => void changeEffort(t.sessionId, effort)}
-                    onRewind={(messageId) => void rewind(t.sessionId, messageId)}
-                    onResume={() => void resume(t.sessionId, t.cwd, t.title)}
-                    onRename={(title) => void renameTab(t.sessionId, title)}
-                    onFork={() => void forkTab(t.sessionId)}
-                    onClose={() => closeTab(t.sessionId)}
-                    onOpenFile={(file, line) => void openInEditor(t.sessionId, t.cwd, file, line)}
+                    onModeChange={(m) => void changeMode(tab.sessionId, m)}
+                    onModelChange={(alias) => void changeModel(tab.sessionId, alias)}
+                    onEffortChange={(effort) => void changeEffort(tab.sessionId, effort)}
+                    onRewind={(messageId) => void rewind(tab.sessionId, messageId)}
+                    onResume={() => void resume(tab.sessionId, tab.cwd, tab.title)}
+                    onRename={(title) => void renameTab(tab.sessionId, title)}
+                    onFork={() => void forkTab(tab.sessionId)}
+                    onClose={() => closeTab(tab.sessionId)}
+                    onOpenFile={(file, line) => void openInEditor(tab.sessionId, tab.cwd, file, line)}
                     onOpenSetup={(dir) =>
                       setSetup({
-                        cwd: dir ?? t.cwd,
-                        model: t.modelAlias,
-                        back: t.sessionId,
-                        ...(t.folders?.length ? { folders: [t.cwd, ...t.folders] } : {}),
+                        cwd: dir ?? tab.cwd,
+                        model: tab.modelAlias,
+                        back: tab.sessionId,
+                        ...(tab.folders?.length ? { folders: [tab.cwd, ...tab.folders] } : {}),
                       })
                     }
                     confirm={confirm}
@@ -1406,7 +1426,7 @@ export function App() {
                       key={`${setup.cwd}-${setup.view ?? "overview"}`}
                       cwd={setup.cwd}
                       model={setup.model}
-                      backLabel={setup.back ? "Back to session" : "Back to Home"}
+                      backLabel={setup.back ? t("app.setup.backToSession") : t("app.setup.backToHome")}
                       confirm={confirm}
                       onBack={() => setSetup(null)}
                       {...(setup.view ? { initialView: setup.view } : {})}
@@ -1417,28 +1437,28 @@ export function App() {
                 )}
                 {taskTabs.length > 0 && (
                   <Suspense fallback={null}>
-                    {taskTabs.map((t) => (
+                    {taskTabs.map((task) => (
                       <TaskPage
-                        key={`${t.cwd}-${t.id}`}
-                        cwd={t.cwd}
-                        taskId={t.id}
-                        model={t.model}
+                        key={`${task.cwd}-${task.id}`}
+                        cwd={task.cwd}
+                        taskId={task.id}
+                        model={task.model}
                         mode={mode}
-                        hidden={active !== taskKey(t.id) || setup !== null}
-                        autoDraft={t.autoDraft}
+                        hidden={active !== taskKey(task.id) || setup !== null}
+                        autoDraft={task.autoDraft}
                         confirm={confirm}
-                        onClose={() => closeTaskTab(t.id)}
+                        onClose={() => closeTaskTab(task.id)}
                         onChange={onTaskChange}
                         approvals={taskApprovals}
                         onAnswerApproval={(req, reply) => void answerTaskStep(req, reply)}
                         onStopFromApproval={(req) => void stopTaskStep(req)}
-                        onSchedule={(task) =>
+                        onSchedule={(scheduled) =>
                           setScheduleTarget({
-                            cwd: t.cwd,
-                            taskId: task.id,
-                            title: task.title ?? task.request,
-                            budgetUsd: task.triage?.budgetUsd ?? null,
-                            ...(task.run?.model ? { model: task.run.model } : {}),
+                            cwd: task.cwd,
+                            taskId: scheduled.id,
+                            title: scheduled.title ?? scheduled.request,
+                            budgetUsd: scheduled.triage?.budgetUsd ?? null,
+                            ...(scheduled.run?.model ? { model: scheduled.run.model } : {}),
                           })
                         }
                         onOpenFile={(file) =>
@@ -1524,5 +1544,31 @@ function withToggled(open: Set<string>, id: string, on: boolean): Set<string> {
 
 /** What the title bar's search field names: the open workspace's folder, or the app. */
 function titleOf(dir: string): string {
-  return dir ? `${folderName(dir)} — AgentChainer` : "AgentChainer";
+  return dir ? t("app.shell.titleWithFolder", { folder: folderName(dir), app: APP_NAME }) : APP_NAME;
+}
+
+/** The first notice of a new chat: where it runs, with which other folders, as which agent profile. */
+function startedNotice(dir: string, folders: string[], profile: string): string {
+  const folder = folderName(dir);
+  const others = folders.map(folderName).join(", ");
+  if (folders.length && profile)
+    return t("app.session.startedWithFoldersAsProfile", { folder, folders: others, profile });
+  if (folders.length) return t("app.session.startedWithFolders", { folder, folders: others });
+  if (profile) return t("app.session.startedAsProfile", { folder, profile });
+  return t("app.session.started", { folder });
+}
+
+/** What `/usage` says as a notice: the chat's spend, against its cap, and how full its context window is. */
+function usageNotice(tab: Tab): string {
+  const spent = tab.cost.totalUsd === null ? t("app.command.spentUnknown") : approxUsd(tab.cost.totalUsd, 4);
+  const cap = tab.budgetUsd !== null ? dollars(tab.budgetUsd, 2) : null;
+  const c = tab.context;
+  if (!c) return cap ? t("app.command.usageCap", { spent, cap }) : t("app.command.usage", { spent });
+  const context = {
+    spent,
+    percent: Math.round(c.percentage),
+    used: count(c.totalTokens),
+    max: count(c.maxTokens),
+  };
+  return cap ? t("app.command.usageCapContext", { ...context, cap }) : t("app.command.usageContext", context);
 }

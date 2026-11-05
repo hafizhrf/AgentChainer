@@ -1,6 +1,9 @@
 import type { BootstrapPlan, BootstrapRun, Methods, PlanAction } from "@agentchainer/protocol";
 import { useCallback, useEffect, useState } from "react";
 import type { Confirm } from "../Dialog.tsx";
+import { approxUsd } from "../i18n/format.ts";
+import { t } from "../i18n/index.ts";
+import { Rich } from "../i18n/Rich.tsx";
 import { request } from "../sidecar.ts";
 
 type ApplyResult = Methods["bootstrap.apply"]["result"]["results"][number];
@@ -59,10 +62,16 @@ export function useBootstrap(cwd: string, model: string, confirm: Confirm, onCha
     try {
       const r = await request("bootstrap.generate", { cwd, action: action.id, ...(model ? { model } : {}) });
       const failing = r.checks.filter((c) => c.status === "fail").length;
+      const params = {
+        title: action.title,
+        files: r.files.join(", "),
+        attempts: t("setup.bootstrap.attempts", { count: r.attempts }),
+        cost: approxUsd(r.costUsd, 4),
+      };
       setGenerated(
-        `${action.title}: proposed ${r.files.join(", ")} in ${r.attempts} attempt${r.attempts > 1 ? "s" : ""} (≈$${r.costUsd.toFixed(4)})${
-          failing ? `; ${failing} check(s) still fail` : ""
-        }.`,
+        failing
+          ? t("setup.bootstrap.generatedFailing", { ...params, failing })
+          : t("setup.bootstrap.generated", params),
       );
       await load();
       return true;
@@ -92,7 +101,7 @@ export function useBootstrap(cwd: string, model: string, confirm: Confirm, onCha
     if (!plan) return;
     const chosen = plan.actions.filter((a) => selected.has(a.id));
     const ok = await confirm({
-      title: `Apply ${chosen.length} action${chosen.length > 1 ? "s" : ""}?`,
+      title: t("setup.bootstrap.applyTitle", { count: chosen.length }),
       body: (
         <>
           <ul className="file-list">
@@ -100,18 +109,21 @@ export function useBootstrap(cwd: string, model: string, confirm: Confirm, onCha
               <li key={a.id}>
                 {a.title}{" "}
                 <span className="muted">
-                  ({a.tier ?? a.kind}, {a.scope} scope)
+                  {t("setup.bootstrap.actionMeta", { kind: a.tier ?? a.kind, scope: a.scope })}
                 </span>
               </li>
             ))}
           </ul>
           <p className="muted">
-            Files are backed up first and the run is recorded in <code>.agentchainer/lock.json</code>. You can roll the
-            run back from History.
+            <Rich
+              k="setup.bootstrap.applyBody"
+              params={{ file: ".agentchainer/lock.json" }}
+              tags={{ code: (s) => <code>{s}</code> }}
+            />
           </p>
         </>
       ),
-      confirmLabel: "Apply",
+      confirmLabel: t("setup.bootstrap.apply"),
     });
     if (!ok) return;
     const allowed = [...install].filter((id) => selected.has(id));
@@ -127,16 +139,17 @@ export function useBootstrap(cwd: string, model: string, confirm: Confirm, onCha
 
   async function undo(runId: string, actionId?: string, force = false) {
     const ok = await confirm({
-      title: force ? "Force the rollback?" : actionId ? "Roll back this action?" : "Roll back the whole run?",
+      title: force
+        ? t("setup.bootstrap.forceTitle")
+        : actionId
+          ? t("setup.bootstrap.rollbackActionTitle")
+          : t("setup.bootstrap.rollbackRunTitle"),
       body: force ? (
-        <p>Files you edited after the run are overwritten with their contents from before it.</p>
+        <p>{t("setup.bootstrap.forceBody")}</p>
       ) : (
-        <p>
-          Undoes what the {actionId ? "action" : "run"} installed and restores the files it changed, byte for byte.
-          Files you edited since are left alone.
-        </p>
+        <p>{actionId ? t("setup.bootstrap.rollbackActionBody") : t("setup.bootstrap.rollbackRunBody")}</p>
       ),
-      confirmLabel: force ? "Overwrite and roll back" : "Roll back",
+      confirmLabel: force ? t("setup.bootstrap.overwriteAndRollBack") : t("setup.bootstrap.rollBack"),
       danger: force,
     });
     if (!ok) return;

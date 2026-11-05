@@ -8,6 +8,7 @@ import {
   KNOWN_TOOLS,
   toolList,
 } from "@agentchainer/protocol";
+import { t } from "../i18n/index.ts";
 
 /**
  * The agent form's state (M4-06, M8-04): its fields, where it's saved, and whether its tools are limited. Whether the
@@ -98,7 +99,7 @@ export function inputOf(d: Draft): AgentInput {
 /** The form's problems, live: the shared checks, plus a limited tool list that lists nothing. */
 export function draftProblems(d: Draft, taken: readonly string[]): string[] {
   const problems = agentProblems({ ...inputOf(d), ...(d.limited ? { tools: d.tools } : {}) }, taken);
-  if (d.limited && toolList(d.tools).length === 0) problems.push("Tools: pick at least one, or allow all tools.");
+  if (d.limited && toolList(d.tools).length === 0) problems.push(t("setup.agents.toolsRequired"));
   return problems;
 }
 

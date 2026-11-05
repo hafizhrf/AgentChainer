@@ -4,6 +4,9 @@ import { openUrl } from "@tauri-apps/plugin-opener";
 import { CircleCheck, CircleX, ExternalLink, Loader2, RefreshCw, Rocket, Undo2 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { Modal } from "../Dialog.tsx";
+import { dateTime } from "../i18n/format.ts";
+import { t } from "../i18n/index.ts";
+import { Rich } from "../i18n/Rich.tsx";
 import { request } from "../sidecar.ts";
 import { Field } from "../ui/Field.tsx";
 import { IconButton } from "../ui/IconButton.tsx";
@@ -14,6 +17,9 @@ const message = (err: unknown) => (err instanceof Error ? err.message : String(e
 /** A hint with its `commands` shown as code. */
 const withCode = (text: string) =>
   text.split("`").map((part, i) => (i % 2 ? <code key={`code:${part}`}>{part}</code> : part));
+
+const code = (s: string) => <code>{s}</code>;
+const strong = (s: string) => <strong>{s}</strong>;
 
 /** What the dialog is for: a production deploy, or rolling the live one back. */
 type Pending = { kind: "deploy"; plan: DeployPlan } | { kind: "rollback"; plan: DeployPlan; record: DeployRecord };
@@ -32,8 +38,8 @@ export function Deploys({ cwd }: { cwd: string }) {
 
   const load = useCallback(async () => {
     try {
-      const [t, d] = await Promise.all([request("deploy.targets", { cwd }), request("deploy.list", { cwd })]);
-      setTargets(t.targets);
+      const [found, d] = await Promise.all([request("deploy.targets", { cwd }), request("deploy.list", { cwd })]);
+      setTargets(found.targets);
       setDeploys(d.deploys);
       setError(null);
     } catch (err) {
@@ -60,79 +66,73 @@ export function Deploys({ cwd }: { cwd: string }) {
 
   // Fly.io and Firebase roll back only to a deploy the app recorded; the others know their own previous one.
   const canRollBack = (d: DeployRecord) =>
-    Boolean(d.previous?.deploymentId) || Boolean(targets?.find((t) => t.adapter === d.adapter)?.rollbackWithoutRecord);
+    Boolean(d.previous?.deploymentId) || Boolean(targets?.find((x) => x.adapter === d.adapter)?.rollbackWithoutRecord);
 
   // The live production deploy of each provider: the newest one that worked.
   const live = new Set(
-    (targets ?? []).flatMap((t) => {
-      const r = deploys.find((d) => d.adapter === t.adapter && d.env === "production" && d.status === "done");
+    (targets ?? []).flatMap((target) => {
+      const r = deploys.find((d) => d.adapter === target.adapter && d.env === "production" && d.status === "done");
       return r ? [r.id] : [];
     }),
   );
 
   return (
     <div className="setup-scroll">
-      <p className="muted">
-        Production deploys of the workspace's current branch, with the provider's own CLI. Previews are made from a
-        task's page.
-      </p>
+      <p className="muted">{t("setup.deploys.intro")}</p>
       <section className="card deploy-card">
         <div className="card-title">
           <Rocket size={16} aria-hidden />
-          <h2>Providers</h2>
+          <h2>{t("setup.deploys.providers")}</h2>
           <span className="grow" />
-          <IconButton label="Check again" onClick={() => void load()}>
+          <IconButton label={t("setup.deploys.checkAgain")} onClick={() => void load()}>
             <RefreshCw size={14} />
           </IconButton>
         </div>
         {error && <p className="warn">{error}</p>}
-        {!targets && !error && <p className="muted">Checking the providers…</p>}
+        {!targets && !error && <p className="muted">{t("setup.deploys.checking")}</p>}
         {targets?.length === 0 && (
           <p className="muted">
-            No deploy config found. Vercel needs <code>.vercel/project.json</code> (<code>vercel link</code>);
-            Cloudflare Workers need <code>wrangler.toml</code>, <code>wrangler.json</code> or{" "}
-            <code>wrangler.jsonc</code>; Firebase Hosting needs <code>firebase.json</code> with a default project;
-            Fly.io needs <code>fly.toml</code>; a Docker image needs a <code>Dockerfile</code>.
+            <Rich k="setup.deploys.noConfig" tags={{ code }} />
           </p>
         )}
         <ul className="deploy-targets">
-          {targets?.map((t) => (
-            <li key={t.adapter} className="deploy-target">
+          {targets?.map((target) => (
+            <li key={target.adapter} className="deploy-target">
               <div className="deploy-target-row">
-                <strong>{t.label}</strong>
-                <code className="muted">{t.config}</code>
-                {t.project && <span>{t.project}</span>}
+                <strong>{target.label}</strong>
+                <code className="muted">{target.config}</code>
+                {target.project && <span>{target.project}</span>}
                 <span className="grow muted">
-                  {t.state === "ready"
-                    ? t.adapter === "docker"
-                      ? "Docker is running."
-                      : "Signed in."
-                    : withCode(t.hint ?? "")}
+                  {target.state === "ready"
+                    ? target.adapter === "docker"
+                      ? t("setup.deploys.dockerRunning")
+                      : t("setup.deploys.signedIn")
+                    : withCode(target.hint ?? "")}
                 </span>
                 <button
                   type="button"
                   className="secondary small"
-                  disabled={t.state !== "ready" || planning !== null}
-                  onClick={() => void open(t.adapter)}
+                  disabled={target.state !== "ready" || planning !== null}
+                  onClick={() => void open(target.adapter)}
                 >
-                  {planning === t.adapter ? <Loader2 size={13} className="spin" /> : <Rocket size={13} />}
-                  Deploy to production…
+                  {planning === target.adapter ? <Loader2 size={13} className="spin" /> : <Rocket size={13} />}
+                  {t("setup.deploys.deployToProductionEllipsis")}
                 </button>
               </div>
-              {t.adapter === "docker" && <DockerImage cwd={cwd} image={t.project ?? ""} onSaved={() => void load()} />}
+              {target.adapter === "docker" && (
+                <DockerImage cwd={cwd} image={target.project ?? ""} onSaved={() => void load()} />
+              )}
             </li>
           ))}
         </ul>
       </section>
 
       {deploys.length === 0 ? (
-        <EmptyState icon={<Rocket size={14} />}>
-          No deploys yet. Each one is recorded here with its smoke test.
-        </EmptyState>
+        <EmptyState icon={<Rocket size={14} />}>{t("setup.deploys.noDeploys")}</EmptyState>
       ) : (
         <section className="card deploy-card">
           <div className="card-title">
-            <h2>History</h2>
+            <h2>{t("setup.deploys.history")}</h2>
           </div>
           <ul className="deploy-list">
             {deploys.map((d) => (
@@ -180,13 +180,13 @@ function DeployRow({
   planning: boolean;
   onRollback: () => void;
 }) {
-  const what = d.rollbackOf ? "rollback" : d.env;
+  const what = d.rollbackOf ? t("setup.deploys.rollbackChip") : d.env;
   return (
     <li>
       {d.status === "done" && d.smoke?.ok !== false ? (
-        <CircleCheck size={14} className="ok" aria-label="Deployed" />
+        <CircleCheck size={14} className="ok" aria-label={t("setup.deploys.deployed")} />
       ) : (
-        <CircleX size={14} className="err" aria-label="Failed" />
+        <CircleX size={14} className="err" aria-label={t("setup.deploys.failed")} />
       )}
       <span className="deploy-what">
         <span className={`chip${d.env === "production" ? " on" : ""}`}>{what}</span> {d.adapter}
@@ -196,28 +196,30 @@ function DeployRow({
             · <code>{d.commit.slice(0, 7)}</code>
           </>
         )}
-        {d.branch && <> · {d.branch}</>} · {new Date(d.startedAt).toLocaleString()}
-        {live && <strong> · live</strong>}
-        {d.rolledBackBy && <span className="muted"> · rolled back</span>}
+        {d.branch && <> · {d.branch}</>} · {dateTime(d.startedAt)}
+        {live && <strong> · {t("setup.deploys.live")}</strong>}
+        {d.rolledBackBy && <span className="muted"> · {t("setup.deploys.rolledBack")}</span>}
       </span>
       <span className="grow muted deploy-detail" title={redactSecrets(d.error ?? d.smoke?.detail ?? "")}>
         {d.status === "failed"
           ? redactSecrets(d.error ?? "")
           : d.smoke
-            ? `Smoke test ${d.smoke.ok ? "passed" : "failed"}: ${redactSecrets(d.smoke.detail)}`
+            ? d.smoke.ok
+              ? t("setup.deploys.smokePassed", { detail: redactSecrets(d.smoke.detail) })
+              : t("setup.deploys.smokeFailed", { detail: redactSecrets(d.smoke.detail) })
             : d.adapter === "docker" && d.deploymentId
-              ? `Pushed ${d.deploymentId}`
+              ? t("setup.deploys.pushed", { id: d.deploymentId })
               : ""}
       </span>
       {d.url && (
-        <IconButton label="Open the deployment" onClick={() => void openUrl(d.url ?? "")}>
+        <IconButton label={t("setup.deploys.openDeployment")} onClick={() => void openUrl(d.url ?? "")}>
           <ExternalLink size={13} />
         </IconButton>
       )}
       {live && canRollBack && (
         <button type="button" className="ghost small" disabled={busy} onClick={onRollback}>
           {planning ? <Loader2 size={13} className="spin" /> : <Undo2 size={13} />}
-          Roll back…
+          {t("setup.deploys.rollBackEllipsis")}
         </button>
       )}
     </li>
@@ -256,26 +258,18 @@ function DockerImage({ cwd, image, onSaved }: { cwd: string; image: string; onSa
         void save();
       }}
     >
-      <Field
-        label="Image to push to"
-        help={
-          <>
-            With its registry and no tag, e.g. <code>ghcr.io/you/app</code>. Saved in{" "}
-            <code>.agentchainer/docker.json</code>, which you can commit. Sign in with <code>docker login</code>.
-          </>
-        }
-      >
+      <Field label={t("setup.deploys.image")} help={<Rich k="setup.deploys.imageHelp" tags={{ code }} />}>
         <input
           value={value}
           onChange={(e) => setValue(e.target.value)}
-          placeholder="ghcr.io/you/app"
+          placeholder={t("setup.deploys.imagePlaceholder")}
           autoComplete="off"
           spellCheck={false}
         />
       </Field>
       <button type="submit" className="secondary small" disabled={busy || value.trim() === image}>
         {busy && <Loader2 size={13} className="spin" />}
-        Save
+        {t("setup.deploys.save")}
       </button>
       {error && <p className="warn">{error}</p>}
     </form>
@@ -312,7 +306,7 @@ function ConfirmDeploy({
         ? await request("deploy.rollback", { cwd, id: rollback.id, confirm: typed })
         : await request("deploy.production", { cwd, adapter: plan.adapter, confirm: typed, commit: plan.commit });
       if (r.status === "failed") {
-        setError(r.error ?? "The provider's CLI failed.");
+        setError(r.error ?? t("setup.deploys.cliFailed"));
         setBusy(false);
         return;
       }
@@ -328,21 +322,25 @@ function ConfirmDeploy({
     <Modal
       open
       onOpenChange={(o) => !o && !busy && onClose()}
-      title={rollback ? `Roll back ${plan.project} on ${plan.label}?` : `Deploy ${plan.project} to production?`}
+      title={
+        rollback
+          ? t("setup.deploys.rollbackTitle", { project: plan.project, provider: plan.label })
+          : t("setup.deploys.deployTitle", { project: plan.project })
+      }
       description={
         plan.adapter === "docker"
           ? rollback
-            ? "The latest tag goes back to the previous commit's image in the registry, without a build."
-            : "This builds the workspace's Dockerfile and pushes the image with the commit's tag and latest."
+            ? t("setup.deploys.dockerRollbackDescription")
+            : t("setup.deploys.dockerDeployDescription")
           : rollback
-            ? "Production goes back to the deploy before this one, with the provider's own rollback. The smoke test runs again."
-            : "This deploys the workspace as it is now to the provider's production. The smoke test runs on the result."
+            ? t("setup.deploys.rollbackDescription")
+            : t("setup.deploys.deployDescription")
       }
       role="alertdialog"
       actions={
         <>
           <button type="button" className="secondary" disabled={busy} onClick={onClose}>
-            Cancel
+            {t("setup.deploys.cancel")}
           </button>
           <button
             type="button"
@@ -351,7 +349,11 @@ function ConfirmDeploy({
             onClick={() => void go()}
           >
             {busy ? <Loader2 size={14} className="spin" /> : rollback ? <Undo2 size={14} /> : <Rocket size={14} />}
-            {busy ? "Working…" : rollback ? "Roll back production" : "Deploy to production"}
+            {busy
+              ? t("setup.deploys.working")
+              : rollback
+                ? t("setup.deploys.rollBackProduction")
+                : t("setup.deploys.deployToProduction")}
           </button>
         </>
       }
@@ -359,18 +361,22 @@ function ConfirmDeploy({
       {error && <p className="warn">{error}</p>}
       {blocked && <p className="callout">{blocked}</p>}
       <dl className="deploy-plan">
-        <dt>Provider</dt>
+        <dt>{t("setup.deploys.provider")}</dt>
         <dd>
-          {plan.label} · project <strong>{plan.project}</strong>
+          <Rich
+            k="setup.deploys.providerProject"
+            params={{ provider: plan.label, project: plan.project }}
+            tags={{ strong }}
+          />
         </dd>
         {rollback ? (
           <>
-            <dt>Now live</dt>
+            <dt>{t("setup.deploys.nowLive")}</dt>
             <dd>
               {rollback.deploymentId ?? rollback.url ?? "—"}
               {rollback.commit && <code> {rollback.commit.slice(0, 7)}</code>}
             </dd>
-            <dt>Back to</dt>
+            <dt>{t("setup.deploys.backTo")}</dt>
             <dd>
               {to?.deploymentId || to?.url ? (
                 <>
@@ -378,23 +384,27 @@ function ConfirmDeploy({
                   {to.commit && <code> {to.commit.slice(0, 7)}</code>}
                 </>
               ) : (
-                "The provider's previous production deploy (the app has no record of it)."
+                t("setup.deploys.previousUnrecorded")
               )}
             </dd>
           </>
         ) : (
           <>
-            <dt>From</dt>
+            <dt>{t("setup.deploys.from")}</dt>
             <dd>
-              {plan.branch} at <code>{plan.commit.slice(0, 7)}</code>
+              <Rich
+                k="setup.deploys.branchAt"
+                params={{ branch: plan.branch, commit: plan.commit.slice(0, 7) }}
+                tags={{ code }}
+              />
             </dd>
-            <dt>Command</dt>
+            <dt>{t("setup.deploys.command")}</dt>
             <dd>
               <code>{plan.command}</code>
             </dd>
             {plan.current && (
               <>
-                <dt>Live now</dt>
+                <dt>{t("setup.deploys.liveNow")}</dt>
                 <dd>{plan.current.url ?? plan.current.deploymentId}</dd>
               </>
             )}
@@ -402,13 +412,7 @@ function ConfirmDeploy({
         )}
       </dl>
       {!blocked && (
-        <Field
-          label={
-            <>
-              Type <strong>{plan.project}</strong> to confirm
-            </>
-          }
-        >
+        <Field label={<Rich k="setup.deploys.typeToConfirm" params={{ project: plan.project }} tags={{ strong }} />}>
           <input value={typed} onChange={(e) => setTyped(e.target.value)} autoComplete="off" spellCheck={false} />
         </Field>
       )}

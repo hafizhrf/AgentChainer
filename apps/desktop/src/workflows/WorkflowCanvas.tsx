@@ -16,6 +16,8 @@ import {
 import { CircleCheck, CircleDashed, CircleMinus, CircleX, LoaderCircle } from "lucide-react";
 import { memo, useEffect, useMemo, useRef } from "react";
 import { DotGrid } from "../graph/DotGrid.tsx";
+import { usd } from "../i18n/format.ts";
+import { t } from "../i18n/index.ts";
 import type { NodeState, NodeStatus } from "./flowStatus.ts";
 import type { WorkflowEdge, WorkflowNode } from "./workflowGraph.ts";
 
@@ -23,22 +25,48 @@ type NodeData = { node: WorkflowNode; selected: boolean; state?: NodeState };
 type FlowNode = Node<NodeData>;
 
 const KIND_TEXT: Record<WorkflowNode["kind"], string> = {
-  agent: "Agent step",
-  gates: "Gates",
-  group: "Parallel",
-  member: "Parallel member",
-  split: "Split",
-  subtasks: "Sub-tasks",
-  integration: "Integration",
+  get agent() {
+    return t("workflows.canvas.kindAgent");
+  },
+  get gates() {
+    return t("workflows.canvas.kindGates");
+  },
+  get group() {
+    return t("workflows.canvas.kindGroup");
+  },
+  get member() {
+    return t("workflows.canvas.kindMember");
+  },
+  get split() {
+    return t("workflows.canvas.kindSplit");
+  },
+  get subtasks() {
+    return t("workflows.canvas.kindSubtasks");
+  },
+  get integration() {
+    return t("workflows.canvas.kindIntegration");
+  },
 };
 
 const STATUS_TEXT: Record<NodeStatus, string> = {
-  pending: "Waiting",
-  running: "Running",
-  done: "Done",
-  failed: "Failed",
-  cancelled: "Stopped",
-  skipped: "Not run",
+  get pending() {
+    return t("workflows.canvas.statusPending");
+  },
+  get running() {
+    return t("workflows.canvas.statusRunning");
+  },
+  get done() {
+    return t("workflows.canvas.statusDone");
+  },
+  get failed() {
+    return t("workflows.canvas.statusFailed");
+  },
+  get cancelled() {
+    return t("workflows.canvas.statusCancelled");
+  },
+  get skipped() {
+    return t("workflows.canvas.statusSkipped");
+  },
 };
 
 /** A step's state on a run's canvas (UX-14): an icon and a word, never color alone (X-12). */
@@ -57,8 +85,8 @@ function StatusMark({ state }: { state: NodeState }) {
     <span className={`step-status ${state.status}`}>
       <Icon size={12} className={state.status === "running" ? "spin" : undefined} aria-hidden />
       {STATUS_TEXT[state.status]}
-      {state.turns > 1 ? ` · ${state.turns} turns` : ""}
-      {state.costUsd > 0 ? ` · $${state.costUsd.toFixed(3)}` : ""}
+      {state.turns > 1 ? ` · ${t("workflows.canvas.turns", { count: state.turns })}` : ""}
+      {state.costUsd > 0 ? ` · ${usd(state.costUsd, 3)}` : ""}
     </span>
   );
 }
@@ -68,7 +96,15 @@ const StepView = memo(function StepView({ data }: NodeProps<FlowNode>) {
   return (
     <div
       className={`graph-node workflow-step ${node.kind}${selected ? " selected" : ""}${state ? ` status-${state.status}` : ""}`}
-      title={`${KIND_TEXT[node.kind]}: ${node.label}${state ? ` (${STATUS_TEXT[state.status]})` : ""}`}
+      title={
+        state
+          ? t("workflows.canvas.stepTitleWithStatus", {
+              kind: KIND_TEXT[node.kind],
+              label: node.label,
+              status: STATUS_TEXT[state.status],
+            })
+          : t("workflows.canvas.stepTitle", { kind: KIND_TEXT[node.kind], label: node.label })
+      }
     >
       <Handle type="target" position={Position.Top} isConnectable={false} />
       {/* Fix loops run beside the column on the right (UX-17): out lower down, back in higher up. */}
@@ -237,7 +273,7 @@ export function WorkflowCanvas({
       }
       const max = e.maxRounds ?? "?";
       const used = fixes?.[e.id];
-      const back = names.get(e.target) ?? "an earlier step";
+      const back = names.get(e.target) ?? t("workflows.canvas.earlierStep");
       return {
         id: e.id,
         source: e.source,
@@ -247,11 +283,12 @@ export function WorkflowCanvas({
         type: "fix",
         data: {
           lane: lane++,
-          label: used !== undefined ? `fix ${used}/${max}` : `fix ×${max}`,
+          label:
+            used !== undefined ? t("workflows.canvas.fixUsed", { used, max }) : t("workflows.graph.fixMax", { max }),
           title:
             used !== undefined
-              ? `Fix rounds used: ${used} of ${max}. Failures go back to ${back}.`
-              : `Up to ${max} fix rounds: failures go back to ${back}.`,
+              ? t("workflows.canvas.fixUsedTitle", { used, max, back })
+              : t("workflows.canvas.fixMaxTitle", { max, back }),
         },
         className: `graph-edge fix${used ? " used" : ""}`,
         markerEnd: { type: MarkerType.ArrowClosed },
@@ -282,7 +319,7 @@ export function WorkflowCanvas({
         <DotGrid />
         <Controls showInteractive={false} />
       </ReactFlow>
-      {!nodes.length && <p className="graph-empty muted">Nothing to draw: the YAML isn't a workflow yet.</p>}
+      {!nodes.length && <p className="graph-empty muted">{t("workflows.canvas.empty")}</p>}
     </div>
   );
 }

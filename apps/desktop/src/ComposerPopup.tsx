@@ -2,6 +2,8 @@ import type { SlashCommand } from "@agentchainer/protocol";
 import { Check, X } from "lucide-react";
 import { type KeyboardEvent, type ReactNode, useEffect, useRef, useState } from "react";
 import { APP_COMMANDS } from "./commands.ts";
+import { approxUsd, count, usd as dollars, seconds, thousands } from "./i18n/format.ts";
+import { t } from "./i18n/index.ts";
 import type { Tab } from "./tabs.ts";
 
 /** What a slash command opens above the composer (UX-12), like the CLI's own `/model` and `/usage`. */
@@ -72,59 +74,70 @@ export function PickerPopup({
             >
               <span className="picker-label">{item.label}</span>
               {item.hint && <span className="muted picker-hint">{item.hint}</span>}
-              {item.value === current && <Check size={14} className="picker-current" aria-label="Current" />}
+              {item.value === current && (
+                <Check size={14} className="picker-current" aria-label={t("session.popup.current")} />
+              )}
             </button>
           </div>
         ))}
       </div>
-      <p className="muted popup-keys">↑/↓ move · Enter picks · Esc closes</p>
+      <p className="muted popup-keys">{t("session.popup.pickerKeys")}</p>
     </Frame>
   );
 }
 
-const k = (n: number) => (n >= 10_000 ? `${Math.round(n / 1000)}k` : n.toLocaleString());
-const usd = (n: number) => `≈$${n.toFixed(4)}`;
+const k = (n: number) => (n >= 10_000 ? thousands(Math.round(n / 1000)) : count(n));
+const usd = (n: number) => approxUsd(n, 4);
 
 /** `/usage`: this chat's spend, tokens and what fills its context window. Estimates, as everywhere. */
 export function UsagePopup({ tab, onClose }: { tab: Tab; onClose: () => void }) {
   const c = tab.context;
   const close = useEscape(onClose);
+  const total = tab.cost.totalUsd === null ? t("session.popup.costUnknown") : usd(tab.cost.totalUsd);
+  const spent =
+    tab.budgetUsd === null ? total : t("session.popup.spentOfCap", { spent: total, cap: dollars(tab.budgetUsd, 2) });
   return (
-    <Frame title="Usage" onClose={onClose} onKeyDown={close}>
+    <Frame title={t("session.popup.usage")} onClose={onClose} onKeyDown={close}>
       <dl className="usage">
-        <dt>Model</dt>
-        <dd>{tab.model ?? "not known until the first turn"}</dd>
-        <dt>This chat</dt>
-        <dd>
-          {tab.cost.totalUsd === null ? "not known for a resumed chat" : usd(tab.cost.totalUsd)}
-          {tab.budgetUsd !== null && ` of a $${tab.budgetUsd.toFixed(2)} cap`}
-        </dd>
+        <dt>{t("session.popup.model")}</dt>
+        <dd>{tab.model ?? t("session.popup.modelUnknown")}</dd>
+        <dt>{t("session.popup.thisChat")}</dt>
+        <dd>{spent}</dd>
         {tab.cost.lastUsd !== null && (
           <>
-            <dt>Last turn</dt>
+            <dt>{t("session.popup.lastTurn")}</dt>
             <dd>
-              {usd(tab.cost.lastUsd)}, {(tab.cost.lastMs / 1000).toFixed(1)} s
+              {t("session.popup.lastTurnValue", {
+                cost: usd(tab.cost.lastUsd),
+                time: seconds((tab.cost.lastMs / 1000).toFixed(1)),
+              })}
             </dd>
           </>
         )}
         {tab.cost.totalTokens && (
           <>
-            <dt>Tokens</dt>
+            <dt>{t("session.popup.tokens")}</dt>
             <dd>
-              {k(tab.cost.totalTokens.input)} in · {k(tab.cost.totalTokens.output)} out
+              {t("session.popup.tokensValue", {
+                input: k(tab.cost.totalTokens.input),
+                output: k(tab.cost.totalTokens.output),
+              })}
             </dd>
           </>
         )}
       </dl>
-      <h3 className="usage-heading">Context window</h3>
+      <h3 className="usage-heading">{t("session.popup.contextWindow")}</h3>
       {c ? (
         <>
           <div className={`usage-bar${c.percentage >= 80 ? " warn" : ""}`} aria-hidden>
             <span className="usage-fill" style={{ width: `${Math.min(100, c.percentage)}%` }} />
           </div>
           <p className="muted usage-line">
-            {Math.round(c.percentage)}% used: {k(c.totalTokens)} of {k(c.maxTokens)} tokens
-            {c.percentage >= 80 ? " · /compact summarizes earlier messages" : ""}
+            {t(c.percentage >= 80 ? "session.popup.contextUsedFull" : "session.popup.contextUsed", {
+              percent: Math.round(c.percentage),
+              used: k(c.totalTokens),
+              max: k(c.maxTokens),
+            })}
           </p>
           {c.categories && c.categories.length > 0 && (
             <table className="usage-table">
@@ -141,9 +154,9 @@ export function UsagePopup({ tab, onClose }: { tab: Tab; onClose: () => void }) 
           )}
         </>
       ) : (
-        <p className="muted">Shown after the first turn.</p>
+        <p className="muted">{t("session.popup.contextLater")}</p>
       )}
-      <p className="muted popup-keys">Costs are estimates · Esc closes</p>
+      <p className="muted popup-keys">{t("session.popup.usageKeys")}</p>
     </Frame>
   );
 }
@@ -161,12 +174,12 @@ export function HelpPopup({ commands, onClose }: { commands: SlashCommand[]; onC
       </li>
     ));
   return (
-    <Frame title="Commands" onClose={onClose} onKeyDown={close}>
-      <h3 className="usage-heading">In the app</h3>
+    <Frame title={t("session.popup.commands")} onClose={onClose} onKeyDown={close}>
+      <h3 className="usage-heading">{t("session.popup.inApp")}</h3>
       <ul className="help-list">{rows(APP_COMMANDS)}</ul>
-      <h3 className="usage-heading">Sent to Claude</h3>
+      <h3 className="usage-heading">{t("session.popup.sentToClaude")}</h3>
       <ul className="help-list">{rows(commands.filter((c) => !app.has(c.name)))}</ul>
-      <p className="muted popup-keys">Type / in the composer to search · Esc closes</p>
+      <p className="muted popup-keys">{t("session.popup.helpKeys")}</p>
     </Frame>
   );
 }
@@ -201,7 +214,12 @@ function Frame({
       <header>
         <strong>{title}</strong>
         <span className="grow" />
-        <button type="button" className="ghost icon tiny" aria-label={`Close ${title}`} onClick={onClose}>
+        <button
+          type="button"
+          className="ghost icon tiny"
+          aria-label={t("session.popup.close", { title })}
+          onClick={onClose}
+        >
           <X size={13} />
         </button>
       </header>

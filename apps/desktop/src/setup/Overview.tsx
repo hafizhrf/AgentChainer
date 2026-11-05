@@ -1,5 +1,6 @@
 import type { Finding, Methods, PlanAction } from "@agentchainer/protocol";
 import { ArrowRight, CircleAlert, CircleCheck, CircleX, Info, type LucideIcon } from "lucide-react";
+import { t } from "../i18n/index.ts";
 import { Section } from "../ui/Section.tsx";
 
 type Scan = Methods["workspace.scan"]["result"];
@@ -12,10 +13,18 @@ export const STATUS_ICON: Record<Finding["status"], LucideIcon> = {
 };
 
 const AREA: Record<Finding["area"], string> = {
-  agent: "Agent setup",
-  quality: "Project checks",
-  hygiene: "Secrets hygiene",
-  git: "Git",
+  get agent() {
+    return t("setup.overview.areaAgent");
+  },
+  get quality() {
+    return t("setup.overview.areaQuality");
+  },
+  get hygiene() {
+    return t("setup.overview.areaHygiene");
+  },
+  get git() {
+    return t("setup.overview.areaGit");
+  },
 };
 
 /** Fixes worth doing: anything short of ok that names its fix. */
@@ -50,10 +59,10 @@ export function Overview({
           {gaps.length ? <CircleAlert size={20} /> : <CircleCheck size={20} />}
           <div>
             <strong>
-              {gaps.length === 0 ? "Ready for agent work" : `${gaps.length} thing${gaps.length > 1 ? "s" : ""} to fix`}
+              {gaps.length === 0 ? t("setup.overview.ready") : t("setup.overview.thingsToFix", { count: gaps.length })}
             </strong>
             <span className="muted">
-              {gaps.length ? "Each one has a fix in the plan." : "Nothing in the readiness checks needs attention."}
+              {gaps.length ? t("setup.overview.eachHasFix") : t("setup.overview.nothingNeeded")}
             </span>
           </div>
         </div>
@@ -61,7 +70,11 @@ export function Overview({
           {(["ok", "info", "warn", "missing"] as const).map((s) => {
             const Icon = STATUS_ICON[s];
             return (
-              <span key={s} className={`finding-${s}`} title={`${count(s)} ${s}`}>
+              <span
+                key={s}
+                className={`finding-${s}`}
+                title={t("setup.overview.statusCount", { n: count(s), status: s })}
+              >
                 <Icon size={14} />
                 {count(s)}
               </span>
@@ -93,7 +106,7 @@ export function Overview({
                     </div>
                     {action && (
                       <button type="button" className="ghost small" onClick={() => onFix(action.id)}>
-                        {f.fix?.label ?? "Fix"}
+                        {f.fix?.label ?? t("setup.overview.fix")}
                         <ArrowRight size={13} />
                       </button>
                     )}

@@ -4,6 +4,9 @@ import { relaunch } from "@tauri-apps/plugin-process";
 import { check, type Update } from "@tauri-apps/plugin-updater";
 import { useEffect, useRef, useState } from "react";
 import { Modal } from "./Dialog.tsx";
+import { megabytes as mb } from "./i18n/format.ts";
+import { t } from "./i18n/index.ts";
+import { Rich } from "./i18n/Rich.tsx";
 import { Markdown } from "./Markdown.tsx";
 
 const RELEASES = "https://github.com/hafizhrf/AgentChainer/releases";
@@ -17,7 +20,6 @@ type Step =
   | { step: "installing" }
   | { step: "failed"; message: string; restart: boolean };
 
-const mb = (bytes: number) => `${(bytes / 1_000_000).toFixed(1)} MB`;
 const describe = (err: unknown) => (err instanceof Error ? err.message : String(err));
 
 /**
@@ -43,7 +45,8 @@ export function UpdateDialog({ appVersion, onClose }: { appVersion: string | nul
       found.current = update;
       setState(update ? { step: "available", update } : { step: "current" });
     })().catch((err: unknown) => {
-      if (live) setState({ step: "failed", message: `Couldn't check for updates: ${describe(err)}`, restart: false });
+      if (live)
+        setState({ step: "failed", message: t("home.update.checkFailed", { error: describe(err) }), restart: false });
     });
     return () => {
       live = false;
@@ -63,7 +66,7 @@ export function UpdateDialog({ appVersion, onClose }: { appVersion: string | nul
       });
     } catch (err) {
       void update.close().catch(() => undefined);
-      setState({ step: "failed", message: `The download failed: ${describe(err)}`, restart: false });
+      setState({ step: "failed", message: t("home.update.downloadFailed", { error: describe(err) }), restart: false });
       return;
     }
     setState({ step: "installing" });
@@ -75,7 +78,7 @@ export function UpdateDialog({ appVersion, onClose }: { appVersion: string | nul
     } catch (err) {
       setState({
         step: "failed",
-        message: `The update couldn't be installed: ${describe(err)}. Restart AgentChainer to continue.`,
+        message: t("home.update.installFailed", { error: describe(err) }),
         restart: true,
       });
     }
@@ -89,66 +92,74 @@ export function UpdateDialog({ appVersion, onClose }: { appVersion: string | nul
       onOpenChange={(open) => {
         if (!open) onClose();
       }}
-      title="Check for updates"
+      title={t("home.update.title")}
       dismissible={!busy && !failedHard}
       actions={
         state.step === "available" ? (
           <>
             <button type="button" className="secondary" onClick={onClose}>
-              Later
+              {t("home.update.later")}
             </button>
             <button type="button" onClick={() => void install(state.update)}>
-              Install and restart
+              {t("home.update.install")}
             </button>
           </>
         ) : failedHard ? (
           <button type="button" onClick={() => void relaunch()}>
-            Restart AgentChainer
+            {t("home.update.restart")}
           </button>
         ) : busy ? null : (
           <button type="button" className="secondary" onClick={onClose}>
-            Close
+            {t("shell.dialog.close")}
           </button>
         )
       }
     >
       <div className="update">
-        {state.step === "checking" && <p>Checking for a new version…</p>}
+        {state.step === "checking" && <p>{t("home.update.checking")}</p>}
         {state.step === "not-set-up" && (
           <>
-            <p>Updates aren't set up in this build.</p>
+            <p>{t("home.update.notSetUp")}</p>
             <p className="field-help">
-              Development builds, and builds made without the release key, can't check for updates. New versions are on
-              the{" "}
-              <button type="button" className="link" onClick={() => void openUrl(RELEASES)}>
-                releases page
-              </button>
-              .
+              <Rich
+                k="home.update.notSetUpHelp"
+                tags={{
+                  link: (s) => (
+                    <button type="button" className="link" onClick={() => void openUrl(RELEASES)}>
+                      {s}
+                    </button>
+                  ),
+                }}
+              />
             </p>
           </>
         )}
-        {state.step === "current" && <p>AgentChainer {appVersion ?? ""} is the newest version.</p>}
+        {state.step === "current" && <p>{t("home.update.current", { version: appVersion ?? "" })}</p>}
         {state.step === "available" && (
           <>
             <p>
-              Version {state.update.version} is available. You have {state.update.currentVersion}.
+              {t("home.update.available", {
+                version: state.update.version,
+                current: state.update.currentVersion,
+              })}
             </p>
             {state.update.body?.trim() && (
               <div className="update-notes">
                 <Markdown text={state.update.body} />
               </div>
             )}
-            <p className="field-help">
-              Installing stops running agents and closes terminals. Resume your sessions from the sidebar after the
-              restart.
-            </p>
+            <p className="field-help">{t("home.update.installHelp")}</p>
           </>
         )}
         {state.step === "downloading" && (
           <>
             <p>
-              Downloading…{" "}
-              {state.total ? `${mb(state.received)} of ${mb(state.total)}` : state.received ? mb(state.received) : ""}
+              {t("home.update.downloading")}{" "}
+              {state.total
+                ? t("home.update.progress", { received: mb(state.received), total: mb(state.total) })
+                : state.received
+                  ? mb(state.received)
+                  : ""}
             </p>
             <progress
               className="update-progress"
@@ -157,7 +168,7 @@ export function UpdateDialog({ appVersion, onClose }: { appVersion: string | nul
             />
           </>
         )}
-        {state.step === "installing" && <p>Installing… AgentChainer restarts when it's done.</p>}
+        {state.step === "installing" && <p>{t("home.update.installing")}</p>}
         {state.step === "failed" && <p className="dialog-error">{state.message}</p>}
       </div>
     </Modal>

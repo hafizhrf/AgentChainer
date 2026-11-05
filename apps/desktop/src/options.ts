@@ -1,13 +1,14 @@
-import { EFFORTS, type ModelOption, type PERMISSION_MODES } from "@agentchainer/protocol";
+import { EFFORTS, type Effort, type ModelOption, type PERMISSION_MODES } from "@agentchainer/protocol";
+import { type MessageKey, t } from "./i18n/index.ts";
 
 /** Choices shared by the start screen, the composer and Settings. */
 
 /** Until a chat has started once: the CLI's aliases, which always point at its latest models. */
-const FALLBACK_MODELS: ModelOption[] = [
-  { value: "default", displayName: "Default (recommended)", description: "From your Claude settings" },
-  { value: "opus", displayName: "Opus", description: "The latest Opus" },
-  { value: "sonnet", displayName: "Sonnet", description: "The latest Sonnet" },
-  { value: "haiku", displayName: "Haiku", description: "The latest Haiku" },
+const fallbackModels = (): ModelOption[] => [
+  { value: "default", displayName: t("shell.options.modelDefault"), description: t("shell.options.modelDefaultHint") },
+  { value: "opus", displayName: t("shell.options.modelOpus"), description: t("shell.options.modelOpusHint") },
+  { value: "sonnet", displayName: t("shell.options.modelSonnet"), description: t("shell.options.modelSonnetHint") },
+  { value: "haiku", displayName: t("shell.options.modelHaiku"), description: t("shell.options.modelHaikuHint") },
 ];
 const MODELS_KEY = "agentchainer.models";
 /** The device's storage, when there is one (not in unit tests). */
@@ -34,7 +35,7 @@ export function knownModels(): ModelOption[] {
   } catch {
     // Not available: use the aliases.
   }
-  return FALLBACK_MODELS;
+  return fallbackModels();
 }
 
 export function rememberModels(models: ModelOption[]): void {
@@ -61,52 +62,116 @@ export function modelChoices(
     ...(m.description ? { hint: m.description } : {}),
   }));
   if (!opts.some((o) => o.value === ""))
-    opts.unshift({ value: "", label: "Default (recommended)", hint: "From your Claude settings" });
+    opts.unshift({ value: "", label: t("shell.options.modelDefault"), hint: t("shell.options.modelDefaultHint") });
   if (current && !opts.some((o) => o.value === current)) opts.push({ value: current, label: current });
   return opts;
 }
 
 /** "Open in editor" targets (M1-28); each needs its command-line launcher on PATH, except the system default. */
 export const EDITORS = [
-  { value: "system", label: "System default app" },
-  { value: "vscode", label: "VS Code (code)" },
-  { value: "cursor", label: "Cursor (cursor)" },
-  { value: "zed", label: "Zed (zed)" },
-  { value: "idea", label: "IntelliJ IDEA (idea)" },
+  {
+    value: "system",
+    get label() {
+      return t("shell.options.editorSystem");
+    },
+  },
+  {
+    value: "vscode",
+    get label() {
+      return t("shell.options.editorVscode");
+    },
+  },
+  {
+    value: "cursor",
+    get label() {
+      return t("shell.options.editorCursor");
+    },
+  },
+  {
+    value: "zed",
+    get label() {
+      return t("shell.options.editorZed");
+    },
+  },
+  {
+    value: "idea",
+    get label() {
+      return t("shell.options.editorIdea");
+    },
+  },
 ];
 
 export const THEMES = [
-  { value: "system", label: "System" },
-  { value: "light", label: "Light" },
-  { value: "dark", label: "Dark" },
+  {
+    value: "system",
+    get label() {
+      return t("shell.options.themeSystem");
+    },
+  },
+  {
+    value: "light",
+    get label() {
+      return t("shell.options.themeLight");
+    },
+  },
+  {
+    value: "dark",
+    get label() {
+      return t("shell.options.themeDark");
+    },
+  },
 ];
 
 type Mode = (typeof PERMISSION_MODES)[number];
 
 /**
  * Permission profiles (M1-18, ARCHITECTURE §6), each one SDK permission mode. The guard's hard denylist applies in
- * all of them. Owner testing showed "auto-accept edits" read as "auto mode", hence the names and explanations.
+ * all of them. Owner testing showed "auto-accept edits" read as "auto mode", hence the names and explanations. Each
+ * text is looked up in the catalogs when it's read (X-13).
  */
 export const MODE_NAMES: Record<Mode, string> = {
-  default: "Safe",
-  acceptEdits: "Standard",
-  auto: "Autonomous",
-  plan: "Plan first",
+  get default() {
+    return t("shell.options.modeDefaultName");
+  },
+  get acceptEdits() {
+    return t("shell.options.modeAcceptEditsName");
+  },
+  get auto() {
+    return t("shell.options.modeAutoName");
+  },
+  get plan() {
+    return t("shell.options.modePlanName");
+  },
 };
 
 const MODE_SUMMARY: Record<Mode, string> = {
-  default: "Asks before edits and commands",
-  acceptEdits: "Edits run, commands still ask",
-  auto: "Claude decides, asks when unsure",
-  plan: "Read-only until you approve a plan",
+  get default() {
+    return t("shell.options.modeDefaultSummary");
+  },
+  get acceptEdits() {
+    return t("shell.options.modeAcceptEditsSummary");
+  },
+  get auto() {
+    return t("shell.options.modeAutoSummary");
+  },
+  get plan() {
+    return t("shell.options.modePlanSummary");
+  },
 };
 
 export const MODE_HELP: Record<Mode, string> = {
-  default: "Reading is allowed. Every file edit and shell command waits for your approval.",
-  acceptEdits:
-    "File edits inside the workspace run without asking. Shell commands, web access and MCP tools still ask.",
-  auto: "Claude's auto mode: a classifier approves or blocks each action and only asks when unsure. Needs a budget cap. AgentChainer's guard still blocks dangerous commands.",
-  plan: "Claude explores and writes a plan without changing anything. You approve the plan, then pick how to run it.",
+  get default() {
+    return t("shell.options.modeDefaultHelp");
+  },
+  get acceptEdits() {
+    return t("shell.options.modeAcceptEditsHelp");
+  },
+  get auto() {
+    return t("shell.options.modeAutoHelp");
+  },
+  get plan() {
+    return t("shell.options.modePlanHelp");
+  },
 };
 
 /** Profile choices for a select; Autonomous is disabled without a budget cap. */
@@ -114,14 +179,32 @@ export function modeOptions(modes: readonly Mode[], canAutonomous: boolean) {
   return modes.map((m) => ({
     value: m,
     label: MODE_NAMES[m],
-    hint: m === "auto" && !canAutonomous ? "Needs a budget cap (Settings)" : MODE_SUMMARY[m],
+    hint: m === "auto" && !canAutonomous ? t("shell.options.needsBudget") : MODE_SUMMARY[m],
     disabled: m === "auto" && !canAutonomous,
   }));
 }
 
+const EFFORT_LABELS: Record<Effort, MessageKey> = {
+  low: "shell.options.effortLow",
+  medium: "shell.options.effortMedium",
+  high: "shell.options.effortHigh",
+  xhigh: "shell.options.effortXhigh",
+  max: "shell.options.effortMax",
+};
+
 export const EFFORT_OPTIONS = [
-  { value: "", label: "Default effort" },
-  ...EFFORTS.map((e) => ({ value: e, label: `${e[0]?.toUpperCase()}${e.slice(1)} effort` })),
+  {
+    value: "",
+    get label() {
+      return t("shell.options.effortDefault");
+    },
+  },
+  ...EFFORTS.map((e) => ({
+    value: e,
+    get label() {
+      return t(EFFORT_LABELS[e]);
+    },
+  })),
 ];
 
 /** macOS keeps the native menu bar; Windows and Linux get the app's own title bar with its menus (UX-15). */

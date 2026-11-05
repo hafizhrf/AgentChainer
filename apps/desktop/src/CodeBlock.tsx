@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { t } from "./i18n/index.ts";
 import { CopyButton } from "./ui/CopyButton.tsx";
 
 /**
@@ -11,7 +12,7 @@ export function CodeBlock({ code, lang }: { code: string; lang: string }) {
   useEffect(() => {
     if (!lang) return;
     let live = true;
-    const t = setTimeout(() => {
+    const timer = setTimeout(() => {
       import("./monaco.ts")
         .then(({ colorize }) => colorize(code, lang))
         .then((out) => {
@@ -21,15 +22,15 @@ export function CodeBlock({ code, lang }: { code: string; lang: string }) {
     }, 150);
     return () => {
       live = false;
-      clearTimeout(t);
+      clearTimeout(timer);
     };
   }, [code, lang]);
 
   return (
     <div className="code-block">
       <div className="code-block-bar">
-        <span>{lang || "text"}</span>
-        <CopyButton text={code} label="Copy code" />
+        <span>{lang || t("panel.code.plainText")}</span>
+        <CopyButton text={code} label={t("panel.code.copy")} />
       </div>
       {html ? (
         // Monaco's colorizer escapes the code; its output is only its own spans (THREAT_MODEL T-01).

@@ -1,5 +1,7 @@
 import { type Cadence, nextRun, type Schedule, type Task } from "@agentchainer/protocol";
 import { isPermissionGranted, requestPermission, sendNotification } from "@tauri-apps/plugin-notification";
+import { approxUsd } from "./i18n/format.ts";
+import { t } from "./i18n/index.ts";
 
 /**
  * Scheduled flows in the UI (M8-05, docs/design/scheduled-flows.md): what the person is told about scheduled runs, as
@@ -23,13 +25,23 @@ export async function notify(title: string, body: string): Promise<void> {
   }
 }
 
-const ENDED: Partial<Record<Task["state"], string>> = {
-  done: "done",
-  failed: "failed",
-  unverified: "ended unverified",
-  cancelled: "was stopped",
-  accepted: "done, risk accepted",
-};
+/** How a run ended, in words; another state is named as it is. */
+function ended(state: Task["state"]): string {
+  switch (state) {
+    case "done":
+      return t("graph.schedules.done");
+    case "failed":
+      return t("graph.schedules.failed");
+    case "unverified":
+      return t("graph.schedules.unverified");
+    case "cancelled":
+      return t("graph.schedules.cancelled");
+    case "accepted":
+      return t("graph.schedules.accepted");
+    default:
+      return state;
+  }
+}
 
 /** What to tell the person when a scheduled run ends: from `before` (the last state seen) to `task`. */
 export function scheduledRunEnded(
@@ -37,43 +49,50 @@ export function scheduledRunEnded(
   task: Task,
 ): { title: string; body: string } | null {
   if (task.run?.trigger !== "schedule" || before !== "running" || task.state === "running") return null;
-  const how = ENDED[task.state] ?? task.state;
   const name = task.title ?? task.request;
+  const cost = approxUsd(task.run.costUsd, 2);
   return {
-    title: `Scheduled run ${how}`,
-    body: `${name.slice(0, 80)}${task.run.outcome ? `: ${task.run.outcome}` : ""} (≈$${task.run.costUsd.toFixed(2)})`,
+    title: t("graph.schedules.runEnded", { how: ended(task.state) }),
+    body: task.run.outcome
+      ? t("graph.schedules.endedBodyOutcome", { name: name.slice(0, 80), outcome: task.run.outcome, cost })
+      : t("graph.schedules.endedBody", { name: name.slice(0, 80), cost }),
   };
 }
 
 /** A schedule's last run in words: "Started 02:00, late", "Skipped: the task was still running". */
 export function lastRunText(s: Schedule, now = new Date()): string {
   const r = s.lastRun;
-  if (!r) return "Hasn't run yet";
+  if (!r) return t("graph.schedules.notRunYet");
   const when = whenText(new Date(r.at), now);
-  if (r.state === "started") return `Ran ${when}${r.late ? ", late" : ""}`;
-  if (r.state === "skipped") return `Skipped ${when}: the task was still running`;
-  return `Couldn't run ${when}: ${r.reason ?? "unknown reason"}`;
+  if (r.state === "started")
+    return r.late ? t("graph.schedules.ranLate", { when }) : t("graph.schedules.ran", { when });
+  if (r.state === "skipped") return t("graph.schedules.skipped", { when });
+  return t("graph.schedules.couldNotRun", { when, reason: r.reason ?? t("graph.schedules.unknownReason") });
 }
 
 /** "today 02:00", "tomorrow 02:00", "Fri 02:00", or a date further out. */
-export function whenText(t: Date, now = new Date()): string {
-  const time = `${String(t.getHours()).padStart(2, "0")}:${String(t.getMinutes()).padStart(2, "0")}`;
+export function whenText(at: Date, now = new Date()): string {
+  const time = `${String(at.getHours()).padStart(2, "0")}:${String(at.getMinutes()).padStart(2, "0")}`;
   const day = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
-  const diff = Math.round((day(t) - day(now)) / 86_400_000);
-  if (diff === 0) return `today ${time}`;
-  if (diff === 1) return `tomorrow ${time}`;
-  if (diff === -1) return `yesterday ${time}`;
-  if (diff > 1 && diff < 7) return `${t.toLocaleDateString("en-US", { weekday: "short" })} ${time}`;
-  return `${t.toLocaleDateString("en-US", { month: "short", day: "numeric" })} ${time}`;
+  const diff = Math.round((day(at) - day(now)) / 86_400_000);
+  if (diff === 0) return t("graph.schedules.today", { time });
+  if (diff === 1) return t("graph.schedules.tomorrow", { time });
+  if (diff === -1) return t("graph.schedules.yesterday", { time });
+  if (diff > 1 && diff < 7)
+    return t("graph.schedules.dayTime", { day: at.toLocaleDateString("en-US", { weekday: "short" }), time });
+  return t("graph.schedules.dayTime", {
+    day: at.toLocaleDateString("en-US", { month: "short", day: "numeric" }),
+    time,
+  });
 }
 
 /** The next `n` times of a cadence after now, for the preview. */
 export function nextTimes(cadence: Cadence, n: number, now = new Date()): Date[] {
   const out: Date[] = [];
-  let t = now;
+  let at = now;
   for (let i = 0; i < n; i++) {
-    t = nextRun(cadence, t);
-    out.push(t);
+    at = nextRun(cadence, at);
+    out.push(at);
   }
   return out;
 }

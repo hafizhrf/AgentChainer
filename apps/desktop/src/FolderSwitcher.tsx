@@ -1,4 +1,5 @@
 import { Folder } from "lucide-react";
+import { t } from "./i18n/index.ts";
 import { folderName } from "./tabs.ts";
 
 /**
@@ -17,14 +18,14 @@ export function FolderSwitcher({
 }) {
   if (folders.length < 2) return null;
   return (
-    <fieldset className="folder-switcher" aria-label="Folder">
+    <fieldset className="folder-switcher" aria-label={t("panel.folders.label")}>
       {folders.map((dir, i) => (
         <button
           key={dir}
           type="button"
           aria-pressed={dir === current}
           className={dir === current ? "chip on" : "chip"}
-          title={i === 0 ? `${dir} (primary)` : dir}
+          title={i === 0 ? t("panel.folders.primary", { dir }) : dir}
           onClick={() => onChange(dir)}
         >
           <Folder size={12} aria-hidden />

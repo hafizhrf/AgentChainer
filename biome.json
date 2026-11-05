@@ -1,6 +1,10 @@
 {
   "$schema": "./node_modules/@biomejs/biome/configuration_schema.json",
-  "vcs": { "enabled": true, "clientKind": "git", "useIgnoreFile": true },
+  "vcs": {
+    "enabled": true,
+    "clientKind": "git",
+    "useIgnoreFile": true
+  },
   "files": {
     "includes": [
       "**",
@@ -26,11 +30,74 @@
     "lineWidth": 120
   },
   "javascript": {
-    "formatter": { "quoteStyle": "double", "semicolons": "always", "trailingCommas": "all" }
+    "formatter": {
+      "quoteStyle": "double",
+      "semicolons": "always",
+      "trailingCommas": "all"
+    }
   },
   "linter": {
     "enabled": true,
-    "rules": { "preset": "recommended" }
+    "rules": {
+      "preset": "recommended"
+    }
   },
-  "assist": { "actions": { "source": { "organizeImports": "on" } } }
+  "assist": {
+    "actions": {
+      "source": {
+        "organizeImports": "on"
+      }
+    }
+  },
+  "overrides": [
+    {
+      "includes": ["apps/desktop/src/**/*.tsx"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noJsxLiterals": {
+              "level": "error",
+              "options": {
+                "allowedStrings": [
+                  "·",
+                  "—",
+                  "–",
+                  "…",
+                  "×",
+                  "/",
+                  "%",
+                  "→",
+                  "←",
+                  "↑",
+                  "↓",
+                  "•",
+                  "⋯",
+                  "$",
+                  "+",
+                  "-",
+                  ":",
+                  "(",
+                  ")",
+                  "|",
+                  "#",
+                  "@",
+                  "≈",
+                  "⌘",
+                  "⇧",
+                  "✓",
+                  "›",
+                  "‹",
+                  "=",
+                  ",",
+                  ".",
+                  "'",
+                  "\""
+                ]
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
 }

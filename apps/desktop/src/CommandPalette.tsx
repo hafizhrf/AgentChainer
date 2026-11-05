@@ -3,6 +3,7 @@ import { Search } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useReturnFocus } from "./Dialog.tsx";
 import { fuzzyFilterBy } from "./fuzzy.ts";
+import { t } from "./i18n/index.ts";
 
 export type PaletteCommand = {
   id: string;
@@ -61,7 +62,7 @@ export function CommandPalette({
       <RadixDialog.Portal>
         <RadixDialog.Overlay className="palette-overlay" />
         <RadixDialog.Content className="palette" aria-describedby={undefined} onCloseAutoFocus={returnFocus}>
-          <RadixDialog.Title className="sr-only">Command palette</RadixDialog.Title>
+          <RadixDialog.Title className="sr-only">{t("app.palette.title")}</RadixDialog.Title>
           <div className="palette-input">
             <Search size={15} aria-hidden />
             <input
@@ -79,7 +80,7 @@ export function CommandPalette({
                   run(results[active]);
                 }
               }}
-              placeholder="Type a command, a session or a folder…"
+              placeholder={t("app.palette.placeholder")}
               role="combobox"
               aria-expanded
               aria-controls="palette-list"
@@ -87,8 +88,14 @@ export function CommandPalette({
               spellCheck={false}
             />
           </div>
-          <div className="palette-list" id="palette-list" role="listbox" ref={list} aria-label="Commands">
-            {results.length === 0 && <div className="palette-empty muted">No matching commands.</div>}
+          <div
+            className="palette-list"
+            id="palette-list"
+            role="listbox"
+            ref={list}
+            aria-label={t("app.palette.listLabel")}
+          >
+            {results.length === 0 && <div className="palette-empty muted">{t("app.palette.empty")}</div>}
             {results.map((c, i) => (
               <div key={c.id} role="presentation">
                 {grouped && c.group !== results[i - 1]?.group && <div className="palette-group">{c.group}</div>}

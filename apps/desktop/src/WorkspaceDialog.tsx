@@ -3,6 +3,7 @@ import { FolderPlus, X } from "lucide-react";
 import { useState } from "react";
 import { Modal } from "./Dialog.tsx";
 import { pickFolder } from "./HomeView.tsx";
+import { t } from "./i18n/index.ts";
 import type { WorkspaceDef } from "./settings.ts";
 import { folderName } from "./tabs.ts";
 import { ActionMenu } from "./ui/ActionMenu.tsx";
@@ -29,12 +30,12 @@ export function WorkspacesCard({
   return (
     <section className="card" aria-labelledby="home-workspaces">
       <div className="card-title">
-        <h2 id="home-workspaces">Workspaces</h2>
-        <span className="muted">Several folders in one session, e.g. an app and its API</span>
+        <h2 id="home-workspaces">{t("shell.workspacesCard.title")}</h2>
+        <span className="muted">{t("shell.workspacesCard.hint")}</span>
         <span className="grow" />
         <button type="button" className="secondary small" onClick={onNew}>
           <FolderPlus size={14} />
-          New workspace…
+          {t("shell.workspacesCard.new")}
         </button>
       </div>
       {workspaces.length > 0 && (
@@ -50,12 +51,12 @@ export function WorkspacesCard({
                 <span className="task-row-title">{w.name}</span>
                 <span className="muted">{[w.primary, ...w.folders].map(folderName).join(" · ")}</span>
               </button>
-              {selected?.id === w.id && <span className="chip on">Selected</span>}
+              {selected?.id === w.id && <span className="chip on">{t("shell.workspacesCard.selected")}</span>}
               <ActionMenu
-                label={`${w.name} actions`}
+                label={t("shell.workspacesCard.actions", { name: w.name })}
                 items={[
-                  { label: "Edit…", onSelect: () => onEdit(w) },
-                  { label: "Remove", onSelect: () => onDelete(w), danger: true },
+                  { label: t("shell.workspacesCard.edit"), onSelect: () => onEdit(w) },
+                  { label: t("shell.workspacesCard.remove"), onSelect: () => onDelete(w), danger: true },
                 ]}
               />
             </li>
@@ -96,13 +97,13 @@ export function WorkspaceDialog({
     <Modal
       open
       onOpenChange={(open) => !open && onClose()}
-      title={initial ? "Edit workspace" : "New workspace"}
-      description="A named set of folders, e.g. an app and its API: a session works across all of them."
+      title={initial ? t("shell.workspaceDialog.editTitle") : t("shell.workspaceDialog.newTitle")}
+      description={t("shell.workspaceDialog.description")}
       size="lg"
       actions={
         <>
           <button type="button" className="secondary" onClick={onClose}>
-            Cancel
+            {t("shell.dialog.cancel")}
           </button>
           <button
             type="button"
@@ -116,21 +117,27 @@ export function WorkspaceDialog({
               })
             }
           >
-            Save workspace
+            {t("shell.workspaceDialog.save")}
           </button>
         </>
       }
     >
-      <Field label="Name">
-        <input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Shop" />
+      <Field label={t("shell.workspaceDialog.name")}>
+        <input
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder={t("shell.workspaceDialog.namePlaceholder")}
+        />
       </Field>
       <div className="ws-folders">
-        <span className="field-label">Folders</span>
-        {folders.length === 0 && <p className="muted">Add the primary folder first: sessions start there.</p>}
+        <span className="field-label">{t("shell.workspaceDialog.folders")}</span>
+        {folders.length === 0 && <p className="muted">{t("shell.workspaceDialog.empty")}</p>}
         <ul>
           {folders.map((dir, i) => (
             <li key={dir}>
-              <span className={i === 0 ? "chip on" : "chip"}>{i === 0 ? "Primary" : "Also"}</span>
+              <span className={i === 0 ? "chip on" : "chip"}>
+                {i === 0 ? t("shell.workspaceDialog.primary") : t("shell.workspaceDialog.also")}
+              </span>
               <span className="ws-folder-name">{folderName(dir)}</span>
               <span className="muted ws-folder-path" title={dir}>
                 {dir}
@@ -138,7 +145,7 @@ export function WorkspaceDialog({
               <button
                 type="button"
                 className="ghost icon tiny"
-                aria-label={`Remove ${folderName(dir)}`}
+                aria-label={t("shell.workspaceDialog.removeFolder", { name: folderName(dir) })}
                 onClick={() => setFolders((all) => all.filter((_, j) => j !== i))}
               >
                 <X size={13} />
@@ -148,7 +155,7 @@ export function WorkspaceDialog({
         </ul>
         <button type="button" className="secondary small" onClick={() => void add()}>
           <FolderPlus size={14} />
-          {folders.length ? "Add a folder…" : "Choose the primary folder…"}
+          {folders.length ? t("shell.workspaceDialog.addFolder") : t("shell.workspaceDialog.choosePrimary")}
         </button>
       </div>
       {problems.length > 0 && (
@@ -158,11 +165,7 @@ export function WorkspaceDialog({
           ))}
         </ul>
       )}
-      <p className="field-help">
-        Claude can read and change every folder listed here, with the same approvals and guard as in one folder. Only
-        the primary folder's CLAUDE.md, project settings, hooks and skills apply: the CLI doesn't load them from the
-        others (checked on CLI 2.1.314).
-      </p>
+      <p className="field-help">{t("shell.workspaceDialog.help")}</p>
     </Modal>
   );
 }

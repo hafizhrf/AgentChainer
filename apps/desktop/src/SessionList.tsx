@@ -2,6 +2,9 @@ import type { SessionInfo } from "@agentchainer/protocol";
 import { invoke } from "@tauri-apps/api/core";
 import { useCallback, useEffect, useState } from "react";
 import type { Confirm } from "./Dialog.tsx";
+import { approxUsd, dateTime } from "./i18n/format.ts";
+import { t } from "./i18n/index.ts";
+import { Rich } from "./i18n/Rich.tsx";
 import { request } from "./sidecar.ts";
 import { ActionMenu } from "./ui/ActionMenu.tsx";
 
@@ -9,7 +12,7 @@ import { ActionMenu } from "./ui/ActionMenu.tsx";
 type SessionCost = { sessionId: string; totalCostUsd: number };
 type Summary = { todayUsd: number; last7Usd: number; last30Usd: number; uncountedTurns: number };
 
-const usd = (v: number) => `≈$${v.toFixed(v < 1 ? 4 : 2)}`;
+const usd = (v: number) => approxUsd(v, v < 1 ? 4 : 2);
 
 type Editing = { sessionId: string; field: "title" | "tag"; value: string };
 
@@ -86,7 +89,12 @@ export function SessionList({
     try {
       const { sessionId } = await request("session.fork", { cwd, sessionId: s.sessionId });
       await refresh();
-      onOpen({ ...s, sessionId, title: `${s.title} (fork)`, lastModified: Date.now() });
+      onOpen({
+        ...s,
+        sessionId,
+        title: t("shell.sessionList.forkTitle", { title: s.title }),
+        lastModified: Date.now(),
+      });
     } catch (err) {
       setError(String(err));
     }
@@ -94,14 +102,9 @@ export function SessionList({
 
   async function remove(s: SessionInfo) {
     const ok = await confirm({
-      title: "Delete this session?",
-      body: (
-        <p>
-          “{s.title}” and its transcript are deleted from Claude Code's session history. Files in the workspace aren't
-          touched. This can't be undone.
-        </p>
-      ),
-      confirmLabel: "Delete session",
+      title: t("shell.sessionList.deleteTitle"),
+      body: <p>{t("shell.sessionList.deleteBody", { title: s.title })}</p>,
+      confirmLabel: t("shell.sessionList.deleteConfirm"),
       danger: true,
     });
     if (ok) await run(() => request("session.delete", { cwd, sessionId: s.sessionId }));
@@ -111,13 +114,13 @@ export function SessionList({
   return (
     <section className="card session-list" aria-labelledby="previous-title">
       <div className="card-title">
-        <h2 id="previous-title">Previous sessions</h2>
+        <h2 id="previous-title">{t("shell.sessionList.title")}</h2>
       </div>
       {error && <p className="warn">{error}</p>}
       {sessions === null ? (
-        <p className="muted">Loading…</p>
+        <p className="muted">{t("shell.sessionList.loading")}</p>
       ) : sessions.length === 0 ? (
-        <p className="muted">No sessions in this folder yet. Sessions started in the terminal show up here too.</p>
+        <p className="muted">{t("shell.sessionList.empty")}</p>
       ) : (
         <ul>
           {sessions.map((s) => {
@@ -132,8 +135,10 @@ export function SessionList({
                         // biome-ignore lint/a11y/noAutofocus: the field appears because the user just asked to edit it.
                         autoFocus
                         value={edit.value}
-                        aria-label={edit.field === "title" ? "Session title" : "Session tag"}
-                        placeholder={edit.field === "tag" ? "Tag (empty to clear)" : ""}
+                        aria-label={
+                          edit.field === "title" ? t("shell.sessionList.titleLabel") : t("shell.sessionList.tagLabel")
+                        }
+                        placeholder={edit.field === "tag" ? t("shell.sessionList.tagPlaceholder") : ""}
                         onChange={(e) => setEditing({ ...edit, value: e.target.value })}
                         onKeyDown={(e) => {
                           if (e.key === "Enter") void saveEdit(edit);
@@ -147,32 +152,32 @@ export function SessionList({
                       </span>
                     )}
                     {s.tag && <span className="badge">{s.tag}</span>}
-                    {open && <span className="badge">open</span>}
+                    {open && <span className="badge">{t("shell.sessionList.open")}</span>}
                   </div>
                   <span className="session-meta">
-                    {new Date(s.lastModified).toLocaleString()}
+                    {dateTime(s.lastModified)}
                     {s.gitBranch ? ` · ${s.gitBranch}` : ""}
                     {costs.has(s.sessionId) ? ` · ${usd(costs.get(s.sessionId) ?? 0)}` : ""}
                   </span>
                 </div>
                 <div className="session-actions">
                   <button type="button" className="secondary small" onClick={() => onOpen(s)}>
-                    {open ? "Show" : "Resume"}
+                    {open ? t("shell.sessionList.show") : t("shell.sessionList.resume")}
                   </button>
                   <ActionMenu
-                    label={`Actions for ${s.title}`}
+                    label={t("shell.sessionList.actions", { title: s.title })}
                     items={[
-                      { label: "Fork", onSelect: () => void fork(s) },
+                      { label: t("shell.sessionList.fork"), onSelect: () => void fork(s) },
                       {
-                        label: "Rename",
+                        label: t("shell.sessionList.rename"),
                         onSelect: () => setEditing({ sessionId: s.sessionId, field: "title", value: s.title }),
                       },
                       {
-                        label: "Tag",
+                        label: t("shell.sessionList.tag"),
                         onSelect: () => setEditing({ sessionId: s.sessionId, field: "tag", value: s.tag ?? "" }),
                       },
                       {
-                        label: open ? "Delete (close it first)" : "Delete",
+                        label: open ? t("shell.sessionList.deleteOpen") : t("shell.sessionList.delete"),
                         danger: true,
                         disabled: open,
                         onSelect: () => void remove(s),
@@ -187,17 +192,29 @@ export function SessionList({
       )}
       {summary && summary.last30Usd + summary.uncountedTurns > 0 && (
         <p className="muted small-print">
-          Spent in this folder (estimates, sessions run in AgentChainer): today {usd(summary.todayUsd)} · 7 days{" "}
-          {usd(summary.last7Usd)} · 30 days {usd(summary.last30Usd)}
-          {summary.uncountedTurns > 0 &&
-            ` · ${summary.uncountedTurns} turn(s) of sessions started elsewhere aren't counted`}
+          {t("shell.sessionList.spent", {
+            today: usd(summary.todayUsd),
+            week: usd(summary.last7Usd),
+            month: usd(summary.last30Usd),
+          })}
+          {summary.uncountedTurns > 0 && ` · ${t("shell.sessionList.uncounted", { n: summary.uncountedTurns })}`}
         </p>
       )}
       {retention && (
         <p className="muted small-print">
-          Claude Code deletes sessions after {retention.days} days without activity (
-          {retention.source === "default" ? "default" : `set in your ${retention.source} settings`}). To keep them
-          longer, raise <code>cleanupPeriodDays</code> in <code>~/.claude/settings.json</code>.
+          <Rich
+            k="shell.sessionList.retention"
+            params={{
+              days: retention.days,
+              source:
+                retention.source === "default"
+                  ? t("shell.sessionList.retentionDefault")
+                  : t("shell.sessionList.retentionSetIn", { source: retention.source }),
+              setting: "cleanupPeriodDays",
+              file: "~/.claude/settings.json",
+            }}
+            tags={{ code: (s) => <code>{s}</code> }}
+          />
         </p>
       )}
     </section>

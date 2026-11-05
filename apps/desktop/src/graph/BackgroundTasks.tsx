@@ -1,12 +1,21 @@
 import { Bot, Loader2, Square, SquareTerminal } from "lucide-react";
 import { useState } from "react";
+import { t } from "../i18n/index.ts";
 import type { BackgroundTask } from "../tabs.ts";
 
-const KIND_LABEL: Record<string, string> = {
-  local_agent: "Subagent",
-  local_bash: "Shell",
-  monitor: "Monitor",
-};
+/** A background task's kind in words; one the app doesn't know yet shows as the SDK names it. */
+function kindLabel(kind: string): string {
+  switch (kind) {
+    case "local_agent":
+      return t("graph.backgroundTasks.subagent");
+    case "local_bash":
+      return t("graph.backgroundTasks.shell");
+    case "monitor":
+      return t("graph.backgroundTasks.monitor");
+    default:
+      return kind;
+  }
+}
 
 /**
  * The session's background tasks (M4-07), above the composer: subagents and shells that outlive the turn. Each one can
@@ -42,33 +51,33 @@ export function BackgroundTasks({
   }
 
   return (
-    <section className="background-tasks" aria-label="Background tasks">
+    <section className="background-tasks" aria-label={t("graph.backgroundTasks.label")}>
       <header>
         <Loader2 size={13} className="spin" aria-hidden />
-        {tasks.length === 1 ? "1 task in the background" : `${tasks.length} tasks in the background`}
+        {t("graph.backgroundTasks.count", { count: tasks.length })}
       </header>
       <ul>
-        {tasks.map((t) => (
-          <li key={t.taskId}>
-            {t.kind === "local_agent" ? <Bot size={13} aria-hidden /> : <SquareTerminal size={13} aria-hidden />}
-            <span className="muted">{KIND_LABEL[t.kind] ?? t.kind}</span>
-            {t.kind === "local_agent" ? (
-              <button type="button" className="link background-name" onClick={() => onOpen(t.taskId)}>
-                {t.description}
+        {tasks.map((task) => (
+          <li key={task.taskId}>
+            {task.kind === "local_agent" ? <Bot size={13} aria-hidden /> : <SquareTerminal size={13} aria-hidden />}
+            <span className="muted">{kindLabel(task.kind)}</span>
+            {task.kind === "local_agent" ? (
+              <button type="button" className="link background-name" onClick={() => onOpen(task.taskId)}>
+                {task.description}
               </button>
             ) : (
-              <span className="background-name" title={t.description}>
-                {t.description}
+              <span className="background-name" title={task.description}>
+                {task.description}
               </span>
             )}
             <button
               type="button"
               className="secondary small"
-              disabled={stopping.has(t.taskId)}
-              onClick={() => void stop(t.taskId)}
+              disabled={stopping.has(task.taskId)}
+              onClick={() => void stop(task.taskId)}
             >
               <Square size={12} />
-              {stopping.has(t.taskId) ? "Stopping…" : "Stop"}
+              {stopping.has(task.taskId) ? t("graph.backgroundTasks.stopping") : t("graph.backgroundTasks.stop")}
             </button>
           </li>
         ))}

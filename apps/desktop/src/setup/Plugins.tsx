@@ -4,6 +4,9 @@ import { openUrl } from "@tauri-apps/plugin-opener";
 import { ExternalLink, Loader2, RefreshCw } from "lucide-react";
 import { type ReactNode, useCallback, useEffect, useMemo, useState } from "react";
 import { type Confirm, Modal } from "../Dialog.tsx";
+import { count, timeOfDay } from "../i18n/format.ts";
+import { t } from "../i18n/index.ts";
+import { Rich } from "../i18n/Rich.tsx";
 import { request } from "../sidecar.ts";
 import { CopyButton } from "../ui/CopyButton.tsx";
 import { IconButton } from "../ui/IconButton.tsx";
@@ -106,15 +109,15 @@ export function Plugins({
   async function uninstall(i: InstalledPlugin) {
     const scope = i.scope as Scope;
     const ok = await confirm({
-      title: `Uninstall ${i.id}?`,
-      body: `Claude Code removes it from this workspace's ${scope === "local" ? "local" : "shared"} settings. Its History entry shows it as rolled back.`,
-      confirmLabel: "Uninstall",
+      title: t("setup.plugins.uninstallTitle", { id: i.id }),
+      body: scope === "local" ? t("setup.plugins.uninstallBodyLocal") : t("setup.plugins.uninstallBodyShared"),
+      confirmLabel: t("setup.plugins.uninstall"),
       danger: true,
     });
     if (!ok) return;
     await change(async () => {
       await request("plugins.uninstall", { cwd, id: i.id, scope });
-      return `Uninstalled ${i.id}.`;
+      return t("setup.plugins.uninstalled", { id: i.id });
     });
   }
 
@@ -122,10 +125,10 @@ export function Plugins({
   return (
     <Tabs.Root className="plugins" value={tab} onValueChange={(v) => setTab(v as Tab)}>
       <div className="plugins-bar">
-        <Tabs.List className="plugins-tabs" aria-label="Plugins">
-          <Tabs.Trigger value="marketplace">Marketplace</Tabs.Trigger>
+        <Tabs.List className="plugins-tabs" aria-label={t("setup.plugins.tabs")}>
+          <Tabs.Trigger value="marketplace">{t("setup.plugins.marketplace")}</Tabs.Trigger>
           <Tabs.Trigger value="installed">
-            Installed
+            {t("setup.plugins.installed")}
             {data && <span className="count">{data.installed.length}</span>}
           </Tabs.Trigger>
         </Tabs.List>
@@ -134,8 +137,8 @@ export function Plugins({
             <input
               type="search"
               className="plugins-search"
-              aria-label="Search plugins"
-              placeholder={total ? `Search ${total.toLocaleString()} plugins` : "Search plugins"}
+              aria-label={t("setup.plugins.search")}
+              placeholder={total ? t("setup.plugins.searchCount", { n: count(total) }) : t("setup.plugins.search")}
               value={query}
               onChange={(e) => {
                 setQuery(e.target.value);
@@ -144,17 +147,17 @@ export function Plugins({
             />
             <label className="check">
               <input type="checkbox" checked={reviewedOnly} onChange={(e) => setReviewedOnly(e.target.checked)} />
-              Reviewed only
+              {t("setup.plugins.reviewedOnly")}
             </label>
           </>
         )}
         <span className="grow" />
         {data && (
-          <span className="muted plugins-fetched" title="When the CLI last listed the marketplaces">
-            Listed {new Date(data.fetchedAt).toLocaleTimeString()}
+          <span className="muted plugins-fetched" title={t("setup.plugins.listedTitle")}>
+            {t("setup.plugins.listed", { time: timeOfDay(data.fetchedAt) })}
           </span>
         )}
-        <IconButton label="Refresh: the CLI updates its marketplaces" onClick={() => void load(true)}>
+        <IconButton label={t("setup.plugins.refresh")} onClick={() => void load(true)}>
           {loading ? <Loader2 size={15} className="spin" /> : <RefreshCw size={15} />}
         </IconButton>
       </div>
@@ -171,7 +174,7 @@ export function Plugins({
             ))}
           </div>
           <button type="button" className="ghost small" onClick={() => setNotice(null)}>
-            Dismiss
+            {t("setup.plugins.dismiss")}
           </button>
         </div>
       )}
@@ -179,7 +182,7 @@ export function Plugins({
       {!data &&
         (["marketplace", "installed"] as const).map((v) => (
           <Tabs.Content key={v} value={v}>
-            {loading && <p className="muted setup-pad">Asking your Claude CLI for its marketplaces…</p>}
+            {loading && <p className="muted setup-pad">{t("setup.plugins.asking")}</p>}
           </Tabs.Content>
         ))}
 
@@ -188,7 +191,7 @@ export function Plugins({
           <div className="plan-list">
             <Tabs.Content value="marketplace">
               {matches.length === 0 ? (
-                <EmptyState>No plugin matches.</EmptyState>
+                <EmptyState>{t("setup.plugins.noMatches")}</EmptyState>
               ) : (
                 <ul className="plugin-rows">
                   {matches.slice(0, shown).map((p) => (
@@ -204,20 +207,20 @@ export function Plugins({
               )}
               {matches.length > shown && (
                 <button type="button" className="ghost small plugins-more" onClick={() => setShown((n) => n + PAGE)}>
-                  Show more ({(matches.length - shown).toLocaleString()} left)
+                  {t("setup.plugins.showMore", { n: count(matches.length - shown) })}
                 </button>
               )}
             </Tabs.Content>
             <Tabs.Content value="installed">
-              {rows.length === 0 && (
-                <EmptyState>No plugins installed for this workspace or for all your projects.</EmptyState>
-              )}
+              {rows.length === 0 && <EmptyState>{t("setup.plugins.noneInstalled")}</EmptyState>}
               {[true, false].map((here) => {
                 const group = rows.filter((r) => r.installed.here === here);
                 if (!group.length) return null;
                 return (
                   <section key={String(here)} className="plugin-group">
-                    <h4 className="muted">{here ? "This workspace" : "All your projects"}</h4>
+                    <h4 className="muted">
+                      {here ? t("setup.plugins.thisWorkspace") : t("setup.plugins.allYourProjects")}
+                    </h4>
                     <ul className="plugin-rows">
                       {group.map((r) => (
                         <PluginRow
@@ -236,7 +239,7 @@ export function Plugins({
             </Tabs.Content>
           </div>
           {/* biome-ignore lint/a11y/noNoninteractiveTabindex: focusable, so the keyboard can scroll it (PlanView). */}
-          <section className="plan-detail" aria-label="Details" tabIndex={0}>
+          <section className="plan-detail" aria-label={t("setup.plugins.details")} tabIndex={0}>
             {selected ? (
               <PluginDetails
                 cwd={cwd}
@@ -255,7 +258,9 @@ export function Plugins({
                       scope: installed.scope as Scope,
                       enabled: !installed.enabled,
                     });
-                    return `Turned ${installed.id} ${installed.enabled ? "off" : "on"} in this workspace.`;
+                    return installed.enabled
+                      ? t("setup.plugins.turnedOff", { id: installed.id })
+                      : t("setup.plugins.turnedOn", { id: installed.id });
                   })
                 }
                 onUpdate={() =>
@@ -264,7 +269,10 @@ export function Plugins({
                     const r = await updateWithConfirm(cwd, installed, confirm);
                     if (!r) return null;
                     setNotice({
-                      text: `Updated ${installed.id} to ${r.version ?? "the listed version"}.`,
+                      text: t("setup.plugins.updated", {
+                        id: installed.id,
+                        version: r.version ?? t("setup.plugins.theListedVersion"),
+                      }),
                       warnings: r.warnings,
                     });
                     return null;
@@ -273,9 +281,7 @@ export function Plugins({
               />
             ) : (
               <EmptyState>
-                {tab === "marketplace"
-                  ? "Pick a plugin to see what it is, who publishes it, and whether AgentChainer reviewed it."
-                  : "Pick an installed plugin to update, turn off or uninstall it."}
+                {tab === "marketplace" ? t("setup.plugins.pickMarketplace") : t("setup.plugins.pickInstalled")}
               </EmptyState>
             )}
           </section>
@@ -290,7 +296,9 @@ export function Plugins({
           onInstalled={(r) => {
             setInstalling(null);
             setNotice({
-              text: `Installed ${installing.id}${r.version ? ` ${r.version}` : ""}. It's in History.`,
+              text: r.version
+                ? t("setup.plugins.installedVersion", { id: installing.id, version: r.version })
+                : t("setup.plugins.installedNotice", { id: installing.id }),
               warnings: r.warnings,
             });
             onChanged();
@@ -312,9 +320,9 @@ async function updateWithConfirm(
   const first = await request("plugins.update", { cwd, id: i.id, scope });
   if (first.status === "done") return first;
   const ok = await confirm({
-    title: "Run the marketplace's command?",
+    title: t("setup.plugins.runCommandTitle"),
     body: <DeclaredCommand command={first.command} />,
-    confirmLabel: "Run it and update",
+    confirmLabel: t("setup.plugins.runAndUpdate"),
     danger: true,
   });
   if (!ok) return null;
@@ -341,13 +349,17 @@ function PluginRow({
       <button type="button" className="plan-row-main" aria-current={focused} onClick={onFocus}>
         <span className="plan-title">{p?.name ?? id}</span>
         <span className="plan-meta">
-          {installed && !p ? `${installed.scope} scope` : oneLiner(p?.description ?? p?.review?.summary)}
+          {installed && !p
+            ? t("setup.plugins.scope", { scope: installed.scope })
+            : oneLiner(p?.description ?? p?.review?.summary)}
         </span>
       </button>
       <span className="plugin-badges">
-        {installed?.update && <span className="badge tone-busy">Update</span>}
-        {installed && !installed.enabled && <span className="badge">Off</span>}
-        {installed && !installed.update && installed.enabled && <span className="badge">Installed</span>}
+        {installed?.update && <span className="badge tone-busy">{t("setup.plugins.badgeUpdate")}</span>}
+        {installed && !installed.enabled && <span className="badge">{t("setup.plugins.badgeOff")}</span>}
+        {installed && !installed.update && installed.enabled && (
+          <span className="badge">{t("setup.plugins.installed")}</span>
+        )}
         <span className={`badge tone-${badge.tone}`} title={badge.title}>
           {badge.label}
         </span>
@@ -400,8 +412,8 @@ function PluginDetails({
   const inv = details?.inventory;
   const runsCode = inv
     ? [
-        inv.hooks.length ? plural(inv.hooks.length, "hook") : null,
-        inv.mcpServers.length ? plural(inv.mcpServers.length, "MCP server") : null,
+        inv.hooks.length ? t("setup.plugins.hooks", { count: inv.hooks.length }) : null,
+        inv.mcpServers.length ? t("setup.plugins.mcpServers", { count: inv.mcpServers.length }) : null,
       ].filter(Boolean)
     : [];
   return (
@@ -412,86 +424,93 @@ function PluginDetails({
           {badge.label}
         </span>
         {r?.approved && <RiskPill risk={r.risk} />}
-        {i && !i.enabled && <span className="badge">Off in this workspace</span>}
+        {i && !i.enabled && <span className="badge">{t("setup.plugins.offHere")}</span>}
       </div>
       {(p?.description || r?.summary) && <p>{p?.description ?? r?.summary}</p>}
 
       {!r?.approved && (
         <p className="callout">
-          {r
-            ? `In the AgentChainer catalog, but still waiting for its reviews (${r.reviews.length} so far).`
-            : "Not reviewed by AgentChainer."}{" "}
-          A plugin runs inside your Claude sessions in this workspace: its skills, hooks and MCP servers can run
-          commands with your permissions.{i ? "" : " Look at its source before you install it."}
+          {[
+            r ? t("setup.plugins.stillWaiting", { n: r.reviews.length }) : t("setup.plugins.notReviewedSentence"),
+            t("setup.plugins.runsInside"),
+            i ? null : t("setup.plugins.lookAtSource"),
+          ]
+            .filter(Boolean)
+            .join(" ")}
         </p>
       )}
       {i?.update && (
         <p className="callout tone-busy">
-          Version {i.update.to} is listed (you have {i.version ?? "an older one"}).
-          {i.update.reviewed === false && " It's newer than the version AgentChainer reviewed."}
+          {t("setup.plugins.versionListed", { to: i.update.to, have: i.version ?? t("setup.plugins.anOlderOne") })}
+          {i.update.reviewed === false && ` ${t("setup.plugins.newerThanReviewed")}`}
         </p>
       )}
 
       <dl className="action-facts">
-        <dt>Plugin</dt>
+        <dt>{t("setup.plugins.factPlugin")}</dt>
         <dd>
           <code>{id}</code>
         </dd>
         {vendor && (
           <>
-            <dt>Published by</dt>
+            <dt>{t("setup.plugins.factPublishedBy")}</dt>
             <dd>{vendor}</dd>
           </>
         )}
-        <dt>Version</dt>
+        <dt>{t("setup.plugins.factVersion")}</dt>
         <dd>
           {[
-            i?.version && `${i.version} installed (${i.scope} scope)`,
-            p?.version && `${p.version} listed`,
-            r?.reviewedVersion && `${r.reviewedVersion} reviewed`,
+            i?.version && t("setup.plugins.versionInstalled", { version: i.version, scope: i.scope }),
+            p?.version && t("setup.plugins.versionListedShort", { version: p.version }),
+            r?.reviewedVersion && t("setup.plugins.versionReviewed", { version: r.reviewedVersion }),
           ]
             .filter(Boolean)
-            .join(" · ") || "Not given"}
+            .join(" · ") || t("setup.plugins.notGiven")}
         </dd>
         {p && (
           <>
-            <dt>Marketplace</dt>
+            <dt>{t("setup.plugins.marketplace")}</dt>
             <dd>
-              {p.marketplace} <span className="muted">· {p.official ? "Anthropic" : "added by you"}</span>
+              {p.marketplace}{" "}
+              <span className="muted">
+                · {p.official ? t("setup.plugins.anthropic") : t("setup.plugins.addedByYou")}
+              </span>
             </dd>
           </>
         )}
         {link && (
           <>
-            <dt>Source</dt>
+            <dt>{t("setup.plugins.factSource")}</dt>
             <dd>
               <WebLink href={link}>
                 {link.replace(/^https:\/\//, "")} <ExternalLink size={12} />
               </WebLink>
-              {!p?.source.sha && <span className="muted"> · not pinned to a commit</span>}
+              {!p?.source.sha && <span className="muted"> · {t("setup.plugins.notPinned")}</span>}
             </dd>
           </>
         )}
         {p?.installCount !== undefined && (
           <>
-            <dt>Installs</dt>
-            <dd>{p.installCount.toLocaleString()}</dd>
+            <dt>{t("setup.plugins.factInstalls")}</dt>
+            <dd>{count(p.installCount)}</dd>
           </>
         )}
-        <dt>License</dt>
-        <dd>{r ? r.license : <span className="muted">Not checked: see the source</span>}</dd>
+        <dt>{t("setup.plugins.factLicense")}</dt>
+        <dd>{r ? r.license : <span className="muted">{t("setup.plugins.licenseNotChecked")}</span>}</dd>
         {r && (
           <>
-            <dt>Review</dt>
+            <dt>{t("setup.plugins.factReview")}</dt>
             <dd>
               {r.tier} ·{" "}
-              {r.reviews.length ? r.reviews.map((rv) => `${rv.by}, ${rv.date}`).join("; ") : "no reviews yet"}
+              {r.reviews.length
+                ? r.reviews.map((rv) => `${rv.by}, ${rv.date}`).join("; ")
+                : t("setup.plugins.noReviewsYet")}
             </dd>
           </>
         )}
         {r && r.permissions.length > 0 && (
           <>
-            <dt>What it can do</dt>
+            <dt>{t("setup.plugins.factPermissions")}</dt>
             <dd>
               <ul className="plain-list">
                 {r.permissions.map((x) => (
@@ -505,41 +524,47 @@ function PluginDetails({
 
       {i && (
         <section className="plugin-inventory">
-          <h4>What it brings</h4>
+          <h4>{t("setup.plugins.whatItBrings")}</h4>
           {detailsError && <p className="warn">{detailsError}</p>}
-          {!details && !detailsError && <p className="muted">Asking the CLI…</p>}
+          {!details && !detailsError && <p className="muted">{t("setup.plugins.askingCli")}</p>}
           {inv && (
             <p className="plugin-counts">
-              {(
-                [
-                  ["skill", inv.skills],
-                  ["agent", inv.agents],
-                  ["hook", inv.hooks],
-                  ["MCP server", inv.mcpServers],
-                  ["LSP server", inv.lspServers],
-                ] as const
-              ).map(([noun, names]) => (
-                <span key={noun} className="chip" title={names.join(", ")}>
-                  {plural(names.length, noun)}
+              {[
+                { kind: "skill", names: inv.skills, text: t("setup.plugins.skills", { count: inv.skills.length }) },
+                { kind: "agent", names: inv.agents, text: t("setup.plugins.agents", { count: inv.agents.length }) },
+                { kind: "hook", names: inv.hooks, text: t("setup.plugins.hooks", { count: inv.hooks.length }) },
+                {
+                  kind: "mcp",
+                  names: inv.mcpServers,
+                  text: t("setup.plugins.mcpServers", { count: inv.mcpServers.length }),
+                },
+                {
+                  kind: "lsp",
+                  names: inv.lspServers,
+                  text: t("setup.plugins.lspServers", { count: inv.lspServers.length }),
+                },
+              ].map(({ kind, names, text }) => (
+                <span key={kind} className="chip" title={names.join(", ")}>
+                  {text}
                 </span>
               ))}
               {details?.alwaysOnTokens !== undefined && (
-                <span className="muted">~{details.alwaysOnTokens.toLocaleString()} tokens in every session</span>
+                <span className="muted">{t("setup.plugins.alwaysOnTokens", { n: count(details.alwaysOnTokens) })}</span>
               )}
             </p>
           )}
-          {runsCode.length > 0 && <p className="callout">Runs code on your machine: {runsCode.join(", ")}.</p>}
+          {runsCode.length > 0 && (
+            <p className="callout">{t("setup.plugins.runsCode", { list: runsCode.join(", ") })}</p>
+          )}
           {details && (
             <details>
-              <summary className="muted">The CLI's details</summary>
+              <summary className="muted">{t("setup.plugins.cliDetails")}</summary>
               <pre className="plugin-raw">{details.text}</pre>
             </details>
           )}
-          <p className="field-help">
-            Settings, if it has any, are set in a terminal, so they never pass through AgentChainer:
-          </p>
+          <p className="field-help">{t("setup.plugins.settingsInTerminal")}</p>
           <p className="plugin-command">
-            <code>claude plugin configure {id}</code> <CopyButton text={`claude plugin configure ${id}`} />
+            <code>{`claude plugin configure ${id}`}</code> <CopyButton text={`claude plugin configure ${id}`} />
           </p>
         </section>
       )}
@@ -547,30 +572,31 @@ function PluginDetails({
       <div className="plugin-actions">
         {!i && p && (
           <button type="button" className="primary small" disabled={busy} onClick={onInstall}>
-            Install…
+            {t("setup.plugins.installEllipsis")}
           </button>
         )}
         {i?.here && (
           <>
             {i.update && (
               <button type="button" className="primary small" disabled={busy} onClick={onUpdate}>
-                Update to {i.update.to}
+                {t("setup.plugins.updateTo", { version: i.update.to })}
               </button>
             )}
             <button type="button" className="secondary small" disabled={busy} onClick={onToggle}>
-              {i.enabled ? "Turn off" : "Turn on"}
+              {i.enabled ? t("setup.plugins.turnOff") : t("setup.plugins.turnOn")}
             </button>
             <button type="button" className="secondary small danger" disabled={busy} onClick={onUninstall}>
-              Uninstall
+              {t("setup.plugins.uninstall")}
             </button>
           </>
         )}
         {i && !i.here && (
           <p className="field-help">
-            Installed for all your projects ({i.scope} scope). Manage it in a terminal:{" "}
-            <code>
-              claude plugin uninstall {id} --scope {i.scope}
-            </code>
+            <Rich
+              k="setup.plugins.manageInTerminal"
+              params={{ scope: i.scope, command: `claude plugin uninstall ${id} --scope ${i.scope}` }}
+              tags={{ code: (s) => <code>{s}</code> }}
+            />
           </p>
         )}
         {busy && <Loader2 size={14} className="spin" />}
@@ -594,12 +620,10 @@ function WebLink({ href, children }: { href: string; children: ReactNode }) {
   );
 }
 
-const plural = (n: number, noun: string) => `${n} ${noun}${n === 1 ? "" : "s"}`;
-
 function DeclaredCommand({ command }: { command: string }) {
   return (
     <>
-      <p>The marketplace declares a command that runs while the plugin is fetched. Run it only if you trust it:</p>
+      <p>{t("setup.plugins.declaredCommand")}</p>
       <pre className="plugin-raw">{command}</pre>
     </>
   );
@@ -650,12 +674,12 @@ function InstallDialog({
     <Modal
       open
       onOpenChange={(open) => !open && !working && onClose()}
-      title={`Install ${p.name}`}
-      description="Claude Code installs it from its marketplace. It's recorded in History, where Roll back removes it."
+      title={t("setup.plugins.installTitle", { name: p.name })}
+      description={t("setup.plugins.installDescription")}
       actions={
         <>
           <button type="button" className="secondary" disabled={working} onClick={onClose}>
-            Cancel
+            {t("setup.plugins.cancel")}
           </button>
           <button
             type="button"
@@ -664,7 +688,11 @@ function InstallDialog({
             onClick={() => void install()}
           >
             {working && <Loader2 size={14} className="spin" />}
-            {pending ? "Run it and install" : reviewed ? "Install" : "Install unreviewed plugin"}
+            {pending
+              ? t("setup.plugins.runAndInstall")
+              : reviewed
+                ? t("setup.plugins.install")
+                : t("setup.plugins.installUnreviewed")}
           </button>
         </>
       }
@@ -676,45 +704,56 @@ function InstallDialog({
           {!reviewed && (
             <div className="callout">
               <p>
-                <strong>AgentChainer hasn't reviewed this plugin.</strong> It will run inside your Claude sessions in
-                this workspace, and its hooks and MCP servers can run commands with your permissions.
+                <Rich k="setup.plugins.unreviewedWarning" tags={{ strong: (s) => <strong>{s}</strong> }} />
               </p>
               <p>
-                Source, as {p.marketplace} lists it:{" "}
+                {t("setup.plugins.sourceAsListed", { marketplace: p.marketplace })}{" "}
                 {link ? (
                   <WebLink href={link}>{link.replace(/^https:\/\//, "")}</WebLink>
                 ) : (
-                  <span className="muted">not given</span>
+                  <span className="muted">{t("setup.plugins.sourceNotGiven")}</span>
                 )}
                 {p.source.sha ? (
                   <>
                     {" "}
-                    at <code>{p.source.sha.slice(0, 12)}</code>
+                    <Rich
+                      k="setup.plugins.atCommit"
+                      params={{ sha: p.source.sha.slice(0, 12) }}
+                      tags={{ code: (s) => <code>{s}</code> }}
+                    />
                   </>
                 ) : (
-                  <span className="muted"> (not pinned to a commit)</span>
+                  <span className="muted"> {t("setup.plugins.notPinnedParen")}</span>
                 )}
                 .
               </p>
             </div>
           )}
           <fieldset className="plugin-scope">
-            <legend className="field-label">Install for</legend>
+            <legend className="field-label">{t("setup.plugins.installFor")}</legend>
             <label className="check">
               <input type="radio" name="scope" checked={scope === "local"} onChange={() => setScope("local")} />
               <span>
-                Just me{" "}
+                {t("setup.plugins.justMe")}{" "}
                 <span className="muted">
-                  (local scope: <code>.claude/settings.local.json</code>, not committed)
+                  <Rich
+                    k="setup.plugins.localScopeNote"
+                    params={{ file: ".claude/settings.local.json" }}
+                    tags={{ code: (s) => <code>{s}</code> }}
+                  />
                 </span>
               </span>
             </label>
             <label className="check">
               <input type="radio" name="scope" checked={scope === "project"} onChange={() => setScope("project")} />
               <span>
-                The team{" "}
+                {t("setup.plugins.theTeam")}{" "}
                 <span className="muted">
-                  (project scope: <code>.claude/settings.json</code>, committed with the repository)
+                  <Rich
+                    k="setup.plugins.projectScopeNote"
+                    params={{ file: ".claude/settings.json" }}
+                    tags={{ code: (s) => <code>{s}</code> }}
+                  />
                 </span>
               </span>
             </label>

@@ -20,7 +20,7 @@ test("the shortcuts the UI shows are the menu's accelerators", () => {
   const rust = readFileSync(new URL("../src-tauri/src/menu.rs", import.meta.url), "utf8");
   const NAMED: Record<string, string> = { Comma: ",", Backslash: "\\" };
   const accelerators = Object.fromEntries(
-    [...rust.matchAll(/item\(\s*app,\s*"([\w-]+)",\s*"[^"]*",\s*Some\("CmdOrCtrl\+((?:Shift\+)?)(\w+)"\)/g)].map(
+    [...rust.matchAll(/item\(\s*app,\s*"([\w-]+)",\s*Some\("CmdOrCtrl\+((?:Shift\+)?)(\w+)"\)/g)].map(
       ([, id = "", shift, key = ""]) => [id, { key: NAMED[key] ?? key, ...(shift ? { shift: true } : {}) }],
     ),
   );

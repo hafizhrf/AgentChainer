@@ -1,6 +1,7 @@
 import type { ModelOption } from "@agentchainer/protocol";
 import { EFFORTS, type Effort, PERMISSION_MODES, type PermissionMode, type SlashCommand } from "@agentchainer/protocol";
 import { fuzzyFilter } from "./fuzzy.ts";
+import { t } from "./i18n/index.ts";
 import { knownModels, MODE_NAMES } from "./options.ts";
 import type { Item } from "./transcript.ts";
 
@@ -11,24 +12,67 @@ import type { Item } from "./transcript.ts";
 
 export type AppCommand = "clear" | "model" | "mode" | "effort" | "usage" | "fork" | "task" | "help";
 
+// The descriptions are getters: they're read in the UI's language when a menu shows them, not at load (X-13).
 export const APP_COMMANDS: (SlashCommand & { name: AppCommand })[] = [
-  { name: "clear", description: "Start a new chat in this folder", argumentHint: "" },
-  { name: "model", description: "Pick the model", argumentHint: "" },
-  { name: "mode", description: "Pick the permission mode (also Shift+Tab)", argumentHint: "" },
-  { name: "effort", description: "Pick the reasoning effort", argumentHint: "" },
+  {
+    name: "clear",
+    get description() {
+      return t("session.commands.clear");
+    },
+    argumentHint: "",
+  },
+  {
+    name: "model",
+    get description() {
+      return t("session.commands.model");
+    },
+    argumentHint: "",
+  },
+  {
+    name: "mode",
+    get description() {
+      return t("session.commands.mode");
+    },
+    argumentHint: "",
+  },
+  {
+    name: "effort",
+    get description() {
+      return t("session.commands.effort");
+    },
+    argumentHint: "",
+  },
   {
     name: "usage",
-    description: "This chat's spend, tokens and context window",
+    get description() {
+      return t("session.commands.usage");
+    },
     argumentHint: "",
     aliases: ["cost", "stats", "context"],
   },
-  { name: "fork", description: "Fork this chat into a new tab", argumentHint: "" },
+  {
+    name: "fork",
+    get description() {
+      return t("session.commands.fork");
+    },
+    argumentHint: "",
+  },
   {
     name: "task",
-    description: "Make a task from this chat: Claude drafts a contract first",
-    argumentHint: "<what to do>",
+    get description() {
+      return t("session.commands.task");
+    },
+    get argumentHint() {
+      return t("session.commands.taskArgument");
+    },
   },
-  { name: "help", description: "List the app's commands", argumentHint: "" },
+  {
+    name: "help",
+    get description() {
+      return t("session.commands.help");
+    },
+    argumentHint: "",
+  },
 ];
 
 /** A command in the `/` menu: the app's or the session's, with what `/` + `name` inserts. */
@@ -75,15 +119,27 @@ export function parseAppCommand(text: string): { name: AppCommand; arg: string }
 /** Commands that open a picker or a panel above the composer when typed without an argument. */
 export const POPUP_COMMANDS = new Set<AppCommand>(["model", "mode", "effort", "usage", "help"]);
 
-/** The mode a name or id means: "plan", "Plan first", "acceptEdits" and "standard" all work. */
+/**
+ * The English names `/mode` takes in any UI language (what's typed after a command stays English, like the command):
+ * the profiles' English names, "Plan first" without its "first".
+ */
+const MODE_WORDS: Record<PermissionMode, string> = {
+  default: "safe",
+  acceptEdits: "standard",
+  auto: "autonomous",
+  plan: "plan",
+};
+
+/** The mode a name or id means: "plan", "Plan first", "acceptEdits" and "standard" all work, as does its shown name. */
 export function modeFromArg(arg: string): PermissionMode | null {
-  const a = arg
-    .trim()
-    .toLowerCase()
-    .replace(/\s+first$/, "");
+  const word = (s: string) =>
+    s
+      .trim()
+      .toLowerCase()
+      .replace(/\s+first$/, "");
+  const a = word(arg);
   return (
-    PERMISSION_MODES.find((m) => m.toLowerCase() === a || MODE_NAMES[m].toLowerCase().replace(/\s+first$/, "") === a) ??
-    null
+    PERMISSION_MODES.find((m) => m.toLowerCase() === a || MODE_WORDS[m] === a || word(MODE_NAMES[m]) === a) ?? null
   );
 }
 
@@ -147,6 +203,7 @@ export function mention(cwd: string, path: string): string {
  * lines, at most `max` characters.
  */
 export function chatContext(items: Item[], max = 12_000): string {
+  // Sent to Claude: stays English (X-13).
   const lines: string[] = [];
   for (const i of items) {
     if (i.kind === "user" && i.text.trim()) lines.push(`you: ${i.text.trim()}`);

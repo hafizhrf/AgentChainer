@@ -1,6 +1,7 @@
 import type { Task } from "@agentchainer/protocol";
 import { Loader2, Sparkles } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
+import { t } from "../i18n/index.ts";
 import { request } from "../sidecar.ts";
 import { fixesUsed, flowStates, type NodeState, type NodeStatus, subtaskGraph } from "../workflows/flowStatus.ts";
 import { WorkflowCanvas } from "../workflows/WorkflowCanvas.tsx";
@@ -21,6 +22,18 @@ const SUBTASK_STATUS: Record<Task["state"], NodeStatus> = {
   cancelled: "cancelled",
   interrupted: "cancelled",
 };
+
+/** Whose workflow the canvas draws, and whether the run has started on it. */
+function sourceNote(source: "app" | "project" | "task" | undefined, workflow: string, started: boolean): string {
+  switch (source) {
+    case "task":
+      return started ? t("tasks.flow.sourceTask", { workflow }) : t("tasks.flow.sourceTaskPlanned", { workflow });
+    case "project":
+      return started ? t("tasks.flow.sourceProject", { workflow }) : t("tasks.flow.sourceProjectPlanned", { workflow });
+    default:
+      return started ? t("tasks.flow.sourceApp", { workflow }) : t("tasks.flow.sourceAppPlanned", { workflow });
+  }
+}
 
 /**
  * A task's Flow tab (UX-14, docs/design/chat-and-tasks.md §6.1): the workflow its run follows on the canvas, each step
@@ -90,7 +103,7 @@ export function FlowPanel({
       }));
       const edges: WorkflowEdge[] = g.edges.map((e) => ({ ...e, kind: "next" }));
       const states: Record<string, NodeState> = Object.fromEntries(
-        subtasks.map((t) => [t.id, { status: SUBTASK_STATUS[t.state], costUsd: t.costUsd, turns: 0 }]),
+        subtasks.map((sub) => [sub.id, { status: SUBTASK_STATUS[sub.state], costUsd: sub.costUsd, turns: 0 }]),
       );
       return { nodes, edges, states, fixes: {} };
     }
@@ -120,25 +133,20 @@ export function FlowPanel({
     task.flow ? (
       <div className="flow-own">
         <p className="flow-text">
-          <Sparkles size={13} aria-hidden /> <strong>This task's own flow:</strong> {task.flow.summary}
+          <Sparkles size={13} aria-hidden /> <strong>{t("tasks.flow.ownFlow")}</strong> {task.flow.summary}
         </p>
-        <p className="muted flow-text">
-          It's approved with the contract, and the run follows it instead of the {tier} flow.
-        </p>
+        <p className="muted flow-text">{t("tasks.flow.ownFlowNote", { tier: tier ?? "" })}</p>
         <button type="button" className="secondary small" disabled={busy !== null} onClick={() => void own("drop")}>
           {busy === "drop" && <Loader2 size={13} className="spin" />}
-          Use the {tier} flow
+          {t("tasks.flow.useTierFlow", { tier: tier ?? "" })}
         </button>
       </div>
     ) : (
       <div className="flow-own">
-        <p className="muted flow-text">
-          The {tier} flow fits most tasks. Claude can shape one for this task from its contract, e.g. a test planner
-          first, or a security review; it's checked like a hand-written workflow.
-        </p>
+        <p className="muted flow-text">{t("tasks.flow.suggestNote", { tier: tier ?? "" })}</p>
         <button type="button" className="secondary small" disabled={busy !== null} onClick={() => void own("propose")}>
           {busy === "propose" ? <Loader2 size={13} className="spin" /> : <Sparkles size={13} />}
-          {busy === "propose" ? "Shaping a flow…" : "Suggest a flow for this task"}
+          {busy === "propose" ? t("tasks.flow.shaping") : t("tasks.flow.suggest")}
         </button>
       </div>
     )
@@ -152,19 +160,15 @@ export function FlowPanel({
       </>
     );
   }
-  if (loaded === undefined && !xl) return <p className="muted flow-note">Loading the flow…</p>;
+  if (loaded === undefined && !xl) return <p className="muted flow-note">{t("tasks.flow.loading")}</p>;
   if (loaded === null && !xl) {
-    return <p className="muted flow-note">The flow shows once the task has a tier: draft its contract first.</p>;
+    return <p className="muted flow-note">{t("tasks.flow.noTier")}</p>;
   }
   const workflowId = typeof loaded?.workflow.id === "string" ? loaded.workflow.id : "";
   return (
     <div className="flow-panel">
       <p className="muted flow-note">
-        {xl
-          ? "The sub-tasks, each on its own tier's workflow. Click one to open it."
-          : `${loaded?.source === "task" ? "This task's own" : loaded?.source === "project" ? "The project's" : "The app's"} ${workflowId}${
-              run ? "" : ", as the run will follow it"
-            }. Click a step to see it in the thread.`}
+        {xl ? t("tasks.flow.subtasksNote") : sourceNote(loaded?.source, workflowId, !!run)}
       </p>
       {ownFlow}
       <WorkflowCanvas

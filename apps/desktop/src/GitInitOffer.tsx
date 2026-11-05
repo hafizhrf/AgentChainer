@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { t } from "./i18n/index.ts";
 import { request } from "./sidecar.ts";
 
 /**
@@ -36,9 +37,9 @@ export function GitInitOffer({ cwd }: { cwd: string }) {
   if (isRepo !== false) return null;
   return (
     <p className="warn">
-      This folder isn't a git repository, so you won't be able to review or revert the agent's changes.{" "}
+      {t("shell.gitInit.notRepo")}{" "}
       <button type="button" className="link" onClick={() => void init()}>
-        Initialize git here
+        {t("shell.gitInit.init")}
       </button>
       {error && <span> {error}</span>}
     </p>

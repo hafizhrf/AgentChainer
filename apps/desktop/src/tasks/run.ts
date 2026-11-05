@@ -1,4 +1,6 @@
 import type { AgentEvent, GateRun, StepRun, Task } from "@agentchainer/protocol";
+import { minutesSeconds } from "../i18n/format.ts";
+import { t } from "../i18n/index.ts";
 import { applyEvent, closeAssistant, type Item } from "../transcript.ts";
 
 /** A task's run on the task page (M3-06): what may run, how states read, step transcripts and gate rounds. */
@@ -23,16 +25,15 @@ export const canAcceptRisk = (task: Task) => (task.state === "failed" || task.st
  */
 export function runBlocker(task: Task, children: Task[] = []): string | null {
   const tier = task.triage?.chosen;
-  if (task.state === "running") return "The task is running.";
-  if (task.state === "interrupted") return "Resume the interrupted run, or revise the task.";
-  if (!tier || !task.contract?.approvedAt || !STARTABLE.has(task.state))
-    return "Approve the contract and the tier first.";
-  if (!RUNNABLE_TIERS.has(tier)) return `${tier} tasks run in a later update.`;
+  if (task.state === "running") return t("tasks.blocker.running");
+  if (task.state === "interrupted") return t("tasks.blocker.interrupted");
+  if (!tier || !task.contract?.approvedAt || !STARTABLE.has(task.state)) return t("tasks.blocker.approveFirst");
+  if (!RUNNABLE_TIERS.has(tier)) return t("tasks.blocker.laterUpdate", { tier });
   if (tier === "XL") {
-    if (task.state !== "ready") return "An XL run that stopped goes on with Continue.";
-    if (!task.subtasks?.length) return "Split the task into sub-tasks first.";
+    if (task.state !== "ready") return t("tasks.blocker.xlContinue");
+    if (!task.subtasks?.length) return t("tasks.blocker.splitFirst");
     if (children.length < task.subtasks.length || children.some((c) => c.state !== "ready"))
-      return "Approve every sub-task first.";
+      return t("tasks.blocker.approveSubtasks");
   }
   return null;
 }
@@ -45,16 +46,16 @@ export const canContinue = (task: Task) =>
 
 /** Why a sub-task can't run on its own now, or null: only in its worktree, and not while its XL task runs. */
 export function childRunBlocker(child: Task, parent: Task | null): string | null {
-  if (parent?.state === "running") return "Its XL task is running: sub-tasks run from there.";
-  if (!child.worktree || child.worktree.removed) return "Sub-tasks run from their XL task.";
-  if (child.state === "done") return "Done, and merged with the XL task's next Continue.";
+  if (parent?.state === "running") return t("tasks.blocker.parentRunning");
+  if (!child.worktree || child.worktree.removed) return t("tasks.blocker.runFromParent");
+  if (child.state === "done") return t("tasks.blocker.childDone");
   return runBlocker(child);
 }
 
 /** "after 1, 3": the sub-tasks one waits for, by their numbers in the split. */
 export function dependsLabel(child: Task, order: string[]): string | null {
   const numbers = (child.dependsOn ?? []).map((id) => order.indexOf(id) + 1).filter((n) => n > 0);
-  return numbers.length ? `after ${numbers.join(", ")}` : null;
+  return numbers.length ? t("tasks.subtasks.after", { numbers: numbers.join(", ") }) : null;
 }
 
 export type Tone = "ok" | "warn" | "err" | "busy" | "muted";
@@ -62,23 +63,23 @@ export type Tone = "ok" | "warn" | "err" | "busy" | "muted";
 export function stateLabel(state: Task["state"]): { label: string; tone: Tone } {
   switch (state) {
     case "running":
-      return { label: "Running", tone: "busy" };
+      return { label: t("tasks.state.running"), tone: "busy" };
     case "done":
-      return { label: "Done", tone: "ok" };
+      return { label: t("tasks.state.done"), tone: "ok" };
     case "accepted":
-      return { label: "Accepted with risk", tone: "warn" };
+      return { label: t("tasks.state.accepted"), tone: "warn" };
     case "failed":
-      return { label: "Failed", tone: "err" };
+      return { label: t("tasks.state.failed"), tone: "err" };
     case "unverified":
-      return { label: "Not verified", tone: "warn" };
+      return { label: t("tasks.state.unverified"), tone: "warn" };
     case "cancelled":
-      return { label: "Stopped", tone: "muted" };
+      return { label: t("tasks.state.cancelled"), tone: "muted" };
     case "interrupted":
-      return { label: "Interrupted", tone: "warn" };
+      return { label: t("tasks.state.interrupted"), tone: "warn" };
     case "ready":
-      return { label: "Ready", tone: "ok" };
+      return { label: t("tasks.state.ready"), tone: "ok" };
     default:
-      return { label: "Draft", tone: "muted" };
+      return { label: t("tasks.state.draft"), tone: "muted" };
   }
 }
 
@@ -115,8 +116,7 @@ export function runsOfEntry(task: Task, entry: StepRun): GateRun[] {
 
 /** "8 s", "3 min 4 s". */
 export function duration(start: string, end: string | undefined, now = Date.now()): string {
-  const seconds = Math.max(0, Math.round(((end ? Date.parse(end) : now) - Date.parse(start)) / 1000));
-  return seconds < 60 ? `${seconds} s` : `${Math.floor(seconds / 60)} min ${seconds % 60} s`;
+  return minutesSeconds(Math.max(0, Math.round(((end ? Date.parse(end) : now) - Date.parse(start)) / 1000)));
 }
 
 export const passedGate = (g: GateRun) => g.exitCode === 0 && !g.timedOut;

@@ -11,6 +11,9 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 import { Modal } from "../Dialog.tsx";
+import { dateTime } from "../i18n/format.ts";
+import { t } from "../i18n/index.ts";
+import { Rich } from "../i18n/Rich.tsx";
 import { request } from "../sidecar.ts";
 import { Field } from "../ui/Field.tsx";
 import { Select } from "../ui/Select.tsx";
@@ -21,17 +24,25 @@ type Method = Gates["methods"][number];
 const message = (err: unknown) => (err instanceof Error ? err.message : String(err));
 const HOLDS = new Set<MergeGate["state"]>(["fail", "pending", "missing"]);
 const METHOD_LABEL: Record<Method, string> = {
-  merge: "Merge commit",
-  squash: "Squash and merge",
-  rebase: "Rebase and merge",
+  get merge() {
+    return t("tasks.mergeGates.methodMerge");
+  },
+  get squash() {
+    return t("tasks.mergeGates.methodSquash");
+  },
+  get rebase() {
+    return t("tasks.mergeGates.methodRebase");
+  },
 };
 
 function GateIcon({ state }: { state: MergeGate["state"] }) {
-  if (state === "pass") return <CircleCheck size={14} className="ok" aria-label="Passed" />;
-  if (state === "fail") return <CircleX size={14} className="err" aria-label="Failed" />;
-  if (state === "pending") return <Loader2 size={14} className="spin" aria-label="Running" />;
-  if (state === "missing") return <CircleDashed size={14} className="warn-text" aria-label="Missing" />;
-  return <CircleMinus size={14} className="muted" aria-label="Not run" />;
+  if (state === "pass") return <CircleCheck size={14} className="ok" aria-label={t("tasks.mergeGates.passed")} />;
+  if (state === "fail") return <CircleX size={14} className="err" aria-label={t("tasks.mergeGates.failed")} />;
+  if (state === "pending") return <Loader2 size={14} className="spin" aria-label={t("tasks.mergeGates.running")} />;
+  if (state === "missing") {
+    return <CircleDashed size={14} className="warn-text" aria-label={t("tasks.mergeGates.missing")} />;
+  }
+  return <CircleMinus size={14} className="muted" aria-label={t("tasks.mergeGates.notRun")} />;
 }
 
 /**
@@ -50,10 +61,17 @@ export function MergeGates({ task, cwd, onChanged }: { task: Task; cwd: string; 
   if (pr.merged) {
     return (
       <p className="pr-merged">
-        <GitMerge size={14} aria-hidden /> Merged by you ({pr.merged.method}) at{" "}
-        <code>{pr.merged.sha.slice(0, 7)}</code>, {new Date(pr.merged.at).toLocaleString()}.
-        {pr.merged.accepted ? ` Gates not green, accepted: ${pr.merged.accepted}` : ""} Pull it into your branch to get
-        it locally.
+        <GitMerge size={14} aria-hidden />{" "}
+        <Rich
+          k={pr.merged.accepted ? "tasks.mergeGates.mergedAccepted" : "tasks.mergeGates.merged"}
+          params={{
+            method: pr.merged.method,
+            sha: pr.merged.sha.slice(0, 7),
+            date: dateTime(pr.merged.at),
+            reason: pr.merged.accepted ?? "",
+          }}
+          tags={{ code: (s) => <code>{s}</code> }}
+        />
       </p>
     );
   }
@@ -88,7 +106,7 @@ export function MergeGates({ task, cwd, onChanged }: { task: Task; cwd: string; 
   return (
     <div className="merge-gates">
       <div className="pr-checks-head">
-        <strong>Merge gates</strong>
+        <strong>{t("tasks.mergeGates.title")}</strong>
         <span className="grow" />
         <button
           type="button"
@@ -97,11 +115,11 @@ export function MergeGates({ task, cwd, onChanged }: { task: Task; cwd: string; 
           onClick={() => void check()}
         >
           {busy === "check" ? <Loader2 size={13} className="spin" /> : <ShieldCheck size={13} />}
-          {gates ? "Check again" : "Check the gates"}
+          {gates ? t("tasks.mergeGates.checkAgain") : t("tasks.mergeGates.check")}
         </button>
       </div>
       {error && <p className="warn">{error}</p>}
-      {!gates && <p className="muted">Runs the scanners on the task's worktree and reads the PR's checks.</p>}
+      {!gates && <p className="muted">{t("tasks.mergeGates.explain")}</p>}
       {gates && (
         <ul>
           {gates.gates.map((g) => (
@@ -125,13 +143,13 @@ export function MergeGates({ task, cwd, onChanged }: { task: Task; cwd: string; 
               onClick={() => void review()}
             >
               {busy === "review" ? <Loader2 size={13} className="spin" /> : <ScanSearch size={13} />}
-              Review the PR
+              {t("tasks.mergeGates.review")}
             </button>
           )}
           <span className="grow" />
           <button type="button" className="small" disabled={busy !== null || running} onClick={() => setMerging(true)}>
             <GitMerge size={13} />
-            Merge…
+            {t("tasks.mergeGates.openMerge")}
           </button>
         </div>
       )}
@@ -194,13 +212,13 @@ function MergeDialog({
     <Modal
       open
       onOpenChange={(open) => !open && onClose()}
-      title={`Merge #${pr?.number} into ${pr?.base}?`}
-      description={`On GitHub, at ${gates.headSha.slice(0, 7)}: a newer push makes this merge fail instead of slipping in.`}
+      title={t("tasks.mergeGates.dialogTitle", { number: String(pr?.number), base: String(pr?.base) })}
+      description={t("tasks.mergeGates.dialogDescription", { sha: gates.headSha.slice(0, 7) })}
       role="alertdialog"
       actions={
         <>
           <button type="button" className="secondary" onClick={onClose}>
-            Cancel
+            {t("tasks.mergeGates.cancel")}
           </button>
           <button
             type="button"
@@ -209,25 +227,27 @@ function MergeDialog({
             onClick={() => void merge()}
           >
             {busy ? <Loader2 size={14} className="spin" /> : <GitMerge size={14} />}
-            {held.length ? "Merge anyway" : "Merge"}
+            {held.length ? t("tasks.mergeGates.mergeAnyway") : t("tasks.mergeGates.merge")}
           </button>
         </>
       }
     >
       {error && <p className="warn">{error}</p>}
-      <Field label="Method">
+      <Field label={t("tasks.mergeGates.method")}>
         <Select
-          label="Merge method"
+          label={t("tasks.mergeGates.methodLabel")}
           value={method}
           options={gates.methods.map((m) => ({ value: m, label: METHOD_LABEL[m] }))}
           onChange={(v) => setMethod(v as Method)}
         />
       </Field>
-      {gates.draft && <p className="muted">It's a draft: it is marked ready for review first.</p>}
+      {gates.draft && <p className="muted">{t("tasks.mergeGates.draft")}</p>}
       {held.length > 0 && (
         <>
-          <p className="callout">Not green: {held.map((g) => `${g.label} (${g.detail})`).join("; ")}</p>
-          <Field label="Why merge anyway?" help="Kept with the task and in its evidence report.">
+          <p className="callout">
+            {t("tasks.mergeGates.notGreen", { gates: held.map((g) => `${g.label} (${g.detail})`).join("; ") })}
+          </p>
+          <Field label={t("tasks.mergeGates.why")} help={t("tasks.mergeGates.whyHelp")}>
             <textarea rows={2} value={reason} onChange={(e) => setReason(e.target.value)} />
           </Field>
         </>

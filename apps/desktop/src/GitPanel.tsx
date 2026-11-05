@@ -22,6 +22,8 @@ import {
 } from "lucide-react";
 import { type ReactNode, useCallback, useEffect, useState } from "react";
 import type { Confirm } from "./Dialog.tsx";
+import { t } from "./i18n/index.ts";
+import { Rich } from "./i18n/Rich.tsx";
 import { request } from "./sidecar.ts";
 import type { MenuAction } from "./ui/ActionMenu.tsx";
 import { IconButton } from "./ui/IconButton.tsx";
@@ -103,88 +105,90 @@ export function GitPanel({
 
   async function pushNow() {
     if (!branches?.current) return;
-    const target = branches.upstream ?? `origin/${branches.current} (new, tracked from now on)`;
+    const target = branches.upstream ?? t("panel.git.newUpstream", { branch: branches.current });
     const ok = await confirm({
-      title: "Push this branch?",
+      title: t("panel.git.pushTitle"),
       body: (
         <p>
-          Pushes <code>{branches.current}</code> to <code>{target}</code>. A normal push only: if the remote has commits
-          you don't have, it fails instead of overwriting them.
+          <Rich k="panel.git.pushBody" params={{ branch: branches.current, target }} tags={{ code }} />
         </p>
       ),
-      confirmLabel: "Push",
+      confirmLabel: t("panel.git.push"),
     });
-    if (ok) await run("push", () => request("git.push", { cwd }), "Pushed.");
+    if (ok) await run("push", () => request("git.push", { cwd }), t("panel.git.pushed"));
   }
 
   async function mergeNow(branch: string) {
     if (!branches?.current) return;
     const ok = await confirm({
-      title: `Merge ${branch}?`,
+      title: t("panel.git.mergeTitle", { branch }),
       body: (
         <p>
-          Merges <code>{branch}</code> into <code>{branches.current}</code>. If files conflict, the merge stops so you
-          can resolve them and commit, or abort it.
+          <Rich k="panel.git.mergeBody" params={{ branch, into: branches.current }} tags={{ code }} />
         </p>
       ),
-      confirmLabel: "Merge",
+      confirmLabel: t("panel.git.merge"),
     });
     if (!ok) return;
     await run("merge", async () => {
       const r = await request("git.merge", { cwd, branch });
-      setNote(r.merged ? `Merged ${branch}.` : `Merge stopped on ${count(r.conflicts.length, "conflicted file")}.`);
+      setNote(
+        r.merged ? t("panel.git.merged", { branch }) : t("panel.git.mergeStopped", { count: r.conflicts.length }),
+      );
     });
   }
 
   async function abortNow() {
     const ok = await confirm({
-      title: "Abort the merge?",
+      title: t("panel.git.abortTitle"),
       body: (
         <p>
-          Puts <code>{branches?.current ?? "the branch"}</code> back as it was before the merge. Conflicts you've
-          resolved so far are lost.
+          <Rich
+            k="panel.git.abortBody"
+            params={{ branch: branches?.current ?? t("panel.git.theBranch") }}
+            tags={{ code }}
+          />
         </p>
       ),
-      confirmLabel: "Abort merge",
+      confirmLabel: t("panel.git.abortConfirm"),
       danger: true,
     });
-    if (ok) await run("abort", () => request("git.abortMerge", { cwd }), "Merge aborted.");
+    if (ok) await run("abort", () => request("git.abortMerge", { cwd }), t("panel.git.aborted"));
   }
 
   async function deleteNow(branch: string) {
     const ok = await confirm({
-      title: `Delete ${branch}?`,
+      title: t("panel.git.deleteTitle", { branch }),
       body: (
         <p>
-          Deletes the local branch <code>{branch}</code>. A remote branch of the same name stays.
+          <Rich k="panel.git.deleteBody" params={{ branch }} tags={{ code }} />
         </p>
       ),
-      confirmLabel: "Delete",
+      confirmLabel: t("panel.git.delete"),
       danger: true,
     });
     if (!ok) return;
     await run("delete", async () => {
       if (!(await request("git.deleteBranch", { cwd, branch })).deleted) {
         const force = await confirm({
-          title: `${branch} has unmerged commits`,
+          title: t("panel.git.unmergedTitle", { branch }),
           body: (
             <p>
-              Some of its commits aren't merged into <code>{branches?.current ?? "HEAD"}</code> or its upstream.
-              Deleting it anyway loses them.
+              <Rich k="panel.git.unmergedBody" params={{ into: branches?.current ?? "HEAD" }} tags={{ code }} />
             </p>
           ),
-          confirmLabel: "Delete anyway",
+          confirmLabel: t("panel.git.deleteAnyway"),
           danger: true,
         });
         if (!force) return;
         await request("git.deleteBranch", { cwd, branch, force: true });
       }
-      setNote(`Deleted ${branch}.`);
+      setNote(t("panel.git.deleted", { branch }));
     });
   }
 
-  if (!files) return <p className="muted">Loading…</p>;
-  if (!files.isGitRepo) return <EmptyState icon={<GitBranch size={14} />}>Not a git repository.</EmptyState>;
+  if (!files) return <p className="muted">{t("panel.git.loading")}</p>;
+  if (!files.isGitRepo) return <EmptyState icon={<GitBranch size={14} />}>{t("panel.git.notRepo")}</EmptyState>;
 
   // A conflicted file has both sides in git's index, but it isn't staged until it's resolved and added.
   const staged = files.files.filter((f) => f.staged && f.status !== "conflicted");
@@ -202,41 +206,50 @@ export function GitPanel({
         <BranchPicker
           branches={branches}
           disabled={!idle}
-          onSwitch={(branch) => void run("switch", () => request("git.switch", { cwd, branch }), `On ${branch}.`)}
+          onSwitch={(branch) =>
+            void run("switch", () => request("git.switch", { cwd, branch }), t("panel.git.switched", { branch }))
+          }
           onTrack={(remote) =>
             void run(
               "switch",
               () => request("git.switch", { cwd, branch: remote, track: true }),
-              `On ${remote.slice(remote.indexOf("/") + 1)}, tracking ${remote}.`,
+              t("panel.git.tracking", { branch: remote.slice(remote.indexOf("/") + 1), remote }),
             )
           }
           onCreate={(branch) =>
-            void run("create", () => request("git.switch", { cwd, branch, create: true }), `Created ${branch}.`)
+            void run(
+              "create",
+              () => request("git.switch", { cwd, branch, create: true }),
+              t("panel.git.created", { branch }),
+            )
           }
           onRename={(from, to) =>
-            void run("rename", () => request("git.renameBranch", { cwd, from, to }), `Renamed to ${to}.`)
+            void run(
+              "rename",
+              () => request("git.renameBranch", { cwd, from, to }),
+              t("panel.git.renamed", { branch: to }),
+            )
           }
           onMerge={(branch) => void mergeNow(branch)}
           onDelete={(branch) => void deleteNow(branch)}
         />
         <IconButton
-          label="Fetch from every remote"
+          label={t("panel.git.fetch")}
           disabled={!idle}
-          onClick={() => void run("fetch", () => request("git.fetch", { cwd }), "Fetched.")}
+          onClick={() => void run("fetch", () => request("git.fetch", { cwd }), t("panel.git.fetched"))}
         >
           {busy === "fetch" ? <Loader2 size={14} className="spin" /> : <RefreshCw size={14} />}
         </IconButton>
         <IconButton
           label={
-            branches?.upstream
-              ? `Pull from ${branches.upstream} (fast-forward only)`
-              : "Pull: this branch has no upstream yet"
+            branches?.upstream ? t("panel.git.pull", { upstream: branches.upstream }) : t("panel.git.pullNoUpstream")
           }
           disabled={!idle || !branches?.upstream}
           onClick={() =>
             void run("pull", async () => {
               const r = await request("git.pull", { cwd });
-              setNote(/already up to date/i.test(r.output) ? "Already up to date." : "Pulled.");
+              // git's own output, in English whatever the UI's language.
+              setNote(/already up to date/i.test(r.output) ? t("panel.git.upToDate") : t("panel.git.pulled"));
             })
           }
         >
@@ -248,13 +261,22 @@ export function GitPanel({
         <div className="merge-banner" role="status">
           <GitMerge size={14} aria-hidden />
           <span>
-            Merging <code>{merging.branch ?? "a branch"}</code>.{" "}
-            {merging.conflicts.length
-              ? `Resolve ${count(merging.conflicts.length, "conflicted file")}, stage, and commit to finish.`
-              : "No conflicts left: commit to finish."}
+            {merging.conflicts.length ? (
+              <Rich
+                k="panel.git.mergingConflicts"
+                params={{ branch: merging.branch ?? t("panel.git.aBranch"), count: merging.conflicts.length }}
+                tags={{ code }}
+              />
+            ) : (
+              <Rich
+                k="panel.git.mergingClean"
+                params={{ branch: merging.branch ?? t("panel.git.aBranch") }}
+                tags={{ code }}
+              />
+            )}
           </span>
           <button type="button" className="secondary small" disabled={!idle} onClick={() => void abortNow()}>
-            Abort
+            {t("panel.git.abort")}
           </button>
         </div>
       )}
@@ -264,12 +286,12 @@ export function GitPanel({
           <textarea
             value={message}
             onChange={(e) => setMessage(e.target.value)}
-            placeholder={staged.length ? "Commit message" : "Stage files, then write a message"}
+            placeholder={staged.length ? t("panel.git.commitPlaceholder") : t("panel.git.stageFirstPlaceholder")}
             rows={3}
-            aria-label="Commit message"
+            aria-label={t("panel.git.commitMessageLabel")}
           />
           <IconButton
-            label={busy === "draft" ? "Drafting…" : "Draft with Claude (haiku), from the staged diff"}
+            label={busy === "draft" ? t("panel.git.drafting") : t("panel.git.draft")}
             className="commit-draft"
             disabled={staged.length === 0 || !idle}
             onClick={() => void draft()}
@@ -289,45 +311,55 @@ export function GitPanel({
                   await request("git.commit", { cwd, message });
                   setMessage("");
                 },
-                "Committed.",
+                t("panel.git.committed"),
               )
             }
           >
             <Check size={14} />
-            {staged.length ? `Commit ${staged.length} staged` : "Commit"}
+            {staged.length ? t("panel.git.commitStaged", { n: staged.length }) : t("panel.git.commit")}
           </button>
           <button
             type="button"
             className="secondary"
             disabled={!branches?.current || !idle || (branches.upstream !== null && ahead === 0)}
-            title={branches?.upstream ? `Push to ${branches.upstream}` : "Publish this branch to origin"}
+            title={
+              branches?.upstream ? t("panel.git.pushTo", { upstream: branches.upstream }) : t("panel.git.publishTitle")
+            }
             onClick={() => void pushNow()}
           >
             <Upload size={14} />
-            {branches?.upstream ? `Push${ahead ? ` ${ahead}` : ""}` : "Publish"}
+            {branches?.upstream
+              ? ahead
+                ? t("panel.git.pushAhead", { n: ahead })
+                : t("panel.git.push")
+              : t("panel.git.publish")}
           </button>
         </div>
         {(busy || note || error) && (
           <p className={`git-status${error ? " error" : ""}`} role="status">
-            {error ?? (busy && busy !== "draft" ? "Working…" : note)}
+            {error ?? (busy && busy !== "draft" ? t("panel.git.working") : note)}
           </p>
         )}
       </div>
 
       <Section
         id="git.staged"
-        title="Staged"
+        title={t("panel.git.staged")}
         count={staged.length}
         actions={
           staged.length > 0 && (
-            <IconButton label="Unstage all" disabled={!idle} onClick={() => unstage(staged.map((f) => f.path))}>
+            <IconButton
+              label={t("panel.git.unstageAll")}
+              disabled={!idle}
+              onClick={() => unstage(staged.map((f) => f.path))}
+            >
               <Minus size={14} />
             </IconButton>
           )
         }
       >
         {staged.length === 0 ? (
-          <EmptyState>Nothing staged. Stage files with + below.</EmptyState>
+          <EmptyState>{t("panel.git.nothingStaged")}</EmptyState>
         ) : (
           staged.map((f) => (
             <FileRow
@@ -339,7 +371,7 @@ export function GitPanel({
               actions={
                 <>
                   {f.status !== "deleted" && openAction(f.path)}
-                  <IconButton label="Unstage" disabled={!idle} onClick={() => unstage([f.path])}>
+                  <IconButton label={t("panel.git.unstage")} disabled={!idle} onClick={() => unstage([f.path])}>
                     <Minus size={14} />
                   </IconButton>
                 </>
@@ -350,18 +382,22 @@ export function GitPanel({
       </Section>
       <Section
         id="git.changes"
-        title="Changes"
+        title={t("panel.git.changes")}
         count={unstaged.length}
         actions={
           unstaged.length > 0 && (
-            <IconButton label="Stage all" disabled={!idle} onClick={() => stage(unstaged.map((f) => f.path))}>
+            <IconButton
+              label={t("panel.git.stageAll")}
+              disabled={!idle}
+              onClick={() => stage(unstaged.map((f) => f.path))}
+            >
               <Plus size={14} />
             </IconButton>
           )
         }
       >
         {unstaged.length === 0 ? (
-          <EmptyState icon={<CircleCheck size={14} />}>Working tree clean.</EmptyState>
+          <EmptyState icon={<CircleCheck size={14} />}>{t("panel.git.clean")}</EmptyState>
         ) : (
           unstaged.map((f) => (
             <FileRow
@@ -373,7 +409,7 @@ export function GitPanel({
               actions={
                 <>
                   {f.status !== "deleted" && openAction(f.path)}
-                  <IconButton label="Stage" disabled={!idle} onClick={() => stage([f.path])}>
+                  <IconButton label={t("panel.git.stage")} disabled={!idle} onClick={() => stage([f.path])}>
                     <Plus size={14} />
                   </IconButton>
                 </>
@@ -386,10 +422,8 @@ export function GitPanel({
   );
 }
 
-/** "1 file", "3 files". */
-function count(n: number, noun: string): string {
-  return `${n} ${noun}${n === 1 ? "" : "s"}`;
-}
+/** A `<code>` part of a message (`Rich`): branch names and refs. */
+const code = (s: string) => <code>{s}</code>;
 
 /**
  * The current branch with its sync state. Opens a searchable list of local and remote branches: pick one to switch (a
@@ -461,29 +495,36 @@ function BranchPicker({
 
   function actions(b: string): MenuAction[] {
     const rename = {
-      label: "Rename…",
+      label: t("panel.git.renameAction"),
       onSelect: () => {
         setActionsFor(null);
         setRenaming(b);
         setQuery(b);
       },
     };
-    if (remoteBranch(b)) {
-      return [
-        { label: `Merge into ${current ?? "HEAD"}…`, disabled: !current, onSelect: () => closeThen(() => onMerge(b)) },
-      ];
-    }
+    const mergeInto = {
+      label: t("panel.git.mergeInto", { branch: current ?? "HEAD" }),
+      disabled: !current,
+      onSelect: () => closeThen(() => onMerge(b)),
+    };
+    if (remoteBranch(b)) return [mergeInto];
     if (b === current) {
       const upstream = branches?.upstream;
       // After a pull refused to fast-forward, this is the way to bring the upstream's commits in.
       return upstream && (branches?.behind ?? 0) > 0
-        ? [{ label: `Merge ${upstream} into ${b}…`, onSelect: () => closeThen(() => onMerge(upstream)) }, rename]
+        ? [
+            {
+              label: t("panel.git.mergeUpstream", { upstream, branch: b }),
+              onSelect: () => closeThen(() => onMerge(upstream)),
+            },
+            rename,
+          ]
         : [rename];
     }
     return [
-      { label: `Merge into ${current ?? "HEAD"}…`, disabled: !current, onSelect: () => closeThen(() => onMerge(b)) },
+      mergeInto,
       rename,
-      { label: "Delete…", danger: true, onSelect: () => closeThen(() => onDelete(b)) },
+      { label: t("panel.git.deleteAction"), danger: true, onSelect: () => closeThen(() => onDelete(b)) },
     ];
   }
 
@@ -493,8 +534,8 @@ function BranchPicker({
       <button
         type="button"
         className="ghost icon"
-        aria-label={`Actions for ${b}`}
-        title={`Actions for ${b}`}
+        aria-label={t("panel.git.actionsFor", { branch: b })}
+        title={t("panel.git.actionsFor", { branch: b })}
         onClick={() => setActionsFor(b)}
       >
         <MoreHorizontal size={16} />
@@ -507,9 +548,9 @@ function BranchPicker({
       <Popover.Trigger asChild>
         <button type="button" className="branch-button" disabled={disabled || !branches}>
           <GitBranch size={14} className="branch-icon" />
-          <span className="branch-name">{current ?? "Detached HEAD"}</span>
+          <span className="branch-name">{current ?? t("panel.git.detached")}</span>
           {branches?.upstream ? (
-            <span className="branch-sync" title={`Compared with ${branches.upstream}`}>
+            <span className="branch-sync" title={t("panel.git.comparedWith", { upstream: branches.upstream })}>
               <span>
                 <ArrowUp size={12} />
                 {branches.ahead}
@@ -520,7 +561,7 @@ function BranchPicker({
               </span>
             </span>
           ) : (
-            current && <span className="badge">not published</span>
+            current && <span className="badge">{t("panel.git.notPublished")}</span>
           )}
           <ChevronDown size={14} className="branch-chevron" />
         </button>
@@ -533,7 +574,7 @@ function BranchPicker({
                 <ArrowLeft size={14} />
                 <span>{actionsFor}</span>
               </button>
-              <ul className="branch-list" aria-label={`Actions for ${actionsFor}`}>
+              <ul className="branch-list" aria-label={t("panel.git.actionsFor", { branch: actionsFor })}>
                 {actions(actionsFor).map((a, i) => (
                   <li key={a.label}>
                     <button
@@ -576,9 +617,19 @@ function BranchPicker({
                   autoFocus
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
-                  placeholder={creating ? "New branch name" : renaming !== null ? "New name" : "Search branches"}
+                  placeholder={
+                    creating
+                      ? t("panel.git.newBranchName")
+                      : renaming !== null
+                        ? t("panel.git.newName")
+                        : t("panel.git.searchBranches")
+                  }
                   aria-label={
-                    creating ? "New branch name" : renaming !== null ? `New name for ${renaming}` : "Search branches"
+                    creating
+                      ? t("panel.git.newBranchName")
+                      : renaming !== null
+                        ? t("panel.git.newNameFor", { branch: renaming })
+                        : t("panel.git.searchBranches")
                   }
                   spellCheck={false}
                 />
@@ -587,24 +638,22 @@ function BranchPicker({
                 <div className="branch-create-hint">
                   <span className="muted">
                     {renaming !== null ? (
-                      <>
-                        Rename <code>{renaming}</code>. Enter renames it.
-                      </>
+                      <Rich k="panel.git.renameHint" params={{ branch: renaming }} tags={{ code }} />
                     ) : (
-                      <>
-                        From <code>{current ?? "HEAD"}</code>. Enter creates it and switches to it.
-                      </>
+                      <Rich k="panel.git.createHint" params={{ branch: current ?? "HEAD" }} tags={{ code }} />
                     )}
                   </span>
                   <button type="button" className="small" disabled={!q || q === renaming} onClick={submitName}>
-                    {renaming !== null ? "Rename branch" : "Create branch"}
+                    {renaming !== null ? t("panel.git.renameBranch") : t("panel.git.createBranch")}
                   </button>
                 </div>
               ) : (
                 <>
                   <div className="branch-lists">
-                    {local.length > 0 && remote.length > 0 && <div className="branch-group">Local</div>}
-                    <ul className="branch-list" aria-label="Local branches">
+                    {local.length > 0 && remote.length > 0 && (
+                      <div className="branch-group">{t("panel.git.local")}</div>
+                    )}
+                    <ul className="branch-list" aria-label={t("panel.git.localBranches")}>
                       {local.map((b) => (
                         <li key={b} className="branch-row">
                           <button type="button" className="branch-item" onClick={() => pick(b)}>
@@ -615,19 +664,19 @@ function BranchPicker({
                         </li>
                       ))}
                       {local.length === 0 && remote.length === 0 && (
-                        <li className="muted branch-none">No branch matches.</li>
+                        <li className="muted branch-none">{t("panel.git.noMatch")}</li>
                       )}
                     </ul>
                     {remote.length > 0 && (
                       <>
-                        <div className="branch-group">Remote</div>
-                        <ul className="branch-list" aria-label="Remote branches">
+                        <div className="branch-group">{t("panel.git.remote")}</div>
+                        <ul className="branch-list" aria-label={t("panel.git.remoteBranches")}>
                           {remote.map((b) => (
                             <li key={b} className="branch-row">
                               <button
                                 type="button"
                                 className="branch-item"
-                                title={`Check out as a local branch that tracks ${b}`}
+                                title={t("panel.git.trackTitle", { branch: b })}
                                 onClick={() => track(b)}
                               >
                                 <span className="branch-check" />
@@ -642,7 +691,7 @@ function BranchPicker({
                   </div>
                   <button type="button" className="branch-item branch-new" onClick={() => setCreating(true)}>
                     <Plus size={14} />
-                    {q ? `New branch “${q}”…` : "New branch…"}
+                    {q ? t("panel.git.newBranchNamed", { name: q }) : t("panel.git.newBranch")}
                   </button>
                 </>
               )}

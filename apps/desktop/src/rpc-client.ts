@@ -8,6 +8,7 @@ import {
   notificationSchemas,
   type RpcError,
 } from "@agentchainer/protocol";
+import { t } from "./i18n/index.ts";
 
 /**
  * JSON-RPC client for the sidecar, independent of how frames travel. The app uses the Tauri transport in
@@ -79,7 +80,7 @@ export function createClient(transport: Transport) {
       }
       const result = methodSchemas[p.method].result.safeParse(frame.result);
       if (result.success) p.resolve(result.data);
-      else p.reject(new Error(`Invalid result for ${p.method}: ${describeIssues(result.error)}`));
+      else p.reject(new Error(t("app.rpc.invalidResult", { method: p.method, issues: describeIssues(result.error) })));
     } else if (frame.method) {
       if (!isNotificationName(frame.method)) {
         console.warn(`Ignoring unknown notification ${frame.method}`);
@@ -100,7 +101,7 @@ export function createClient(transport: Transport) {
     connected ??= transport.listen({
       frame: handleFrame,
       exit: (exit) => {
-        for (const p of pending.values()) p.reject(new Error(`Agent runtime stopped (${exit.status})`));
+        for (const p of pending.values()) p.reject(new Error(t("app.rpc.runtimeStopped", { status: exit.status })));
         pending.clear();
         for (const fn of exitSubscribers) fn(exit);
       },
@@ -131,7 +132,7 @@ export function createClient(transport: Transport) {
   ): Promise<Methods[M]["result"]> {
     return Promise.race([
       request(method, params),
-      new Promise<never>((_, reject) => setTimeout(() => reject(new Error(`${method} timed out after ${ms} ms`)), ms)),
+      new Promise<never>((_, reject) => setTimeout(() => reject(new Error(t("app.rpc.timedOut", { method, ms }))), ms)),
     ]);
   }
 

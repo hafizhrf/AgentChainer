@@ -1,3 +1,4 @@
+import { t } from "../i18n/index.ts";
 import type { Path } from "./workflowDoc.ts";
 
 /**
@@ -85,17 +86,24 @@ export function workflowGraph(data: Obj | null): { nodes: WorkflowNode[]; edges:
   if (data.split !== undefined) {
     // XL: the split, the sub-tasks with their own tiers' workflows, then the integration gates.
     const split = obj(data.split);
-    box(["split"], "split", str(split.label, "Split"), agentDetail(split), 0, 0);
+    box(["split"], "split", str(split.label, t("workflows.graph.split")), agentDetail(split), 0, 0);
     box(
       ["maxParallel"],
       "subtasks",
-      "Sub-tasks",
-      `each with its tier's workflow · ${data.maxParallel ?? "?"} at once`,
+      t("workflows.graph.subtasks"),
+      t("workflows.graph.subtasksDetail", { n: String(data.maxParallel ?? "?") }),
       0,
       STEP_H + GAP_Y,
     );
     const gates = list(obj(data.integration).gates).map(String);
-    box(["integration"], "integration", "Integration gates", gates.join(", ") || "none", 0, 2 * (STEP_H + GAP_Y));
+    box(
+      ["integration"],
+      "integration",
+      t("workflows.graph.integrationGates"),
+      gates.join(", ") || t("workflows.graph.noGates"),
+      0,
+      2 * (STEP_H + GAP_Y),
+    );
     next(["split"], ["maxParallel"]);
     next(["maxParallel"], ["integration"]);
     return { nodes, edges };
@@ -116,8 +124,8 @@ export function workflowGraph(data: Obj | null): { nodes: WorkflowNode[]; edges:
         id: keyOf(path),
         path,
         kind: "group",
-        label: str(s.label, "Parallel"),
-        detail: `${members.length} at once, read-only`,
+        label: str(s.label, t("workflows.graph.parallel")),
+        detail: t("workflows.graph.groupDetail", { n: members.length }),
         x: left - GROUP_PAD,
         y,
         width: width + 2 * GROUP_PAD,
@@ -145,7 +153,7 @@ export function workflowGraph(data: Obj | null): { nodes: WorkflowNode[]; edges:
     const node = box(
       path,
       gates ? "gates" : "agent",
-      str(s.label, str(s.id, `Step ${i + 1}`)),
+      str(s.label, str(s.id, t("workflows.graph.step", { n: i + 1 }))),
       gates ? list(s.gates).map(String).join(", ") : agentDetail(s),
       0,
       y,
@@ -166,7 +174,7 @@ export function workflowGraph(data: Obj | null): { nodes: WorkflowNode[]; edges:
       source: f.from,
       target,
       kind: "fix",
-      label: `fix ×${f.rounds ?? "?"}`,
+      label: t("workflows.graph.fixMax", { max: String(f.rounds ?? "?") }),
       ...(typeof f.rounds === "number" ? { maxRounds: f.rounds } : {}),
       targetStep: f.step,
     });

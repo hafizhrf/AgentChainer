@@ -1,3 +1,5 @@
+import { seconds } from "../i18n/format.ts";
+import { t } from "../i18n/index.ts";
 import type { Wait } from "../tabs.ts";
 import { type AgentItem, type AgentStatus, agentDuration, type Item, type ToolItem } from "../transcript.ts";
 import { MAIN_ID } from "./agentGraph.ts";
@@ -35,7 +37,7 @@ export function timeline(
 ): Timeline | null {
   const rows: TimelineRow[] = [];
   const ownWaits = (tools: ToolItem[], end: number): Span[] => {
-    const ids = new Set(tools.map((t) => t.id));
+    const ids = new Set(tools.map((tool) => tool.id));
     return waits.filter((w) => ids.has(w.toolUseId)).map((w) => ({ start: w.start, end: w.end ?? end }));
   };
 
@@ -91,7 +93,7 @@ export function timeline(
   rows.unshift({
     id: MAIN_ID,
     depth: 0,
-    label: "Main agent",
+    label: t("graph.timeline.mainAgent"),
     status: null,
     bar: { start, end },
     waits: ownWaits(tools, end),
@@ -121,15 +123,15 @@ const STEPS = [1, 2, 5, 10, 15, 30, 60, 120, 300, 600, 900, 1800, 3600].map((s) 
 export function ticks(span: number, max = 8): number[] {
   const step = STEPS.find((s) => span / s <= max) ?? Math.ceil(span / max / 3_600_000) * 3_600_000;
   const out: number[] = [];
-  for (let t = 0; t <= span; t += step) out.push(t);
+  for (let at = 0; at <= span; at += step) out.push(at);
   return out;
 }
 
 /** `0 s`, `2.5 s`, `45 s`, `2:05`, `1:02:05` */
 export function clock(ms: number): string {
-  if (ms < 10_000) return `${Number((ms / 1000).toFixed(1))} s`;
+  if (ms < 10_000) return seconds(Number((ms / 1000).toFixed(1)));
   const s = Math.round(ms / 1000);
-  if (s < 60) return `${s} s`;
+  if (s < 60) return seconds(s);
   const pad = (n: number) => String(n).padStart(2, "0");
   const h = Math.floor(s / 3600);
   const m = Math.floor((s % 3600) / 60);

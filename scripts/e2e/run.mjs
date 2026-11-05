@@ -1,5 +1,7 @@
 // X-06: runs the end-to-end tests against a debug build through WebDriver, on Linux and Windows, then X-12's
-// accessibility audits (a11y.e2e.mjs). macOS has no WebDriver for its WebView: use docs/guides/MANUAL_CHECKS.md there.
+// accessibility audits (a11y.e2e.mjs), then X-13's check in the pseudo-locale (i18n.e2e.mjs), in an app started
+// again with AGENTCHAINER_PSEUDO_LOCALE=1. macOS has no WebDriver for its WebView: use docs/guides/MANUAL_CHECKS.md
+// there.
 //
 // Usage: node scripts/e2e/run.mjs --binary target/debug/agentchainer [--artifacts e2e-artifacts]
 // - Linux: tauri-driver (cargo install tauri-driver --version 2.1.0 --locked) with WebKitWebDriver (apt:
@@ -74,53 +76,85 @@ const windows = process.platform === "win32";
 // Linux: tauri-driver starts the app through WebKitWebDriver. Windows: the app starts here with WebView2's debugging
 // port open, and msedgedriver attaches to it (debuggerAddress); launched by msedgedriver itself, a Tauri app's
 // DevToolsActivePort file isn't where msedgedriver looks.
-const DEBUG_PORT = 9222;
-const started = windows
-  ? spawn(binary, [], {
-      env: { ...env, WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS: `--remote-debugging-port=${DEBUG_PORT}` },
-      stdio: ["ignore", "inherit", "inherit"],
-    })
-  : null;
 const driverBin = windows ? path.join(process.env.EDGEWEBDRIVER ?? "", "msedgedriver.exe") : "tauri-driver";
-const driver = spawn(driverBin, windows ? ["--port=4444"] : [], { env, stdio: ["ignore", "inherit", "inherit"] });
-driver.on("error", (err) => {
-  console.error(
-    `couldn't start ${driverBin}: ${err.message}. ${windows ? "Set EDGEWEBDRIVER to msedgedriver's folder." : "Install it with: cargo install tauri-driver"}`,
-  );
-  process.exit(1);
-});
 
-let code = 1;
-try {
-  await waitForDriver();
-  if (windows) await waitForDebugPort();
-  // One file at a time, in this order: the X-06 flows expect the app as it starts, and on Windows both files drive the
-  // same running instance. (node --test sorts the files it's given, so each gets its own run.)
-  code = 0;
-  for (const file of ["app.e2e.mjs", "a11y.e2e.mjs"]) {
-    const exit = await new Promise((resolve) => {
-      const tests = spawn(process.execPath, ["--test", "--test-reporter=spec", path.join(import.meta.dirname, file)], {
-        env: {
-          ...env,
-          AC_E2E_BINARY: binary,
-          AC_E2E_WORKSPACE: workspace,
-          AC_E2E_SETTINGS: settingsFile,
-          AC_E2E_ARTIFACTS: artifacts,
-          ...(windows ? { AC_E2E_DEBUGGER: `127.0.0.1:${DEBUG_PORT}` } : {}),
-        },
-        stdio: "inherit",
-      });
-      tests.on("exit", (c) => resolve(c ?? 1));
-    });
-    code ||= exit;
-  }
-} finally {
-  driver.kill();
-  started?.kill();
-  // The app log, for a failed run's artifacts.
-  if (code !== 0 && existsSync(logDir)) cpSync(logDir, path.join(artifacts, "logs"), { recursive: true });
+// Each phase has its own driver (and, on Windows, its own app on its own debugging port: WebView2 may hold the last
+// one for a moment). Files run one at a time, in order: the X-06 flows expect the app as it starts, and on Windows the
+// files of a phase drive the same running instance. (node --test sorts the files it's given, so each gets its own run.)
+const PHASES = [
+  { files: ["app.e2e.mjs", "a11y.e2e.mjs"], env: {}, port: 9222 },
+  { files: ["i18n.e2e.mjs"], env: { AGENTCHAINER_PSEUDO_LOCALE: "1" }, port: 9223 },
+];
+
+let code = 0;
+for (const phase of PHASES) {
+  code ||= await runPhase(phase);
 }
+// The app log, for a failed run's artifacts.
+if (code !== 0 && existsSync(logDir)) cpSync(logDir, path.join(artifacts, "logs"), { recursive: true });
 process.exit(code);
+
+async function runPhase({ files, env: extra, port }) {
+  const phaseEnv = { ...env, ...extra };
+  const started = windows
+    ? spawn(binary, [], {
+        env: { ...phaseEnv, WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS: `--remote-debugging-port=${port}` },
+        stdio: ["ignore", "inherit", "inherit"],
+      })
+    : null;
+  const driver = spawn(driverBin, windows ? ["--port=4444"] : [], {
+    env: phaseEnv,
+    stdio: ["ignore", "inherit", "inherit"],
+  });
+  driver.on("error", (err) => {
+    console.error(
+      `couldn't start ${driverBin}: ${err.message}. ${windows ? "Set EDGEWEBDRIVER to msedgedriver's folder." : "Install it with: cargo install tauri-driver"}`,
+    );
+    process.exit(1);
+  });
+  let failed = 0;
+  try {
+    await waitForDriver();
+    if (windows) await waitForDebugPort(port);
+    for (const file of files) {
+      const exit = await new Promise((resolve) => {
+        const tests = spawn(
+          process.execPath,
+          ["--test", "--test-reporter=spec", path.join(import.meta.dirname, file)],
+          {
+            env: {
+              ...phaseEnv,
+              AC_E2E_BINARY: binary,
+              AC_E2E_WORKSPACE: workspace,
+              AC_E2E_SETTINGS: settingsFile,
+              AC_E2E_ARTIFACTS: artifacts,
+              ...(windows ? { AC_E2E_DEBUGGER: `127.0.0.1:${port}` } : {}),
+            },
+            stdio: "inherit",
+          },
+        );
+        tests.on("exit", (c) => resolve(c ?? 1));
+      });
+      failed ||= exit;
+    }
+  } catch (err) {
+    console.error(String(err));
+    failed = 1;
+  } finally {
+    await stop(driver);
+    if (started) await stop(started);
+  }
+  return failed;
+}
+
+/** Kills a process and waits until it's gone, so the next phase can take its port. */
+function stop(child) {
+  if (child.exitCode !== null || child.signalCode !== null) return Promise.resolve();
+  return new Promise((resolve) => {
+    child.once("exit", () => resolve());
+    child.kill();
+  });
+}
 
 async function waitForDriver() {
   const deadline = Date.now() + 30_000;
@@ -136,16 +170,16 @@ async function waitForDriver() {
   throw new Error("the WebDriver server didn't start listening on 127.0.0.1:4444");
 }
 
-async function waitForDebugPort() {
+async function waitForDebugPort(port) {
   const deadline = Date.now() + 120_000;
   while (Date.now() < deadline) {
     try {
-      const res = await fetch(`http://127.0.0.1:${DEBUG_PORT}/json/version`);
+      const res = await fetch(`http://127.0.0.1:${port}/json/version`);
       if (res.ok) return;
     } catch {
       // the WebView isn't up yet
     }
     await new Promise((r) => setTimeout(r, 500));
   }
-  throw new Error(`the app's WebView2 didn't open its debugging port ${DEBUG_PORT} within 120 s`);
+  throw new Error(`the app's WebView2 didn't open its debugging port ${port} within 120 s`);
 }

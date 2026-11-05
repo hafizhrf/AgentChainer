@@ -1,4 +1,6 @@
 import type { FleetItem } from "@agentchainer/protocol";
+import { hours, minutes, seconds } from "./i18n/format.ts";
+import { t } from "./i18n/index.ts";
 
 /** The fleet view's pure parts (M8-02): ordering and time labels. */
 
@@ -10,16 +12,36 @@ export function workspaceOf(dir: string): string {
 /** How long ago `iso` was, short: "12 s", "4 min", "2 h". */
 export function ago(iso: string, now: number): string {
   const s = Math.max(0, Math.round((now - Date.parse(iso)) / 1000));
-  if (s < 60) return `${s} s`;
-  if (s < 3600) return `${Math.floor(s / 60)} min`;
-  return `${Math.floor(s / 3600)} h`;
+  if (s < 60) return seconds(s);
+  if (s < 3600) return minutes(Math.floor(s / 60));
+  return hours(Math.floor(s / 3600));
 }
 
 export const FLEET_STATUS: Record<FleetItem["status"], { label: string; order: number }> = {
-  waiting: { label: "Waiting for you", order: 0 },
-  working: { label: "Working", order: 1 },
-  idle: { label: "Idle", order: 2 },
-  ended: { label: "Ended", order: 3 },
+  waiting: {
+    get label() {
+      return t("graph.fleet.statusWaiting");
+    },
+    order: 0,
+  },
+  working: {
+    get label() {
+      return t("graph.fleet.statusWorking");
+    },
+    order: 1,
+  },
+  idle: {
+    get label() {
+      return t("graph.fleet.statusIdle");
+    },
+    order: 2,
+  },
+  ended: {
+    get label() {
+      return t("graph.fleet.statusEnded");
+    },
+    order: 3,
+  },
 };
 
 /** The fleet's rows by workspace, the ones needing the person first, then working, idle and ended. */

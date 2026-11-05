@@ -5,6 +5,7 @@ import { readText } from "@tauri-apps/plugin-clipboard-manager";
 import { Copy, Minus, PanelBottom, PanelLeft, PanelRight, Search, Square, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { BrandMark } from "./BrandMark.tsx";
+import { t } from "./i18n/index.ts";
 import { isMac, shortcut } from "./options.ts";
 import { IconButton } from "./ui/IconButton.tsx";
 import { commandForKey, type MenuCommand, menuShortcut } from "./useMenuCommands.ts";
@@ -18,54 +19,60 @@ type Item =
 
 type EditAction = "undo" | "redo" | "cut" | "copy" | "paste" | "selectAll";
 
-/** The same menus as `menu.rs` builds natively on macOS, with the same ids and shortcuts. */
+/** The same menus as `menu.rs` builds natively on macOS, with the same ids, labels (`menu.json`) and shortcuts. */
 function menus(tasks: boolean): { label: string; items: Item[] }[] {
   const sep: Item = { kind: "separator" };
+  const command = (id: MenuCommand): Item => ({ kind: "command", id, label: t(`menu.${id}`) });
+  const help = (id: "help-getting-started" | "help-report-issue"): Item => ({
+    kind: "help",
+    id,
+    label: t(`menu.${id}`),
+  });
   return [
     {
-      label: "File",
+      label: t("menu.file"),
       items: [
-        { kind: "command", id: "new-session", label: "New Session" },
-        ...(tasks ? [{ kind: "command", id: "new-task", label: "New Task" } as const] : []),
-        { kind: "command", id: "open-folder", label: "Open Folder…" },
+        command("new-session"),
+        ...(tasks ? [command("new-task")] : []),
+        command("open-folder"),
         sep,
-        { kind: "command", id: "close-session", label: "Close Session" },
+        command("close-session"),
         sep,
-        { kind: "command", id: "settings", label: "Settings…" },
+        command("settings"),
         sep,
-        { kind: "quit", label: "Exit" },
+        { kind: "quit", label: t("menu.exit") },
       ],
     },
     {
-      label: "Edit",
+      label: t("menu.edit"),
       items: [
-        { kind: "edit", id: "undo", label: "Undo", keys: shortcut("Z") },
-        { kind: "edit", id: "redo", label: "Redo", keys: shortcut("Y") },
+        { kind: "edit", id: "undo", label: t("menu.undo"), keys: shortcut("Z") },
+        { kind: "edit", id: "redo", label: t("menu.redo"), keys: shortcut("Y") },
         sep,
-        { kind: "edit", id: "cut", label: "Cut", keys: shortcut("X") },
-        { kind: "edit", id: "copy", label: "Copy", keys: shortcut("C") },
-        { kind: "edit", id: "paste", label: "Paste", keys: shortcut("V") },
-        { kind: "edit", id: "selectAll", label: "Select All", keys: shortcut("A") },
+        { kind: "edit", id: "cut", label: t("menu.cut"), keys: shortcut("X") },
+        { kind: "edit", id: "copy", label: t("menu.copy"), keys: shortcut("C") },
+        { kind: "edit", id: "paste", label: t("menu.paste"), keys: shortcut("V") },
+        { kind: "edit", id: "selectAll", label: t("menu.select-all"), keys: shortcut("A") },
       ],
     },
     {
-      label: "View",
+      label: t("menu.view"),
       items: [
-        { kind: "command", id: "command-palette", label: "Command Palette…" },
+        command("command-palette"),
         sep,
-        { kind: "command", id: "toggle-sidebar", label: "Toggle Sidebar" },
-        { kind: "command", id: "toggle-right-panel", label: "Toggle Workspace Panel" },
-        { kind: "command", id: "toggle-terminal", label: "Toggle Terminal" },
+        command("toggle-sidebar"),
+        command("toggle-right-panel"),
+        command("toggle-terminal"),
       ],
     },
     {
-      label: "Help",
+      label: t("menu.help"),
       items: [
-        { kind: "help", id: "help-getting-started", label: "Getting Started" },
-        { kind: "help", id: "help-report-issue", label: "Report an Issue" },
+        help("help-getting-started"),
+        help("help-report-issue"),
         sep,
-        { kind: "command", id: "export-diagnostics", label: "Export Diagnostics…" },
-        { kind: "command", id: "check-updates", label: "Check for Updates…" },
+        command("export-diagnostics"),
+        command("check-updates"),
       ],
     },
   ];
@@ -232,7 +239,7 @@ export function TitleBar({
       <span className="grow" data-tauri-drag-region />
       <div className="titlebar-toggles">
         <IconButton
-          label="Toggle Sidebar"
+          label={t("menu.toggle-sidebar")}
           shortcut={menuShortcut("toggle-sidebar")}
           pressed={sidebarOpen}
           onClick={() => onCommand("toggle-sidebar")}
@@ -241,7 +248,7 @@ export function TitleBar({
         </IconButton>
         {terminalOpen !== null && (
           <IconButton
-            label="Toggle Terminal"
+            label={t("menu.toggle-terminal")}
             shortcut={menuShortcut("toggle-terminal")}
             pressed={terminalOpen}
             onClick={() => onCommand("toggle-terminal")}
@@ -250,7 +257,7 @@ export function TitleBar({
           </IconButton>
         )}
         <IconButton
-          label="Toggle Workspace Panel"
+          label={t("menu.toggle-right-panel")}
           shortcut={menuShortcut("toggle-right-panel")}
           pressed={rightOpen}
           onClick={() => onCommand("toggle-right-panel")}
@@ -260,17 +267,22 @@ export function TitleBar({
       </div>
       {win && (
         <div className="titlebar-window">
-          <button type="button" aria-label="Minimize" onClick={() => void win.minimize()}>
+          <button type="button" aria-label={t("shell.titleBar.minimize")} onClick={() => void win.minimize()}>
             <Minus size={15} />
           </button>
           <button
             type="button"
-            aria-label={maximized ? "Restore" : "Maximize"}
+            aria-label={maximized ? t("shell.titleBar.restore") : t("shell.titleBar.maximize")}
             onClick={() => void win.toggleMaximize()}
           >
             {maximized ? <Copy size={13} /> : <Square size={12} />}
           </button>
-          <button type="button" className="close" aria-label="Close" onClick={() => void win.close()}>
+          <button
+            type="button"
+            className="close"
+            aria-label={t("shell.titleBar.close")}
+            onClick={() => void win.close()}
+          >
             <X size={16} />
           </button>
         </div>

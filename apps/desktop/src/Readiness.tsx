@@ -2,6 +2,7 @@ import type { EnvCheck } from "@agentchainer/protocol";
 import { invoke } from "@tauri-apps/api/core";
 import { CircleCheck, CircleX, RefreshCw, SquareTerminal } from "lucide-react";
 import { useState } from "react";
+import { t } from "./i18n/index.ts";
 
 /**
  * Onboarding readiness and tutorial (spike S5, checklist M1-04/M1-05). The app never signs in for the user: it shows
@@ -18,8 +19,8 @@ export function Readiness({
 }) {
   if (!env)
     return (
-      <section className="card readiness compact" aria-label="Setup check">
-        <p className="muted">{checking ? "Checking your setup…" : "Waiting for the agent runtime…"}</p>
+      <section className="card readiness compact" aria-label={t("home.readiness.label")}>
+        <p className="muted">{checking ? t("home.readiness.checking") : t("home.readiness.waiting")}</p>
       </section>
     );
   const install =
@@ -28,32 +29,35 @@ export function Readiness({
       : "curl -fsSL https://claude.ai/install.sh | bash";
   const rows: { ok: boolean; label: string; fix?: string; command?: string }[] = [
     env.claude.path
-      ? { ok: true, label: `Claude Code CLI found (${env.claude.version ?? "version unknown"})` }
+      ? {
+          ok: true,
+          label: t("home.readiness.cliFound", { version: env.claude.version ?? t("home.readiness.versionUnknown") }),
+        }
       : {
           ok: false,
-          label: "Claude Code CLI not found",
-          fix: "Install it in your terminal, then open a new terminal window:",
+          label: t("home.readiness.cliMissing"),
+          fix: t("home.readiness.cliFix"),
           command: install,
         },
   ];
   if (env.claude.path) {
     rows.push(
       env.claude.versionOk
-        ? { ok: true, label: `Version ${env.claude.minVersion} or newer` }
+        ? { ok: true, label: t("home.readiness.versionOk", { min: env.claude.minVersion }) }
         : {
             ok: false,
-            label: `Version older than ${env.claude.minVersion}`,
-            fix: "Update it in your terminal:",
+            label: t("home.readiness.versionOld", { min: env.claude.minVersion }),
+            fix: t("home.readiness.versionFix"),
             command: "claude update",
           },
     );
     rows.push(
       env.auth?.loggedIn
-        ? { ok: true, label: `Signed in (${authLabel(env)})` }
+        ? { ok: true, label: t("home.readiness.signedIn", { method: authLabel(env) }) }
         : {
             ok: false,
-            label: "Not signed in",
-            fix: "Sign in yourself in your terminal. AgentChainer never handles your login:",
+            label: t("home.readiness.notSignedIn"),
+            fix: t("home.readiness.signInFix"),
             command: "claude auth login",
           },
     );
@@ -61,27 +65,34 @@ export function Readiness({
   rows.push(
     env.git.version
       ? { ok: true, label: env.git.version }
-      : { ok: false, label: "git not found", fix: "Install git from https://git-scm.com/downloads, then re-check." },
+      : {
+          ok: false,
+          label: t("home.readiness.gitMissing"),
+          fix: t("home.readiness.gitFix", { url: "https://git-scm.com/downloads" }),
+        },
   );
 
   const recheck = (
     <button type="button" className="ghost small" disabled={checking} onClick={onRecheck}>
       <RefreshCw size={14} className={checking ? "spin" : undefined} />
-      {checking ? "Checking…" : "Re-check"}
+      {checking ? t("home.readiness.rechecking") : t("home.readiness.recheck")}
     </button>
   );
 
   // Once everything is in place, one line is enough.
   if (env.ready)
     return (
-      <section className="card readiness compact" aria-label="Setup check">
+      <section className="card readiness compact" aria-label={t("home.readiness.label")}>
         <CircleCheck size={18} className="readiness-ok" aria-hidden />
         <span className="grow">
-          <strong>Ready</strong>
+          <strong>{t("home.readiness.ready")}</strong>
           <span className="muted">
             {" "}
-            · Claude CLI {shortVersion(env.claude.version)} · signed in with {authLabel(env)} · git{" "}
-            {shortVersion(env.git.version?.replace(/^git version /, "") ?? null)}
+            {t("home.readiness.summary", {
+              claude: shortVersion(env.claude.version),
+              auth: authLabel(env),
+              git: shortVersion(env.git.version?.replace(/^git version /, "") ?? null),
+            })}
           </span>
         </span>
         {recheck}
@@ -91,14 +102,18 @@ export function Readiness({
   return (
     <section className="card readiness" aria-labelledby="readiness-title">
       <div className="card-title">
-        <h2 id="readiness-title">Set up Claude</h2>
+        <h2 id="readiness-title">{t("home.readiness.title")}</h2>
         <span className="grow" />
         {recheck}
       </div>
       <ul>
         {rows.map((r) => (
           <li key={r.label} className={r.ok ? "ok" : "fail"}>
-            {r.ok ? <CircleCheck size={16} aria-label="Done" /> : <CircleX size={16} aria-label="Missing" />}
+            {r.ok ? (
+              <CircleCheck size={16} aria-label={t("home.readiness.done")} />
+            ) : (
+              <CircleX size={16} aria-label={t("home.readiness.missing")} />
+            )}
             <div>
               {r.label}
               {r.fix && <div className="muted">{r.fix}</div>}
@@ -107,14 +122,11 @@ export function Readiness({
           </li>
         ))}
       </ul>
-      <p className="muted">
-        Step-by-step guide for each OS: Help → Getting Started. Claude installed somewhere unusual? Set the Claude CLI
-        path in Settings.
-      </p>
+      <p className="muted">{t("home.readiness.guide")}</p>
       <div className="row">
         <button type="button" className="secondary" onClick={() => void invoke("open_terminal", { dir: null })}>
           <SquareTerminal size={14} />
-          Open terminal
+          {t("home.readiness.openTerminal")}
         </button>
       </div>
     </section>
@@ -136,7 +148,7 @@ function CommandLine({ command }: { command: string }) {
           })
         }
       >
-        {copied ? "Copied" : "Copy"}
+        {copied ? t("shell.copyButton.copied") : t("shell.copyButton.copy")}
       </button>
     </div>
   );
@@ -149,9 +161,9 @@ function shortVersion(version: string | null): string {
 
 function authLabel(env: EnvCheck): string {
   const a = env.auth;
-  if (!a) return "unknown";
-  if (a.method === "claude.ai") return "Claude subscription";
-  if (a.method === "api_key") return "API key";
-  if (a.method === "third_party") return `cloud provider: ${a.provider}`;
+  if (!a) return t("home.readiness.authUnknown");
+  if (a.method === "claude.ai") return t("home.readiness.authSubscription");
+  if (a.method === "api_key") return t("home.readiness.authApiKey");
+  if (a.method === "third_party") return t("home.readiness.authCloud", { provider: String(a.provider) });
   return a.method;
 }

@@ -1,4 +1,5 @@
 import { GATE_KINDS, STEP_INPUTS, WORKFLOW_ROLES } from "@agentchainer/protocol";
+import { t } from "../i18n/index.ts";
 import { Field } from "../ui/Field.tsx";
 import { Select } from "../ui/Select.tsx";
 import type { Path } from "./workflowDoc.ts";
@@ -79,7 +80,7 @@ export function StepForm({
 
   if (node.kind === "subtasks") {
     return (
-      <Field label="Sub-tasks at once" help="Each sub-task runs its own tier's workflow in its own worktree (1–4).">
+      <Field label={t("workflows.stepForm.subtasksAtOnce")} help={t("workflows.stepForm.subtasksHelp")}>
         <input
           type="number"
           min={1}
@@ -93,7 +94,7 @@ export function StepForm({
   if (node.kind === "integration") {
     return (
       <Checks
-        label="Integration gates, on the merged task branch"
+        label={t("workflows.stepForm.integrationGates")}
         options={GATE_KINDS}
         value={strings(obj(data?.integration).gates)}
         onChange={(v) => onSet(["integration", "gates"], v)}
@@ -106,7 +107,7 @@ export function StepForm({
   const targets = fixTargets(data, index);
   const fixFields = (required: boolean) => (
     <fieldset className="workflow-fix">
-      <legend className="field-label">Fix rounds</legend>
+      <legend className="field-label">{t("workflows.stepForm.fixRounds")}</legend>
       {!required && (
         <label className="check">
           <input
@@ -119,21 +120,23 @@ export function StepForm({
               )
             }
           />
-          Send must-fix findings back to a write step
+          {t("workflows.stepForm.sendFindingsBack")}
         </label>
       )}
       {step.fix !== undefined && (
         <>
-          <Field label="Back to">
+          <Field label={t("workflows.stepForm.backTo")}>
             <Select
-              label="The write step that gets the failures"
+              label={t("workflows.stepForm.backToStep")}
               value={text(fix.step)}
-              options={[...new Set([...targets, text(fix.step)])].filter(Boolean).map((t) => ({ value: t, label: t }))}
+              options={[...new Set([...targets, text(fix.step)])]
+                .filter(Boolean)
+                .map((id) => ({ value: id, label: id }))}
               onChange={(v) => onSet(at("fix", "step"), v)}
             />
           </Field>
           <div className="workflow-row">
-            <Field label="Rounds (0–5)">
+            <Field label={t("workflows.stepForm.rounds")}>
               <input
                 type="number"
                 min={0}
@@ -142,7 +145,7 @@ export function StepForm({
                 onChange={(e) => onSet(at("fix", "maxRounds"), num(e.target.value))}
               />
             </Field>
-            <Field label="Budget for the fixes ($)">
+            <Field label={t("workflows.stepForm.fixBudget")}>
               <input
                 type="number"
                 min={0}
@@ -159,10 +162,10 @@ export function StepForm({
 
   const idLabel = (
     <div className="workflow-row">
-      <Field label="Id" help="Lowercase letters, digits and dashes; fix rounds name steps by it.">
+      <Field label={t("workflows.stepForm.id")} help={t("workflows.stepForm.idHelp")}>
         <input value={text(step.id)} onChange={(e) => onSet(at("id"), e.target.value)} spellCheck={false} />
       </Field>
-      <Field label="Label">
+      <Field label={t("workflows.stepForm.label")}>
         <input value={text(step.label)} onChange={(e) => onSet(at("label"), e.target.value)} />
       </Field>
     </div>
@@ -172,10 +175,7 @@ export function StepForm({
     return (
       <>
         {idLabel}
-        <p className="muted">
-          Its members run at the same time, read-only, and their answers merge into the plan. Select a member to edit
-          it.
-        </p>
+        <p className="muted">{t("workflows.stepForm.groupHelp")}</p>
       </>
     );
   }
@@ -184,7 +184,7 @@ export function StepForm({
       <>
         {idLabel}
         <Checks
-          label="Gates, in order"
+          label={t("workflows.stepForm.gatesInOrder")}
           options={GATE_KINDS}
           value={strings(step.gates)}
           onChange={(v) => onSet(at("gates"), v)}
@@ -200,24 +200,20 @@ export function StepForm({
   return (
     <>
       {idLabel}
-      <Field label="Role">
+      <Field label={t("workflows.stepForm.role")}>
         <Select
-          label="Role"
+          label={t("workflows.stepForm.role")}
           value={text(step.role)}
           options={WORKFLOW_ROLES.map((r) => ({ value: r, label: r }))}
           onChange={(v) => onSet(at("role"), v)}
         />
       </Field>
       <Field
-        label="Access"
-        help={
-          readOnly
-            ? "Parallel members and the split are read-only."
-            : "Read: Read, Grep and Glob only. Write: the normal tools, with approvals."
-        }
+        label={t("workflows.stepForm.access")}
+        help={readOnly ? t("workflows.stepForm.accessReadOnly") : t("workflows.stepForm.accessHelp")}
       >
         <Select
-          label="Access"
+          label={t("workflows.stepForm.access")}
           value={text(step.access)}
           disabled={readOnly}
           options={[
@@ -228,19 +224,19 @@ export function StepForm({
         />
       </Field>
       <Checks
-        label="Inputs"
+        label={t("workflows.stepForm.inputs")}
         options={STEP_INPUTS}
         value={strings(step.inputs)}
         onChange={(v) => onSet(at("inputs"), v)}
       />
       {node.kind === "agent" && (
         <>
-          <Field label="Output" help="plan: kept as plan.md for later steps. review: findings, read-only steps only.">
+          <Field label={t("workflows.stepForm.output")} help={t("workflows.stepForm.outputHelp")}>
             <Select
-              label="Output"
+              label={t("workflows.stepForm.output")}
               value={text(step.output)}
               options={[
-                { value: "", label: "none" },
+                { value: "", label: t("workflows.stepForm.outputNone") },
                 { value: "plan", label: "plan" },
                 { value: "review", label: "review" },
               ]}
@@ -253,12 +249,12 @@ export function StepForm({
               checked={step.fresh === true}
               onChange={(e) => onSet(at("fresh"), e.target.checked || undefined)}
             />
-            A fresh session that sees only its inputs
+            {t("workflows.stepForm.fresh")}
           </label>
         </>
       )}
       <div className="workflow-row">
-        <Field label="Max turns">
+        <Field label={t("workflows.stepForm.maxTurns")}>
           <input
             type="number"
             min={1}
@@ -267,7 +263,7 @@ export function StepForm({
             onChange={(e) => onSet(at("limits", "maxTurns"), num(e.target.value))}
           />
         </Field>
-        <Field label="Budget ($)">
+        <Field label={t("workflows.stepForm.budget")}>
           <input
             type="number"
             min={0}

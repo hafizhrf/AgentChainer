@@ -2,6 +2,8 @@ import type { FileDiff } from "@agentchainer/protocol";
 import { ArrowLeft, ExternalLink, Undo2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import type { Confirm } from "./Dialog.tsx";
+import { t } from "./i18n/index.ts";
+import { Rich } from "./i18n/Rich.tsx";
 import { languageFor, monaco, monacoTheme } from "./monaco.ts";
 import { request } from "./sidecar.ts";
 
@@ -92,16 +94,13 @@ export default function DiffView({
     if (!diff) return;
     const removes = diff.status === "untracked" || diff.status === "added";
     const ok = await confirm({
-      title: removes ? "Delete this new file?" : "Revert this file?",
+      title: removes ? t("panel.diff.deleteTitle") : t("panel.diff.revertTitle"),
       body: (
         <p>
-          <code>{path}</code>{" "}
-          {removes
-            ? "isn't in the last commit, so reverting deletes it."
-            : "goes back to how it is in the last commit (HEAD). Staged changes to it are dropped too."}
+          <Rich k={removes ? "panel.diff.deleteBody" : "panel.diff.revertBody"} params={{ path }} tags={{ code }} />
         </p>
       ),
-      confirmLabel: removes ? "Delete file" : "Revert file",
+      confirmLabel: removes ? t("panel.diff.deleteFile") : t("panel.diff.revertFile"),
       danger: true,
     });
     if (ok) await run(() => request("workspace.revert", { cwd, path }));
@@ -111,14 +110,17 @@ export default function DiffView({
     const hunk = diff?.hunks[index];
     if (!hunk) return;
     const ok = await confirm({
-      title: "Revert this change?",
+      title: t("panel.diff.revertHunkTitle"),
       body: (
         <p>
-          Lines {hunk.newStart}–{hunk.newStart + Math.max(hunk.newLines, 1) - 1} of <code>{path}</code> go back to the
-          last commit. The rest of the file stays as it is.
+          <Rich
+            k="panel.diff.revertHunkBody"
+            params={{ from: hunk.newStart, to: hunk.newStart + Math.max(hunk.newLines, 1) - 1, path }}
+            tags={{ code }}
+          />
         </p>
       ),
-      confirmLabel: "Revert change",
+      confirmLabel: t("panel.diff.revertHunk"),
       danger: true,
     });
     if (ok) await run(() => request("workspace.revert", { cwd, path, hunk: index }));
@@ -137,9 +139,9 @@ export default function DiffView({
   return (
     <div className="diff-view">
       <header className="diff-header">
-        <button type="button" className="ghost small" onClick={onClose} aria-label="Back to the workspace panel">
+        <button type="button" className="ghost small" onClick={onClose} aria-label={t("panel.diff.backLabel")}>
           <ArrowLeft size={14} />
-          Back
+          {t("panel.diff.back")}
         </button>
         <code className="grow diff-path" title={path}>
           {path}
@@ -149,26 +151,26 @@ export default function DiffView({
       <div className="diff-actions">
         <button type="button" className="ghost small" onClick={() => onOpenInEditor(diff?.hunks[0]?.newStart)}>
           <ExternalLink size={14} />
-          Open in editor
+          {t("panel.diff.openInEditor")}
         </button>
         {diff?.status && (
           <button type="button" className="ghost small" onClick={() => void revertFile()}>
             <Undo2 size={14} />
-            Revert file
+            {t("panel.diff.revertFile")}
           </button>
         )}
       </div>
       {error && <p className="warn">{error}</p>}
-      {diff?.binary && <p className="muted">Binary file: no text diff.</p>}
-      {diff?.tooLarge && <p className="muted">This file is too large to diff here. Open it in your editor.</p>}
-      {unchanged && <p className="muted">No changes since the last commit.</p>}
+      {diff?.binary && <p className="muted">{t("panel.diff.binary")}</p>}
+      {diff?.tooLarge && <p className="muted">{t("panel.diff.tooLarge")}</p>}
+      {unchanged && <p className="muted">{t("panel.diff.unchanged")}</p>}
       {diff && diff.hunks.length > 1 && (
         <ul className="hunks">
           {diff.hunks.map((h, i) => (
             <li key={h.header}>
               <code>{h.header.replace(/^(@@[^@]*@@).*$/, "$1")}</code>
               <button type="button" className="link" onClick={() => void revertHunk(i)}>
-                Revert
+                {t("panel.diff.revert")}
               </button>
             </li>
           ))}
@@ -178,3 +180,6 @@ export default function DiffView({
     </div>
   );
 }
+
+/** A `<code>` part of a message (`Rich`): the file's path. */
+const code = (s: string) => <code>{s}</code>;

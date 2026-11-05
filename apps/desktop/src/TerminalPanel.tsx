@@ -5,6 +5,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { useEffect, useRef } from "react";
 import { isDark, onThemeChange } from "./appearance.ts";
+import { t } from "./i18n/index.ts";
 
 const THEMES = {
   dark: { background: "#1c201e", foreground: "#e6ebe8", cursor: "#7fb89a", selectionBackground: "#2f4a3b" },
@@ -45,7 +46,7 @@ export default function TerminalPanel({ cwd }: { cwd: string }) {
       else if (id === null) early.set(e.payload.id, [...(early.get(e.payload.id) ?? []), e.payload.data]);
     });
     const offExit = listen<{ id: number }>("pty://exit", (e) => {
-      if (e.payload.id === id) term.write("\r\n[shell exited — close and reopen the terminal to start a new one]\r\n");
+      if (e.payload.id === id) term.write(`\r\n${t("panel.terminal.exited")}\r\n`);
     });
     invoke<number>("pty_open", { cwd, cols: term.cols, rows: term.rows })
       .then((opened) => {
@@ -57,7 +58,7 @@ export default function TerminalPanel({ cwd }: { cwd: string }) {
         for (const chunk of early.get(opened) ?? []) term.write(chunk);
         early.clear();
       })
-      .catch((err: unknown) => term.write(`Couldn't start a shell: ${err}\r\n`));
+      .catch((err: unknown) => term.write(`${t("panel.terminal.startFailed", { error: String(err) })}\r\n`));
 
     const input = term.onData((data) => {
       if (id !== null) void invoke("pty_write", { id, data });

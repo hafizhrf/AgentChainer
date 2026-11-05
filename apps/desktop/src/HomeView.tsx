@@ -11,6 +11,7 @@ import { Folder, FolderOpen, Play, Wrench, X } from "lucide-react";
 import { type ReactNode, useEffect, useState } from "react";
 import type { Confirm } from "./Dialog.tsx";
 import { GitInitOffer } from "./GitInitOffer.tsx";
+import { t } from "./i18n/index.ts";
 import { MODE_HELP, modelChoices, modeOptions } from "./options.ts";
 import { Readiness } from "./Readiness.tsx";
 import { SessionList } from "./SessionList.tsx";
@@ -21,7 +22,7 @@ import { Select } from "./ui/Select.tsx";
 
 /** Opens the native folder picker; null when cancelled. */
 export async function pickFolder(): Promise<string | null> {
-  const picked = await open({ directory: true, multiple: false, title: "Choose a project folder" });
+  const picked = await open({ directory: true, multiple: false, title: t("home.view.pickFolder") });
   return typeof picked === "string" ? picked : null;
 }
 
@@ -85,19 +86,19 @@ export function HomeView({
     if (profile && profiles && !profiles.some((p) => p.name === profile)) onProfileChange("");
   }, [profile, profiles, onProfileChange]);
   const blocked = !env?.ready
-    ? "Finish the setup check first."
+    ? t("home.view.blockedSetup")
     : !workspace
-      ? "Choose a workspace folder first."
+      ? t("home.view.blockedFolder")
       : mode === "auto" && !canAutonomous
-        ? "Autonomous needs a budget cap: set one in Settings."
+        ? t("home.view.blockedBudget")
         : null;
 
   return (
     <div className="home">
       <div className="home-inner">
         <header className="home-header">
-          <h1>Start a session</h1>
-          <p className="muted">Pick a project folder, choose how much Claude may do on its own, and start.</p>
+          <h1>{t("home.view.title")}</h1>
+          <p className="muted">{t("home.view.subtitle")}</p>
         </header>
 
         <Readiness env={env} checking={checking} onRecheck={onRecheck} />
@@ -106,10 +107,10 @@ export function HomeView({
           {connected && workspace && <GitInitOffer cwd={workspace} />}
           {connected && workspace && (
             <div className="workspace-setup">
-              <span className="muted">See what this project needs for agent work, and set it up with previews.</span>
+              <span className="muted">{t("home.view.setupHint")}</span>
               <button type="button" className="secondary small" onClick={onOpenSetup}>
                 <Wrench size={14} />
-                Workspace settings…
+                {t("home.view.openSetup")}
               </button>
             </div>
           )}
@@ -117,15 +118,20 @@ export function HomeView({
 
         <section className="card" aria-labelledby="options-title">
           <div className="card-title">
-            <h2 id="options-title">Options</h2>
+            <h2 id="options-title">{t("home.view.options")}</h2>
           </div>
           <div className="field-row">
-            <Field label="Model">
-              <Select label="Model" value={model} onChange={onModelChange} options={modelChoices(undefined, model)} />
-            </Field>
-            <Field label="Permission profile">
+            <Field label={t("home.view.model")}>
               <Select
-                label="Permission profile"
+                label={t("home.view.model")}
+                value={model}
+                onChange={onModelChange}
+                options={modelChoices(undefined, model)}
+              />
+            </Field>
+            <Field label={t("home.view.permissionProfile")}>
+              <Select
+                label={t("home.view.permissionProfile")}
                 value={mode}
                 onChange={(m) => onModeChange(asMode(m))}
                 options={modeOptions(PERMISSION_MODES, canAutonomous)}
@@ -134,20 +140,17 @@ export function HomeView({
           </div>
           <p className="field-help">{MODE_HELP[mode]}</p>
           {profiles && profiles.length > 0 && (
-            <Field
-              label="Agent profile"
-              help="Run the chat as one of your agents: its instructions, its model unless you pick one, and only its tools. Manage them in Workspace settings → Agents."
-            >
+            <Field label={t("home.view.agentProfile")} help={t("home.view.agentProfileHelp")}>
               <Select
-                label="Agent profile"
+                label={t("home.view.agentProfile")}
                 value={profile}
                 onChange={onProfileChange}
                 options={[
-                  { value: "", label: "None", hint: "Claude as usual" },
+                  { value: "", label: t("home.view.profileNone"), hint: t("home.view.profileNoneHint") },
                   ...profiles.map((p) => ({
                     value: p.name,
                     label: p.name,
-                    hint: `${p.scope === "user" ? "Yours" : "This project"} · ${p.description}`,
+                    hint: `${p.scope === "user" ? t("home.view.profileYours") : t("home.view.profileProject")} · ${p.description}`,
                   })),
                 ]}
               />
@@ -158,7 +161,7 @@ export function HomeView({
             <span className="grow" />
             <button type="button" disabled={blocked !== null} onClick={onStart}>
               <Play size={14} />
-              Start session
+              {t("home.view.start")}
             </button>
           </div>
         </section>
@@ -205,10 +208,10 @@ export function WorkspaceCard({
   return (
     <section className="card" aria-labelledby="workspace-title">
       <div className="card-title">
-        <h2 id="workspace-title">Workspace</h2>
+        <h2 id="workspace-title">{t("home.workspace.title")}</h2>
         <span className="grow" />
         <button type="button" className="ghost small" onClick={() => setTyping((v) => !v)}>
-          {typing ? "Done" : "Enter a path"}
+          {typing ? t("home.workspace.done") : t("home.workspace.enterPath")}
         </button>
       </div>
 
@@ -219,9 +222,11 @@ export function WorkspaceCard({
           value={cwd}
           onChange={(e) => onChange(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && setTyping(false)}
-          placeholder={homeDir ? `e.g. ${homeDir}/projects/my-app` : "Path to a project folder"}
+          placeholder={
+            homeDir ? t("home.workspace.pathExample", { home: homeDir }) : t("home.workspace.pathPlaceholder")
+          }
           spellCheck={false}
-          aria-label="Workspace folder"
+          aria-label={t("home.workspace.folderLabel")}
         />
       )}
 
@@ -235,13 +240,13 @@ export function WorkspaceCard({
             </span>
           </div>
           <button type="button" className="secondary small" onClick={() => void browse()}>
-            Change…
+            {t("home.workspace.change")}
           </button>
           <button
             type="button"
             className="ghost icon"
-            aria-label="Clear the workspace"
-            title="Clear"
+            aria-label={t("home.workspace.clearLabel")}
+            title={t("home.workspace.clear")}
             onClick={() => onChange("")}
           >
             <X size={14} />
@@ -249,27 +254,20 @@ export function WorkspaceCard({
         </div>
       ) : (
         <div className="workspace-empty">
-          <p className="muted">
-            The agent works in this folder. In Safe and Standard, an edit outside it waits for your approval, except
-            Claude Code's own plan files.
-          </p>
+          <p className="muted">{t("home.workspace.empty")}</p>
           <button type="button" onClick={() => void browse()}>
             <FolderOpen size={16} />
-            Open folder…
+            {t("home.workspace.open")}
           </button>
         </div>
       )}
 
-      {isHome && (
-        <p className="warn">
-          That's your whole home folder. Pick a single project folder so the agent stays inside it.
-        </p>
-      )}
+      {isHome && <p className="warn">{t("home.workspace.homeWarning")}</p>}
       {children}
 
       {others.length > 0 && (
         <div className="recent">
-          <h3 className="recent-heading">Recent</h3>
+          <h3 className="recent-heading">{t("home.workspace.recent")}</h3>
           <ul>
             {others.map((dir) => (
               <li key={dir}>

@@ -3,6 +3,8 @@ import { describeRequest, displayPath, type RiskLevel } from "@agentchainer/prot
 import { useState } from "react";
 import { Modal } from "./Dialog.tsx";
 import { editDiffs, InlineDiff } from "./InlineDiff.tsx";
+import { t } from "./i18n/index.ts";
+import { Rich } from "./i18n/Rich.tsx";
 import { Markdown } from "./Markdown.tsx";
 import { MODE_HELP, modeOptions } from "./options.ts";
 import { QuestionCard } from "./QuestionCard.tsx";
@@ -40,7 +42,13 @@ export function PermissionDialog({
   // A task step's questions have no thread yet: they show in the dialog (UX-12).
   if (request.toolName === "AskUserQuestion") {
     return (
-      <Modal open onOpenChange={() => undefined} dismissible={false} size="lg" title="Claude asks">
+      <Modal
+        open
+        onOpenChange={() => undefined}
+        dismissible={false}
+        size="lg"
+        title={t("session.permission.claudeAsks")}
+      >
         <QuestionCard request={request} onAnswer={onAnswer} />
       </Modal>
     );
@@ -52,22 +60,53 @@ export function PermissionDialog({
   );
 }
 
-const SCOPES: { value: AlwaysScope; label: string; hint: string }[] = [
-  { value: "session", label: "Only this session", hint: "Forgotten when the session ends." },
-  {
-    value: "workspace",
-    label: "This workspace, just me",
-    hint: "Saved in .claude/settings.local.json, which stays out of git.",
-  },
-  {
-    value: "team",
-    label: "This workspace, shared with the team",
-    hint: "Saved in .claude/settings.json, which is committed: your teammates get this rule too.",
-  },
-];
-const asScope = (v: string): AlwaysScope => SCOPES.find((s) => s.value === v)?.value ?? "workspace";
+const SCOPES: AlwaysScope[] = ["session", "workspace", "team"];
+const asScope = (v: string): AlwaysScope => SCOPES.find((s) => s === v) ?? "workspace";
 
-const RISK_LABEL: Record<RiskLevel, string> = { low: "Low risk", medium: "Review first", high: "High risk" };
+/** Where an "Always allow" rule is saved, in words. */
+function scopeLabel(scope: AlwaysScope): string {
+  switch (scope) {
+    case "session":
+      return t("session.permission.scopeSession");
+    case "workspace":
+      return t("session.permission.scopeWorkspace");
+    case "team":
+      return t("session.permission.scopeTeam");
+  }
+}
+
+/** What saving there means. */
+function scopeHint(scope: AlwaysScope): string {
+  switch (scope) {
+    case "session":
+      return t("session.permission.scopeSessionHint");
+    case "workspace":
+      return t("session.permission.scopeWorkspaceHint");
+    case "team":
+      return t("session.permission.scopeTeamHint");
+  }
+}
+
+function riskLabel(level: RiskLevel): string {
+  switch (level) {
+    case "low":
+      return t("session.permission.riskLow");
+    case "medium":
+      return t("session.permission.riskMedium");
+    case "high":
+      return t("session.permission.riskHigh");
+  }
+}
+
+/** Who asks for an approval: a task step, a subagent or the main agent. */
+function requester(request: PermissionRequest): string {
+  if (request.task) {
+    const { label: step, role } = request.task;
+    return role ? t("session.permission.byTaskStepRole", { step, role }) : t("session.permission.byTaskStep", { step });
+  }
+  if (request.agentId) return t("session.permission.bySubagent", { agent: request.agentId });
+  return t("session.permission.byMain");
+}
 
 function Approval({
   request,
@@ -104,7 +143,7 @@ function Approval({
     try {
       const parsed: unknown = JSON.parse(input);
       if (!parsed || typeof parsed !== "object" || Array.isArray(parsed))
-        throw new Error("The input must be a JSON object.");
+        throw new Error(t("session.permission.inputNotObject"));
       onAnswer({ allow: true, updatedInput: parsed as Record<string, unknown>, ...saved });
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -117,22 +156,13 @@ function Approval({
       onOpenChange={() => undefined}
       dismissible={false}
       size={diffs ? "lg" : "md"}
-      title={request.title ?? `Allow ${request.toolName}?`}
-      description={
-        <>
-          {request.task
-            ? `Requested by the task step ${request.task.label}${request.task.role ? ` (${request.task.role})` : ""}`
-            : request.agentId
-              ? `Requested by subagent ${request.agentId}`
-              : "Requested by the main agent"}{" "}
-          · {request.toolName}
-        </>
-      }
+      title={request.title ?? t("session.permission.allowTitle", { tool: request.toolName })}
+      description={`${requester(request)} · ${request.toolName}`}
       actions={
         <>
           {onStopTask && (
             <button type="button" className="secondary approval-stop" onClick={onStopTask}>
-              Stop task
+              {t("session.permission.stopTask")}
             </button>
           )}
           <button
@@ -142,28 +172,28 @@ function Approval({
             autoFocus={risky}
             onClick={() => onAnswer({ allow: false, ...(message.trim() ? { message } : {}) })}
           >
-            Deny
+            {t("session.permission.deny")}
           </button>
           {request.alwaysRules.length > 0 && (
             <button type="button" className="secondary" onClick={() => allow(true)}>
-              Always allow
+              {t("session.permission.alwaysAllow")}
             </button>
           )}
           <button type="button" onClick={() => allow(false)}>
-            Allow once
+            {t("session.permission.allowOnce")}
           </button>
         </>
       }
     >
       <div className={`approval-risk risk-${described.risk.level}`}>
-        <span className={`badge risk-${described.risk.level}`}>{RISK_LABEL[described.risk.level]}</span>
+        <span className={`badge risk-${described.risk.level}`}>{riskLabel(described.risk.level)}</span>
         <span>{described.risk.reasons.join(" · ")}</span>
       </div>
       {described.kind === "command" && (
         <>
           {described.explanation && (
             <p>
-              <span className="muted">Claude says:</span> {described.explanation}
+              <span className="muted">{t("session.permission.claudeSays")}</span> {described.explanation}
             </p>
           )}
           <pre className="approval-command">{described.command}</pre>
@@ -184,18 +214,28 @@ function Approval({
       )}
       {described.kind === "mcp" && (
         <p>
-          Tool <code>{described.tool}</code> from the <strong>{described.server}</strong> MCP server.
+          <Rich
+            k="session.permission.mcpTool"
+            params={{ tool: described.tool, server: described.server }}
+            tags={{ code: (s) => <code>{s}</code>, strong: (s) => <strong>{s}</strong> }}
+          />
         </p>
       )}
       {extraDescription && <p>{extraDescription}</p>}
-      {request.decisionReason && <p className="muted">Why it asks: {request.decisionReason}</p>}
+      {request.decisionReason && (
+        <p className="muted">{t("session.permission.whyItAsks", { reason: request.decisionReason })}</p>
+      )}
       {request.blockedPath && (
         <p className="muted">
-          Path: <code>{request.blockedPath}</code>
+          <Rich
+            k="session.permission.path"
+            params={{ path: request.blockedPath }}
+            tags={{ code: (s) => <code>{s}</code> }}
+          />
         </p>
       )}
       <details className="approval-details" open={described.kind === "other" || editing}>
-        <summary>Details</summary>
+        <summary>{t("session.permission.details")}</summary>
         {editing ? (
           <textarea
             className="input-editor"
@@ -206,25 +246,25 @@ function Approval({
             }}
             rows={Math.min(16, input.split("\n").length + 1)}
             spellCheck={false}
-            aria-label="Tool input (JSON)"
+            aria-label={t("session.permission.inputLabel")}
           />
         ) : (
           <pre className="tool-input">{input}</pre>
         )}
         <button type="button" className="link" onClick={() => setEditing((v) => !v)}>
-          {editing ? "Stop editing" : "Edit input before allowing"}
+          {editing ? t("session.permission.stopEditing") : t("session.permission.editInput")}
         </button>
       </details>
       {error && <p className="warn">{error}</p>}
-      <Field label="Message to Claude if you deny" help="Optional, e.g. “use pnpm instead”.">
+      <Field label={t("session.permission.denyMessage")} help={t("session.permission.denyMessageHelp")}>
         <input value={message} onChange={(e) => setMessage(e.target.value)} />
       </Field>
       {request.alwaysRules.length > 0 && (
         <Field
-          label="“Always allow” saves"
+          label={t("session.permission.alwaysSaves")}
           help={
             <>
-              {SCOPES.find((s) => s.value === scope)?.hint}{" "}
+              {scopeHint(scope)}{" "}
               {request.alwaysRules.map((r) => (
                 <code key={r} className="rule">
                   {r}
@@ -234,9 +274,9 @@ function Approval({
           }
         >
           <Select
-            label="Where Always allow saves the rule"
+            label={t("session.permission.scopeLabel")}
             value={scope}
-            options={SCOPES.map(({ value, label }) => ({ value, label }))}
+            options={SCOPES.map((value) => ({ value, label: scopeLabel(value) }))}
             onChange={(v) => setScope(asScope(v))}
           />
         </Field>
@@ -264,17 +304,18 @@ function PlanReview({
       onOpenChange={() => undefined}
       dismissible={false}
       size="lg"
-      title="Review the plan"
+      title={t("session.plan.title")}
       actions={
         <>
           <button
             type="button"
             className="secondary"
             onClick={() =>
+              // Sent to Claude: stays English (X-13).
               onAnswer({ allow: false, message: "The user rejected this plan. Stop and wait for new instructions." })
             }
           >
-            Reject
+            {t("session.plan.reject")}
           </button>
           <button
             type="button"
@@ -283,14 +324,15 @@ function PlanReview({
             onClick={() =>
               onAnswer({
                 allow: false,
+                // Sent to Claude: stays English (X-13).
                 message: `Revise the plan before doing anything. The user asks: ${feedback.trim()}`,
               })
             }
           >
-            Revise
+            {t("session.plan.revise")}
           </button>
           <button type="button" onClick={() => onAnswer({ allow: true, mode })}>
-            Approve &amp; run
+            {t("session.plan.approve")}
           </button>
         </>
       }
@@ -300,17 +342,17 @@ function PlanReview({
           <Markdown text={plan} />
         </div>
       ) : (
-        <p className="muted">The plan is in the transcript.</p>
+        <p className="muted">{t("session.plan.inTranscript")}</p>
       )}
-      <Field label="Then run it as" help={MODE_HELP[mode]}>
+      <Field label={t("session.plan.runAs")} help={MODE_HELP[mode]}>
         <Select
-          label="Run the plan as"
+          label={t("session.plan.runAsLabel")}
           value={mode}
           options={modeOptions(EXECUTE_MODES, canAutonomous)}
           onChange={(m) => setMode(asMode(m))}
         />
       </Field>
-      <Field label="Changes you want" help="For Revise: Claude updates the plan and asks again.">
+      <Field label={t("session.plan.changes")} help={t("session.plan.changesHelp")}>
         <textarea value={feedback} onChange={(e) => setFeedback(e.target.value)} rows={3} />
       </Field>
     </Modal>

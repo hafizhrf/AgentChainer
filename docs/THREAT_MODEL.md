@@ -95,6 +95,7 @@ Nothing else. In particular, there is no file-system or shell plugin.
 | `pty_resize` / `pty_close` | Terminal id | Only terminals this window opened. |
 | `cost_record` / `cost_sessions` / `cost_summary` | Typed numbers and ids | Local spend history, parameterized SQL. |
 | `selftest_config` | — | Debug builds only: release builds ignore `AGENTCHAINER_SELFTEST`. |
+| `pseudo_locale` | — | Debug builds only: release builds ignore `AGENTCHAINER_PSEUDO_LOCALE` (X-13). It only changes how the UI's own text is drawn. |
 | `quit_app` | — | Quits the app. |
 | `update_prepare` | — | Stops the runtime and terminals before an update installs. |
 | `menu_select` | A menu item id | Runs the same item as the native menu (UX-15): an id the UI handles is sent back as a `menu` event, a Help id opens its fixed page, anything else is ignored. |

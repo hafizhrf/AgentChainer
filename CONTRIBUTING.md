@@ -104,6 +104,10 @@ Troubleshooting:
     failing elements' selectors and axe's fix hint. It's in the CI job's artifact too. `blocking` is what failed the
     run.
   - **New screens:** when you add a screen or dialog, add an `audit("…")` for it.
+
+  Last, the run starts the app again in the pseudo-locale (X-13, `i18n.e2e.mjs`), where every catalog message is
+  accented and in ⟦brackets⟧. It fails on any visible text in the app's own chrome that didn't come from a catalog,
+  and saves `pseudo-*.png` screenshots of the main screens.
 - **The SDK and the CLI move fast.**
   - The weekly **Drift** workflow tries the newest of both and opens an issue when something the app relies on
     breaks (X-05).
@@ -116,6 +120,35 @@ Troubleshooting:
 ## Code style
 
 - Biome formats and lints TypeScript, JSON, CSS and YAML (`pnpm format`). rustfmt and clippy cover Rust.
+
+### Text in the UI
+
+Every string a person reads goes through a catalog ([ADR-0011](docs/adr/0011-ui-text-catalogs.md), X-13). Only English
+exists so far.
+- **Where:** `apps/desktop/src/i18n/locales/en/<area>.json`, in the area of the file you're editing: `app`, `session`,
+  `panel`, `shell`, `home`, `graph`, `tasks`, `setup`, `workflows`, `menu`.
+  - Keys are flat, `<area>.<component>.<purpose>`, e.g. `setup.plugins.searchPlaceholder`.
+  - A key's prefix is its file's name.
+- **How:**
+  - `t("setup.plugins.searchPlaceholder")`, with `{{name}}` in the message for values.
+  - `t(key, { count })` with two keys, `…_one` and `…_other`, for plurals.
+  - `<Rich k="…" tags={{ code: (s) => <code>{s}</code> }} />` for a sentence with markup in it.
+  - `i18n/format.ts` for money, counts, dates and durations.
+- **Never call `t()` at module top level.** It must run after the locale is set. Exported label maps are getters, as
+  in `options.ts`.
+- **What stays English:**
+  - text sent to Claude, in constants commented "sent to Claude";
+  - code, commands and ids;
+  - prose the sidecar or the Rust core returns.
+- **What catches mistakes:**
+  - `pnpm lint` fails on text between tags (`noJsxLiterals`).
+  - `pnpm test` fails on a literal `label`, `title`, `placeholder` or `aria-label`, on an unused key, and on a key in
+    the wrong file.
+  - Running a debug build with `AGENTCHAINER_PSEUDO_LOCALE=1` shows anything you missed: it's the text without ⟦⟧.
+- **Adding a language:**
+  1. Copy `locales/en/` to `locales/<code>/` and translate the values.
+  2. Register it in `i18n/index.ts`.
+  3. Add the Language setting that comes with the second language (ADR-0011).
 - Docs are in English. Mark unverified external facts **(verify)** and link sources.
 
 ## Reporting security issues

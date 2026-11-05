@@ -2054,6 +2054,8 @@ first.
 
 - [ ] **X-09** Every decision that is expensive to reverse gets an ADR, and this checklist stays current.
 - [ ] **X-10** User docs, a contributor guide, and good-first-issues tagged for each milestone.
+      - User docs: [the user guide](guides/user/README.md), six pages with screenshots from the app (2026-11-06). Left:
+        the contributor guide refresh and the good-first-issues.
 - [ ] **X-11** Review [RISKS](RISKS.md) at every milestone boundary.
       - Reviewed 2026-11-05:
         - R-08, R-09, R-10, R-12, R-14 and R-15 are updated to what's built;

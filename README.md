@@ -32,6 +32,8 @@ workspace and keeps the agent's work transparent and verifiable:
 3. **Open a project folder.** Start a session, or open **Workspace settings** to see what AgentChainer would add. Nothing
    changes until you approve the plan, and every applied setup can be rolled back.
 
+The [user guide](docs/guides/user/README.md) walks through the rest: chats and approvals, tasks, workspaces and settings.
+
 To build from source instead, see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Principles
@@ -61,6 +63,7 @@ You need a Claude Pro, Max, Team, Enterprise or Console account, or Bedrock/Vert
 | [Catalog](docs/CATALOG.md) | How skills, plugins and MCP servers are curated, pinned and installed |
 | [Risks](docs/RISKS.md) | Risk register with mitigations |
 | [ADRs](docs/adr/) | Architecture decision records |
+| [User guide](docs/guides/user/README.md) | Using the app: chats, approvals, tasks, workspaces, settings, with screenshots |
 | [Install guide](docs/guides/INSTALL.md) | Downloading, checking and opening the installers on each OS |
 | [Auth setup guide](docs/guides/AUTH_SETUP.md) | User-facing tutorial for installing and signing in to Claude Code |
 | [Privacy](docs/PRIVACY.md) | What stays on your machine, and every time the app uses the network |

@@ -175,7 +175,13 @@ export function Plugins({
           </button>
         </div>
       )}
-      {!data && loading && <p className="muted setup-pad">Asking your Claude CLI for its marketplaces…</p>}
+      {/* The tabs point at their panels (aria-controls), so the panels exist before there's a list, too. */}
+      {!data &&
+        (["marketplace", "installed"] as const).map((v) => (
+          <Tabs.Content key={v} value={v}>
+            {loading && <p className="muted setup-pad">Asking your Claude CLI for its marketplaces…</p>}
+          </Tabs.Content>
+        ))}
 
       {data && (
         <div className="plan-split">
@@ -229,7 +235,8 @@ export function Plugins({
               })}
             </Tabs.Content>
           </div>
-          <div className="plan-detail">
+          {/* biome-ignore lint/a11y/noNoninteractiveTabindex: focusable, so the keyboard can scroll it (PlanView). */}
+          <section className="plan-detail" aria-label="Details" tabIndex={0}>
             {selected ? (
               <PluginDetails
                 cwd={cwd}
@@ -271,7 +278,7 @@ export function Plugins({
                   : "Pick an installed plugin to update, turn off or uninstall it."}
               </EmptyState>
             )}
-          </div>
+          </section>
         </div>
       )}
 

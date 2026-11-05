@@ -1,6 +1,7 @@
 import * as RadixDialog from "@radix-ui/react-dialog";
 import { Search } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useReturnFocus } from "./Dialog.tsx";
 import { fuzzyFilterBy } from "./fuzzy.ts";
 
 export type PaletteCommand = {
@@ -31,6 +32,7 @@ export function CommandPalette({
   const [query, setQuery] = useState("");
   const [active, setActive] = useState(0);
   const list = useRef<HTMLDivElement>(null);
+  const returnFocus = useReturnFocus(open);
   const results = useMemo(
     // Titles and groups only: hints are paths, whose many letters would match almost any query.
     () => fuzzyFilterBy(query, commands, (c) => `${c.title} ${c.group}`, 80),
@@ -58,7 +60,7 @@ export function CommandPalette({
     <RadixDialog.Root open={open} onOpenChange={onOpenChange}>
       <RadixDialog.Portal>
         <RadixDialog.Overlay className="palette-overlay" />
-        <RadixDialog.Content className="palette" aria-describedby={undefined}>
+        <RadixDialog.Content className="palette" aria-describedby={undefined} onCloseAutoFocus={returnFocus}>
           <RadixDialog.Title className="sr-only">Command palette</RadixDialog.Title>
           <div className="palette-input">
             <Search size={15} aria-hidden />

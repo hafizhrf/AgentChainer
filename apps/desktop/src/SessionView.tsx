@@ -351,7 +351,7 @@ export function SessionView({
                   </div>
                 </div>
               </Panel>
-              {terminalOpen && <Separator className="resize-handle" />}
+              {terminalOpen && <Separator className="resize-handle" aria-label="Resize the terminal" />}
               {terminalOpen && (
                 <Panel id="terminal" defaultSize={220} minSize={100} groupResizeBehavior="preserve-pixel-size">
                   <Suspense fallback={<div className="terminal-host muted">Loading terminal…</div>}>
@@ -378,7 +378,7 @@ export function SessionView({
             </footer>
           </div>
         </Panel>
-        {rightOpen && <Separator className="resize-handle" />}
+        {rightOpen && <Separator className="resize-handle" aria-label="Resize the right panel" />}
         {rightOpen && (
           <Panel
             id="right"

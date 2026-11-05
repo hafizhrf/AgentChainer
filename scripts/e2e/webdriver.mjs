@@ -2,7 +2,7 @@
 // end-to-end tests need sessions, finding elements, clicks, typing, keys, scripts and screenshots, nothing more.
 
 const ELEMENT = "element-6066-11e4-a52e-4f735466cecf";
-export const KEY = { enter: "", escape: "", control: "", shift: "" };
+export const KEY = { enter: "\uE007", escape: "\uE00C", control: "\uE009", shift: "\uE008", tab: "\uE004" };
 
 export class WebDriver {
   /** @param {string} url tauri-driver's address */
@@ -118,6 +118,10 @@ class Element {
   }
   call(method, path, body) {
     return this.driver.sessionCall(method, `/element/${this.id}${path}`, body);
+  }
+  /** The element as a script argument. */
+  get ref() {
+    return { [ELEMENT]: this.id };
   }
   click() {
     return this.call("POST", "/click", {});

@@ -1,6 +1,26 @@
 import * as RadixDialog from "@radix-ui/react-dialog";
 import { X } from "lucide-react";
-import { type ReactNode, useCallback, useRef, useState } from "react";
+import { type ReactNode, useCallback, useLayoutEffect, useRef, useState } from "react";
+
+/**
+ * Gives focus back to whatever had it when a dialog opened. Radix returns it only to a Dialog.Trigger, and these
+ * dialogs open from shortcuts, menus and plain buttons. Pass the result as `onCloseAutoFocus`. Focus that something
+ * else took meanwhile (a command that focuses the composer) stays where it is.
+ */
+export function useReturnFocus(open: boolean): (event: Event) => void {
+  const opener = useRef<Element | null>(null);
+  // Before the dialog's content mounts and takes focus.
+  useLayoutEffect(() => {
+    if (open) opener.current = document.activeElement;
+  }, [open]);
+  return useCallback((event: Event) => {
+    event.preventDefault();
+    const to = opener.current;
+    opener.current = null;
+    const free = !document.activeElement || document.activeElement === document.body;
+    if (free && to instanceof HTMLElement && to.isConnected) to.focus();
+  }, []);
+}
 
 /**
  * A modal dialog (Radix Dialog): focus is trapped, Esc and the close button dismiss it, and it is announced as a
@@ -29,6 +49,7 @@ export function Modal({
   dismissible?: boolean;
 }) {
   const content = useRef<HTMLDivElement>(null);
+  const returnFocus = useReturnFocus(open);
   return (
     <RadixDialog.Root open={open} onOpenChange={onOpenChange}>
       <RadixDialog.Portal>
@@ -44,6 +65,7 @@ export function Modal({
             e.preventDefault();
             if (!content.current?.contains(document.activeElement)) content.current?.focus();
           }}
+          onCloseAutoFocus={returnFocus}
           {...(dismissible ? {} : { onEscapeKeyDown: (e: KeyboardEvent) => e.preventDefault() })}
         >
           <header className="dialog-header">

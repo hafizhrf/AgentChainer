@@ -58,7 +58,10 @@
 .titlebar-menu[data-state="open"],
 .titlebar-menu:focus-visible {
   background: var(--surface-3);
-  outline: none;
+}
+
+.titlebar-menu:focus-visible {
+  outline-offset: -2px;
 }
 
 .titlebar-search {
@@ -168,6 +171,12 @@
   background: var(--accent);
 }
 
+/* Keyboard focus: a 3px line on top of both panels, wider than the hover colour. */
+.resize-handle:focus-visible {
+  z-index: 2;
+  box-shadow: 0 0 0 1px var(--focus);
+}
+
 /* ---------- Sidebar ---------- */
 
 .sidebar {
@@ -201,7 +210,7 @@
   margin-left: auto;
   color: inherit;
   border-color: currentColor;
-  opacity: 0.6;
+  opacity: 0.85;
 }
 
 .sidebar-scroll {

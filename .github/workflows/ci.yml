@@ -157,9 +157,10 @@ jobs:
         env:
           NO_AT_BRIDGE: "1"
         run: xvfb-run -a -s "-screen 0 1440x900x24" node scripts/perf-budgets.mjs --binary ${{ matrix.binary }} --json perf-${{ matrix.name }}.json --warn-only
-      # End-to-end tests (X-06), through WebDriver: tauri-driver and WebKitWebDriver on Linux; on Windows the runner's
-      # msedgedriver (EDGEWEBDRIVER, which matches its WebView2 runtime) attaches to the app. macOS has no WebDriver for
-      # its WebView: docs/guides/MANUAL_CHECKS.md. rust-cache keeps ~/.cargo/bin, so the install is quick after the first.
+      # End-to-end tests (X-06) and the accessibility audits (X-12), through WebDriver: tauri-driver and WebKitWebDriver
+      # on Linux; on Windows the runner's msedgedriver (EDGEWEBDRIVER, which matches its WebView2 runtime) attaches to the
+      # app. macOS has no WebDriver for its WebView: docs/guides/MANUAL_CHECKS.md. rust-cache keeps ~/.cargo/bin, so the
+      # install is quick after the first.
       - name: Install tauri-driver
         if: runner.os == 'Linux'
         run: cargo install tauri-driver --version 2.1.0 --locked

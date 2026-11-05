@@ -1,6 +1,7 @@
 import type { TierWorkflow } from "@agentchainer/protocol";
 import { Workflow } from "lucide-react";
 import { useEffect, useState } from "react";
+import { Rich } from "../i18n/Rich.tsx";
 import { request } from "../sidecar.ts";
 
 /**
@@ -26,7 +27,12 @@ export function ProjectWorkflowNote({ cwd, tier }: { cwd: string; tier: TierWork
   if (workflow?.source !== "project") return null;
   return (
     <span className="muted task-workflow-note" title={workflow.description}>
-      <Workflow size={13} aria-hidden /> Runs the project's {tier} workflow, <code>{workflow.file}</code>
+      <Workflow size={13} aria-hidden />{" "}
+      <Rich
+        k="tasks.projectWorkflow.note"
+        params={{ tier: tier ?? "", file: workflow.file ?? "" }}
+        tags={{ code: (s) => <code>{s}</code> }}
+      />
     </span>
   );
 }

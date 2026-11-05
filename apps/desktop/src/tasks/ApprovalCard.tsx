@@ -1,9 +1,20 @@
 import { describeRequest, type PermissionRequest, type RiskLevel } from "@agentchainer/protocol";
 import { ShieldQuestion } from "lucide-react";
 import { useState } from "react";
+import { t } from "../i18n/index.ts";
 import { type PermissionAnswer, PermissionDialog } from "../PermissionDialog.tsx";
 
-const RISK_LABEL: Record<RiskLevel, string> = { low: "Low risk", medium: "Review first", high: "High risk" };
+const RISK_LABEL: Record<RiskLevel, string> = {
+  get low() {
+    return t("tasks.approval.riskLow");
+  },
+  get medium() {
+    return t("tasks.approval.riskMedium");
+  },
+  get high() {
+    return t("tasks.approval.riskHigh");
+  },
+};
 
 /**
  * A task step's approval as a card in its thread (UX-13), where the step is: what it wants to do, in plain words, with
@@ -32,12 +43,12 @@ export function ApprovalCard({
           ? d.target
           : request.toolName;
   return (
-    <section className={`card thread-card approval-card risk-${d.risk.level}`} aria-label="Approval">
+    <section className={`card thread-card approval-card risk-${d.risk.level}`} aria-label={t("tasks.approval.label")}>
       <div className="card-title">
         <ShieldQuestion size={16} aria-hidden />
-        <h2>{request.title ?? `Allow ${request.toolName}?`}</h2>
+        <h2>{request.title ?? t("tasks.approval.allowTool", { tool: request.toolName })}</h2>
         <span className="muted">
-          {request.task?.label ?? "Task step"}
+          {request.task?.label ?? t("tasks.approval.taskStep")}
           {request.task?.role ? ` · ${request.task.role}` : ""}
         </span>
         <span className="grow" />
@@ -45,21 +56,21 @@ export function ApprovalCard({
       </div>
       {d.kind === "command" && d.explanation && (
         <p className="approval-why">
-          <span className="muted">Claude says:</span> {d.explanation}
+          <span className="muted">{t("tasks.approval.claudeSays")}</span> {d.explanation}
         </p>
       )}
       <pre className="approval-command">{what}</pre>
       {d.risk.reasons.length > 0 && <p className="muted approval-reasons">{d.risk.reasons.join(" · ")}</p>}
       <div className="card-footer">
         <button type="button" className="secondary" onClick={onStopTask}>
-          Stop task
+          {t("tasks.approval.stopTask")}
         </button>
         <span className="grow" />
         <button type="button" className="ghost" onClick={() => setDetails(true)}>
-          Details…
+          {t("tasks.approval.details")}
         </button>
         <button type="button" className="secondary" onClick={() => onAnswer({ allow: false })}>
-          Deny
+          {t("tasks.approval.deny")}
         </button>
         <button
           type="button"
@@ -67,7 +78,7 @@ export function ApprovalCard({
           className={risky ? "secondary" : undefined}
           onClick={() => onAnswer({ allow: true })}
         >
-          Allow once
+          {t("tasks.approval.allowOnce")}
         </button>
       </div>
       {details && (

@@ -3,6 +3,8 @@ import { openUrl } from "@tauri-apps/plugin-opener";
 import { GitPullRequest, Loader2, RefreshCw } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { Modal } from "../Dialog.tsx";
+import { t } from "../i18n/index.ts";
+import { Rich } from "../i18n/Rich.tsx";
 import { Markdown } from "../Markdown.tsx";
 import { request } from "../sidecar.ts";
 import { Field } from "../ui/Field.tsx";
@@ -17,21 +19,21 @@ const message = (err: unknown) => (err instanceof Error ? err.message : String(e
 function NotReady({ github, onRecheck }: { github: GitHubStatus; onRecheck: () => void }) {
   const text =
     github.state === "missing"
-      ? "The GitHub CLI (gh) isn't installed. Install it, then sign in from a terminal with `gh auth login`."
+      ? t("tasks.createPr.ghMissing")
       : github.state === "signed-out"
-        ? `gh isn't signed in to ${github.host}. Run \`gh auth login --hostname ${github.host}\` in a terminal.`
-        : "This repository has no origin remote on GitHub, so there is nowhere to open a PR.";
+        ? t("tasks.createPr.ghSignedOut", { host: String(github.host) })
+        : t("tasks.createPr.noRemote");
   return (
     <div className="pr-not-ready">
       <Markdown text={text} />
-      <p className="muted">AgentChainer never signs in for you or reads gh's credentials.</p>
+      <p className="muted">{t("tasks.createPr.neverSignsIn")}</p>
       <div className="row">
         <button type="button" className="secondary small" onClick={() => void openUrl(GUIDE)}>
-          Setup guide
+          {t("tasks.createPr.setupGuide")}
         </button>
         <button type="button" className="secondary small" onClick={onRecheck}>
           <RefreshCw size={13} />
-          Check again
+          {t("tasks.createPr.checkAgain")}
         </button>
       </div>
     </div>
@@ -66,7 +68,7 @@ export function CreatePrDialog({
     try {
       const p = await request("task.prPreview", { cwd, id: task.id });
       setPreview(p);
-      setTitle((t) => t || p.title);
+      setTitle((current) => current || p.title);
     } catch (err) {
       setError(message(err));
     }
@@ -95,41 +97,46 @@ export function CreatePrDialog({
       open={open}
       onOpenChange={onOpenChange}
       size="lg"
-      title="Create a pull request"
+      title={t("tasks.createPr.title")}
       description={
         preview
-          ? `${preview.head} → ${preview.base}${preview.github.repo ? ` on ${preview.github.repo}` : ""}`
-          : "Reading the task…"
+          ? preview.github.repo
+            ? t("tasks.createPr.branchesOnRepo", {
+                head: preview.head,
+                base: preview.base,
+                repo: preview.github.repo,
+              })
+            : t("tasks.createPr.branches", { head: preview.head, base: preview.base })
+          : t("tasks.createPr.reading")
       }
       actions={
         <>
           <button type="button" className="secondary" onClick={() => onOpenChange(false)}>
-            Cancel
+            {t("tasks.createPr.cancel")}
           </button>
           <button type="button" disabled={!ready || !title.trim() || busy} onClick={() => void create()}>
             {busy ? <Loader2 size={14} className="spin" /> : <GitPullRequest size={14} />}
-            Push and create PR
+            {t("tasks.createPr.push")}
           </button>
         </>
       }
     >
       {error && <p className="warn">{error}</p>}
-      {!preview && !error && <p className="muted">Loading…</p>}
+      {!preview && !error && <p className="muted">{t("tasks.createPr.loading")}</p>}
       {preview && !ready && <NotReady github={preview.github} onRecheck={() => void load()} />}
       {preview && ready && (
         <div className="pr-form">
           <p className="muted">
-            What the run left is committed on <code>{preview.head}</code>, its changed files are scanned for secrets,
-            and the branch is pushed (never forced). Nothing is merged.
+            <Rich k="tasks.createPr.explain" params={{ head: preview.head }} tags={{ code: (s) => <code>{s}</code> }} />
           </p>
-          <Field label="Title">
+          <Field label={t("tasks.createPr.titleField")}>
             <input value={title} onChange={(e) => setTitle(e.target.value)} maxLength={256} />
           </Field>
           <label className="check">
             <input type="checkbox" checked={draft} onChange={(e) => setDraft(e.target.checked)} />
-            <span>Open it as a draft</span>
+            <span>{t("tasks.createPr.asDraft")}</span>
           </label>
-          <span className="field-label">Body (from the contract and the evidence)</span>
+          <span className="field-label">{t("tasks.createPr.body")}</span>
           <div className="pr-body">
             <Markdown text={preview.body} />
           </div>

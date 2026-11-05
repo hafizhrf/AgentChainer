@@ -1,4 +1,5 @@
 import { type CriterionCheck, GATE_KINDS, type GateKind, type TaskContract, type Tier } from "@agentchainer/protocol";
+import { t } from "../i18n/index.ts";
 
 /** The task page's form logic (M3-02, M3-03), kept out of the component so it can be tested. */
 
@@ -6,23 +7,39 @@ export const TIERS: Tier[] = ["S", "M", "L", "XL"];
 
 /** What each tier runs, as the PRD's workflow templates describe it. */
 export const TIER_HELP: Record<Tier, string> = {
-  S: "One agent, then the project's checks.",
-  M: "Plan, implement, checks, then a review.",
-  L: "Specialist planning, implement, checks, then an independent review.",
-  XL: "Split into sub-tasks, each with its own contract and worktree.",
+  get S() {
+    return t("tasks.form.tierHelpS");
+  },
+  get M() {
+    return t("tasks.form.tierHelpM");
+  },
+  get L() {
+    return t("tasks.form.tierHelpL");
+  },
+  get XL() {
+    return t("tasks.form.tierHelpXl");
+  },
 };
 
 /** Default spend caps per tier (planner.md §15); XL's applies per sub-task. Mirrors the sidecar's defaults. */
 export const DEFAULT_BUDGET_USD: Record<Tier, number> = { S: 1, M: 3, L: 8, XL: 5 };
 
-const GATE_LABEL: Record<GateKind, string> = {
-  format: "Format",
-  lint: "Lint",
-  typecheck: "Typecheck",
-  test: "Tests",
-  build: "Build",
-  smoke: "Smoke test",
-};
+function gateLabel(kind: GateKind): string {
+  switch (kind) {
+    case "format":
+      return t("tasks.form.gateFormat");
+    case "lint":
+      return t("tasks.form.gateLint");
+    case "typecheck":
+      return t("tasks.form.gateTypecheck");
+    case "test":
+      return t("tasks.form.gateTest");
+    case "build":
+      return t("tasks.form.gateBuild");
+    case "smoke":
+      return t("tasks.form.gateSmoke");
+  }
+}
 
 export type CheckOption = { value: CriterionCheck; label: string; hint?: string; disabled?: boolean };
 
@@ -33,28 +50,38 @@ export function checkOptions(gates: GateKind[]): CheckOption[] {
       const ok = gates.includes(kind);
       return {
         value: `gate:${kind}`,
-        label: `Gate: ${GATE_LABEL[kind]}`,
-        ...(ok ? { hint: "Proved by a run" } : { hint: "No command detected", disabled: true }),
+        label: t("tasks.form.gateCheck", { gate: gateLabel(kind) }),
+        ...(ok ? { hint: t("tasks.form.provedByRun") } : { hint: t("tasks.form.noCommand"), disabled: true }),
       };
     }),
-    { value: "review", label: "Reviewer", hint: "Judged from the diff" },
-    { value: "manual", label: "You check it", hint: "Not checked by AgentChainer" },
+    { value: "review", label: t("tasks.form.reviewer"), hint: t("tasks.form.judgedFromDiff") },
+    { value: "manual", label: t("tasks.form.youCheck"), hint: t("tasks.form.notChecked") },
   ];
 }
 
-const SIGNAL_LABELS: Record<string, string> = {
-  "risk-keywords": "Risk keywords",
-  breadth: "Breadth",
-  scope: "Scope",
-  "new-areas": "New areas",
-  "repo-size": "Repository size",
-  tests: "Tests",
-};
+function knownSignal(signal: string): string | undefined {
+  switch (signal) {
+    case "risk-keywords":
+      return t("tasks.form.signalRiskKeywords");
+    case "breadth":
+      return t("tasks.form.signalBreadth");
+    case "scope":
+      return t("tasks.form.signalScope");
+    case "new-areas":
+      return t("tasks.form.signalNewAreas");
+    case "repo-size":
+      return t("tasks.form.signalRepoSize");
+    case "tests":
+      return t("tasks.form.signalTests");
+    default:
+      return undefined;
+  }
+}
 
 /** A triage signal's name in sentence case; an unknown one from a newer sidecar reads as its words. */
 export function signalLabel(signal: string): string {
   const words = signal.replace(/-/g, " ");
-  return SIGNAL_LABELS[signal] ?? `${words.charAt(0).toUpperCase()}${words.slice(1)}`;
+  return knownSignal(signal) ?? `${words.charAt(0).toUpperCase()}${words.slice(1)}`;
 }
 
 export function checkLabel(check: CriterionCheck): string {
@@ -103,14 +130,14 @@ export function approveBlocker(state: {
   budget: string;
 }): string | null {
   const c = tidyContract(state.edited);
-  if (state.stale) return "The contract changed: run triage again.";
-  if (!c.objective) return "Write the objective.";
-  if (c.acceptanceCriteria.length === 0) return "Add at least one acceptance criterion.";
+  if (state.stale) return t("tasks.form.staleContract");
+  if (!c.objective) return t("tasks.form.writeObjective");
+  if (c.acceptanceCriteria.length === 0) return t("tasks.form.addCriterion");
   if (state.tier !== state.proposed && !state.reason.trim())
-    return `Say why ${state.tier} rather than ${state.proposed}.`;
-  if (state.budget === NO_BUDGET) return state.tier === "XL" ? "An XL task needs a budget per sub-task." : null;
+    return t("tasks.form.sayWhy", { tier: state.tier, proposed: state.proposed });
+  if (state.budget === NO_BUDGET) return state.tier === "XL" ? t("tasks.form.xlNeedsBudget") : null;
   const budget = Number(state.budget);
-  if (!Number.isFinite(budget) || budget <= 0 || budget > 1000) return "Set a budget between $0 and $1000.";
+  if (!Number.isFinite(budget) || budget <= 0 || budget > 1000) return t("tasks.form.budgetRange");
   return null;
 }
 
@@ -122,7 +149,7 @@ export const budgetValue = (budget: string): number | null => (budget === NO_BUD
 
 /** "$2", "$2 per sub-task", or "no budget". */
 export function budgetText(budgetUsd: number | null | undefined, xl = false): string {
-  if (budgetUsd === null) return "no budget";
+  if (budgetUsd === null) return t("tasks.form.noBudget");
   if (budgetUsd === undefined) return "";
-  return `$${budgetUsd}${xl ? " per sub-task" : ""}`;
+  return t(xl ? "tasks.form.budgetPerSubtask" : "tasks.form.budget", { amount: budgetUsd });
 }

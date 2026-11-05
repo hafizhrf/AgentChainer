@@ -1,16 +1,30 @@
 import type { Lesson, Task } from "@agentchainer/protocol";
 import { GraduationCap, Loader2 } from "lucide-react";
 import { useEffect, useState } from "react";
+import { t } from "../i18n/index.ts";
+import { Rich } from "../i18n/Rich.tsx";
 import { request } from "../sidecar.ts";
 import { lineDiff } from "../textdiff.ts";
 
 const SOURCE_TEXT: Record<Lesson["sources"][number]["source"], string> = {
-  gate: "gate",
-  format: "formatter",
-  review: "review",
-  guard: "guard",
-  approval: "denied",
-  notes: "implementer's note",
+  get gate() {
+    return t("tasks.lessons.sourceGate");
+  },
+  get format() {
+    return t("tasks.lessons.sourceFormat");
+  },
+  get review() {
+    return t("tasks.lessons.sourceReview");
+  },
+  get guard() {
+    return t("tasks.lessons.sourceGuard");
+  },
+  get approval() {
+    return t("tasks.lessons.sourceApproval");
+  },
+  get notes() {
+    return t("tasks.lessons.sourceNotes");
+  },
 };
 
 /**
@@ -117,25 +131,22 @@ export function LessonsCard({ task, cwd }: { task: Task; cwd: string }) {
     <section className="card task-lessons">
       <div className="card-title">
         <GraduationCap size={16} aria-hidden />
-        <h2>Lessons</h2>
-        <span className="muted">What this run suggests Claude should know next time, as CLAUDE.md lines.</span>
+        <h2>{t("tasks.lessons.title")}</h2>
+        <span className="muted">{t("tasks.lessons.subtitle")}</span>
       </div>
       {added && (
         <p className="ok-text">
-          Added to <code>{added}</code>. Roll it back in Workspace settings → History.
+          <Rich k="tasks.lessons.added" params={{ path: added }} tags={{ code: (s) => <code>{s}</code> }} />
         </p>
       )}
       {error && <p className="warn">{error}</p>}
       {lessons === null || (!lessons.length && !note && !added) ? (
         <div className="card-footer">
-          <span className="muted">
-            Reads the run's records: gates that needed a fix, review findings, blocked or denied actions, the
-            implementer's notes. One small model call (about $0.01).
-          </span>
+          <span className="muted">{t("tasks.lessons.explain")}</span>
           <span className="grow" />
           <button type="button" className="secondary small" disabled={busy !== null} onClick={() => void suggest()}>
             {busy === "suggest" && <Loader2 size={13} className="spin" aria-hidden />}
-            Suggest lessons
+            {t("tasks.lessons.suggest")}
           </button>
         </div>
       ) : !lessons.length ? (
@@ -166,7 +177,7 @@ export function LessonsCard({ task, cwd }: { task: Task; cwd: string }) {
             <div className="preview-file">
               <code className="preview-path">
                 {diff.path}
-                {diff.before ? "" : " (new)"}
+                {diff.before ? "" : ` ${t("tasks.lessons.new")}`}
               </code>
               <pre className="plan-preview inline-diff">
                 {lineDiff(diff.before, diff.after)
@@ -182,12 +193,10 @@ export function LessonsCard({ task, cwd }: { task: Task; cwd: string }) {
             </div>
           )}
           <div className="card-footer">
-            <span className="muted">
-              Added as a History run, so it can be rolled back. The ones not picked are dismissed.
-            </span>
+            <span className="muted">{t("tasks.lessons.applyNote")}</span>
             <span className="grow" />
             <button type="button" className="ghost small" disabled={busy !== null} onClick={() => void dismissAll()}>
-              Dismiss all
+              {t("tasks.lessons.dismissAll")}
             </button>
             <button
               type="button"
@@ -196,7 +205,7 @@ export function LessonsCard({ task, cwd }: { task: Task; cwd: string }) {
               onClick={() => void apply()}
             >
               {busy === "apply" && <Loader2 size={13} className="spin" aria-hidden />}
-              Add {picked.size} to CLAUDE.md
+              {t("tasks.lessons.add", { n: picked.size })}
             </button>
           </div>
         </>

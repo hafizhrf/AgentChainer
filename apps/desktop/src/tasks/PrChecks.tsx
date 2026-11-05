@@ -3,6 +3,7 @@ import { openUrl } from "@tauri-apps/plugin-opener";
 import { CircleCheck, CircleMinus, CircleX, ExternalLink, Loader2, RefreshCw, Wrench } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Modal } from "../Dialog.tsx";
+import { t } from "../i18n/index.ts";
 import { request } from "../sidecar.ts";
 import { IconButton } from "../ui/IconButton.tsx";
 
@@ -18,10 +19,16 @@ const MAX_MS = 120_000;
 const isActions = (c: PrCheck) => /\/actions\/runs\/\d+\/job\/\d+/.test(c.link);
 
 function BucketIcon({ bucket }: { bucket: string }) {
-  if (bucket === "pass") return <CircleCheck size={14} className="ok" aria-label="Passed" />;
-  if (bucket === "fail") return <CircleX size={14} className="err" aria-label="Failed" />;
-  if (bucket === "pending") return <Loader2 size={14} className="spin" aria-label="Running" />;
-  return <CircleMinus size={14} className="muted" aria-label={bucket === "skipping" ? "Skipped" : "Cancelled"} />;
+  if (bucket === "pass") return <CircleCheck size={14} className="ok" aria-label={t("tasks.prChecks.passed")} />;
+  if (bucket === "fail") return <CircleX size={14} className="err" aria-label={t("tasks.prChecks.failed")} />;
+  if (bucket === "pending") return <Loader2 size={14} className="spin" aria-label={t("tasks.prChecks.running")} />;
+  return (
+    <CircleMinus
+      size={14}
+      className="muted"
+      aria-label={bucket === "skipping" ? t("tasks.prChecks.skipped") : t("tasks.prChecks.cancelled")}
+    />
+  );
 }
 
 /**
@@ -72,20 +79,24 @@ export function PrChecks({ task, cwd, onChanged }: { task: Task; cwd: string; on
   return (
     <div className="pr-checks">
       <div className="pr-checks-head">
-        <strong>Checks</strong>
+        <strong>{t("tasks.prChecks.title")}</strong>
         {status && (
           <span className="muted">
-            {status.state === "OPEN" ? (status.draft ? "Draft" : "Open") : status.state.toLowerCase()}
-            {rounds ? ` · Fix CI ${rounds} of ${MAX_CI_FIXES}` : ""}
+            {status.state === "OPEN"
+              ? status.draft
+                ? t("tasks.prChecks.draft")
+                : t("tasks.prChecks.open")
+              : status.state.toLowerCase()}
+            {rounds ? ` · ${t("tasks.prChecks.fixRounds", { n: rounds, max: MAX_CI_FIXES })}` : ""}
           </span>
         )}
         <span className="grow" />
-        <IconButton label="Check again" onClick={() => void load()}>
+        <IconButton label={t("tasks.prChecks.checkAgain")} onClick={() => void load()}>
           <RefreshCw size={13} />
         </IconButton>
       </div>
       {error && <p className="warn">{error}</p>}
-      {status && status.checks.length === 0 && <p className="muted">No checks reported yet.</p>}
+      {status && status.checks.length === 0 && <p className="muted">{t("tasks.prChecks.none")}</p>}
       <ul>
         {status?.checks.map((c) => (
           <li key={c.link || c.name}>
@@ -98,15 +109,15 @@ export function PrChecks({ task, cwd, onChanged }: { task: Task; cwd: string; on
                 type="button"
                 className="secondary small"
                 disabled={busy || rounds >= MAX_CI_FIXES}
-                title={rounds >= MAX_CI_FIXES ? `This PR had its ${MAX_CI_FIXES} Fix CI rounds.` : undefined}
+                title={rounds >= MAX_CI_FIXES ? t("tasks.prChecks.roundsUsed", { max: MAX_CI_FIXES }) : undefined}
                 onClick={() => setFixing(c)}
               >
                 <Wrench size={13} />
-                Fix CI…
+                {t("tasks.prChecks.fixCi")}
               </button>
             )}
             {c.link && (
-              <IconButton label="Open the check on GitHub" onClick={() => void openUrl(c.link)}>
+              <IconButton label={t("tasks.prChecks.openCheck")} onClick={() => void openUrl(c.link)}>
                 <ExternalLink size={13} />
               </IconButton>
             )}
@@ -170,28 +181,24 @@ function FixCiDialog({
       open
       onOpenChange={(open) => !open && onClose()}
       size="lg"
-      title={`Fix CI: ${check.name}`}
-      description={`Round ${rounds + 1} of ${MAX_CI_FIXES}. It counts against the task's budget.`}
+      title={t("tasks.prChecks.fixTitle", { check: check.name })}
+      description={t("tasks.prChecks.fixDescription", { n: rounds + 1, max: MAX_CI_FIXES })}
       actions={
         <>
           <button type="button" className="secondary" onClick={onClose}>
-            Not now
+            {t("tasks.prChecks.notNow")}
           </button>
           <button type="button" disabled={log === null || busy} onClick={() => void fix()}>
             {busy ? <Loader2 size={14} className="spin" /> : <Wrench size={14} />}
-            Fix this
+            {t("tasks.prChecks.fixThis")}
           </button>
         </>
       }
     >
-      <p className="muted">
-        Claude gets this log as data, with the contract and the task's diff, and fixes the code in the task's worktree
-        with the same approvals as the run. The gates run again, and only when they pass is the branch pushed (never
-        forced).
-      </p>
+      <p className="muted">{t("tasks.prChecks.fixExplain")}</p>
       {error && <p className="warn">{error}</p>}
-      {log === null && !error && <p className="muted">Reading the log…</p>}
-      {log !== null && <pre className="ci-log">{log || "(The failed steps wrote nothing.)"}</pre>}
+      {log === null && !error && <p className="muted">{t("tasks.prChecks.readingLog")}</p>}
+      {log !== null && <pre className="ci-log">{log || t("tasks.prChecks.emptyLog")}</pre>}
     </Modal>
   );
 }

@@ -37,6 +37,9 @@ import {
 } from "lucide-react";
 import { Fragment, useCallback, useEffect, useRef, useState } from "react";
 import { type Confirm, Modal } from "../Dialog.tsx";
+import { approxUsd, dateTime, seconds as secondsText } from "../i18n/format.ts";
+import { t } from "../i18n/index.ts";
+import { Rich } from "../i18n/Rich.tsx";
 import { Markdown } from "../Markdown.tsx";
 import { MODE_NAMES, modelChoices, modeOptions } from "../options.ts";
 import type { PermissionAnswer } from "../PermissionDialog.tsx";
@@ -112,7 +115,7 @@ type Busy =
 const RUN_MODES: Exclude<PermissionMode, "plan">[] = ["default", "acceptEdits", "auto"];
 
 const errorText = (err: unknown) => (err instanceof Error ? err.message : String(err));
-const usd = (n: number) => `≈$${n.toFixed(n < 0.1 ? 4 : 2)}`;
+const usd = (n: number) => approxUsd(n, n < 0.1 ? 4 : 2);
 
 /** One entry of a task's thread, in order: a drafting (its events) or the person's reply to the contract. */
 type ThreadEntry = { kind: "draft"; sessionId: string } | { kind: "reply"; text: string; at: number };
@@ -280,7 +283,7 @@ export function TaskPage({
     try {
       show(await action());
     } catch (err) {
-      setError(isRpcError(err, RpcErrorCode.cancelled) ? "Stopped. Nothing was changed." : errorText(err));
+      setError(isRpcError(err, RpcErrorCode.cancelled) ? t("tasks.page.stoppedNothingChanged") : errorText(err));
       await request("task.get", { cwd, id }).then(show, () => undefined);
     } finally {
       setBusy(null);
@@ -351,14 +354,14 @@ export function TaskPage({
     );
   }
 
-  async function stop(t: Task) {
+  async function stop(running: Task) {
     const ok = await confirm({
-      title: "Stop the run?",
-      body: <p>The running step stops now. Files it already changed stay as they are; git and rewind still work.</p>,
-      confirmLabel: "Stop",
+      title: t("tasks.page.stopTitle"),
+      body: <p>{t("tasks.page.stopBody")}</p>,
+      confirmLabel: t("tasks.page.stop"),
       danger: true,
     });
-    if (ok) await request("task.cancel", { cwd, id: t.id }).catch((err: unknown) => setError(errorText(err)));
+    if (ok) await request("task.cancel", { cwd, id: running.id }).catch((err: unknown) => setError(errorText(err)));
   }
 
   async function acceptRisk(id: string) {
@@ -391,16 +394,16 @@ export function TaskPage({
     }
   }
 
-  async function discard(t: { id: string; request: string }) {
+  async function discard(target: { id: string; request: string }) {
     const ok = await confirm({
-      title: "Discard this task?",
-      body: <p>Deletes its request, contract and triage from this workspace.</p>,
-      confirmLabel: "Discard",
+      title: t("tasks.page.discardTitle"),
+      body: <p>{t("tasks.page.discardBody")}</p>,
+      confirmLabel: t("tasks.page.discard"),
       danger: true,
     });
     if (!ok) return;
     try {
-      await request("task.delete", { cwd, id: t.id });
+      await request("task.delete", { cwd, id: target.id });
       onClose();
     } catch (err) {
       setError(errorText(err));
@@ -414,7 +417,7 @@ export function TaskPage({
   const blocker =
     edited && triage
       ? approveBlocker({ edited, stale, tier, proposed: triage.proposed, reason, budget })
-      : "Draft the contract first.";
+      : t("tasks.page.draftFirst");
   const drafting = busy === "draft";
   const lastDraft = [...thread].reverse().find((e) => e.kind === "draft");
   const bottom = useRef<HTMLDivElement>(null);
@@ -427,7 +430,7 @@ export function TaskPage({
     return (
       <div className="task-thread" hidden={hidden}>
         <div className="task-thread-main">
-          {error ? <p className="warn">{error}</p> : <p className="muted task-loading">Opening the task…</p>}
+          {error ? <p className="warn">{error}</p> : <p className="muted task-loading">{t("tasks.page.opening")}</p>}
         </div>
       </div>
     );
@@ -445,35 +448,39 @@ export function TaskPage({
               disabled={busy !== null}
             >
               <ArrowLeft size={14} />
-              XL task
+              {t("tasks.page.backToXl")}
             </button>
           )}
           <ClipboardList size={16} aria-hidden />
           <div className="task-thread-title">
             <h1 title={task.request}>
-              {task.parent ? `Sub-task ${task.parent.index + 1}: ` : ""}
-              {task.title ?? task.request}
+              {task.parent
+                ? t("tasks.page.subtaskTitle", { n: task.parent.index + 1, title: task.title ?? task.request })
+                : (task.title ?? task.request)}
             </h1>
             <span className="muted" title={cwd}>
-              {[folderName(cwd), ...(task.folders ?? []).map((f) => f.name)].join(" + ")} · {usd(task.costUsd)} spent
+              {t("tasks.page.spent", {
+                folders: [folderName(cwd), ...(task.folders ?? []).map((f) => f.name)].join(" + "),
+                cost: usd(task.costUsd),
+              })}
             </span>
           </div>
           <span className="grow" />
           <StateBadge task={task} />
           <IconButton
-            label={sideOpen ? "Hide the task panel" : "Show the task panel"}
+            label={sideOpen ? t("tasks.page.hidePanel") : t("tasks.page.showPanel")}
             onClick={() => setSideOpen((v) => !v)}
           >
             <PanelRight size={15} />
           </IconButton>
-          <IconButton label="Close the task tab" onClick={onClose}>
+          <IconButton label={t("tasks.page.closeTab")} onClick={onClose}>
             <X size={15} />
           </IconButton>
         </header>
         {error && (
           <div className="banner" role="alert">
             <span className="grow">{error}</span>
-            <IconButton label="Dismiss" onClick={() => setError(null)}>
+            <IconButton label={t("tasks.page.dismiss")} onClick={() => setError(null)}>
               <X size={14} />
             </IconButton>
           </div>
@@ -482,7 +489,7 @@ export function TaskPage({
         <div className="task-thread-scroll" ref={threadRef}>
           <div className="thread">
             <div className="msg user task-request-msg">
-              {task.chatContext && <span className="chip">From a chat</span>}
+              {task.chatContext && <span className="chip">{t("tasks.page.fromChat")}</span>}
               <p>{task.request}</p>
             </div>
 
@@ -502,8 +509,7 @@ export function TaskPage({
             )}
             {drafting && !lastDraft && (
               <div className="draft-block live">
-                <Loader2 size={14} className="spin" aria-hidden /> Claude is reading the project to draft the contract
-                (read-only). <Elapsed />
+                <Loader2 size={14} className="spin" aria-hidden /> {t("tasks.page.readingToDraft")} <Elapsed />
               </div>
             )}
             {drafting && (
@@ -513,29 +519,29 @@ export function TaskPage({
                   className="secondary small"
                   onClick={() => void request("task.cancel", { cwd, id: task.id })}
                 >
-                  Stop drafting
+                  {t("tasks.page.stopDrafting")}
                 </button>
               </div>
             )}
 
             {!drafting && task.state === "draft" && !task.contract && (
               <section className="card thread-card">
-                <p>The contract isn't drafted yet.</p>
+                <p>{t("tasks.page.notDrafted")}</p>
                 <div className="card-footer">
                   <div className="task-model">
                     <Select
                       value={modelAlias}
                       onChange={setModelAlias}
                       options={modelChoices(undefined, modelAlias)}
-                      label="Model for the draft"
+                      label={t("tasks.page.draftModel")}
                     />
                   </div>
                   <span className="grow" />
                   <button type="button" className="secondary" onClick={() => void discard(task)}>
-                    Discard
+                    {t("tasks.page.discard")}
                   </button>
                   <button type="button" onClick={() => void draft(task.id)}>
-                    Draft contract
+                    {t("tasks.page.draftContract")}
                   </button>
                 </div>
               </section>
@@ -555,13 +561,15 @@ export function TaskPage({
                   triage={triage}
                   stale={stale}
                   tier={tier}
-                  onTier={(t) => {
-                    setTier(t);
+                  onTier={(next) => {
+                    setTier(next);
                     setBudget((b) =>
-                      b === NO_BUDGET && t !== "XL"
+                      b === NO_BUDGET && next !== "XL"
                         ? b
                         : String(
-                            t === triage.chosen && triage.budgetUsd !== null ? triage.budgetUsd : DEFAULT_BUDGET_USD[t],
+                            next === triage.chosen && triage.budgetUsd !== null
+                              ? triage.budgetUsd
+                              : DEFAULT_BUDGET_USD[next],
                           ),
                     );
                   }}
@@ -569,13 +577,13 @@ export function TaskPage({
                   onReason={setReason}
                   budget={budget}
                   onBudget={setBudget}
-                  {...(task.parent ? { tiers: TIERS.filter((t) => t !== "XL") } : {})}
+                  {...(task.parent ? { tiers: TIERS.filter((x) => x !== "XL") } : {})}
                 />
                 <div className="thread-actions">
                   {blocker && !stale && <span className="muted">{blocker}</span>}
                   <span className="grow" />
                   <button type="button" className="secondary" onClick={() => void discard(task)}>
-                    Discard
+                    {t("tasks.page.discard")}
                   </button>
                   {stale ? (
                     <button
@@ -588,7 +596,7 @@ export function TaskPage({
                       }
                     >
                       {busy === "retriage" && <Loader2 size={14} className="spin" />}
-                      Run triage again
+                      {t("tasks.page.retriage")}
                     </button>
                   ) : (
                     <button
@@ -598,7 +606,7 @@ export function TaskPage({
                     >
                       {busy === "approve" || busy === "run" ? <Loader2 size={14} className="spin" /> : null}
                       {/* A sub-task runs from its XL task, never on approval. */}
-                      {tier === "S" && !task.parent ? "Approve and run" : "Approve contract and tier"}
+                      {tier === "S" && !task.parent ? t("tasks.page.approveAndRun") : t("tasks.page.approveContract")}
                     </button>
                   )}
                 </div>
@@ -613,9 +621,9 @@ export function TaskPage({
               <section className="card task-drafting" aria-live="polite">
                 <Loader2 size={18} className="spin" aria-hidden />
                 <div className="grow">
-                  <strong>Claude is reading the project to split the task into sub-tasks.</strong>
+                  <strong>{t("tasks.page.readingToSplit")}</strong>
                   <p className="muted">
-                    Read-only: it can't change files. Each sub-task gets its own contract and tier. <Elapsed />
+                    {t("tasks.page.splitReadOnly")} <Elapsed />
                   </p>
                 </div>
                 <button
@@ -623,7 +631,7 @@ export function TaskPage({
                   className="secondary"
                   onClick={() => void request("task.cancel", { cwd, id: task.id })}
                 >
-                  Cancel
+                  {t("tasks.page.cancel")}
                 </button>
               </section>
             )}
@@ -668,7 +676,9 @@ export function TaskPage({
                 task={task}
                 cwd={cwd}
                 onOpenFile={(file) =>
-                  onOpenFile(file).catch((err: unknown) => setError(`Couldn't open the report: ${errorText(err)}`))
+                  onOpenFile(file).catch((err: unknown) =>
+                    setError(t("tasks.page.openReportFailed", { error: errorText(err) })),
+                  )
                 }
               />
             )}
@@ -699,10 +709,10 @@ export function TaskPage({
             busy={false}
             placeholder={
               runningStep && (runningStep.kind === "agent" || runningStep.kind === "fix")
-                ? `Message ${runningStep.label}: it joins the step's work, e.g. “keep the public API as it is”`
-                : "A step that runs Claude takes messages; this one runs the project's checks."
+                ? t("tasks.page.messageStep", { step: runningStep.label })
+                : t("tasks.page.stepTakesNoMessages")
             }
-            hint="Enter sends it to the running step"
+            hint={t("tasks.page.messageStepHint")}
             onSend={(text) => void message(text)}
           />
         )}
@@ -719,17 +729,22 @@ export function TaskPage({
             {task.state === "running" ? (
               <>
                 <span className="muted">
-                  Run {usd(task.run?.costUsd ?? 0)}
                   {isXl(task)
-                    ? ` · ${budgetText(task.triage?.budgetUsd, true)}`
+                    ? t("tasks.page.runCostXl", {
+                        cost: usd(task.run?.costUsd ?? 0),
+                        budget: budgetText(task.triage?.budgetUsd, true),
+                      })
                     : task.triage?.budgetUsd === null
-                      ? " · no budget"
-                      : ` of ${budgetText(task.triage?.budgetUsd)}`}
+                      ? t("tasks.page.runCostNoBudget", { cost: usd(task.run?.costUsd ?? 0) })
+                      : t("tasks.page.runCostOf", {
+                          cost: usd(task.run?.costUsd ?? 0),
+                          budget: budgetText(task.triage?.budgetUsd),
+                        })}
                 </span>
                 <span className="grow" />
                 <button type="button" className="danger" onClick={() => void stop(task)}>
                   <Square size={14} />
-                  Stop
+                  {t("tasks.page.stop")}
                 </button>
               </>
             ) : (
@@ -746,7 +761,7 @@ export function TaskPage({
                     }}
                   >
                     {busy === "accept" && <Loader2 size={14} className="spin" />}
-                    Accept risk…
+                    {t("tasks.page.acceptRisk")}
                   </button>
                 )}
                 {/* Once split, an XL task's contract is what its sub-tasks were made from: it stays. */}
@@ -757,7 +772,7 @@ export function TaskPage({
                     disabled={busy !== null}
                     onClick={() => void step("revise", task.id, () => request("task.revise", { cwd, id: task.id }))}
                   >
-                    Revise
+                    {t("tasks.page.revise")}
                   </button>
                 )}
                 {task.state === "interrupted" ? (
@@ -767,12 +782,12 @@ export function TaskPage({
                     onClick={() => void step("resume", task.id, () => request("task.resume", { cwd, id: task.id }))}
                   >
                     <Play size={14} />
-                    Resume
+                    {t("tasks.page.resume")}
                   </button>
                 ) : canContinue(task) ? (
                   <button type="button" disabled={busy !== null} onClick={() => void continueRun(task.id)}>
                     {busy === "continue" ? <Loader2 size={14} className="spin" /> : <Play size={14} />}
-                    Continue
+                    {t("tasks.page.continue")}
                   </button>
                 ) : isXl(task) && task.state === "ready" && !task.subtasks?.length ? (
                   <>
@@ -781,19 +796,19 @@ export function TaskPage({
                         value={modelAlias}
                         onChange={setModelAlias}
                         options={modelChoices(undefined, modelAlias)}
-                        label="Model for the split"
+                        label={t("tasks.page.splitModel")}
                       />
                     </div>
                     <button type="button" disabled={busy !== null} onClick={() => void split(task.id)}>
                       {busy === "split" && <Loader2 size={14} className="spin" />}
-                      Split into sub-tasks
+                      {t("tasks.page.split")}
                     </button>
                   </>
                 ) : isXl(task) && task.state !== "ready" ? null : (
                   <>
                     <ProjectWorkflowNote cwd={cwd} tier={task.triage?.chosen} />
                     <RunButton
-                      label={task.run ? "Run again" : "Run"}
+                      label={task.run ? t("tasks.page.runAgain") : t("tasks.page.run")}
                       blocker={
                         task.parent
                           ? childRunBlocker(task, parentTask)
@@ -812,11 +827,11 @@ export function TaskPage({
                       <button
                         type="button"
                         className="secondary"
-                        title="Run this task again on a schedule, while AgentChainer is open"
+                        title={t("tasks.page.scheduleHint")}
                         onClick={() => onSchedule(task)}
                       >
                         <CalendarClock size={14} />
-                        Schedule…
+                        {t("tasks.page.schedule")}
                       </button>
                     )}
                   </>
@@ -828,9 +843,9 @@ export function TaskPage({
       </div>
 
       {sideOpen && (
-        <aside className={`task-side${sideTab === "flow" ? " wide" : ""}`} aria-label="Task">
+        <aside className={`task-side${sideTab === "flow" ? " wide" : ""}`} aria-label={t("tasks.page.task")}>
           <fieldset className="segmented side-tabs">
-            <legend className="sr-only">Panel</legend>
+            <legend className="sr-only">{t("tasks.page.panel")}</legend>
             {(["task", "flow"] as const).map((k) => (
               <button
                 key={k}
@@ -839,7 +854,7 @@ export function TaskPage({
                 className={sideTab === k ? "active" : undefined}
                 onClick={() => setSideTab(k)}
               >
-                {k === "task" ? "Task" : "Flow"}
+                {k === "task" ? t("tasks.page.task") : t("tasks.page.flow")}
               </button>
             ))}
           </fieldset>
@@ -868,37 +883,32 @@ export function TaskPage({
       <Modal
         open={accepting}
         onOpenChange={setAccepting}
-        title="Accept the risk?"
-        description={
-          task.state === "unverified"
-            ? "No gate ran, so nothing proved the task."
-            : "The latest gate runs didn't all pass, so the task isn't proved."
-        }
+        title={t("tasks.page.acceptTitle")}
+        description={task.state === "unverified" ? t("tasks.page.acceptUnverified") : t("tasks.page.acceptFailed")}
         actions={
           <>
             <button type="button" className="secondary" onClick={() => setAccepting(false)}>
-              Cancel
+              {t("tasks.page.cancel")}
             </button>
             <button
               type="button"
               disabled={!acceptReason.trim() || busy !== null}
               onClick={() => void acceptRisk(task.id)}
             >
-              Accept with risk
+              {t("tasks.page.acceptWithRisk")}
             </button>
           </>
         }
       >
         <p>
-          The task ends as <strong>Accepted with risk</strong>, not Done. Your reason goes into the evidence report.
-          Nothing in the working tree changes.
+          <Rich k="tasks.page.acceptBody" tags={{ strong: (s) => <strong>{s}</strong> }} />
         </p>
-        <Field label="Why is it acceptable?">
+        <Field label={t("tasks.page.acceptReason")}>
           <textarea
             rows={3}
             value={acceptReason}
             onChange={(e) => setAcceptReason(e.target.value)}
-            placeholder="e.g. The failing test is a known bug, tracked separately."
+            placeholder={t("tasks.page.acceptReasonPlaceholder")}
             maxLength={2000}
           />
         </Field>
@@ -914,11 +924,8 @@ function DraftBlock({ items, live, cwd }: { items: Item[]; live: boolean; cwd: s
     <details className={`draft-block${live ? " live" : ""}`} open={live}>
       <summary>
         {live ? <Loader2 size={14} className="spin" aria-hidden /> : <CircleCheck size={14} aria-hidden />}
-        {live ? "Drafting the contract (read-only)" : "Drafted the contract"}
-        <span className="muted">
-          {" "}
-          · {tools} {tools === 1 ? "tool call" : "tool calls"}
-        </span>
+        {live ? t("tasks.draftBlock.drafting") : t("tasks.draftBlock.drafted")}
+        <span className="muted"> · {t("tasks.draftBlock.toolCalls", { count: tools })}</span>
       </summary>
       <TranscriptView cwd={cwd} items={items} onOpenFile={() => undefined} />
     </details>
@@ -945,28 +952,30 @@ function ContractCard({
   onChange: (c: TaskContract) => void;
 }) {
   const lists: [string, string[]][] = [
-    ["Constraints", contract.constraints],
-    ["Out of scope", contract.outOfScope],
-    ["Risks", contract.risks],
-    ["Open questions", contract.openQuestions],
+    [t("tasks.contract.constraints"), contract.constraints],
+    [t("tasks.contract.outOfScope"), contract.outOfScope],
+    [t("tasks.contract.risks"), contract.risks],
+    [t("tasks.contract.openQuestions"), contract.openQuestions],
   ];
   return (
     <section className="card thread-card contract-card">
       <div className="card-title">
         <ClipboardList size={16} aria-hidden />
-        <h2>Contract</h2>
-        <span className="muted">draft</span>
+        <h2>{t("tasks.contract.title")}</h2>
+        <span className="muted">{t("tasks.contractCard.draft")}</span>
         <span className="grow" />
         <button type="button" className="ghost small" onClick={() => onEdit(!editing)}>
-          {editing ? "Done editing" : "Edit"}
+          {editing ? t("tasks.contractCard.doneEditing") : t("tasks.contractCard.edit")}
         </button>
       </div>
       {editing ? (
         <ContractForm request={request} contract={contract} gates={gates} onChange={onChange} />
       ) : (
         <>
-          <p className="contract-objective">{contract.objective || <span className="muted">No objective yet.</span>}</p>
-          <h3 className="contract-heading">Done when</h3>
+          <p className="contract-objective">
+            {contract.objective || <span className="muted">{t("tasks.contractCard.noObjective")}</span>}
+          </p>
+          <h3 className="contract-heading">{t("tasks.contractCard.doneWhen")}</h3>
           <ul className="contract-criteria">
             {contract.acceptanceCriteria.map((c) => (
               <li key={c.id} className="contract-criterion">
@@ -991,7 +1000,7 @@ function ContractCard({
             ))}
           {contract.affectedAreas.length > 0 && (
             <>
-              <h3 className="contract-heading">Affected areas</h3>
+              <h3 className="contract-heading">{t("tasks.contract.affectedAreas")}</h3>
               <p className="contract-areas">
                 {contract.affectedAreas.map((a) => (
                   <code key={a}>{a}</code>
@@ -999,7 +1008,7 @@ function ContractCard({
               </p>
             </>
           )}
-          <p className="muted contract-hint">Reply below to change it, or edit it here.</p>
+          <p className="muted contract-hint">{t("tasks.contractCard.hint")}</p>
         </>
       )}
     </section>
@@ -1008,35 +1017,42 @@ function ContractCard({
 
 /** The task's facts for the right panel: state, tier, budget, spend, worktree and overlapping tasks. */
 function TaskFacts({ task, cwd, onOpenTask }: { task: Task; cwd: string; onOpenTask: (id: string) => void }) {
-  const { label } = task.state === "draft" ? { label: task.contract ? "Draft" : "New" } : stateLabel(task.state);
+  const { label } =
+    task.state === "draft"
+      ? { label: task.contract ? t("tasks.state.draft") : t("tasks.state.new") }
+      : stateLabel(task.state);
   return (
     <div className="task-facts-panel">
-      <h2>Task</h2>
+      <h2>{t("tasks.facts.title")}</h2>
       <dl className="task-facts">
-        <dt>State</dt>
+        <dt>{t("tasks.facts.state")}</dt>
         <dd>{label}</dd>
-        <dt>Tier</dt>
-        <dd>{task.triage ? `${task.triage.chosen}: ${TIER_HELP[task.triage.chosen]}` : "after drafting"}</dd>
+        <dt>{t("tasks.contract.tier")}</dt>
+        <dd>
+          {task.triage
+            ? t("tasks.contract.tierValue", { tier: task.triage.chosen, help: TIER_HELP[task.triage.chosen] })
+            : t("tasks.facts.afterDrafting")}
+        </dd>
         {task.triage && (
           <>
-            <dt>Budget</dt>
+            <dt>{t("tasks.contract.budget")}</dt>
             <dd>{budgetText(task.triage.budgetUsd, task.triage.chosen === "XL")}</dd>
           </>
         )}
-        <dt>Spent</dt>
+        <dt>{t("tasks.facts.spent")}</dt>
         <dd>{usd(task.costUsd)}</dd>
         {task.worktree && (
           <>
-            <dt>Branch</dt>
+            <dt>{t("tasks.facts.branch")}</dt>
             <dd>
               <code>{task.worktree.branch}</code>
-              {task.worktree.removed ? " (worktree removed)" : ""}
+              {task.worktree.removed ? ` ${t("tasks.facts.worktreeRemoved")}` : ""}
             </dd>
           </>
         )}
-        <dt>Saved in</dt>
+        <dt>{t("tasks.facts.savedIn")}</dt>
         <dd>
-          <code>.agentchainer/tasks/{task.id}/</code>
+          <code>{`.agentchainer/tasks/${task.id}/`}</code>
         </dd>
       </dl>
       <Overlaps task={task} cwd={cwd} onOpenTask={onOpenTask} />
@@ -1051,7 +1067,7 @@ function TaskComposer({
   modelAlias,
   onModel,
   placeholder,
-  hint = "Enter redrafts the contract with your reply",
+  hint,
   onSend,
 }: {
   disabled: boolean;
@@ -1065,10 +1081,10 @@ function TaskComposer({
 }) {
   const [text, setText] = useState("");
   const send = () => {
-    const t = text.trim();
-    if (!t || disabled) return;
+    const trimmed = text.trim();
+    if (!trimmed || disabled) return;
     setText("");
-    onSend(t);
+    onSend(trimmed);
   };
   return (
     <div className="composer task-composer">
@@ -1076,13 +1092,8 @@ function TaskComposer({
         <textarea
           rows={2}
           value={text}
-          aria-label={onModel ? "Reply to the contract" : "Message the running step"}
-          placeholder={
-            busy
-              ? "Claude is drafting…"
-              : (placeholder ??
-                "Reply to change the contract, e.g. “leave applyDiscount alone” or “add a test for an empty cart”")
-          }
+          aria-label={onModel ? t("tasks.composer.replyLabel") : t("tasks.composer.messageLabel")}
+          placeholder={busy ? t("tasks.composer.drafting") : (placeholder ?? t("tasks.composer.replyPlaceholder"))}
           disabled={disabled}
           onChange={(e) => setText(e.target.value)}
           onKeyDown={(e) => {
@@ -1096,20 +1107,20 @@ function TaskComposer({
           {onModel && (
             <Select
               compact
-              label="Model for the draft"
+              label={t("tasks.page.draftModel")}
               value={modelAlias ?? ""}
               options={modelChoices(undefined, modelAlias)}
               onChange={onModel}
             />
           )}
           <span className="grow" />
-          <span className="composer-hint">{hint}</span>
+          <span className="composer-hint">{hint ?? t("tasks.composer.replyHint")}</span>
           <button
             type="button"
             className="icon round"
             disabled={disabled || !text.trim()}
             onClick={send}
-            aria-label={onModel ? "Send the reply" : "Send to the running step"}
+            aria-label={onModel ? t("tasks.composer.sendReply") : t("tasks.composer.sendMessage")}
           >
             <ArrowUp size={16} />
           </button>
@@ -1120,7 +1131,9 @@ function TaskComposer({
 }
 
 function StateBadge({ task }: { task: Task }) {
-  if (task.state === "draft") return <span className="badge">{task.contract ? "Draft" : "New"}</span>;
+  if (task.state === "draft") {
+    return <span className="badge">{task.contract ? t("tasks.state.draft") : t("tasks.state.new")}</span>;
+  }
   const { label, tone } = stateLabel(task.state);
   return (
     <span className={`badge tone-${tone}`}>
@@ -1132,16 +1145,16 @@ function StateBadge({ task }: { task: Task }) {
 function Elapsed() {
   const [seconds, setSeconds] = useState(0);
   useEffect(() => {
-    const t = setInterval(() => setSeconds((s) => s + 1), 1000);
-    return () => clearInterval(t);
+    const timer = setInterval(() => setSeconds((s) => s + 1), 1000);
+    return () => clearInterval(timer);
   }, []);
-  return <span>{seconds} s</span>;
+  return <span>{secondsText(seconds)}</span>;
 }
 
 function Quote({ text }: { text: string }) {
   return (
     <blockquote className="task-request">
-      <span className="field-label">Request</span>
+      <span className="field-label">{t("tasks.quote.request")}</span>
       {text}
     </blockquote>
   );
@@ -1161,42 +1174,39 @@ function ContractForm({
   const set = <K extends keyof TaskContract>(key: K, value: TaskContract[K]) => onChange({ ...contract, [key]: value });
   const options = checkOptions(gates);
   return (
-    <section className="card task-contract" aria-label="Contract">
+    <section className="card task-contract" aria-label={t("tasks.contract.title")}>
       <div className="card-title">
         <ClipboardList size={16} aria-hidden />
-        <h2>Contract</h2>
-        <span className="muted">Drafted by Claude. Edit anything before you approve.</span>
+        <h2>{t("tasks.contract.title")}</h2>
+        <span className="muted">{t("tasks.contractForm.subtitle")}</span>
       </div>
       <Quote text={request} />
       {contract.openQuestions.length > 0 && (
         <div className="callout task-questions">
           <strong>
-            <CircleHelp size={14} aria-hidden /> Open questions
+            <CircleHelp size={14} aria-hidden /> {t("tasks.contract.openQuestions")}
           </strong>
-          <p className="muted">Settle them by editing the contract, then remove them.</p>
+          <p className="muted">{t("tasks.contractForm.settleQuestions")}</p>
           <StringList
-            label="Open question"
+            label={t("tasks.contractForm.openQuestion")}
             items={contract.openQuestions}
             onChange={(v) => set("openQuestions", v)}
             multiline
           />
         </div>
       )}
-      <Field label="Objective" help="The outcome in a sentence or two, not the steps.">
+      <Field label={t("tasks.contract.objective")} help={t("tasks.contractForm.objectiveHelp")}>
         <textarea rows={2} value={contract.objective} onChange={(e) => set("objective", e.target.value)} />
       </Field>
       <div className="task-field">
-        <span className="field-label">Acceptance criteria</span>
-        <span className="field-help">
-          What counts as done, and how each is proved: a gate run, the reviewer, or you. Only gates with a detected
-          command can prove anything.
-        </span>
+        <span className="field-label">{t("tasks.contract.acceptanceCriteria")}</span>
+        <span className="field-help">{t("tasks.contractForm.criteriaHelp")}</span>
         <EditableList<AcceptanceCriterion>
-          label="Criterion"
+          label={t("tasks.contractForm.criterion")}
           items={contract.acceptanceCriteria}
           onChange={(v) => set("acceptanceCriteria", v)}
-          addLabel="Add criterion"
-          empty="No criteria yet: a task needs at least one."
+          addLabel={t("tasks.contractForm.addCriterion")}
+          empty={t("tasks.contractForm.noCriteria")}
           multiline
           text={(c) => c.text}
           withText={(c, text) => ({ ...c, text })}
@@ -1207,33 +1217,33 @@ function ContractForm({
               value={c.check}
               onChange={(v) => setC({ ...c, check: v as AcceptanceCriterion["check"] })}
               options={options}
-              label="How it's checked"
+              label={t("tasks.contractForm.howChecked")}
             />
           )}
         />
       </div>
       <ListField
-        label="Affected areas"
-        help="Paths or globs Claude expects to change."
+        label={t("tasks.contract.affectedAreas")}
+        help={t("tasks.contractForm.affectedAreasHelp")}
         mono
         items={contract.affectedAreas}
         onChange={(v) => set("affectedAreas", v)}
       />
       <ListField
-        label="Constraints"
-        help="Limits the work must respect."
+        label={t("tasks.contract.constraints")}
+        help={t("tasks.contractForm.constraintsHelp")}
         items={contract.constraints}
         onChange={(v) => set("constraints", v)}
       />
       <ListField
-        label="Out of scope"
-        help="Related work this task won't do."
+        label={t("tasks.contract.outOfScope")}
+        help={t("tasks.contractForm.outOfScopeHelp")}
         items={contract.outOfScope}
         onChange={(v) => set("outOfScope", v)}
       />
       <ListField
-        label="Risks"
-        help="What could go wrong. Feeds triage and the report."
+        label={t("tasks.contract.risks")}
+        help={t("tasks.contractForm.risksHelp")}
         items={contract.risks}
         onChange={(v) => set("risks", v)}
       />
@@ -1263,7 +1273,7 @@ function ListField({
         label={label}
         items={items}
         onChange={onChange}
-        empty="None."
+        empty={t("tasks.contractForm.none")}
         {...(mono ? { mono } : { multiline: true })}
       />
     </div>
@@ -1293,28 +1303,26 @@ function TriageCard({
   tiers?: readonly Tier[];
 }) {
   return (
-    <aside className="card task-triage" aria-label="Triage">
+    <aside className="card task-triage" aria-label={t("tasks.triage.title")}>
       <div className="card-title">
         <Scale size={16} aria-hidden />
-        <h2>Triage</h2>
+        <h2>{t("tasks.triage.title")}</h2>
         <span className="grow" />
-        <span className={`tier-badge tier-${triage.proposed}`} title="Proposed tier">
+        <span className={`tier-badge tier-${triage.proposed}`} title={t("tasks.triage.proposedTier")}>
           {triage.proposed}
         </span>
       </div>
-      {stale && (
-        <p className="callout">The contract changed since this triage. Run triage again to update the proposal.</p>
-      )}
+      {stale && <p className="callout">{t("tasks.triage.stale")}</p>}
       <div className="task-why">
-        <span className="field-label">Why</span>
+        <span className="field-label">{t("tasks.triage.why")}</span>
         <ul className="task-signals">
           {triage.signals.map((s) => (
             <li key={s.signal}>
               <div className="task-signal-head">
                 <span className="task-signal-name">{signalLabel(s.signal)}</span>
                 {s.floor && (
-                  <span className="badge" title={`At least ${s.floor}`}>
-                    ≥ {s.floor}
+                  <span className="badge" title={t("tasks.triage.atLeast", { tier: s.floor })}>
+                    {`≥ ${s.floor}`}
                   </span>
                 )}
               </div>
@@ -1323,54 +1331,57 @@ function TriageCard({
           ))}
           <li>
             <div className="task-signal-head">
-              <span className="task-signal-name">Claude (Haiku)</span>
+              <span className="task-signal-name">{t("tasks.triage.model")}</span>
               {triage.model && <span className="badge">{triage.model.tier}</span>}
             </div>
             {triage.model ? (
               <span>
-                {triage.model.rationale} <span className="muted">({triage.model.confidence} confidence)</span>
+                {triage.model.rationale}{" "}
+                <span className="muted">{t("tasks.triage.confidence", { confidence: triage.model.confidence })}</span>
               </span>
             ) : (
-              <span className="muted">Unavailable: {triage.modelError}. The proposal is the floor.</span>
+              <span className="muted">{t("tasks.triage.unavailable", { error: triage.modelError ?? "" })}</span>
             )}
           </li>
         </ul>
         {triage.model && triage.floor !== "S" && triage.proposed !== triage.model.tier && (
-          <p className="field-help">
-            The signals set a floor of {triage.floor}, above Claude's {triage.model.tier}.
-          </p>
+          <p className="field-help">{t("tasks.triage.floorAbove", { floor: triage.floor, tier: triage.model.tier })}</p>
         )}
       </div>
       <fieldset className="task-field">
-        <legend className="field-label">Tier</legend>
+        <legend className="field-label">{t("tasks.contract.tier")}</legend>
         <div className="task-tiers">
-          {tiers.map((t) => (
+          {tiers.map((option) => (
             <button
-              key={t}
+              key={option}
               type="button"
-              aria-pressed={tier === t}
-              className={`chip${tier === t ? " on" : ""}`}
-              onClick={() => onTier(t)}
+              aria-pressed={tier === option}
+              className={`chip${tier === option ? " on" : ""}`}
+              onClick={() => onTier(option)}
             >
-              {t}
-              {t === triage.proposed && <span className="muted"> · proposed</span>}
+              {option}
+              {option === triage.proposed && (
+                <span className="muted">
+                  {" · "}
+                  {t("tasks.triage.proposed")}
+                </span>
+              )}
             </button>
           ))}
         </div>
         <span className="field-help">{TIER_HELP[tier]}</span>
       </fieldset>
       {tier !== triage.proposed && (
-        <Field label={`Why ${tier} rather than ${triage.proposed}?`} help="Recorded with the task's evidence.">
+        <Field
+          label={t("tasks.triage.whyOverride", { tier, proposed: triage.proposed })}
+          help={t("tasks.triage.whyOverrideHelp")}
+        >
           <textarea rows={2} value={reason} onChange={(e) => onReason(e.target.value)} />
         </Field>
       )}
       <Field
-        label={tier === "XL" ? "Budget per sub-task (USD)" : "Budget (USD)"}
-        help={
-          budget === NO_BUDGET
-            ? "No spend cap: the task runs until it's done or you stop it. Read-only steps keep their own small limits."
-            : "The task stops when it's spent."
-        }
+        label={tier === "XL" ? t("tasks.triage.budgetPerSubtask") : t("tasks.triage.budget")}
+        help={budget === NO_BUDGET ? t("tasks.triage.noBudgetHelp") : t("tasks.triage.budgetHelp")}
       >
         <input
           type="number"
@@ -1378,7 +1389,7 @@ function TriageCard({
           max={1000}
           step={0.5}
           value={budget === NO_BUDGET ? "" : budget}
-          placeholder={budget === NO_BUDGET ? "No budget" : undefined}
+          placeholder={budget === NO_BUDGET ? t("tasks.triage.noBudget") : undefined}
           disabled={budget === NO_BUDGET}
           onChange={(e) => onBudget(e.target.value)}
         />
@@ -1390,7 +1401,7 @@ function TriageCard({
             checked={budget === NO_BUDGET}
             onChange={(e) => onBudget(e.target.checked ? NO_BUDGET : String(DEFAULT_BUDGET_USD[tier]))}
           />
-          No budget
+          {t("tasks.triage.noBudget")}
         </label>
       )}
     </aside>
@@ -1404,17 +1415,17 @@ function TriageCard({
 function ContractView({ task, contract, triage }: { task: Task; contract: TaskContract; triage: Triage }) {
   const [open, setOpen] = useState(!task.run);
   const lists: [string, string[]][] = [
-    ["Constraints", contract.constraints],
-    ["Out of scope", contract.outOfScope],
-    ["Risks", contract.risks],
+    [t("tasks.contract.constraints"), contract.constraints],
+    [t("tasks.contract.outOfScope"), contract.outOfScope],
+    [t("tasks.contract.risks"), contract.risks],
   ];
   return (
     <section className="card task-contract-view">
       <div className="card-title">
         <ClipboardList size={16} aria-hidden />
-        <h2>Contract</h2>
+        <h2>{t("tasks.contract.title")}</h2>
         {contract.approvedAt && (
-          <span className="muted">Approved {new Date(contract.approvedAt).toLocaleString()}</span>
+          <span className="muted">{t("tasks.contractView.approved", { date: dateTime(contract.approvedAt) })}</span>
         )}
         <span className="grow" />
         <span className={`tier-badge tier-${triage.chosen}`} title={TIER_HELP[triage.chosen]}>
@@ -1423,21 +1434,23 @@ function ContractView({ task, contract, triage }: { task: Task; contract: TaskCo
         {task.run && (
           <button type="button" className="ghost small task-fold" aria-expanded={open} onClick={() => setOpen(!open)}>
             <ChevronRight size={14} aria-hidden />
-            {open ? "Hide" : "Show"}
+            {open ? t("tasks.contractView.hide") : t("tasks.contractView.show")}
           </button>
         )}
       </div>
-      {task.state === "ready" && task.parent && (
-        <p className="callout">It runs from its XL task: approve the sub-tasks there, then run that task.</p>
-      )}
+      {task.state === "ready" && task.parent && <p className="callout">{t("tasks.contractView.runsFromXl")}</p>}
       {task.state === "ready" && !task.parent && (
         <p className="callout">
           {triage.chosen === "XL"
-            ? "Split it into sub-tasks from the footer: each gets its own contract, tier and git worktree, and you approve them before anything runs."
+            ? t("tasks.contractView.readyXl")
             : RUNNABLE_TIERS.has(triage.chosen)
-              ? "Run it from the footer: each step is a Claude session you can watch here, and the app runs the gates itself."
-              : `${triage.chosen} tasks run in a later update.`}{" "}
-          The task is saved in <code>.agentchainer/tasks/{task.id}/</code>.
+              ? t("tasks.contractView.readyRun")
+              : t("tasks.blocker.laterUpdate", { tier: triage.chosen })}{" "}
+          <Rich
+            k="tasks.contractView.savedIn"
+            params={{ path: `.agentchainer/tasks/${task.id}/` }}
+            tags={{ code: (s) => <code>{s}</code> }}
+          />
         </p>
       )}
       {!open ? (
@@ -1446,23 +1459,23 @@ function ContractView({ task, contract, triage }: { task: Task; contract: TaskCo
         <>
           <Quote text={task.request} />
           <dl className="task-facts">
-            <dt>Objective</dt>
+            <dt>{t("tasks.contract.objective")}</dt>
             <dd>{contract.objective}</dd>
-            <dt>Tier</dt>
+            <dt>{t("tasks.contract.tier")}</dt>
             <dd>
-              {triage.chosen}: {TIER_HELP[triage.chosen]}
+              {t("tasks.contract.tierValue", { tier: triage.chosen, help: TIER_HELP[triage.chosen] })}
               {triage.override && (
                 <span className="muted">
                   {" "}
-                  Proposed {triage.proposed}; changed because: {triage.override.reason}
+                  {t("tasks.contractView.overridden", { tier: triage.proposed, reason: triage.override.reason })}
                 </span>
               )}
             </dd>
-            <dt>Budget</dt>
+            <dt>{t("tasks.contract.budget")}</dt>
             <dd>{budgetText(triage.budgetUsd, triage.chosen === "XL")}</dd>
           </dl>
           <div className="task-field">
-            <span className="field-label">Acceptance criteria</span>
+            <span className="field-label">{t("tasks.contract.acceptanceCriteria")}</span>
             <ul className="task-criteria">
               {contract.acceptanceCriteria.map((c) => (
                 <li key={c.id}>
@@ -1475,7 +1488,7 @@ function ContractView({ task, contract, triage }: { task: Task; contract: TaskCo
           <dl className="task-facts">
             {contract.affectedAreas.length > 0 && (
               <div className="task-fact">
-                <dt>Affected areas</dt>
+                <dt>{t("tasks.contract.affectedAreas")}</dt>
                 <dd>
                   <ul className="task-paths-list">
                     {contract.affectedAreas.map((a) => (
@@ -1509,10 +1522,10 @@ function ContractView({ task, contract, triage }: { task: Task; contract: TaskCo
 }
 
 function StepIcon({ status }: { status: StepRun["status"] }) {
-  if (status === "running") return <Loader2 size={15} className="spin" aria-label="Running" />;
-  if (status === "done") return <CircleCheck size={15} className="ok" aria-label="Done" />;
-  if (status === "failed") return <CircleX size={15} className="err" aria-label="Failed" />;
-  return <MinusCircle size={15} className="muted" aria-label="Stopped" />;
+  if (status === "running") return <Loader2 size={15} className="spin" aria-label={t("tasks.step.running")} />;
+  if (status === "done") return <CircleCheck size={15} className="ok" aria-label={t("tasks.step.done")} />;
+  if (status === "failed") return <CircleX size={15} className="err" aria-label={t("tasks.step.failed")} />;
+  return <MinusCircle size={15} className="muted" aria-label={t("tasks.step.stopped")} />;
 }
 
 /**
@@ -1550,8 +1563,8 @@ function RunView({
   // Running steps' durations count up.
   useEffect(() => {
     if (task.state !== "running") return;
-    const t = setInterval(() => tick((n) => n + 1), 1000);
-    return () => clearInterval(t);
+    const timer = setInterval(() => tick((n) => n + 1), 1000);
+    return () => clearInterval(timer);
   }, [task.state]);
   if (!run) return null;
   const { label, tone } = stateLabel(task.state);
@@ -1576,16 +1589,19 @@ function RunView({
     <>
       <div className="run-divider">
         <Play size={14} aria-hidden />
-        <span>Run</span>
+        <span>{t("tasks.run.title")}</span>
         <span className={`badge tone-${tone}`}>{label}</span>
         <span className="grow" />
         <span className="muted">
-          {MODE_NAMES[run.permissionMode]} · {usd(run.costUsd)}
           {isXl(task)
-            ? " across its sub-tasks"
+            ? t("tasks.run.costXl", { mode: MODE_NAMES[run.permissionMode], cost: usd(run.costUsd) })
             : task.triage?.budgetUsd === null
-              ? " · no budget"
-              : ` of ${budgetText(task.triage?.budgetUsd)}`}
+              ? t("tasks.run.costNoBudget", { mode: MODE_NAMES[run.permissionMode], cost: usd(run.costUsd) })
+              : t("tasks.run.costOf", {
+                  mode: MODE_NAMES[run.permissionMode],
+                  cost: usd(run.costUsd),
+                  budget: budgetText(task.triage?.budgetUsd),
+                })}
         </span>
       </div>
       {run.steps.map((entry) => {
@@ -1606,8 +1622,8 @@ function RunView({
               <span className="task-step-label">{entry.label}</span>
               {entry.role && <span className="chip step-role">{entry.role}</span>}
               {entry.group && (
-                <span className="badge" title={`Runs at the same time as the other ${entry.group} steps`}>
-                  parallel
+                <span className="badge" title={t("tasks.run.parallelHint", { group: entry.group })}>
+                  {t("tasks.run.parallel")}
                 </span>
               )}
               <span className="grow muted task-step-note">{entry.note}</span>
@@ -1622,18 +1638,18 @@ function RunView({
                   <GateList runs={gates} before={entry.kind === "gates" ? before : undefined} />
                 ) : entry.kind === "subtask" && entry.taskId ? (
                   <div className="task-step-empty task-step-actions">
-                    <span className="muted grow">{entry.note ?? "Runs its own tier's workflow in its worktree."}</span>
+                    <span className="muted grow">{entry.note ?? t("tasks.run.subtaskNote")}</span>
                     <button type="button" className="secondary small" onClick={() => onOpenTask(entry.taskId ?? "")}>
-                      Open sub-task
+                      {t("tasks.run.openSubtask")}
                     </button>
                   </div>
                 ) : entry.kind === "setup" || entry.kind === "merge" ? (
-                  <p className="muted task-step-empty">{entry.note ?? "Working…"}</p>
+                  <p className="muted task-step-empty">{entry.note ?? t("tasks.run.working")}</p>
                 ) : sessionItems?.length ? (
                   <TranscriptView cwd={cwd} items={sessionItems} />
                 ) : (
                   <p className="muted task-step-empty">
-                    {entry.status === "running" ? "Waiting for the session's first words…" : "No transcript."}
+                    {entry.status === "running" ? t("tasks.run.waiting") : t("tasks.run.noTranscript")}
                   </p>
                 )}
               </div>
@@ -1644,35 +1660,33 @@ function RunView({
       {run.outcome && <p className={`callout tone-${tone} run-outcome`}>{run.outcome}</p>}
       {run.acceptance && (
         <p className="callout">
-          <strong>Risk accepted</strong> {new Date(run.acceptance.at).toLocaleString()}: {run.acceptance.reason}
+          <strong>{t("tasks.run.riskAccepted")}</strong> {dateTime(run.acceptance.at)}: {run.acceptance.reason}
         </p>
       )}
       <section className="card">
         <div className="card-title">
-          <h2>Gates</h2>
-          <span className="muted">Run by AgentChainer, with the real exit codes.</span>
+          <h2>{t("tasks.run.gates")}</h2>
+          <span className="muted">{t("tasks.run.gatesSubtitle")}</span>
         </div>
         {run.gates.length === 0 && run.baseline.length === 0 ? (
-          <EmptyState>No gate has run yet.</EmptyState>
+          <EmptyState>{t("tasks.run.noGates")}</EmptyState>
         ) : (
           <>
             {run.baseline.length > 0 && (
               <div className="task-gate-round">
-                <span className="field-label">Before the task</span>
+                <span className="field-label">{t("tasks.run.beforeTask")}</span>
                 <GateList runs={run.baseline} />
               </div>
             )}
             {gateRounds(run.gates).map((round) => (
               <div key={round[0]?.round} className="task-gate-round">
-                <span className="field-label">Round {(round[0]?.round ?? 0) + 1}</span>
+                <span className="field-label">{t("tasks.run.round", { n: (round[0]?.round ?? 0) + 1 })}</span>
                 <GateList runs={round} before={before} />
               </div>
             ))}
           </>
         )}
-        {run.notRun.length > 0 && (
-          <p className="muted">Not run, no command detected: {run.notRun.join(", ")}. They don't count as passed.</p>
-        )}
+        {run.notRun.length > 0 && <p className="muted">{t("tasks.run.notRun", { gates: run.notRun.join(", ") })}</p>}
       </section>
     </>
   );
@@ -1680,7 +1694,7 @@ function RunView({
 
 /** `before`: the gates that failed before the task, marked in later rounds. */
 function GateList({ runs, before }: { runs: GateRun[]; before?: ReadonlySet<string> }) {
-  if (!runs.length) return <p className="muted task-step-empty">No gates to run.</p>;
+  if (!runs.length) return <p className="muted task-step-empty">{t("tasks.gateList.empty")}</p>;
   return (
     <ul className="task-gates">
       {runs.map((g) => (
@@ -1688,9 +1702,9 @@ function GateList({ runs, before }: { runs: GateRun[]; before?: ReadonlySet<stri
           <details>
             <summary>
               {passedGate(g) ? (
-                <CircleCheck size={14} className="ok" aria-label="Passed" />
+                <CircleCheck size={14} className="ok" aria-label={t("tasks.gateList.passed")} />
               ) : (
-                <CircleX size={14} className="err" aria-label="Failed" />
+                <CircleX size={14} className="err" aria-label={t("tasks.gateList.failed")} />
               )}
               {g.folder && <span className="chip">{g.folder}</span>}
               <span className="task-gate-kind">{g.kind}</span>
@@ -1698,20 +1712,23 @@ function GateList({ runs, before }: { runs: GateRun[]; before?: ReadonlySet<stri
               {g.package !== "." && g.package !== g.folder && <span className="muted">{g.package}</span>}
               {before?.has(gateKey(g)) && (
                 <span className="badge">
-                  {passedGate(g) ? "fixed: failed before the task" : "failed before the task"}
+                  {passedGate(g) ? t("tasks.gateList.fixedBefore") : t("tasks.gateList.failedBefore")}
                 </span>
               )}
               <span className="grow" />
               <span className="muted">
-                {g.timedOut ? "timed out" : `exit ${g.exitCode}`} · {(g.durationMs / 1000).toFixed(1)} s
+                {g.timedOut ? t("tasks.gateList.timedOut") : t("tasks.gateList.exit", { code: String(g.exitCode) })} ·{" "}
+                {secondsText((g.durationMs / 1000).toFixed(1))}
               </span>
             </summary>
             {g.changed?.length ? (
               <p className="muted">
-                {g.kind === "format" ? "Formatted" : "Reverted changes to"}: {g.changed.join(", ")}
+                {g.kind === "format"
+                  ? t("tasks.gateList.formatted", { files: g.changed.join(", ") })
+                  : t("tasks.gateList.reverted", { files: g.changed.join(", ") })}
               </p>
             ) : null}
-            <pre className="task-gate-log">{redactSecrets(g.tail) || "(no output)"}</pre>
+            <pre className="task-gate-log">{redactSecrets(g.tail) || t("tasks.gateList.noOutput")}</pre>
           </details>
         </li>
       ))}
@@ -1751,22 +1768,22 @@ function EvidenceCard({
     <section className="card task-evidence">
       <div className="card-title">
         <FileText size={16} aria-hidden />
-        <h2>Evidence</h2>
-        <span className="muted">From the run's records; Claude's own statements are labeled as such.</span>
+        <h2>{t("tasks.evidence.title")}</h2>
+        <span className="muted">{t("tasks.evidence.subtitle")}</span>
         <span className="grow" />
-        {report && <CopyButton text={report.markdown} label="Copy the report as markdown" />}
+        {report && <CopyButton text={report.markdown} label={t("tasks.evidence.copy")} />}
         {report && (
           <button type="button" className="ghost small" onClick={() => void onOpenFile(report.path)}>
             <ExternalLink size={13} />
-            Open in editor
+            {t("tasks.evidence.openInEditor")}
           </button>
         )}
       </div>
       {error ? (
-        <p className="muted">The report couldn't be built: {error}</p>
+        <p className="muted">{t("tasks.evidence.failed", { error })}</p>
       ) : !report ? (
         <p className="muted">
-          <Loader2 size={14} className="spin" aria-hidden /> Building the report…
+          <Loader2 size={14} className="spin" aria-hidden /> {t("tasks.evidence.building")}
         </p>
       ) : (
         <>
@@ -1783,11 +1800,11 @@ function EvidenceCard({
               onClick={() => setOpen(!open)}
             >
               <ChevronRight size={14} aria-hidden />
-              {open ? "Hide the report" : "Show the report"}
+              {open ? t("tasks.evidence.hide") : t("tasks.evidence.show")}
             </button>
             <span className="grow" />
             <span className="muted" title={report.path}>
-              .agentchainer/tasks/{task.id}/evidence.md
+              {`.agentchainer/tasks/${task.id}/evidence.md`}
             </span>
           </div>
         </>
@@ -1820,7 +1837,7 @@ function RunButton({
           value={runMode}
           onChange={(v) => onRunMode(v as Exclude<PermissionMode, "plan">)}
           options={modeOptions(RUN_MODES, true)}
-          label="Permission profile for the run's write steps"
+          label={t("tasks.runButton.profile")}
         />
       </div>
       <button type="button" disabled={busy !== null || blocker !== null} onClick={onRun}>
@@ -1877,32 +1894,33 @@ function SubtasksCard({
     <section className="card">
       <div className="card-title">
         <ListTree size={16} aria-hidden />
-        <h2>Sub-tasks</h2>
-        <span className="muted">In dependency order, two at once, each in its own worktree.</span>
+        <h2>{t("tasks.subtasks.title")}</h2>
+        <span className="muted">{t("tasks.subtasks.subtitle")}</span>
         <span className="grow" />
         {task.state === "ready" && !ran && (
           <button type="button" className="ghost small" disabled={busy !== null} onClick={onSplitAgain}>
-            Split again
+            {t("tasks.subtasks.splitAgain")}
           </button>
         )}
         {drafts > 0 && (
           <button type="button" className="secondary small" disabled={busy !== null} onClick={onApproveAll}>
             {busy === "approveAll" && <Loader2 size={14} className="spin" />}
-            Approve all
+            {t("tasks.subtasks.approveAll")}
           </button>
         )}
       </div>
       {task.state === "ready" && (
         <p className="callout">
-          {drafts
-            ? "Open a sub-task to edit its contract and tier, or approve them all as drafted. "
-            : "Every sub-task is approved: run the task from the footer. "}
-          The task branch starts from your last commit
-          {dirty ? "; your uncommitted changes aren't part of it" : ""}.
+          {drafts ? t("tasks.subtasks.openToEdit") : t("tasks.subtasks.allApproved")}{" "}
+          {dirty ? t("tasks.subtasks.branchStartsDirty") : t("tasks.subtasks.branchStarts")}
           {setup && (
             <>
               {" "}
-              Each worktree runs <code>{setup}</code> first.
+              <Rich
+                k="tasks.subtasks.setupFirst"
+                params={{ command: setup }}
+                tags={{ code: (s) => <code>{s}</code> }}
+              />
             </>
           )}
         </p>
@@ -1913,7 +1931,7 @@ function SubtasksCard({
           if (!c) {
             return (
               <li key={id} className="muted">
-                Loading…
+                {t("tasks.subtasks.loading")}
               </li>
             );
           }
@@ -1965,10 +1983,17 @@ function Overlaps({ task, cwd, onOpenTask }: { task: Task; cwd: string; onOpenTa
       <div>
         {overlaps.map((o) => (
           <p key={o.taskId}>
-            <button type="button" className="link" onClick={() => onOpenTask(o.taskId)}>
-              {o.title}
-            </button>{" "}
-            also changes {o.files.join(", ")}. Merging both may conflict.
+            <Rich
+              k="tasks.overlaps.alsoChanges"
+              params={{ title: o.title, files: o.files.join(", ") }}
+              tags={{
+                task: (s) => (
+                  <button type="button" className="link" onClick={() => onOpenTask(o.taskId)}>
+                    {s}
+                  </button>
+                ),
+              }}
+            />
           </p>
         ))}
       </div>
@@ -2015,9 +2040,9 @@ function ResultCard({
   if (!wt) return null;
   const finished = task.state === "done" || task.state === "accepted";
   const mergeBlock = !finished
-    ? "Merge once the run is Done, or accept its risk first."
+    ? t("tasks.result.mergeNotFinished")
     : status?.dirty
-      ? "Commit or stash your changes first."
+      ? t("tasks.result.mergeDirty")
       : null;
 
   async function act(kind: "merge" | "cleanup", action: () => Promise<void>) {
@@ -2034,15 +2059,17 @@ function ResultCard({
 
   async function cleanUp() {
     const ok = await confirm({
-      title: isXl(task) ? "Remove the task's worktrees?" : "Remove the task's worktree?",
+      title: isXl(task) ? t("tasks.result.removeTitleXl") : t("tasks.result.removeTitle"),
       body: (
         <p>
-          The task's folders in <code>.agentchainer/worktrees/</code> are removed, with whatever was installed in them.
-          What the run left uncommitted is committed on its branch first, and the branches stay, so no work is lost;
-          delete them with git when you no longer need them.
+          <Rich
+            k="tasks.result.removeBody"
+            params={{ path: ".agentchainer/worktrees/" }}
+            tags={{ code: (s) => <code>{s}</code> }}
+          />
         </p>
       ),
-      confirmLabel: isXl(task) ? "Remove worktrees" : "Remove worktree",
+      confirmLabel: isXl(task) ? t("tasks.result.removeConfirmXl") : t("tasks.result.removeConfirm"),
     });
     if (ok)
       await act("cleanup", () =>
@@ -2054,40 +2081,42 @@ function ResultCard({
     <section className="card">
       <div className="card-title">
         <GitMerge size={16} aria-hidden />
-        <h2>Result</h2>
-        <span className="muted">On its own branch: your branch changes only when you merge it.</span>
+        <h2>{t("tasks.result.title")}</h2>
+        <span className="muted">{t("tasks.result.subtitle")}</span>
       </div>
       <dl className="task-facts">
-        <dt>Branch</dt>
+        <dt>{t("tasks.result.branch")}</dt>
         <dd>
           <code>{wt.branch}</code>
         </dd>
-        <dt>Merged</dt>
+        <dt>{t("tasks.result.merged")}</dt>
         <dd>
           {task.mergedInto
-            ? `Into ${task.mergedInto.branch}, ${new Date(task.mergedInto.at).toLocaleString()}`
-            : "Not yet"}
+            ? t("tasks.result.mergedInto", { branch: task.mergedInto.branch, date: dateTime(task.mergedInto.at) })
+            : t("tasks.result.notYet")}
         </dd>
-        <dt>{isXl(task) ? "Worktrees" : "Worktree"}</dt>
-        <dd>{wt.removed ? "Removed" : <code>.agentchainer/worktrees/</code>}</dd>
-        <dt>Pull request</dt>
+        <dt>{isXl(task) ? t("tasks.result.worktreesXl") : t("tasks.result.worktree")}</dt>
+        <dd>{wt.removed ? t("tasks.result.removed") : <code>{".agentchainer/worktrees/"}</code>}</dd>
+        <dt>{t("tasks.result.pullRequest")}</dt>
         <dd>
           {task.pr ? (
             <button type="button" className="link" onClick={() => void openUrl(task.pr?.url ?? "")}>
-              #{task.pr.number} into {task.pr.base}
-              {task.pr.draft ? " (draft)" : ""}
+              {t(task.pr.draft ? "tasks.result.prIntoDraft" : "tasks.result.prInto", {
+                number: task.pr.number,
+                base: task.pr.base,
+              })}
             </button>
           ) : (
-            "None"
+            t("tasks.result.none")
           )}
         </dd>
         {(task.folders ?? []).map((f) =>
           f.pr ? (
             <Fragment key={f.name}>
-              <dt>In {f.name}</dt>
+              <dt>{t("tasks.result.inFolder", { folder: f.name })}</dt>
               <dd>
                 <button type="button" className="link" onClick={() => void openUrl(f.pr?.url ?? "")}>
-                  #{f.pr.number} into {f.pr.base} (draft)
+                  {t("tasks.result.prIntoDraft", { number: f.pr.number, base: f.pr.base })}
                 </button>
               </dd>
             </Fragment>
@@ -2097,10 +2126,7 @@ function ResultCard({
       {task.pr && <PrChecks task={task} cwd={cwd} onChanged={onChanged} />}
       {task.pr && <MergeGates task={task} cwd={cwd} onChanged={onChanged} />}
       {conflicts.length > 0 && (
-        <p className="callout">
-          The merge stopped on conflicts in {conflicts.join(", ")}. Resolve and commit them, or abort the merge, in the
-          Git panel.
-        </p>
+        <p className="callout">{t("tasks.result.conflicts", { files: conflicts.join(", ") })}</p>
       )}
       <div className="card-footer">
         {mergeBlock && !task.mergedInto && !task.pr && <span className="muted">{mergeBlock}</span>}
@@ -2108,13 +2134,13 @@ function ResultCard({
         {!wt.removed && !task.pr && finished && !task.mergedInto && (
           <button type="button" className="secondary" disabled={busy !== null} onClick={() => setCreatingPr(true)}>
             <GitPullRequest size={14} />
-            Create PR…
+            {t("tasks.result.createPr")}
           </button>
         )}
         {!wt.removed && (
           <button type="button" className="secondary" disabled={busy !== null} onClick={() => void cleanUp()}>
             {busy === "cleanup" && <Loader2 size={14} className="spin" />}
-            Clean up
+            {t("tasks.result.cleanUp")}
           </button>
         )}
         {!task.mergedInto && !task.pr && (
@@ -2129,7 +2155,7 @@ function ResultCard({
             }
           >
             {busy === "merge" ? <Loader2 size={14} className="spin" /> : <GitMerge size={14} />}
-            Merge into {status?.branch ?? "your branch"}
+            {t("tasks.result.mergeInto", { branch: status?.branch ?? t("tasks.result.yourBranch") })}
           </button>
         )}
       </div>

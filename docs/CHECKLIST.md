@@ -20,7 +20,7 @@
 |---|---|---|---|
 | [M0](#m0--foundations--spikes) | — | Foundations & spikes | ◐ Exit criteria met. Owner items left: M0-01, M0-05, M0-07, M0-13, M0-14, M0-22 |
 | [M1](#m1--agent-session-core-v01-a) | v0.1 | Agent session core | ◐ Built. E1–E5 pass on macOS and Windows, and in the app on Windows; left: Ubuntu, E6 by hand, the click-through on macOS and Ubuntu |
-| [M2](#m2--workspace-bootstrap-v01-b) | v0.1 | Workspace bootstrap | ◐ Built. E1, E3, E4 pass; E2 (real repositories) deferred by the owner |
+| [M2](#m2--workspace-bootstrap-v01-b) | v0.1 | Workspace bootstrap | ◐ Built. E1, E3, E4 pass; E2 (real repositories) deferred by the owner; more MCP items (M2-33, M2-34) after v0.1 |
 | [UX](#ux--product-design--ui-polish-before-r1) | v0.1 | Product design & UI polish (after M1/M2 work functionally) | ◐ Design system, shell, chat room (UX-12), tasks as chats (UX-13), live flows (UX-14), icon (UX-16) and canvas (UX-17) in; title bar (UX-15) and Plugins page (UX-10) built, not yet ticked; left: research, click-throughs, usability tests |
 | [R1](#r1--v01-release) | v0.1 | Packaging & release | ◐ Pipeline, updater, security review and docs in place; publishing waits for M0-01 and M0-22 |
 | [M3](#m3--adaptive-planner--task-contracts-v02) | v0.2 | Adaptive planner, contracts, evidence | ◐ Every tier (S, M, L, XL) runs live on macOS and Windows, with gates, evidence and accepted risk (preview); E2 passes; left: the owner's click-through and E1 (benchmark labels) |
@@ -872,6 +872,49 @@ All of these run on macOS, Windows and Ubuntu against a sample repo in `fixtures
       approval. It found the binary makes no outbound requests and the 0.11.0 security fixes are in. It also found that
       the web UI on 127.0.0.1:9749 is on by default with no sign-in (0.11.0 too). The owner chose to disclose it in
       `permissions` rather than pass `--ui=false`, which is saved for the whole account. Remaining: two signed reviews.
+
+### More catalog items (after v0.1)
+
+Owner request (2026-11-05). Not part of M2's exit criteria or of v0.1. Each candidate gets the
+[§4 review](CATALOG.md#4-review-checklist-adding-or-updating-an-item) like the seed items, and its tier comes from
+that review, never from the list it was found on.
+
+- [ ] **M2-33** Pick useful MCP servers for the catalog from
+      [awesome-mcp-servers](https://github.com/punkpeye/awesome-mcp-servers) (MIT; read at `29f2d49`, 2026-11-02).
+      - **The list:** about 5,000 lines in 60+ categories. Its 🎖️ "official" mark is the submitter's own claim: some
+        entries marked official are published from personal accounts, not by the vendor. It's a source of candidates,
+        not of trust.
+      - **Where to look:** the categories that serve work in a repository: Version Control, Developer Tools,
+        Databases, Cloud Platforms, Monitoring, Security, Browser Automation, Code Execution, Search & Data
+        Extraction.
+      - **What qualifies:**
+        - published by the tool's vendor from its own organization (`verified-vendor`);
+        - a pinnable release: an npm or PyPI version, or a release asset with its sha256;
+        - a detection signal that can offer it, such as a Terraform, Supabase or Cloudflare config in the repo.
+        - Servers that need a sign-in follow ADR-0002: the user's own environment provides the token, as with
+          `github`, and the app never handles it.
+      - **First candidates (verify each):** `cloudflare/mcp-server-cloudflare`, `hashicorp/terraform-mcp-server`,
+        `awslabs/mcp`, `supabase-community/supabase-mcp`, `localstack/localstack-mcp-server`.
+      - **Done when:** a note in `catalog-reviews/` lists what was considered and why each was taken or left. The
+        accepted items are in `catalog/items/`, with the profiles or detection rules that offer them.
+- [ ] **M2-34** Review [api-anything](https://github.com/goodnight000/api-anything) as a `community` MCP item (MIT;
+      created 2026-09-27; read at `6617d9e`, 2026-11-04).
+      - **What it does:** it learns an HTTP API for a website that has none, from the site's own frontend in a
+        headless browser, and serves it over MCP (`api-anything mcp`).
+      - **What the review must settle** (from its README; verify at the pinned version):
+        - **Install:** its `setup` edits agent config files and adds a skill. ADR-0005 rules out upstream install
+          scripts, so the item registers the pinned package itself (`npx -y api-anything@<version> mcp`) and never
+          runs `setup`.
+        - **Network:** search words go to a shared catalog (a Cloudflare Worker). With sharing on, as `setup` leaves
+          it by default, learned operations and usage reports go there too. An idle server also runs a few checks a
+          day. The item turns sharing off (verify how for `mcp`), or `permissions` says plainly what's sent.
+        - **Credentials:** `login` imports cookies from signed-in browser profiles. Specs keep references, not the
+          cookies. That's `high` risk and must be stated. The app itself never reads them (ADR-0002).
+        - **Writes:** these are blocked unless `--allow-writes` is passed. The item never passes it.
+        - **Terms:** the README leaves each site's terms to the user. The item's `why` says so.
+        - **Age:** the project is about five weeks old, and the pinned release must clear the 14-day minimum.
+      - **Tier:** `community`: two reviews, never pre-selected.
+      - **Done when:** the review is in `catalog-reviews/` with a decision.
 
 ### Exit criteria
 
@@ -2020,7 +2063,7 @@ first.
 
 ### Accessibility & i18n
 
-- [ ] **X-12** Keyboard-first navigation, focus management, screen-reader labels, and sufficient contrast in both themes.
+- [x] **X-12** Keyboard-first navigation, focus management, screen-reader labels, and sufficient contrast in both themes.
       - Built (2026-11-05):
         - **Audits:** `scripts/e2e/a11y.e2e.mjs` runs after the X-06 flows, in CI on Ubuntu and Windows.
           - It injects axe-core 4.14.0 (MPL-2.0, a pinned dev dependency that never ships in the app) and checks
@@ -2057,6 +2100,9 @@ first.
         - **Not covered yet:** a session with a transcript (it needs a model call), the session graph and the right
           panel's tabs.
       - **Evidence:**
-        - Locally, in the Ubuntu 22.04 image (`scripts/e2e/Dockerfile`): 13/13 pass (the 5 X-06 flows and 8 here).
+        - CI run [41987314583](https://github.com/hafizhrf/AgentChainer/actions/runs/41987314583) (#129): 5/5 X-06
+          flows and 8/8 here on Ubuntu and on Windows. Windows' report lists no violations on its 9 screens. The
+          run before found the Windows-only scrolling problem and the two test problems above.
+        - Locally, in the Ubuntu 22.04 image (`scripts/e2e/Dockerfile`): 13/13 pass at 1440×900 and at 1024×768.
           With one icon button's label removed on purpose, the gate failed with `button-name` on every screen.
 - [ ] **X-13** i18n-ready strings: English first, Indonesian next.

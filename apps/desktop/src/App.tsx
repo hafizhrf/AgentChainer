@@ -1281,7 +1281,7 @@ export function App() {
               />
             </Panel>
           )}
-          {sidebarOpen && <Separator className="resize-handle" />}
+          {sidebarOpen && <Separator className="resize-handle" aria-label="Resize the sidebar" />}
           <Panel id="main" minSize={480}>
             <main className="main">
               {runtimeNotice && (

@@ -2021,4 +2021,35 @@ first.
 ### Accessibility & i18n
 
 - [ ] **X-12** Keyboard-first navigation, focus management, screen-reader labels, and sufficient contrast in both themes.
+      - Built (2026-11-05):
+        - **Audits:** `scripts/e2e/a11y.e2e.mjs` runs after the X-06 flows, in CI on Ubuntu and Windows.
+          - It injects axe-core 4.14.0 (MPL-2.0, a pinned dev dependency that never ships in the app) and checks
+            WCAG 2.1 A and AA.
+          - Screens: Home, Workspace settings (Overview, Setup plan, Commands, Plugins, History), a confirm dialog,
+            Settings and the command palette, each in light and in dark.
+          - Serious and critical violations fail the run. Every violation goes to `e2e-artifacts/a11y-report.json`.
+        - **Keyboard flows:**
+          - Ctrl+Shift+P opens the palette, and Esc gives focus back to where it was;
+          - Tab reaches the sidebar's New and Settings, with a focus ring at every stop;
+          - Tab stays inside the Settings dialog, and Esc closes it.
+        - **What the first run found, and the fixes:**
+          - **Contrast, light theme:** `--muted` #646e69 → #58615c and `--warn` #a16207 → #8f5606, now at least 4.5:1
+            on every light surface. The dark theme passed, apart from the New button's shortcut hint, which now
+            shows at 85% instead of 60% opacity in both themes.
+          - **Plugins:** the tabs pointed `aria-controls` at panels that weren't rendered while the list loaded or
+            failed (critical).
+          - **Focus return:** the palette and every Modal left focus on the page body when they closed, because
+            Radix only gives it back to a Dialog.Trigger. `useReturnFocus` now gives it back to the opener, unless
+            something else took it meanwhile.
+          - **Focus rings:** the title bar's menu triggers hid their ring. The resize handles had neither a ring nor a
+            name; they're now "Resize the sidebar", "Resize the terminal" and "Resize the right panel".
+        - **After the fixes,** axe reports no violations of any impact on the audited screens, in either theme. The
+          audit finishes running animations first: WebKitGTK under Xvfb is slow enough that axe once measured the
+          palette mid fade-in.
+        - **macOS:** a VoiceOver and keyboard spot check in [MANUAL_CHECKS.md](guides/MANUAL_CHECKS.md) (checks 6–8).
+        - **Not covered yet:** a session with a transcript (it needs a model call), the session graph and the right
+          panel's tabs.
+      - **Evidence:**
+        - Locally, in the Ubuntu 22.04 image (`scripts/e2e/Dockerfile`): 13/13 pass (the 5 X-06 flows and 8 here).
+          With one icon button's label removed on purpose, the gate failed with `button-name` on every screen.
 - [ ] **X-13** i18n-ready strings: English first, Indonesian next.

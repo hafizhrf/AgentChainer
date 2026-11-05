@@ -95,6 +95,15 @@ Troubleshooting:
     run, and [MANUAL_CHECKS.md](docs/guides/MANUAL_CHECKS.md) for macOS itself.
 
   A failing flow saves a screenshot and the app log in `e2e-artifacts/`.
+
+  The same run checks accessibility (X-12, `a11y.e2e.mjs`). axe-core audits the main screens and dialogs in light and
+  in dark against WCAG 2.1 A and AA, then keyboard-only flows check the palette, Tab order with focus rings, and focus
+  staying inside a dialog.
+  - **What fails:** a serious or critical violation fails the run.
+  - **The report:** `e2e-artifacts/a11y-report.json` lists every violation by screen and theme, with the impact, the
+    failing elements' selectors and axe's fix hint. It's in the CI job's artifact too. `blocking` is what failed the
+    run.
+  - **New screens:** when you add a screen or dialog, add an `audit("…")` for it.
 - **The SDK and the CLI move fast.**
   - The weekly **Drift** workflow tries the newest of both and opens an issue when something the app relies on
     breaks (X-05).

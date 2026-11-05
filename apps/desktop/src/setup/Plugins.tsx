@@ -175,7 +175,13 @@ export function Plugins({
           </button>
         </div>
       )}
-      {!data && loading && <p className="muted setup-pad">Asking your Claude CLI for its marketplaces…</p>}
+      {/* The tabs point at their panels (aria-controls), so the panels exist before there's a list, too. */}
+      {!data &&
+        (["marketplace", "installed"] as const).map((v) => (
+          <Tabs.Content key={v} value={v}>
+            {loading && <p className="muted setup-pad">Asking your Claude CLI for its marketplaces…</p>}
+          </Tabs.Content>
+        ))}
 
       {data && (
         <div className="plan-split">

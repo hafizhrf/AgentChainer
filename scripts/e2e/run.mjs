@@ -1,5 +1,5 @@
-// X-06: runs the end-to-end tests against a debug build through WebDriver, on Linux and Windows. macOS has no WebDriver
-// for its WebView: use docs/guides/MANUAL_CHECKS.md there.
+// X-06: runs the end-to-end tests against a debug build through WebDriver, on Linux and Windows, then X-12's
+// accessibility audits (a11y.e2e.mjs). macOS has no WebDriver for its WebView: use docs/guides/MANUAL_CHECKS.md there.
 //
 // Usage: node scripts/e2e/run.mjs --binary target/debug/agentchainer [--artifacts e2e-artifacts]
 // - Linux: tauri-driver (cargo install tauri-driver --version 2.1.0 --locked) with WebKitWebDriver (apt:
@@ -97,7 +97,14 @@ try {
   code = await new Promise((resolve) => {
     const tests = spawn(
       process.execPath,
-      ["--test", "--test-reporter=spec", path.join(import.meta.dirname, "app.e2e.mjs")],
+      // One file at a time: they drive the same app (on Windows, the same running instance).
+      [
+        "--test",
+        "--test-concurrency=1",
+        "--test-reporter=spec",
+        path.join(import.meta.dirname, "app.e2e.mjs"),
+        path.join(import.meta.dirname, "a11y.e2e.mjs"),
+      ],
       {
         env: {
           ...env,

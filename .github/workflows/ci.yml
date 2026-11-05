@@ -160,6 +160,19 @@ jobs:
       - name: Install tauri-driver
         if: runner.os != 'macOS'
         run: cargo install tauri-driver --version 2.1.0 --locked
+      # msedgedriver has to match the WebView2 runtime the app runs in, not the Edge browser the runner's own driver
+      # follows. Both versions are printed, and the matching driver comes from Microsoft's download host.
+      - name: Edge WebDriver for the WebView2 runtime (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $pv = (Get-ItemProperty 'HKLM:\SOFTWARE\WOW6432Node\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}').pv
+          Write-Host "WebView2 runtime $pv; the runner's driver: $(& "$env:EDGEWEBDRIVER\msedgedriver.exe" --version)"
+          $zip = "$env:RUNNER_TEMP\edgedriver.zip"
+          Invoke-WebRequest "https://msedgedriver.microsoft.com/$pv/edgedriver_win64.zip" -OutFile $zip
+          Expand-Archive $zip -DestinationPath "$env:RUNNER_TEMP\edgedriver" -Force
+          Write-Host "Using $(& "$env:RUNNER_TEMP\edgedriver\msedgedriver.exe" --version)"
+          "EDGEWEBDRIVER=$env:RUNNER_TEMP\edgedriver" >> $env:GITHUB_ENV
       - name: End-to-end tests
         if: runner.os == 'Windows'
         run: node scripts/e2e/run.mjs --binary ${{ matrix.binary }} --artifacts e2e-artifacts

@@ -48,7 +48,8 @@ async function shot(name) {
 }
 
 describe("pseudo-locale (X-13)", () => {
-  const data = [path.basename(workspace), workspace, "AgentChainer"];
+  // Data, not the app's text: the workspace, the product name, and what `git --version` says on the setup check.
+  const data = [path.basename(workspace), workspace, "AgentChainer", "git version "];
 
   before(async () => {
     assert.ok(binary && workspace, "run through scripts/e2e/run.mjs");

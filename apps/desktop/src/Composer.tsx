@@ -14,6 +14,7 @@ import {
   slashMenu,
 } from "./commands.ts";
 import { fuzzyFilter, tokenAt } from "./fuzzy.ts";
+import { t } from "./i18n/index.ts";
 import { ModeHelp } from "./ModeHelp.tsx";
 import { EFFORT_OPTIONS, MODE_HELP, MODE_NAMES, modelChoices, modeOptions } from "./options.ts";
 import { asMode, isFresh, type Tab } from "./tabs.ts";
@@ -173,7 +174,9 @@ export function Composer({
       insert: `/${c.name}`,
       label: `/${c.name}`,
       ...(c.argumentHint ? { hint: c.argumentHint } : {}),
-      ...(c.description ? { detail: c.app ? `${c.description} · app` : c.description } : {}),
+      ...(c.description
+        ? { detail: c.app ? t("session.composer.appCommand", { description: c.description }) : c.description }
+        : {}),
     }));
   }, [token, dismissed, files, tab.slashCommands]);
 
@@ -219,7 +222,7 @@ export function Composer({
   }
 
   async function attach() {
-    const picked = await open({ multiple: true, title: "Attach files" }).catch(() => null);
+    const picked = await open({ multiple: true, title: t("session.composer.attachDialogTitle") }).catch(() => null);
     for (const p of Array.isArray(picked) ? picked : picked ? [picked] : []) insert(mention(tab.cwd, p));
   }
 
@@ -233,8 +236,8 @@ export function Composer({
     e.preventDefault();
     setPasteError(null);
     for (const file of files) {
-      if (images.length >= MAX_IMAGES) return setPasteError(`At most ${MAX_IMAGES} images per message.`);
-      if (file.size > MAX_IMAGE_BYTES) return setPasteError("That image is over 5 MB; paste a smaller one.");
+      if (images.length >= MAX_IMAGES) return setPasteError(t("session.composer.tooManyImages", { count: MAX_IMAGES }));
+      if (file.size > MAX_IMAGE_BYTES) return setPasteError(t("session.composer.imageTooLarge"));
       const reader = new FileReader();
       reader.onload = () => {
         const url = String(reader.result);
@@ -324,17 +327,17 @@ export function Composer({
     <div className="composer">
       {queue.length > 0 && (
         <div className="queue">
-          <span className="muted">Queued, sent after this turn:</span>
+          <span className="muted">{t("session.composer.queued")}</span>
           {queue.map(({ text: q, images: qi }, i) => (
             // Queued messages can repeat, so the position is part of the key.
             // biome-ignore lint/suspicious/noArrayIndexKey: see above.
             <span key={`${i}-${q}`} className="queued" title={q}>
               {q.length > 40 ? `${q.slice(0, 40)}…` : q}
-              {qi.length > 0 && ` (+${qi.length} image${qi.length > 1 ? "s" : ""})`}
+              {qi.length > 0 && ` ${t("session.composer.queuedImages", { count: qi.length })}`}
               <button
                 type="button"
                 className="ghost icon tiny"
-                aria-label="Edit queued message"
+                aria-label={t("session.composer.editQueued")}
                 onClick={() => edit(i)}
               >
                 <Pencil size={12} />
@@ -343,8 +346,8 @@ export function Composer({
                 <button
                   type="button"
                   className="ghost icon tiny"
-                  aria-label="Send now: stop the turn and send this"
-                  title="Send now (stops the turn)"
+                  aria-label={t("session.composer.sendNowLabel")}
+                  title={t("session.composer.sendNowTitle")}
                   onClick={() => sendNow(i)}
                 >
                   <SendHorizontal size={12} />
@@ -353,21 +356,26 @@ export function Composer({
               <button
                 type="button"
                 className="ghost icon tiny"
-                aria-label="Remove from queue"
+                aria-label={t("session.composer.removeQueued")}
                 onClick={() => setQueue((all) => all.filter((_, j) => j !== i))}
               >
                 <X size={12} />
               </button>
             </span>
           ))}
-          <button type="button" className="link" onClick={() => setQueue([])} title="Stop after this turn">
-            Clear queue
+          <button
+            type="button"
+            className="link"
+            onClick={() => setQueue([])}
+            title={t("session.composer.clearQueueTitle")}
+          >
+            {t("session.composer.clearQueue")}
           </button>
         </div>
       )}
       {popup === "model" && (
         <PickerPopup
-          title="Model"
+          title={t("session.composer.modelPicker")}
           items={modelChoices(tab.models.length ? tab.models : undefined, tab.modelAlias)}
           current={tab.modelAlias}
           onPick={(v) => {
@@ -379,11 +387,11 @@ export function Composer({
       )}
       {popup === "mode" && (
         <PickerPopup
-          title="Permission mode"
+          title={t("session.composer.modePicker")}
           items={(["default", "acceptEdits", "plan", "auto"] as const).map((m) => ({
             value: m,
             label: MODE_NAMES[m],
-            hint: m === "auto" && !canAutonomous ? "Needs a budget cap (Settings)" : MODE_HELP[m],
+            hint: m === "auto" && !canAutonomous ? t("session.composer.needsBudgetCap") : MODE_HELP[m],
             disabled: m === "auto" && !canAutonomous,
           }))}
           current={tab.mode}
@@ -396,7 +404,7 @@ export function Composer({
       )}
       {popup === "effort" && (
         <PickerPopup
-          title="Effort"
+          title={t("session.composer.effortPicker")}
           items={EFFORT_OPTIONS}
           current={tab.effort ?? ""}
           onPick={(v) => {
@@ -413,7 +421,12 @@ export function Composer({
         data-mode={kind === "task" ? "plan" : tab.mode}
       >
         {suggestions.length > 0 && (
-          <ul className="suggestions" aria-label={token?.kind === "@" ? "Matching files" : "Matching commands"}>
+          <ul
+            className="suggestions"
+            aria-label={
+              token?.kind === "@" ? t("session.composer.matchingFiles") : t("session.composer.matchingCommands")
+            }
+          >
             {suggestions.map((s, i) => (
               <li key={s.key} className={i === pick ? "active" : undefined}>
                 <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => accept(s)}>
@@ -430,11 +443,11 @@ export function Composer({
             {images.map((img, i) => (
               // biome-ignore lint/suspicious/noArrayIndexKey: attachments have no ids; removal is by position.
               <span key={i} className="attachment">
-                <img src={img.preview} alt={`Pasted screenshot ${i + 1}`} />
+                <img src={img.preview} alt={t("session.composer.pastedScreenshot", { n: i + 1 })} />
                 <button
                   type="button"
                   className="ghost icon tiny"
-                  aria-label={`Remove screenshot ${i + 1}`}
+                  aria-label={t("session.composer.removeScreenshot", { n: i + 1 })}
                   onClick={() => setImages((all) => all.filter((_, j) => j !== i))}
                 >
                   <X size={12} />
@@ -448,17 +461,17 @@ export function Composer({
           ref={area}
           onPaste={onPaste}
           value={draft}
-          aria-label="Message to Claude"
+          aria-label={t("session.composer.messageLabel")}
           placeholder={
             tab.ended
-              ? "This session ended. Resume it to continue."
+              ? t("session.composer.placeholderEnded")
               : dropping
-                ? "Drop to attach as @path"
+                ? t("session.composer.placeholderDrop")
                 : kind === "task"
-                  ? "Describe the task. Claude reads the project and drafts a contract for you to approve first."
+                  ? t("session.composer.placeholderTask")
                   : tab.running
-                    ? "Claude is working… type a follow-up to queue it"
-                    : "Ask Claude to do something… @ for files, / for commands"
+                    ? t("session.composer.placeholderRunning")
+                    : t("session.composer.placeholder")
           }
           onChange={(e) => {
             setDraft(e.target.value);
@@ -478,24 +491,24 @@ export function Composer({
           <div className="composer-controls">
             {onTask && (
               <fieldset className="segmented kind-switch">
-                <legend className="sr-only">Send as</legend>
+                <legend className="sr-only">{t("session.composer.sendAs")}</legend>
                 {(["chat", "task"] as const).map((k) => (
                   <button
                     key={k}
                     type="button"
                     className={kind === k ? "active" : undefined}
                     aria-pressed={kind === k}
-                    title={k === "chat" ? "Talk with Claude" : "A task: a contract first, then a verified run"}
+                    title={k === "chat" ? t("session.composer.chatTitle") : t("session.composer.taskTitle")}
                     onClick={() => setKind(k)}
                   >
-                    {k === "chat" ? "Chat" : "Task"}
+                    {k === "chat" ? t("session.composer.chat") : t("session.composer.task")}
                   </button>
                 ))}
               </fieldset>
             )}
             <Select
               compact
-              label="Permission profile"
+              label={t("session.composer.modeLabel")}
               value={tab.mode}
               options={modeOptions(PERMISSION_MODES, canAutonomous)}
               onChange={(m) => onModeChange(asMode(m))}
@@ -504,7 +517,7 @@ export function Composer({
             <ModeHelp current={tab.mode} />
             <Select
               compact
-              label="Model"
+              label={t("session.composer.modelLabel")}
               value={tab.modelAlias}
               options={modelChoices(tab.models.length ? tab.models : undefined, tab.modelAlias)}
               onChange={onModelChange}
@@ -512,7 +525,7 @@ export function Composer({
             />
             <Select
               compact
-              label="Effort"
+              label={t("session.composer.effortLabel")}
               value={tab.effort ?? ""}
               options={EFFORT_OPTIONS}
               onChange={(e) => onEffortChange((e || null) as Effort | null)}
@@ -521,8 +534,8 @@ export function Composer({
             <button
               type="button"
               className="ghost icon"
-              aria-label="Attach files"
-              title="Attach files as @path (or drop them here)"
+              aria-label={t("session.composer.attachLabel")}
+              title={t("session.composer.attachTitle")}
               onClick={() => void attach()}
               disabled={tab.ended}
             >
@@ -536,13 +549,13 @@ export function Composer({
                 aria-pressed={tab.team !== undefined}
                 title={
                   tab.team
-                    ? `A Team chat: Claude can start worker sessions, each in its own tab. ${teamSpend(tab.team)}. Click to make it a plain chat.`
-                    : "Let Claude start worker sessions that work in parallel, each in its own tab, under one budget cap"
+                    ? t("session.composer.teamOn", { spend: teamSpend(tab.team) })
+                    : t("session.composer.teamOff")
                 }
                 onClick={() => onTeam(tab.team === undefined)}
               >
                 <Users size={14} />
-                Team
+                {t("session.composer.team")}
               </button>
             )}
           </div>
@@ -550,7 +563,9 @@ export function Composer({
             {tab.team && (
               <span className={`team-spend${tab.team.stopped ? " stopped" : ""}`} title={teamSpend(tab.team)}>
                 <Users size={12} aria-hidden />
-                {tab.team.stopped ? "Stopped at cap" : `${usdShort(tab.team.spentUsd)} / ${usdShort(tab.team.capUsd)}`}
+                {tab.team.stopped
+                  ? t("session.composer.teamStopped")
+                  : `${usdShort(tab.team.spentUsd)} / ${usdShort(tab.team.capUsd)}`}
               </span>
             )}
             {tab.context && !tab.ended && (
@@ -561,27 +576,22 @@ export function Composer({
               />
             )}
             {tab.ended ? (
-              <button
-                type="button"
-                className="small"
-                onClick={onResume}
-                title="Continue this conversation in a new live session"
-              >
+              <button type="button" className="small" onClick={onResume} title={t("session.composer.resumeTitle")}>
                 <Play size={14} />
-                Resume session
+                {t("session.composer.resume")}
               </button>
             ) : (
               <>
                 <span className="composer-hint">
-                  {tab.running ? "Esc stops" : "Enter to send · Shift+Enter new line"}
+                  {tab.running ? t("session.composer.hintRunning") : t("session.composer.hint")}
                 </span>
                 {tab.running && (
                   <button
                     type="button"
                     className="secondary icon round"
                     onClick={onInterrupt}
-                    aria-label="Stop the running turn"
-                    title="Stop (Esc)"
+                    aria-label={t("session.composer.stopLabel")}
+                    title={t("session.composer.stopTitle")}
                   >
                     <Square size={12} fill="currentColor" />
                   </button>
@@ -591,8 +601,8 @@ export function Composer({
                   className="icon round"
                   disabled={!draft.trim()}
                   onClick={() => submit()}
-                  aria-label={tab.running ? "Queue message" : "Send message"}
-                  title={tab.running ? "Queue (Enter)" : "Send (Enter)"}
+                  aria-label={tab.running ? t("session.composer.queueLabel") : t("session.composer.sendLabel")}
+                  title={tab.running ? t("session.composer.queueTitle") : t("session.composer.sendTitle")}
                 >
                   {tab.running ? <ListPlus size={16} /> : <ArrowUp size={16} />}
                 </button>
@@ -623,7 +633,9 @@ function ContextRing({
   const left = Math.round(100 - used);
   const r = 7;
   const around = 2 * Math.PI * r;
-  const label = `${left}% of the context window left. ${disabled ? "Compact once this turn ends." : "Click to compact now."}`;
+  const label = disabled
+    ? t("session.composer.contextLeftBusy", { left })
+    : t("session.composer.contextLeft", { left });
   return (
     <button
       type="button"

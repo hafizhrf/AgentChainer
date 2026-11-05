@@ -1,6 +1,6 @@
 import { Bot, ChartGantt, Folder, GitBranch, MessageSquare, Network, PanelRight, SquareTerminal } from "lucide-react";
 import { useState } from "react";
-
+import { t } from "./i18n/index.ts";
 import { folderName, type Tab } from "./tabs.ts";
 import { ActionMenu } from "./ui/ActionMenu.tsx";
 import { IconButton } from "./ui/IconButton.tsx";
@@ -56,7 +56,7 @@ export function SessionHeader({
             autoFocus
             className="session-rename"
             value={editing}
-            aria-label="Session title"
+            aria-label={t("session.header.titleLabel")}
             onChange={(e) => setEditing(e.target.value)}
             onKeyDown={(e) => {
               if (e.key === "Enter") finish(true);
@@ -68,7 +68,12 @@ export function SessionHeader({
             onBlur={() => finish(true)}
           />
         ) : (
-          <button type="button" className="session-name" title="Rename" onClick={() => setEditing(tab.title)}>
+          <button
+            type="button"
+            className="session-name"
+            title={t("session.header.rename")}
+            onClick={() => setEditing(tab.title)}
+          >
             {tab.title}
           </button>
         )}
@@ -77,11 +82,11 @@ export function SessionHeader({
           {folderName(tab.cwd)}
           {tab.folders?.length ? (
             <span className="chip" title={tab.folders.join("\n")}>
-              +{tab.folders.length} {tab.folders.length === 1 ? "folder" : "folders"}
+              {t("session.header.folders", { count: tab.folders.length })}
             </span>
           ) : null}
           {tab.profile && (
-            <span className="chip" title="The agent profile this session runs as: its instructions, model and tools">
+            <span className="chip" title={t("session.header.profileTitle")}>
               <Bot size={11} aria-hidden />
               {tab.profile}
             </span>
@@ -92,26 +97,26 @@ export function SessionHeader({
               {branch}
             </>
           )}
-          {tab.ended && <span className="badge">ended</span>}
+          {tab.ended && <span className="badge">{t("session.header.ended")}</span>}
         </span>
       </div>
       <div className="session-tools">
-        <fieldset className="segmented" aria-label="Session view">
+        <fieldset className="segmented" aria-label={t("session.header.viewLabel")}>
           <button type="button" aria-pressed={view === "chat"} onClick={() => onViewChange("chat")}>
             <MessageSquare size={13} aria-hidden />
-            Chat
+            {t("session.header.chat")}
           </button>
           <button type="button" aria-pressed={view === "graph"} onClick={() => onViewChange("graph")}>
             <Network size={13} aria-hidden />
-            Graph
+            {t("session.header.graph")}
           </button>
           <button type="button" aria-pressed={view === "timeline"} onClick={() => onViewChange("timeline")}>
             <ChartGantt size={13} aria-hidden />
-            Timeline
+            {t("session.header.timeline")}
           </button>
         </fieldset>
         <IconButton
-          label="Terminal"
+          label={t("session.header.terminal")}
           shortcut={menuShortcut("toggle-terminal")}
           pressed={terminalOpen}
           onClick={onToggleTerminal}
@@ -119,7 +124,7 @@ export function SessionHeader({
           <SquareTerminal size={16} />
         </IconButton>
         <IconButton
-          label="Workspace panel"
+          label={t("session.header.workspacePanel")}
           shortcut={menuShortcut("toggle-right-panel")}
           pressed={rightOpen}
           onClick={onToggleRight}
@@ -127,12 +132,12 @@ export function SessionHeader({
           <PanelRight size={16} />
         </IconButton>
         <ActionMenu
-          label="Session actions"
+          label={t("session.header.actions")}
           items={[
-            { label: "Rename", onSelect: () => setEditing(tab.title) },
-            { label: "Fork into a new session", onSelect: onFork },
-            { label: "Workspace settings…", onSelect: onOpenSetup },
-            { label: "Close session", shortcut: menuShortcut("close-session"), onSelect: onClose },
+            { label: t("session.header.rename"), onSelect: () => setEditing(tab.title) },
+            { label: t("session.header.fork"), onSelect: onFork },
+            { label: t("session.header.setup"), onSelect: onOpenSetup },
+            { label: t("session.header.close"), shortcut: menuShortcut("close-session"), onSelect: onClose },
           ]}
         />
       </div>

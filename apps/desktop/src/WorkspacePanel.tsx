@@ -18,7 +18,9 @@ import { type KeyboardEvent, type ReactNode, useMemo, useRef, useState } from "r
 import type { Confirm } from "./Dialog.tsx";
 import { agentEdits, buildTree, filterTree, folderPaths, visibleRows } from "./files.ts";
 import { GitPanel } from "./GitPanel.tsx";
-
+import { count } from "./i18n/format.ts";
+import { t } from "./i18n/index.ts";
+import { Rich } from "./i18n/Rich.tsx";
 import { PANEL_TAB_LABEL, PANEL_TABS, type PanelTab, pickTab, toggleHidden, visibleTabs } from "./panelTabs.ts";
 import { SetupSummary } from "./setup/SetupSummary.tsx";
 import { request } from "./sidecar.ts";
@@ -87,7 +89,7 @@ export function WorkspacePanel({
   }
 
   const openAction = (path: string) => (
-    <IconButton label="Open in editor" tabIndex={-1} onClick={() => onOpenFile(path)}>
+    <IconButton label={t("panel.workspace.openInEditor")} tabIndex={-1} onClick={() => onOpenFile(path)}>
       <ExternalLink size={13} />
     </IconButton>
   );
@@ -97,20 +99,20 @@ export function WorkspacePanel({
       <div className="panel-tabbar">
         <Tabs.List
           className="panel-tabs"
-          aria-label="Workspace"
+          aria-label={t("panel.workspace.tabsLabel")}
           onContextMenu={(e) => {
             e.preventDefault();
             setMenuOpen(true);
           }}
         >
-          {visible.map((t) => (
-            <Tabs.Trigger key={t} value={t}>
-              {PANEL_TAB_LABEL[t]}
-              {t === "changes" && changed.length > 0 && <span className="count">{changed.length}</span>}
+          {visible.map((tab) => (
+            <Tabs.Trigger key={tab} value={tab}>
+              {PANEL_TAB_LABEL[tab]}
+              {tab === "changes" && changed.length > 0 && <span className="count">{changed.length}</span>}
             </Tabs.Trigger>
           ))}
         </Tabs.List>
-        <IconButton label="Refresh" onClick={onRefresh}>
+        <IconButton label={t("panel.workspace.refresh")} onClick={onRefresh}>
           <RefreshCw size={14} />
         </IconButton>
         <TabsMenu
@@ -125,10 +127,16 @@ export function WorkspacePanel({
         {(error || initError) && <p className="warn">{error ?? initError}</p>}
         {files && !files.isGitRepo && (
           <p className="warn">
-            This folder isn't a git repository, so changes can't be reviewed or reverted.{" "}
-            <button type="button" className="link" onClick={() => void initGit()}>
-              Initialize git
-            </button>
+            <Rich
+              k="panel.workspace.notGit"
+              tags={{
+                button: (s) => (
+                  <button type="button" className="link" onClick={() => void initGit()}>
+                    {s}
+                  </button>
+                ),
+              }}
+            />
           </p>
         )}
         {visible.includes("changes") && (
@@ -192,39 +200,44 @@ function TabsMenu({
   return (
     <Menu.Root open={open} onOpenChange={onOpenChange}>
       <Menu.Trigger asChild>
-        <button type="button" className="ghost icon" aria-label="Customize tabs" title="Customize tabs">
+        <button
+          type="button"
+          className="ghost icon"
+          aria-label={t("panel.workspace.customizeTabs")}
+          title={t("panel.workspace.customizeTabs")}
+        >
           <MoreHorizontal size={14} />
         </button>
       </Menu.Trigger>
       <Menu.Portal>
         <Menu.Content className="menu-content" align="end" sideOffset={4}>
-          <Menu.Label className="menu-label">Show tabs</Menu.Label>
-          {PANEL_TABS.map((t) => {
-            const checked = !hidden.includes(t);
+          <Menu.Label className="menu-label">{t("panel.workspace.showTabs")}</Menu.Label>
+          {PANEL_TABS.map((tab) => {
+            const checked = !hidden.includes(tab);
             return (
               <Menu.CheckboxItem
-                key={t}
+                key={tab}
                 className="menu-item menu-check"
                 checked={checked}
                 disabled={checked && shown.length === 1}
                 onSelect={(e) => e.preventDefault()}
-                onCheckedChange={() => onChange(toggleHidden(hidden, t))}
+                onCheckedChange={() => onChange(toggleHidden(hidden, tab))}
               >
                 <span className="menu-check-box">
                   <Menu.ItemIndicator>
                     <Check size={13} />
                   </Menu.ItemIndicator>
                 </span>
-                {PANEL_TAB_LABEL[t]}
+                {PANEL_TAB_LABEL[tab]}
               </Menu.CheckboxItem>
             );
           })}
           <Menu.Separator className="menu-separator" />
           <Menu.Item className="menu-item" disabled={hidden.length === 0} onSelect={() => onChange([])}>
-            Show all tabs
+            {t("panel.workspace.showAllTabs")}
           </Menu.Item>
           <Menu.Item className="menu-item" onSelect={onHidePanel}>
-            Hide panel
+            {t("panel.workspace.hidePanel")}
             <kbd>{menuShortcut("toggle-right-panel")}</kbd>
           </Menu.Item>
         </Menu.Content>
@@ -256,16 +269,18 @@ function ChangesView({
   const outside = (file: string) => file.startsWith("/") || /^[A-Za-z]:\\/.test(file);
   return (
     <div className="changes">
-      <Section id="changes.agent" title="Agent edits" count={edits.reduce((n, t) => n + t.files.length, 0)}>
+      <Section
+        id="changes.agent"
+        title={t("panel.changes.agentEdits")}
+        count={edits.reduce((n, turn) => n + turn.files.length, 0)}
+      >
         {edits.length === 0 ? (
-          <EmptyState icon={<Bot size={14} />}>
-            No file edits yet. Changes made by shell commands show under Uncommitted.
-          </EmptyState>
+          <EmptyState icon={<Bot size={14} />}>{t("panel.changes.noEdits")}</EmptyState>
         ) : (
           edits.map((turn) => (
             <div key={`${turn.prompt}-${turn.files.join()}`} className="turn-group">
               <div className="turn-label" title={turn.prompt}>
-                {turn.prompt || "Earlier in the session"}
+                {turn.prompt || t("panel.changes.earlier")}
               </div>
               {turn.files.map((file) => (
                 <FileRow
@@ -282,9 +297,9 @@ function ChangesView({
           ))
         )}
       </Section>
-      <Section id="changes.git" title="Uncommitted" count={files.length}>
+      <Section id="changes.git" title={t("panel.changes.uncommitted")} count={files.length}>
         {files.length === 0 ? (
-          <EmptyState icon={<CircleCheck size={14} />}>No uncommitted changes.</EmptyState>
+          <EmptyState icon={<CircleCheck size={14} />}>{t("panel.changes.noUncommitted")}</EmptyState>
         ) : (
           files.map((f) => (
             <FileRow
@@ -328,7 +343,7 @@ function FileTree({
   const rows = useMemo(() => visibleRows(filtered, open), [filtered, open]);
   const current = Math.min(focus, Math.max(rows.length - 1, 0));
 
-  if (!files) return <p className="muted">Loading…</p>;
+  if (!files) return <p className="muted">{t("panel.files.loading")}</p>;
 
   const toggle = (path: string) =>
     setExpanded((prev) => {
@@ -398,34 +413,34 @@ function FileTree({
                 move(0);
               }
             }}
-            placeholder="Filter files"
-            aria-label="Filter files"
+            placeholder={t("panel.files.filter")}
+            aria-label={t("panel.files.filter")}
             spellCheck={false}
           />
           {query && (
             <button
               type="button"
               className="ghost icon tiny"
-              aria-label="Clear the filter"
+              aria-label={t("panel.files.clearFilter")}
               onClick={() => setQuery("")}
             >
               <X size={12} />
             </button>
           )}
         </label>
-        <IconButton label="Collapse all" onClick={() => setExpanded(new Set())}>
+        <IconButton label={t("panel.files.collapseAll")} onClick={() => setExpanded(new Set())}>
           <ChevronsDownUp size={14} />
         </IconButton>
       </div>
       {files.truncated && (
-        <p className="muted small-print">Showing the first {files.files.length.toLocaleString()} files.</p>
+        <p className="muted small-print">{t("panel.files.truncated", { n: count(files.files.length) })}</p>
       )}
       {rows.length === 0 ? (
         <EmptyState icon={<Search size={14} />}>
-          {query ? `No files match “${query.trim()}”.` : "This folder is empty."}
+          {query ? t("panel.files.noMatch", { query: query.trim() }) : t("panel.files.empty")}
         </EmptyState>
       ) : (
-        <div className="tree" role="tree" aria-label="Workspace files" onKeyDown={onKeyDown}>
+        <div className="tree" role="tree" aria-label={t("panel.files.treeLabel")} onKeyDown={onKeyDown}>
           {rows.map(({ node, depth }, i) => {
             const folder = node.children !== undefined;
             const isOpen = folder && open.has(node.path);

@@ -11,6 +11,9 @@ import { joinPath } from "./files.ts";
 import { AgentDrawer } from "./graph/AgentDrawer.tsx";
 import { BackgroundTasks } from "./graph/BackgroundTasks.tsx";
 import { SessionTimeline } from "./graph/SessionTimeline.tsx";
+import { approxUsd, count, seconds, thousands } from "./i18n/format.ts";
+import { t } from "./i18n/index.ts";
+import { Rich } from "./i18n/Rich.tsx";
 import { MODE_NAMES } from "./options.ts";
 import type { PermissionAnswer } from "./PermissionDialog.tsx";
 import type { PanelTab } from "./panelTabs.ts";
@@ -239,7 +242,7 @@ export function SessionView({
               <Panel id="chat" minSize={200}>
                 <div className={`chat${fresh ? " fresh" : ""}`}>
                   {view === "graph" && (
-                    <Suspense fallback={<div className="session-graph muted">Loading the graph…</div>}>
+                    <Suspense fallback={<div className="session-graph muted">{t("session.view.loadingGraph")}</div>}>
                       <SessionGraph
                         items={tab.items}
                         running={tab.running}
@@ -278,7 +281,7 @@ export function SessionView({
                       {tab.running && (
                         <div className="working">
                           <Loader2 size={14} className="spin" aria-hidden />
-                          Working… <kbd>Esc</kbd> to stop
+                          <Rich k="session.view.working" tags={{ kbd: (s) => <kbd>{s}</kbd> }} />
                         </div>
                       )}
                       <div ref={bottomRef} />
@@ -286,29 +289,27 @@ export function SessionView({
                     {!atBottom && (
                       <button type="button" className="secondary small jump-latest" onClick={jumpToLatest}>
                         <ArrowDown size={13} />
-                        Jump to latest
+                        {t("session.view.jumpToLatest")}
                       </button>
                     )}
                   </div>
                   <div className="chat-dock" hidden={view !== "chat"}>
                     {fresh ? (
                       <div className="fresh-heading">
-                        <h2>What should Claude work on?</h2>
-                        <p className="muted">Describe a task, or start from one of these.</p>
+                        <h2>{t("session.view.freshHeading")}</h2>
+                        <p className="muted">{t("session.view.freshHint")}</p>
                       </div>
                     ) : null}
                     {planSwitch && (
                       <div className="plan-switch" role="status">
                         <ClipboardList size={14} aria-hidden />
-                        <span className="grow">
-                          Claude switched to {MODE_NAMES.plan} to ask before changing anything.
-                        </span>
+                        <span className="grow">{t("session.view.planSwitched", { mode: MODE_NAMES.plan })}</span>
                         <button
                           type="button"
                           className="secondary small"
                           onClick={() => onModeChange(planSwitch.previous)}
                         >
-                          Back to {MODE_NAMES[planSwitch.previous]}
+                          {t("session.view.backToMode", { mode: MODE_NAMES[planSwitch.previous] })}
                         </button>
                       </div>
                     )}
@@ -351,10 +352,10 @@ export function SessionView({
                   </div>
                 </div>
               </Panel>
-              {terminalOpen && <Separator className="resize-handle" aria-label="Resize the terminal" />}
+              {terminalOpen && <Separator className="resize-handle" aria-label={t("session.view.resizeTerminal")} />}
               {terminalOpen && (
                 <Panel id="terminal" defaultSize={220} minSize={100} groupResizeBehavior="preserve-pixel-size">
-                  <Suspense fallback={<div className="terminal-host muted">Loading terminal…</div>}>
+                  <Suspense fallback={<div className="terminal-host muted">{t("session.view.loadingTerminal")}</div>}>
                     <TerminalPanel cwd={tab.cwd} />
                   </Suspense>
                 </Panel>
@@ -369,16 +370,19 @@ export function SessionView({
               {tab.context && (
                 <span
                   className={tab.context.percentage >= 80 ? "context-meter warn" : "context-meter"}
-                  title={`${tab.context.totalTokens.toLocaleString()} of ${tab.context.maxTokens.toLocaleString()} tokens in the context window${tab.context.percentage >= 80 ? "; /compact summarizes earlier messages" : ""}`}
+                  title={t(
+                    tab.context.percentage >= 80 ? "session.view.contextTitleFull" : "session.view.contextTitle",
+                    { used: count(tab.context.totalTokens), max: count(tab.context.maxTokens) },
+                  )}
                 >
-                  context {Math.round(tab.context.percentage)}%
+                  {t("session.view.context", { percent: Math.round(tab.context.percentage) })}
                 </span>
               )}
               <span>{costLabel(tab.cost)}</span>
             </footer>
           </div>
         </Panel>
-        {rightOpen && <Separator className="resize-handle" aria-label="Resize the right panel" />}
+        {rightOpen && <Separator className="resize-handle" aria-label={t("session.view.resizeRight")} />}
         {rightOpen && (
           <Panel
             id="right"
@@ -388,7 +392,7 @@ export function SessionView({
             maxSize="75%"
             groupResizeBehavior="preserve-pixel-size"
           >
-            <aside className="right-panel" aria-label="Workspace">
+            <aside className="right-panel" aria-label={t("session.view.workspace")}>
               <div className="right-tabs" hidden={selected !== null || agent !== undefined}>
                 <FolderSwitcher
                   folders={dirs}
@@ -398,7 +402,7 @@ export function SessionView({
                     setPanelDir(dir);
                   }}
                 />
-                <Suspense fallback={<p className="muted panel-loading">Loading…</p>}>
+                <Suspense fallback={<p className="muted panel-loading">{t("session.view.loading")}</p>}>
                   <WorkspacePanel
                     key={panelTab}
                     {...(panelTab ? { initialTab: panelTab } : {})}
@@ -431,7 +435,7 @@ export function SessionView({
                 />
               )}
               {selected && (
-                <Suspense fallback={<p className="muted">Loading diff viewer…</p>}>
+                <Suspense fallback={<p className="muted">{t("session.view.loadingDiff")}</p>}>
                   <DiffView
                     cwd={panelDir}
                     path={selected}
@@ -450,18 +454,18 @@ export function SessionView({
   );
 }
 
-const STARTERS = [
-  "Explain how this codebase is organized",
-  "Find a bug and propose a fix",
-  "Add tests for the most important module",
-  "Review the uncommitted changes",
-];
-
 /** Starter prompts under a new session's composer (UX-06); picking one fills the composer. */
 function StarterChips({ onPick }: { onPick: (text: string) => void }) {
+  // The person's own words once picked, so in the UI's language.
+  const starters = [
+    t("session.starters.explain"),
+    t("session.starters.findBug"),
+    t("session.starters.addTests"),
+    t("session.starters.review"),
+  ];
   return (
     <div className="starter-chips">
-      {STARTERS.map((text) => (
+      {starters.map((text) => (
         <button key={text} type="button" className="secondary small" onClick={() => onPick(text)}>
           {text}
         </button>
@@ -470,15 +474,18 @@ function StarterChips({ onPick }: { onPick: (text: string) => void }) {
   );
 }
 
-const usd = (v: number) => `≈$${v.toFixed(4)}`;
-const kTokens = (n: number) => (n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(n));
+const usd = (v: number) => approxUsd(v, 4);
+const kTokens = (n: number) => (n >= 1000 ? thousands((n / 1000).toFixed(1)) : String(n));
 
 /** Per-turn and per-session cost, tokens and duration (M1-31), labeled as estimates. */
 function costLabel(cost: Cost): string {
   const parts: string[] = [];
-  if (cost.lastUsd !== null) parts.push(`last turn ${usd(cost.lastUsd)}, ${(cost.lastMs / 1000).toFixed(1)} s`);
+  if (cost.lastUsd !== null)
+    parts.push(t("session.cost.lastTurn", { cost: usd(cost.lastUsd), time: seconds((cost.lastMs / 1000).toFixed(1)) }));
   if (cost.lastTokens)
-    parts.push(`${kTokens(cost.lastTokens.input)} in / ${kTokens(cost.lastTokens.output)} out tokens`);
-  parts.push(`session ${cost.totalUsd === null ? "–" : usd(cost.totalUsd)}`);
-  return `${parts.join(" · ")} (estimate)`;
+    parts.push(
+      t("session.cost.tokens", { input: kTokens(cost.lastTokens.input), output: kTokens(cost.lastTokens.output) }),
+    );
+  parts.push(t("session.cost.session", { cost: cost.totalUsd === null ? "–" : usd(cost.totalUsd) }));
+  return t("session.cost.estimate", { parts: parts.join(" · ") });
 }

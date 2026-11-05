@@ -7,6 +7,8 @@ import type {
   SlashCommand,
 } from "@agentchainer/protocol";
 import { PERMISSION_MODES } from "@agentchainer/protocol";
+import { percent, usd } from "./i18n/format.ts";
+import { t } from "./i18n/index.ts";
 import { applyEvent, type Item } from "./transcript.ts";
 
 /**
@@ -19,6 +21,8 @@ export type Tab = {
   /** A multi-folder workspace's other folders the session also reaches (M8-01). */
   folders?: string[];
   title: string;
+  /** The title is still the placeholder a new chat starts with: the first message sent names the tab. */
+  untitled?: boolean;
   /** The model the CLI reports (full id), and the alias picked in the UI ("" = default). */
   model?: string;
   modelAlias: string;
@@ -89,6 +93,8 @@ export function newTab(
   cwd: string,
   options: {
     title: string;
+    /** `title` is a placeholder, replaced by the first message sent. */
+    untitled?: boolean;
     mode: PermissionMode;
     items?: Item[];
     resumed?: boolean;
@@ -112,6 +118,7 @@ export function newTab(
     ...(options.profile ? { profile: options.profile } : {}),
     ...(options.teamCapUsd ? { team: { capUsd: options.teamCapUsd, spentUsd: 0, stopped: false } } : {}),
     title: options.title,
+    ...(options.untitled ? { untitled: true } : {}),
     modelAlias: options.modelAlias ?? "",
     effort: options.effort ?? null,
     budgetUsd: options.budgetUsd ?? null,
@@ -268,11 +275,8 @@ export function agentUsd(cost: Cost, tokens: number | undefined): number | null 
 /** The budget warning (M1-32): at 80% of the cap, for sessions whose whole spend is known. */
 export function budgetWarning(tab: Tab): string | null {
   if (tab.budgetUsd === null || tab.cost.totalUsd === null) return null;
-  if (tab.lastSubtype === "error_max_budget_usd") {
-    return `Budget cap of $${tab.budgetUsd.toFixed(2)} reached. Raise it in Settings and resume the session to continue.`;
-  }
+  const cap = usd(tab.budgetUsd, 2);
+  if (tab.lastSubtype === "error_max_budget_usd") return t("session.budget.reached", { cap });
   const share = tab.cost.totalUsd / tab.budgetUsd;
-  return share >= 0.8
-    ? `About ${Math.round(share * 100)}% of this session's $${tab.budgetUsd.toFixed(2)} budget is used (estimate).`
-    : null;
+  return share >= 0.8 ? t("session.budget.warning", { percent: percent(share), cap }) : null;
 }

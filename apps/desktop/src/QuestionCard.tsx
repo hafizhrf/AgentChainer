@@ -1,6 +1,7 @@
 import type { PermissionRequest } from "@agentchainer/protocol";
 import { Check, MessageCircleQuestion } from "lucide-react";
 import { type KeyboardEvent, useMemo, useRef, useState } from "react";
+import { t } from "./i18n/index.ts";
 import type { PermissionAnswer } from "./PermissionDialog.tsx";
 import { answeredInput, answerOf, type Choice, questionsOf } from "./questions.ts";
 
@@ -81,12 +82,18 @@ export function QuestionCard({
   const q = questions[at];
   const c = choice(at);
   return (
-    // biome-ignore lint/a11y/noNoninteractiveTabindex: the card takes the number and arrow keys while it has focus.
-    <section className="question-card" aria-label="Claude asks" tabIndex={0} ref={card} onKeyDown={onKey}>
+    <section
+      className="question-card"
+      aria-label={t("session.question.claudeAsks")}
+      // biome-ignore lint/a11y/noNoninteractiveTabindex: the card takes the number and arrow keys while it has focus.
+      tabIndex={0}
+      ref={card}
+      onKeyDown={onKey}
+    >
       <header>
         <MessageCircleQuestion size={15} aria-hidden />
-        <strong>Claude asks</strong>
-        <div className="question-tabs" role="tablist" aria-label="Questions">
+        <strong>{t("session.question.claudeAsks")}</strong>
+        <div className="question-tabs" role="tablist" aria-label={t("session.question.tabsLabel")}>
           {questions.map((x, i) => (
             <button
               key={x.question}
@@ -96,8 +103,8 @@ export function QuestionCard({
               className={`question-tab${at === i ? " active" : ""}`}
               onClick={() => go(i)}
             >
-              {answered(i) && <Check size={12} aria-label="Answered" />}
-              {x.header ?? `Question ${i + 1}`}
+              {answered(i) && <Check size={12} aria-label={t("session.question.answered")} />}
+              {x.header ?? t("session.question.number", { n: i + 1 })}
             </button>
           ))}
           <button
@@ -107,7 +114,7 @@ export function QuestionCard({
             className={`question-tab${at === submitTab ? " active" : ""}`}
             onClick={() => go(submitTab)}
           >
-            Submit
+            {t("session.question.submitTab")}
           </button>
         </div>
       </header>
@@ -115,7 +122,7 @@ export function QuestionCard({
       {q ? (
         <div className="question" role="tabpanel">
           <p className="question-text">{q.question}</p>
-          {q.multiSelect && <p className="muted question-hint">Pick any that apply.</p>}
+          {q.multiSelect && <p className="muted question-hint">{t("session.question.multi")}</p>}
           <ol className="question-options">
             {q.options.map((o, k) => {
               const on = c.picked.includes(o.label);
@@ -138,11 +145,11 @@ export function QuestionCard({
             })}
           </ol>
           <label className="question-other">
-            <span className="muted">Other</span>
+            <span className="muted">{t("session.question.other")}</span>
             <input
               type="text"
               value={c.other}
-              placeholder="Type your own answer, Enter to go on"
+              placeholder={t("session.question.otherPlaceholder")}
               onChange={(e) =>
                 setChoices((all) => ({
                   ...all,
@@ -158,9 +165,11 @@ export function QuestionCard({
             {questions.map((x, i) => (
               <li key={x.question}>
                 <button type="button" className="link" onClick={() => go(i)}>
-                  {x.header ?? `Question ${i + 1}`}
+                  {x.header ?? t("session.question.number", { n: i + 1 })}
                 </button>
-                <span className={answered(i) ? undefined : "muted"}>{answerOf(choices[i]) || "Not answered yet"}</span>
+                <span className={answered(i) ? undefined : "muted"}>
+                  {answerOf(choices[i]) || t("session.question.notAnswered")}
+                </span>
               </li>
             ))}
           </ul>
@@ -169,29 +178,30 @@ export function QuestionCard({
 
       <footer>
         <span className="muted question-keys">
-          1–{Math.max(...questions.map((x) => x.options.length), 1)} pick · ←/→ move
+          {t("session.question.keys", { max: Math.max(...questions.map((x) => x.options.length), 1) })}
         </span>
         <span className="grow" />
         <button
           type="button"
           className="secondary small"
+          // Sent to Claude: stays English (X-13).
           onClick={() => onAnswer({ allow: false, message: "The person skipped these questions. Go on without them." })}
         >
-          Skip
+          {t("session.question.skip")}
         </button>
         {q && (q.multiSelect || c.other.trim()) && at < submitTab ? (
           <button type="button" className="small" disabled={!answered(at)} onClick={() => go(nextFrom(at, choices))}>
-            Next
+            {t("session.question.next")}
           </button>
         ) : (
           <button
             type="button"
             className="small"
             disabled={!input}
-            title={input ? undefined : "Answer every question first"}
+            title={input ? undefined : t("session.question.answerAllFirst")}
             onClick={() => input && onAnswer({ allow: true, updatedInput: input })}
           >
-            Submit answers
+            {t("session.question.submit")}
           </button>
         )}
       </footer>

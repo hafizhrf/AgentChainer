@@ -1,4 +1,6 @@
 import type { AgentEvent } from "@agentchainer/protocol";
+import { thousands } from "./i18n/format.ts";
+import { t } from "./i18n/index.ts";
 
 /**
  * Transcript model for a session tab. Subagents (spike S4) are cards keyed by the `toolUseId` of the Agent tool call
@@ -103,13 +105,16 @@ export function applyEvent(items: Item[], e: AgentEvent, now?: number): Item[] {
     }
 
     case "context.compacted": {
-      const k = (n: number) => `${Math.round(n / 1000)}k`;
-      const how = e.trigger === "auto" ? "automatically" : "by /compact";
-      const size = e.postTokens !== undefined ? ` (${k(e.preTokens)} → ${k(e.postTokens)} tokens)` : "";
-      return [
-        ...closeAssistant(items),
-        { kind: "divider", id: nextId(), text: `Earlier messages summarized ${how}${size}` },
-      ];
+      const k = (n: number) => thousands(Math.round(n / 1000));
+      const auto = e.trigger === "auto";
+      const text =
+        e.postTokens === undefined
+          ? t(auto ? "session.transcript.compactedAuto" : "session.transcript.compactedManual")
+          : t(auto ? "session.transcript.compactedAutoSize" : "session.transcript.compactedManualSize", {
+              before: k(e.preTokens),
+              after: k(e.postTokens),
+            });
+      return [...closeAssistant(items), { kind: "divider", id: nextId(), text }];
     }
 
     case "user.message":
@@ -154,7 +159,7 @@ export function applyEvent(items: Item[], e: AgentEvent, now?: number): Item[] {
         child = {
           kind: "agent",
           id: e.toolUseId,
-          description: typeof input.description === "string" ? input.description : "Subagent",
+          description: typeof input.description === "string" ? input.description : t("session.transcript.subagent"),
           status: "running",
           children: [],
           ...(typeof input.subagent_type === "string" ? { agentType: input.subagent_type } : {}),
@@ -281,7 +286,7 @@ export function applyEvent(items: Item[], e: AgentEvent, now?: number): Item[] {
         {
           kind: "notice",
           id: nextId(),
-          text: "A background task ended. Claude picks it up.",
+          text: t("session.transcript.backgroundEnded"),
           ...(now !== undefined ? { at: now } : {}),
         },
       ];

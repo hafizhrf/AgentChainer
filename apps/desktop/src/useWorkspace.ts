@@ -3,6 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { useCallback, useEffect, useState } from "react";
 import { sameListing } from "./files.ts";
+import { t } from "./i18n/index.ts";
 import { request } from "./sidecar.ts";
 
 /**
@@ -26,7 +27,9 @@ export function useWorkspace(cwd: string, active: boolean) {
   useEffect(() => {
     if (!active) return;
     void refresh();
-    void invoke("workspace_watch", { cwd }).catch((err: unknown) => setError(`File watching is off: ${err}`));
+    void invoke("workspace_watch", { cwd }).catch((err: unknown) =>
+      setError(t("panel.workspace.watchOff", { error: String(err) })),
+    );
     const off = listen<string>("workspace://changed", (e) => {
       if (e.payload === cwd) void refresh();
     });

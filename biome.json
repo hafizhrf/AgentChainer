@@ -56,7 +56,7 @@
         "rules": {
           "style": {
             "noJsxLiterals": {
-              "level": "off",
+              "level": "error",
               "options": {
                 "allowedStrings": [
                   "·",

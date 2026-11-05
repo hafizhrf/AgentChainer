@@ -1,5 +1,6 @@
 import type { ReactFlowInstance, Viewport } from "@xyflow/react";
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
+import { t } from "../i18n/index.ts";
 import { benchItems, type FrameStats, frameStats } from "./benchScene.ts";
 import type { FlowNode } from "./SessionGraph.tsx";
 
@@ -90,7 +91,7 @@ export function GraphBench({ onDone }: { onDone: (report: BenchReport) => void }
 
   return (
     <div className="graph-bench">
-      <Suspense fallback={<p className="muted">Loading the graph…</p>}>
+      <Suspense fallback={<p className="muted">{t("graph.bench.loading")}</p>}>
         <SessionGraph
           items={items}
           running={false}
@@ -102,8 +103,14 @@ export function GraphBench({ onDone }: { onDone: (report: BenchReport) => void }
       </Suspense>
       <p className="graph-bench-status muted">
         {report
-          ? `${report.nodes} nodes · pan p95 ${report.pan.p95Ms} ms (${report.pan.fps} fps) · zoom p95 ${report.zoom.p95Ms} ms (${report.zoom.fps} fps)`
-          : "Measuring pan and zoom with 200 nodes…"}
+          ? t("graph.bench.result", {
+              nodes: report.nodes,
+              panP95: report.pan.p95Ms,
+              panFps: report.pan.fps,
+              zoomP95: report.zoom.p95Ms,
+              zoomFps: report.zoom.fps,
+            })
+          : t("graph.bench.measuring")}
       </p>
     </div>
   );

@@ -1,5 +1,6 @@
 import { Plus, X } from "lucide-react";
 import { type KeyboardEvent, type ReactNode, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { t } from "../i18n/index.ts";
 import { IconButton } from "./IconButton.tsx";
 import { oneLine } from "./listText.ts";
 
@@ -24,7 +25,7 @@ export function EditableList<T>({
   items,
   onChange,
   empty,
-  addLabel = "Add",
+  addLabel = t("shell.editableList.add"),
   placeholder,
   mono,
   multiline,
@@ -116,7 +117,7 @@ export function EditableList<T>({
               rows={1}
               value={text(item)}
               placeholder={placeholder}
-              aria-label={`${label} ${i + 1}`}
+              aria-label={t("shell.editableList.row", { label, n: i + 1 })}
               onChange={(e) => set(i, withText(item, oneLine(e.target.value)))}
               onKeyDown={keys(item, i)}
             />
@@ -128,14 +129,17 @@ export function EditableList<T>({
               className={mono ? "mono" : undefined}
               value={text(item)}
               placeholder={placeholder}
-              aria-label={`${label} ${i + 1}`}
+              aria-label={t("shell.editableList.row", { label, n: i + 1 })}
               spellCheck={!mono}
               onChange={(e) => set(i, withText(item, e.target.value))}
               onKeyDown={keys(item, i)}
             />
           )}
           {extra?.(item, (next) => set(i, next))}
-          <IconButton label={`Remove ${label.toLowerCase()} ${i + 1}`} onClick={() => remove(i)}>
+          <IconButton
+            label={t("shell.editableList.remove", { label: label.toLowerCase(), n: i + 1 })}
+            onClick={() => remove(i)}
+          >
             <X size={14} />
           </IconButton>
         </div>
@@ -159,5 +163,5 @@ export function StringList(props: {
   mono?: boolean;
   multiline?: boolean;
 }) {
-  return <EditableList {...props} text={(s) => s} withText={(_, t) => t} blank={() => ""} />;
+  return <EditableList {...props} text={(s) => s} withText={(_, s) => s} blank={() => ""} />;
 }

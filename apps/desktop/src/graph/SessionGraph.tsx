@@ -12,11 +12,12 @@ import {
 } from "@xyflow/react";
 import { Bot, Loader2, Sparkles, Wrench } from "lucide-react";
 import { type KeyboardEvent, memo, useEffect, useMemo, useRef, useState } from "react";
+import { t } from "../i18n/index.ts";
 import type { Item } from "../transcript.ts";
 import { agentGraph, type GraphNode, MAIN_ID, moveFocus, structureKey } from "./agentGraph.ts";
 import { DotGrid } from "./DotGrid.tsx";
 import { layoutGraph, NODE_SIZE } from "./layout.ts";
-import { StatusIcon } from "./StatusIcon.tsx";
+import { StatusIcon, statusLabel } from "./StatusIcon.tsx";
 import { useNow } from "./useNow.ts";
 
 type NodeData = {
@@ -125,7 +126,7 @@ export default function SessionGraph({
       // biome-ignore lint/a11y/noNoninteractiveTabindex: the graph is navigable with the arrow keys (X-12).
       tabIndex={0}
       role="application"
-      aria-label="Agent graph. Arrow keys move between agents, Enter opens one, Esc closes it."
+      aria-label={t("graph.sessionGraph.label")}
       onKeyDown={onKeyDown}
     >
       <ReactFlow<FlowNode>
@@ -155,7 +156,7 @@ export default function SessionGraph({
         <ZoomedOut below={FAR_ZOOM} onChange={setFar} />
         <Controls showInteractive={false} />
       </ReactFlow>
-      {!hasAgents && <p className="graph-empty muted">No subagents in this session yet.</p>}
+      {!hasAgents && <p className="graph-empty muted">{t("graph.sessionGraph.empty")}</p>}
     </div>
   );
 }
@@ -198,7 +199,7 @@ function FoldButton({
         onToggle(id);
       }}
     >
-      {expanded ? "Fold tools" : `${count} tool${count === 1 ? "" : "s"}`}
+      {expanded ? t("graph.sessionGraph.foldTools") : t("graph.sessionGraph.tools", { count })}
     </button>
   );
 }
@@ -214,8 +215,8 @@ const MainNodeView = memo(function MainNodeView({ data }: NodeProps<FlowNode>) {
       <Handles />
       <div className="graph-node-title">
         <Sparkles size={14} aria-hidden />
-        <strong>Main agent</strong>
-        {n.running && <Loader2 size={13} className="spin" aria-label="Running" />}
+        <strong>{t("graph.sessionGraph.mainAgent")}</strong>
+        {n.running && <Loader2 size={13} className="spin" aria-label={statusLabel("running")} />}
       </div>
       <FoldButton id={n.id} count={n.foldedTools} expanded={data.expanded} onToggle={data.onToggle} />
     </div>
@@ -229,8 +230,8 @@ const AgentNodeView = memo(function AgentNodeView({ data }: NodeProps<FlowNode>)
   const live = a.status === "running" || a.status === "paused";
   const meta = [
     a.agentType,
-    live && a.lastTool ? `using ${a.lastTool}` : null,
-    a.tokens !== undefined ? `${(a.tokens / 1000).toFixed(1)}k tokens` : null,
+    live && a.lastTool ? t("graph.sessionGraph.using", { tool: a.lastTool }) : null,
+    a.tokens !== undefined ? t("graph.sessionGraph.tokens", { n: (a.tokens / 1000).toFixed(1) }) : null,
   ].filter(Boolean);
   return (
     <div className={cls("agent", data, n.waiting && live ? "waiting" : a.status)} title={a.description}>
@@ -240,10 +241,10 @@ const AgentNodeView = memo(function AgentNodeView({ data }: NodeProps<FlowNode>)
         <strong>{a.description}</strong>
         <StatusIcon status={a.status} />
       </div>
-      <div className="graph-node-meta">{n.waiting && live ? "Waiting for approval" : meta.join(" · ")}</div>
+      <div className="graph-node-meta">{n.waiting && live ? t("graph.sessionGraph.waiting") : meta.join(" · ")}</div>
       <div className="graph-node-meta">
         <FoldButton id={n.id} count={n.foldedTools} expanded={data.expanded} onToggle={data.onToggle} />
-        {n.foldedAgents > 0 && <span>+{n.foldedAgents} agents</span>}
+        {n.foldedAgents > 0 && <span>{t("graph.sessionGraph.moreAgents", { n: n.foldedAgents })}</span>}
       </div>
     </div>
   );
@@ -252,14 +253,18 @@ const AgentNodeView = memo(function AgentNodeView({ data }: NodeProps<FlowNode>)
 const ToolNodeView = memo(function ToolNodeView({ data }: NodeProps<FlowNode>) {
   const n = data.node;
   if (n.kind !== "tool") return null;
-  const t = n.tool;
+  const tool = n.tool;
   return (
-    <div className={cls("tool", data, n.waiting ? "waiting" : t.status)}>
+    <div className={cls("tool", data, n.waiting ? "waiting" : tool.status)}>
       <Handles />
       <div className="graph-node-title">
         <Wrench size={13} aria-hidden />
-        <span>{t.name}</span>
-        {n.waiting ? <span className="graph-node-meta">approval</span> : <StatusIcon status={t.status} />}
+        <span>{tool.name}</span>
+        {n.waiting ? (
+          <span className="graph-node-meta">{t("graph.sessionGraph.approval")}</span>
+        ) : (
+          <StatusIcon status={tool.status} />
+        )}
       </div>
     </div>
   );

@@ -4,6 +4,8 @@ import { Download, RefreshCw } from "lucide-react";
 import { useState } from "react";
 import { applyTheme } from "./appearance.ts";
 import { Modal } from "./Dialog.tsx";
+import { t } from "./i18n/index.ts";
+import { Rich } from "./i18n/Rich.tsx";
 import { EDITORS, EFFORT_OPTIONS, MODE_HELP, modelChoices, modeOptions, THEMES } from "./options.ts";
 import type { Settings } from "./settings.ts";
 import { asMode } from "./tabs.ts";
@@ -44,6 +46,7 @@ export function SettingsDialog({
   const [exported, setExported] = useState<string | null>(null);
   const dirty = JSON.stringify(draft) !== JSON.stringify(settings);
   const mode = asMode(draft.defaultMode);
+  const muted = (s: string) => <span className="muted">{s}</span>;
 
   function cancel() {
     applyTheme(asTheme(settings.theme));
@@ -65,9 +68,9 @@ export function SettingsDialog({
   async function exportBundle() {
     try {
       const path = await onExportDiagnostics();
-      if (path) setExported(`Saved to ${path}. Secrets, emails and your home folder are masked; check before sharing.`);
+      if (path) setExported(t("home.settings.exported", { path }));
     } catch (err) {
-      setExported(`Export failed: ${err}`);
+      setExported(t("home.settings.exportFailed", { error: String(err) }));
     }
   }
 
@@ -77,26 +80,26 @@ export function SettingsDialog({
       onOpenChange={(open) => {
         if (!open) cancel();
       }}
-      title="Settings"
+      title={t("home.settings.title")}
       size="lg"
       actions={
         <>
           {error && <span className="dialog-error">{error}</span>}
           <button type="button" className="secondary" onClick={cancel}>
-            Cancel
+            {t("shell.dialog.cancel")}
           </button>
           <button type="button" disabled={!dirty || saving} onClick={() => void save()}>
-            {saving ? "Saving…" : "Save"}
+            {saving ? t("home.settings.saving") : t("home.settings.save")}
           </button>
         </>
       }
     >
       <div className="settings">
         <section className="settings-section">
-          <h3>Appearance</h3>
-          <Field label="Theme">
+          <h3>{t("home.settings.appearance")}</h3>
+          <Field label={t("home.settings.theme")}>
             <Select
-              label="Theme"
+              label={t("home.settings.theme")}
               value={asTheme(draft.theme)}
               options={THEMES}
               onChange={(value) => {
@@ -109,28 +112,28 @@ export function SettingsDialog({
         </section>
 
         <section className="settings-section">
-          <h3>New sessions</h3>
+          <h3>{t("home.settings.newSessions")}</h3>
           <div className="field-row">
-            <Field label="Model">
+            <Field label={t("home.settings.model")}>
               <Select
-                label="Default model"
+                label={t("home.settings.defaultModel")}
                 value={draft.defaultModel ?? ""}
                 options={modelChoices()}
                 onChange={(value) => setDraft({ ...draft, defaultModel: value || null })}
               />
             </Field>
-            <Field label="Effort">
+            <Field label={t("home.settings.effort")}>
               <Select
-                label="Default effort"
+                label={t("home.settings.defaultEffort")}
                 value={EFFORTS.find((e) => e === draft.defaultEffort) ?? ""}
                 options={EFFORT_OPTIONS}
                 onChange={(value) => setDraft({ ...draft, defaultEffort: value || null })}
               />
             </Field>
           </div>
-          <Field label="Permission profile" help={MODE_HELP[mode]}>
+          <Field label={t("home.settings.permissionProfile")} help={MODE_HELP[mode]}>
             <Select
-              label="Default permission profile"
+              label={t("home.settings.defaultPermissionProfile")}
               value={mode}
               options={modeOptions(PERMISSION_MODES, true)}
               onChange={(value) => setDraft({ ...draft, defaultMode: value })}
@@ -143,7 +146,7 @@ export function SettingsDialog({
               onChange={(e) => setDraft({ ...draft, showThinking: e.target.checked })}
             />
             <span>
-              Show summaries of Claude's thinking <span className="muted">(no extra cost)</span>
+              <Rich k="home.settings.showThinking" tags={{ muted }} />
             </span>
           </label>
           <label className="check">
@@ -152,13 +155,9 @@ export function SettingsDialog({
               checked={draft.autoApply === true}
               onChange={(e) => setDraft({ ...draft, autoApply: e.target.checked || null })}
             />
-            <span>Apply safe setup automatically before a new session</span>
+            <span>{t("home.settings.autoApply")}</span>
           </label>
-          <p className="field-help">
-            Only reviewed first-party and official catalog items, plus fixes that only add lines (env rules in
-            .gitignore, importing AGENTS.md). Never generators, git changes, or vendor and community items. What was
-            applied shows in the session, and Workspace settings → History can roll it back.
-          </p>
+          <p className="field-help">{t("home.settings.autoApplyHelp")}</p>
           <label className="check">
             <input
               type="checkbox"
@@ -166,84 +165,79 @@ export function SettingsDialog({
               onChange={(e) => setDraft({ ...draft, tasksPreview: e.target.checked || null })}
             />
             <span>
-              Tasks <span className="muted">(preview)</span>
+              <Rich k="home.settings.tasksPreview" tags={{ muted }} />
             </span>
           </label>
-          <p className="field-help">
-            Adds New task ({menuShortcut("new-task")}): Claude drafts a contract for the work, triage proposes a tier,
-            and you approve both. Running tasks arrives in a later update.
-          </p>
+          <p className="field-help">{t("home.settings.tasksPreviewHelp", { keys: menuShortcut("new-task") ?? "" })}</p>
         </section>
 
         <section className="settings-section">
-          <h3>Limits</h3>
-          <Field
-            label="Budget cap per session (USD)"
-            help="Leave empty for no cap. The Autonomous profile needs one. Applies to sessions started after saving."
-          >
+          <h3>{t("home.settings.limits")}</h3>
+          <Field label={t("home.settings.budget")} help={t("home.settings.budgetHelp")}>
             <input
               type="number"
               min="0"
               step="0.5"
               value={draft.budgetUsd ?? ""}
               onChange={(e) => setDraft({ ...draft, budgetUsd: e.target.value ? Number(e.target.value) : null })}
-              placeholder="e.g. 5"
+              placeholder={t("home.settings.budgetPlaceholder")}
             />
           </Field>
         </section>
 
         <section className="settings-section">
-          <h3>Tools</h3>
-          <Field label="Open files in" help="Editors other than the system default need their command-line launcher.">
+          <h3>{t("home.settings.tools")}</h3>
+          <Field label={t("home.settings.editor")} help={t("home.settings.editorHelp")}>
             <Select
-              label="Open files in"
+              label={t("home.settings.editor")}
               value={draft.editor ?? "system"}
               options={EDITORS}
               onChange={(value) => setDraft({ ...draft, editor: value })}
             />
           </Field>
-          <Field
-            label="Claude CLI path"
-            help="Leave empty to find it automatically. Changing it restarts the agent runtime."
-          >
+          <Field label={t("home.settings.claudePath")} help={t("home.settings.claudePathHelp")}>
             <input
               value={draft.claudePath ?? ""}
               onChange={(e) => setDraft({ ...draft, claudePath: e.target.value || null })}
-              placeholder="e.g. /Users/you/.local/bin/claude"
+              placeholder={t("home.settings.claudePathPlaceholder")}
               spellCheck={false}
             />
           </Field>
         </section>
 
         <section className="settings-section">
-          <h3>About</h3>
+          <h3>{t("home.settings.about")}</h3>
           <dl className="about">
-            <dt>AgentChainer</dt>
+            <dt>{t("home.settings.aboutApp")}</dt>
             <dd>{appVersion ?? "…"}</dd>
-            <dt>Claude CLI</dt>
-            <dd>{hello ? (hello.claudeVersion ?? "not found") : "…"}</dd>
-            <dt>Agent SDK</dt>
+            <dt>{t("home.settings.aboutCli")}</dt>
+            <dd>{hello ? (hello.claudeVersion ?? t("home.settings.notFound")) : "…"}</dd>
+            <dt>{t("home.settings.aboutSdk")}</dt>
             <dd>{hello?.sdkVersion ?? "…"}</dd>
-            <dt>Node</dt>
+            <dt>{t("home.settings.aboutNode")}</dt>
             <dd>{hello?.nodeVersion ?? "…"}</dd>
           </dl>
           <div className="row">
             <button type="button" className="secondary" onClick={onCheckUpdates}>
               <RefreshCw size={14} />
-              Check for updates…
+              {t("home.settings.checkUpdates")}
             </button>
             <button type="button" className="secondary" onClick={() => void exportBundle()}>
               <Download size={14} />
-              Export diagnostics…
+              {t("home.settings.exportDiagnostics")}
             </button>
           </div>
           <p className="field-help">
-            Diagnostics hold versions, settings, the setup check and recent logs, for bug reports. No credentials or
-            account details. AgentChainer sends no telemetry; see the{" "}
-            <button type="button" className="link" onClick={() => void openUrl(PRIVACY)}>
-              privacy statement
-            </button>
-            .
+            <Rich
+              k="home.settings.diagnosticsHelp"
+              tags={{
+                link: (s) => (
+                  <button type="button" className="link" onClick={() => void openUrl(PRIVACY)}>
+                    {s}
+                  </button>
+                ),
+              }}
+            />
           </p>
           {exported && <p className="field-help">{exported}</p>}
         </section>

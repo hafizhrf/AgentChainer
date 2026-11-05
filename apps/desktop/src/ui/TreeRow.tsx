@@ -1,7 +1,18 @@
 import type { FileStatus } from "@agentchainer/protocol";
 import type { ButtonHTMLAttributes, CSSProperties, ReactNode, Ref } from "react";
 import { STATUS_LETTER, splitPath } from "../files.ts";
+import { type MessageKey, t } from "../i18n/index.ts";
 import { FileIcon } from "./FileIcon.tsx";
+
+/** A git status in words, as a row's status letter explains it. */
+const STATUS_NAME: Record<FileStatus, MessageKey> = {
+  modified: "shell.treeRow.modified",
+  added: "shell.treeRow.added",
+  deleted: "shell.treeRow.deleted",
+  renamed: "shell.treeRow.renamed",
+  untracked: "shell.treeRow.untracked",
+  conflicted: "shell.treeRow.conflicted",
+};
 
 /**
  * One row of a file list or tree (UX-03): indent, chevron, icon, name tinted by git status, a muted detail, actions
@@ -62,7 +73,7 @@ export function TreeRow({
       {actions && <span className="tree-actions">{actions}</span>}
       {dot && <span className="tree-dot" aria-hidden />}
       {status && (
-        <span className={`tree-status status-${status}`} title={status}>
+        <span className={`tree-status status-${status}`} title={t(STATUS_NAME[status])}>
           {STATUS_LETTER[status]}
         </span>
       )}
@@ -96,7 +107,7 @@ export function FileRow({
       status={status}
       selected={selected}
       dimmed={outside}
-      title={outside ? `${path} (outside the workspace)` : path}
+      title={outside ? t("shell.treeRow.outside", { path }) : path}
       actions={actions}
       {...(onSelect && !outside ? { onClick: onSelect } : {})}
     />

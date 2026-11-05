@@ -1,5 +1,6 @@
 import type { FleetItem } from "@agentchainer/protocol";
 import { CircleAlert, CircleCheck, ClipboardList, Folder, Folders, Loader2, Plus, Radar, Settings } from "lucide-react";
+import { t } from "./i18n/index.ts";
 import type { WorkspaceDef } from "./settings.ts";
 import { folderName, type Tab } from "./tabs.ts";
 import { stateLabel } from "./tasks/run.ts";
@@ -58,17 +59,17 @@ export function Sidebar({
   onSettings: () => void;
 }) {
   return (
-    <nav className="sidebar" aria-label="Sessions and workspaces">
+    <nav className="sidebar" aria-label={t("shell.sidebar.label")}>
       <div className="sidebar-top">
-        <span className="brand">AgentChainer</span>
+        <span className="brand">{t("shell.sidebar.brand")}</span>
         <button
           type="button"
           className={`new-session${active === null ? " current" : ""}`}
           onClick={onNew}
-          title={onNewTask ? `New chat; pick Task in its composer for a task (${menuShortcut("new-task")})` : undefined}
+          title={onNewTask ? t("shell.sidebar.newTitle", { keys: menuShortcut("new-task") ?? "" }) : undefined}
         >
           <Plus size={16} />
-          New
+          {t("shell.sidebar.newSession")}
           <kbd>{menuShortcut("new-session")}</kbd>
         </button>
         <button
@@ -78,16 +79,16 @@ export function Sidebar({
           onClick={() => onSelect(FLEET)}
         >
           <Radar size={15} aria-hidden />
-          Fleet
+          {t("shell.sidebar.fleet")}
           <span className="grow" />
           {fleet.some((i) => i.status === "waiting") && (
-            <span className="fleet-count waiting" title="Waiting for you">
-              {fleet.filter((i) => i.status === "waiting").length} waiting
+            <span className="fleet-count waiting" title={t("shell.sidebar.waitingTitle")}>
+              {t("shell.sidebar.waitingCount", { n: fleet.filter((i) => i.status === "waiting").length })}
             </span>
           )}
           {fleet.some((i) => i.status === "working") && (
-            <span className="fleet-count" title="Working">
-              {fleet.filter((i) => i.status === "working").length} working
+            <span className="fleet-count" title={t("shell.sidebar.working")}>
+              {t("shell.sidebar.workingCount", { n: fleet.filter((i) => i.status === "working").length })}
             </span>
           )}
         </button>
@@ -95,39 +96,45 @@ export function Sidebar({
 
       <div className="sidebar-scroll">
         <section>
-          <h2 className="sidebar-heading">Chats</h2>
+          <h2 className="sidebar-heading">{t("shell.sidebar.chats")}</h2>
           {tabs.length === 0 ? (
-            <p className="sidebar-empty">Open chats show up here.</p>
+            <p className="sidebar-empty">{t("shell.sidebar.chatsEmpty")}</p>
           ) : (
             <ul className="nav-list">
-              {nestedTabs(tabs).map(({ tab: t, child }) => (
+              {nestedTabs(tabs).map(({ tab, child }) => (
                 <li
-                  key={t.sessionId}
-                  className={`nav-row${child ? " child" : ""}${t.sessionId === active ? " active" : ""}`}
+                  key={tab.sessionId}
+                  className={`nav-row${child ? " child" : ""}${tab.sessionId === active ? " active" : ""}`}
                 >
                   <button
                     type="button"
                     className="nav-main"
-                    aria-current={t.sessionId === active ? "page" : undefined}
-                    title={`${t.title}\n${t.cwd}`}
-                    onClick={() => onSelect(t.sessionId)}
+                    aria-current={tab.sessionId === active ? "page" : undefined}
+                    title={`${tab.title}\n${tab.cwd}`}
+                    onClick={() => onSelect(tab.sessionId)}
                   >
-                    <span className="nav-title">{t.title}</span>
+                    <span className="nav-title">{tab.title}</span>
                     <span className="nav-sub">
                       {child
-                        ? `Worker${t.profile ? ` · ${t.profile}` : ""} · ${t.access === "write" ? "can edit" : "read only"}`
-                        : `${folderName(t.cwd)}${t.profile ? ` · ${t.profile}` : ""}`}
-                      {t.team ? " · Team" : ""}
+                        ? [
+                            t("shell.sidebar.worker"),
+                            tab.profile,
+                            tab.access === "write" ? t("shell.sidebar.canEdit") : t("shell.sidebar.readOnly"),
+                          ]
+                            .filter(Boolean)
+                            .join(" · ")
+                        : `${folderName(tab.cwd)}${tab.profile ? ` · ${tab.profile}` : ""}`}
+                      {tab.team ? ` · ${t("shell.sidebar.team")}` : ""}
                     </span>
                   </button>
-                  <SessionStatus tab={t} />
+                  <SessionStatus tab={tab} />
                   <ActionMenu
-                    label={`Actions for ${t.title}`}
+                    label={t("shell.sidebar.actionsFor", { title: tab.title })}
                     items={[
                       {
-                        label: "Close session",
+                        label: t("shell.sidebar.closeSession"),
                         shortcut: menuShortcut("close-session"),
-                        onSelect: () => onClose(t.sessionId),
+                        onSelect: () => onClose(tab.sessionId),
                       },
                     ]}
                   />
@@ -139,40 +146,41 @@ export function Sidebar({
 
         {taskTabs.length > 0 && (
           <section>
-            <h2 className="sidebar-heading">Tasks</h2>
+            <h2 className="sidebar-heading">{t("shell.sidebar.tasks")}</h2>
             <ul className="nav-list">
-              {taskTabs.map((t) => {
-                const key = taskKey(t.id);
+              {taskTabs.map((task) => {
+                const key = taskKey(task.id);
                 return (
-                  <li key={t.id} className={`nav-row${key === active ? " active" : ""}`}>
+                  <li key={task.id} className={`nav-row${key === active ? " active" : ""}`}>
                     <button
                       type="button"
                       className="nav-main"
                       aria-current={key === active ? "page" : undefined}
-                      title={`${t.title}\n${t.cwd}`}
+                      title={`${task.title}\n${task.cwd}`}
                       onClick={() => onSelect(key)}
                     >
                       <span className="nav-title">
                         <ClipboardList size={13} aria-hidden className="nav-kind" />
-                        {t.title}
+                        {task.title}
                       </span>
                       <span className="nav-sub">
-                        {folderName(t.cwd)} · {t.state === "draft" ? "draft" : stateLabel(t.state).label}
+                        {folderName(task.cwd)} ·{" "}
+                        {task.state === "draft" ? t("shell.sidebar.draft") : stateLabel(task.state).label}
                       </span>
                     </button>
-                    {waitingTasks.has(t.id) ? (
+                    {waitingTasks.has(task.id) ? (
                       <span
                         className="nav-status approval"
                         role="img"
-                        title="Waiting for your approval"
-                        aria-label="Waiting for approval"
+                        title={t("shell.sidebar.approvalTitle")}
+                        aria-label={t("shell.sidebar.approvalLabel")}
                       />
-                    ) : t.busy ? (
-                      <Loader2 className="nav-status spin" size={14} aria-label="Working" />
+                    ) : task.busy ? (
+                      <Loader2 className="nav-status spin" size={14} aria-label={t("shell.sidebar.working")} />
                     ) : null}
                     <ActionMenu
-                      label={`Actions for ${t.title}`}
-                      items={[{ label: "Close task tab", onSelect: () => onCloseTask(t.id) }]}
+                      label={t("shell.sidebar.actionsFor", { title: task.title })}
+                      items={[{ label: t("shell.sidebar.closeTaskTab"), onSelect: () => onCloseTask(task.id) }]}
                     />
                   </li>
                 );
@@ -183,7 +191,7 @@ export function Sidebar({
 
         {workspaces.length > 0 && (
           <section>
-            <h2 className="sidebar-heading">Workspaces</h2>
+            <h2 className="sidebar-heading">{t("shell.sidebar.workspaces")}</h2>
             <ul className="nav-list">
               {workspaces.map((w) => (
                 <li key={w.id} className="nav-row">
@@ -196,7 +204,10 @@ export function Sidebar({
                     <Folders size={14} aria-hidden />
                     <span className="nav-title">{w.name}</span>
                     <span className="grow" />
-                    <span className="nav-status ended" title={`${w.folders.length + 1} folders`}>
+                    <span
+                      className="nav-status ended"
+                      title={t("shell.sidebar.folderCount", { n: w.folders.length + 1 })}
+                    >
                       {w.folders.length + 1}
                     </span>
                   </button>
@@ -208,7 +219,7 @@ export function Sidebar({
 
         {recent.length > 0 && (
           <section>
-            <h2 className="sidebar-heading">Recent workspaces</h2>
+            <h2 className="sidebar-heading">{t("shell.sidebar.recent")}</h2>
             <ul className="nav-list">
               {recent.map((dir) => (
                 <li key={dir} className="nav-row">
@@ -228,13 +239,17 @@ export function Sidebar({
           type="button"
           className={`ready-pill${ready === false ? " not-ready" : ""}`}
           onClick={onNew}
-          title="Setup check"
+          title={t("shell.sidebar.setupCheck")}
         >
           {ready === false ? <CircleAlert size={14} /> : <CircleCheck size={14} />}
-          {ready === null ? "Checking…" : ready ? "Ready" : "Needs setup"}
+          {ready === null
+            ? t("shell.sidebar.checking")
+            : ready
+              ? t("shell.sidebar.ready")
+              : t("shell.sidebar.needsSetup")}
         </button>
         <span className="grow" />
-        <IconButton label="Settings" shortcut={menuShortcut("settings")} onClick={onSettings}>
+        <IconButton label={t("shell.sidebar.settings")} shortcut={menuShortcut("settings")} onClick={onSettings}>
           <Settings size={16} />
         </IconButton>
       </div>
@@ -248,17 +263,17 @@ function SessionStatus({ tab }: { tab: Tab }) {
       <span
         className="nav-status approval"
         role="img"
-        title="Waiting for your approval"
-        aria-label="Waiting for approval"
+        title={t("shell.sidebar.approvalTitle")}
+        aria-label={t("shell.sidebar.approvalLabel")}
       />
     );
-  if (tab.running) return <Loader2 className="nav-status spin" size={14} aria-label="Working" />;
+  if (tab.running) return <Loader2 className="nav-status spin" size={14} aria-label={t("shell.sidebar.working")} />;
   if (tab.background.length > 0)
-    return <Loader2 className="nav-status spin" size={14} aria-label="Working in the background" />;
+    return <Loader2 className="nav-status spin" size={14} aria-label={t("shell.sidebar.workingBackground")} />;
   if (tab.ended)
     return (
-      <span className="nav-status ended" title="Ended: open it to resume">
-        ended
+      <span className="nav-status ended" title={t("shell.sidebar.endedTitle")}>
+        {t("shell.sidebar.ended")}
       </span>
     );
   return null;

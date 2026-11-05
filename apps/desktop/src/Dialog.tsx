@@ -1,6 +1,7 @@
 import * as RadixDialog from "@radix-ui/react-dialog";
 import { X } from "lucide-react";
 import { type ReactNode, useCallback, useLayoutEffect, useRef, useState } from "react";
+import { t } from "./i18n/index.ts";
 
 /**
  * Gives focus back to whatever had it when a dialog opened. Radix returns it only to a Dialog.Trigger, and these
@@ -72,7 +73,7 @@ export function Modal({
             <RadixDialog.Title>{title}</RadixDialog.Title>
             {dismissible && (
               <RadixDialog.Close asChild>
-                <button type="button" className="ghost icon" aria-label="Close">
+                <button type="button" className="ghost icon" aria-label={t("shell.dialog.close")}>
                   <X size={16} />
                 </button>
               </RadixDialog.Close>
@@ -119,7 +120,7 @@ export function useConfirm(): [Confirm, ReactNode] {
       actions={
         <>
           <button type="button" className="secondary" onClick={() => close(false)}>
-            Cancel
+            {t("shell.dialog.cancel")}
           </button>
           <button type="button" className={pending?.danger ? "danger" : ""} onClick={() => close(true)}>
             {pending?.confirmLabel}

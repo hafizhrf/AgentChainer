@@ -14,6 +14,8 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { ago, fleetGroups, FLEET_STATUS as STATUS, workspaceOf } from "./fleet.ts";
+import { approxUsd, dateTime } from "./i18n/format.ts";
+import { t } from "./i18n/index.ts";
 import { lastRunText, whenText } from "./schedules.ts";
 import { folderName, type Tab } from "./tabs.ts";
 import { IconButton } from "./ui/IconButton.tsx";
@@ -62,8 +64,8 @@ export function FleetView({
 }) {
   const [now, setNow] = useState(Date.now());
   useEffect(() => {
-    const t = setInterval(() => setNow(Date.now()), 5000);
-    return () => clearInterval(t);
+    const timer = setInterval(() => setNow(Date.now()), 5000);
+    return () => clearInterval(timer);
   }, []);
   const groups = useMemo(() => fleetGroups(items), [items]);
   const counts = {
@@ -71,34 +73,39 @@ export function FleetView({
     working: items.filter((i) => i.status === "working").length,
     ended: items.filter((i) => i.status === "ended").length,
   };
-  const tabTitle = (id: string) => tabs.find((t) => t.sessionId === id)?.title;
+  const tabTitle = (id: string) => tabs.find((tab) => tab.sessionId === id)?.title;
   const title = (i: FleetItem) =>
     i.task
       ? `${i.task.title ?? i.task.id}`
       : i.parentId
         ? // A Team chat's worker (M8-03).
-          `${tabTitle(i.sessionId) ?? "Worker"} · worker of ${tabTitle(i.parentId) ?? "a Team chat"}`
-        : (tabTitle(i.sessionId) ?? "Chat");
+          t("graph.fleet.workerOf", {
+            worker: tabTitle(i.sessionId) ?? t("graph.fleet.worker"),
+            parent: tabTitle(i.parentId) ?? t("graph.fleet.teamChat"),
+          })
+        : (tabTitle(i.sessionId) ?? t("graph.fleet.chat"));
   const open = (i: FleetItem) =>
-    i.task ? onOpenTask(workspaceOf(i.task.cwd), i.task.id, i.task.title ?? "Task") : onOpenChat(i.sessionId);
+    i.task
+      ? onOpenTask(workspaceOf(i.task.cwd), i.task.id, i.task.title ?? t("graph.fleet.task"))
+      : onOpenChat(i.sessionId);
 
   return (
     <div className="fleet">
       <header className="fleet-header">
         <Radar size={18} aria-hidden />
-        <h1>Fleet</h1>
+        <h1>{t("graph.fleet.title")}</h1>
         <span className="muted">
-          {counts.waiting} waiting for you · {counts.working} working · {items.length} in all
+          {t("graph.fleet.counts", { waiting: counts.waiting, working: counts.working, total: items.length })}
         </span>
         <span className="grow" />
         {counts.ended > 0 && (
           <button type="button" className="secondary small" onClick={onClearEnded}>
-            Clear {counts.ended} ended
+            {t("graph.fleet.clearEnded", { n: counts.ended })}
           </button>
         )}
       </header>
       {items.length === 0 ? (
-        <p className="muted fleet-empty">Nothing is running. Chats and task steps show here while they live.</p>
+        <p className="muted fleet-empty">{t("graph.fleet.empty")}</p>
       ) : (
         groups.map((g) => (
           <section key={g.cwd} className="fleet-group" aria-label={folderName(g.cwd)}>
@@ -107,11 +114,11 @@ export function FleetView({
               {g.items.map((i) => (
                 <li key={i.sessionId} className={`fleet-row ${i.status}`}>
                   {i.task ? (
-                    <ClipboardList size={14} aria-label="Task step" />
+                    <ClipboardList size={14} aria-label={t("graph.fleet.taskStep")} />
                   ) : (
-                    <MessageSquare size={14} aria-label="Chat" />
+                    <MessageSquare size={14} aria-label={t("graph.fleet.chat")} />
                   )}
-                  <button type="button" className="fleet-main" onClick={() => open(i)} title="Open it">
+                  <button type="button" className="fleet-main" onClick={() => open(i)} title={t("graph.fleet.openIt")}>
                     <span className="fleet-title">{title(i)}</span>
                     {i.task && (
                       <span className="muted fleet-step">
@@ -121,26 +128,26 @@ export function FleetView({
                     )}
                   </button>
                   <StatusMark status={i.status} />
-                  {i.waiting > 0 && <span className="badge">{i.waiting} to answer</span>}
-                  <span className="muted fleet-time" title={new Date(i.since).toLocaleString()}>
+                  {i.waiting > 0 && <span className="badge">{t("graph.fleet.toAnswer", { n: i.waiting })}</span>}
+                  <span className="muted fleet-time" title={dateTime(i.since)}>
                     {ago(i.since, now)}
                   </span>
-                  <span className="muted fleet-cost">≈${i.costUsd.toFixed(3)}</span>
+                  <span className="muted fleet-cost">{approxUsd(i.costUsd, 3)}</span>
                   {i.status === "waiting" ? (
                     <button type="button" className="small" onClick={() => open(i)}>
-                      Answer
+                      {t("graph.fleet.answer")}
                     </button>
                   ) : (
                     <button type="button" className="secondary small" onClick={() => open(i)}>
-                      Open
+                      {t("graph.fleet.open")}
                     </button>
                   )}
                   {(i.status === "working" || i.status === "waiting") && (
                     <button
                       type="button"
                       className="ghost icon"
-                      aria-label={i.task ? "Stop the task" : "Stop the turn"}
-                      title={i.task ? "Stop the task" : "Stop the turn"}
+                      aria-label={i.task ? t("graph.fleet.stopTask") : t("graph.fleet.stopTurn")}
+                      title={i.task ? t("graph.fleet.stopTask") : t("graph.fleet.stopTurn")}
                       onClick={() => onStop(i)}
                     >
                       <Square size={12} />
@@ -153,48 +160,54 @@ export function FleetView({
         ))
       )}
       {schedules.length > 0 && (
-        <section className="fleet-group fleet-schedules" aria-label="Scheduled">
-          <h2>Scheduled</h2>
-          <p className="muted fleet-note">
-            Runs only while AgentChainer is open; a time missed while it was closed runs once.
-          </p>
+        <section className="fleet-group fleet-schedules" aria-label={t("graph.fleet.scheduled")}>
+          <h2>{t("graph.fleet.scheduled")}</h2>
+          <p className="muted fleet-note">{t("graph.fleet.scheduledNote")}</p>
           <ul className="fleet-list">
             {[...schedules]
               .sort((a, b) => a.nextAt.localeCompare(b.nextAt))
               .map((s) => (
                 <li key={`${s.cwd}|${s.id}`} className={`fleet-row${s.enabled ? "" : " ended"}`}>
-                  <CalendarClock size={14} aria-label="Schedule" />
+                  <CalendarClock size={14} aria-label={t("graph.fleet.schedule")} />
                   <button
                     type="button"
                     className="fleet-main"
                     onClick={() => onOpenTask(workspaceOf(s.cwd), s.taskId, s.title)}
-                    title="Open the task"
+                    title={t("graph.fleet.openTask")}
                   >
                     <span className="fleet-title">{s.title}</span>
                     <span className="muted fleet-step">
                       {folderName(s.cwd)} · {cadenceText(s.cadence)} ·{" "}
-                      {s.enabled ? `next ${whenText(new Date(s.nextAt), new Date(now))}` : "off"}
+                      {s.enabled
+                        ? t("graph.fleet.next", { when: whenText(new Date(s.nextAt), new Date(now)) })
+                        : t("graph.fleet.off")}
                     </span>
                   </button>
                   <span className={`muted fleet-time${s.lastRun?.state === "failed-to-start" ? " warn" : ""}`}>
                     {lastRunText(s, new Date(now))}
                   </span>
-                  <label className="check" title={s.enabled ? "Turn this schedule off" : "Turn this schedule on"}>
+                  <label className="check" title={s.enabled ? t("graph.fleet.turnOff") : t("graph.fleet.turnOn")}>
                     <input
                       type="checkbox"
                       checked={s.enabled}
                       onChange={() => onSchedule?.("toggle", s)}
-                      aria-label={`${s.title}: schedule on`}
+                      aria-label={t("graph.fleet.scheduleOn", { title: s.title })}
                     />
-                    <span className="sr-only">On</span>
+                    <span className="sr-only">{t("graph.fleet.on")}</span>
                   </label>
                   <button type="button" className="secondary small" onClick={() => onSchedule?.("run", s)}>
-                    Run now
+                    {t("graph.fleet.runNow")}
                   </button>
-                  <IconButton label={`Edit the schedule of ${s.title}`} onClick={() => onSchedule?.("edit", s)}>
+                  <IconButton
+                    label={t("graph.fleet.editSchedule", { title: s.title })}
+                    onClick={() => onSchedule?.("edit", s)}
+                  >
                     <Pencil size={13} />
                   </IconButton>
-                  <IconButton label={`Delete the schedule of ${s.title}`} onClick={() => onSchedule?.("delete", s)}>
+                  <IconButton
+                    label={t("graph.fleet.deleteSchedule", { title: s.title })}
+                    onClick={() => onSchedule?.("delete", s)}
+                  >
                     <Trash2 size={13} />
                   </IconButton>
                 </li>

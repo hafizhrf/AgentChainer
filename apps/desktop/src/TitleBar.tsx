@@ -239,7 +239,7 @@ export function TitleBar({
       <span className="grow" data-tauri-drag-region />
       <div className="titlebar-toggles">
         <IconButton
-          label="Toggle Sidebar"
+          label={t("menu.toggle-sidebar")}
           shortcut={menuShortcut("toggle-sidebar")}
           pressed={sidebarOpen}
           onClick={() => onCommand("toggle-sidebar")}
@@ -248,7 +248,7 @@ export function TitleBar({
         </IconButton>
         {terminalOpen !== null && (
           <IconButton
-            label="Toggle Terminal"
+            label={t("menu.toggle-terminal")}
             shortcut={menuShortcut("toggle-terminal")}
             pressed={terminalOpen}
             onClick={() => onCommand("toggle-terminal")}
@@ -257,7 +257,7 @@ export function TitleBar({
           </IconButton>
         )}
         <IconButton
-          label="Toggle Workspace Panel"
+          label={t("menu.toggle-right-panel")}
           shortcut={menuShortcut("toggle-right-panel")}
           pressed={rightOpen}
           onClick={() => onCommand("toggle-right-panel")}
@@ -267,17 +267,22 @@ export function TitleBar({
       </div>
       {win && (
         <div className="titlebar-window">
-          <button type="button" aria-label="Minimize" onClick={() => void win.minimize()}>
+          <button type="button" aria-label={t("shell.titleBar.minimize")} onClick={() => void win.minimize()}>
             <Minus size={15} />
           </button>
           <button
             type="button"
-            aria-label={maximized ? "Restore" : "Maximize"}
+            aria-label={maximized ? t("shell.titleBar.restore") : t("shell.titleBar.maximize")}
             onClick={() => void win.toggleMaximize()}
           >
             {maximized ? <Copy size={13} /> : <Square size={12} />}
           </button>
-          <button type="button" className="close" aria-label="Close" onClick={() => void win.close()}>
+          <button
+            type="button"
+            className="close"
+            aria-label={t("shell.titleBar.close")}
+            onClick={() => void win.close()}
+          >
             <X size={16} />
           </button>
         </div>

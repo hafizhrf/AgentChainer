@@ -81,7 +81,13 @@ The packaged loader (`sdk-loader.ts`, when `AGENTCHAINER_DATA_DIR` is set):
 
 - [ ] Full app with a signed-in CLI on Windows and Ubuntu, including `%USERPROFILE%\.local\bin\claude.exe` discovery.
       CI covers the packaged sidecar and SDK download there, but not a Claude session (no CLI login on runners).
-- [ ] Behind an HTTP proxy: `NODE_USE_ENV_PROXY=1` is set, but this hasn't been tested yet.
+- [x] Behind an HTTP proxy (X-14, 2026-11-05). `scripts/proxy-smoke.mjs` runs the packaged sidecar's first-run SDK
+      download three ways:
+      - through a local CONNECT proxy: it succeeds, and the proxy tunnelled to `registry.npmjs.org:443`;
+      - through a dead proxy: it fails with "offline or blocked by a proxy?";
+      - with `NO_PROXY=registry.npmjs.org`: it succeeds directly.
+
+      It ran on macOS here and runs in CI on all three OSes.
 - [ ] Installer sizes (dmg/msi/AppImage) and signing at R1.
 
 ## Decision

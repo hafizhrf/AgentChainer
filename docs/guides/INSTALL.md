@@ -74,6 +74,18 @@ The packages pull in WebKitGTK 4.1. The AppImage brings its own.
 On first start, AgentChainer downloads the pinned Claude Agent SDK from npm and checks its hash, so it needs
 internet access once. Then it checks that `claude` is installed and signed in, and walks you through it if not.
 
+### Behind a proxy
+
+Set `HTTPS_PROXY` (and `HTTP_PROXY`, with `NO_PROXY` for hosts that skip it) in your shell profile, such as
+`~/.zshrc`, `~/.bashrc` or your Windows user environment variables. AgentChainer reads your login shell's environment
+even when you start it from Finder, the Start menu or a launcher. These all use it:
+- the SDK download, and the tools a workspace setup installs;
+- the `claude` CLI, `git` and `gh`, which read the same variables themselves;
+- the update check **(verify)**.
+
+If the first start says it couldn't download the SDK, "offline or blocked by a proxy?", check that `HTTPS_PROXY` is
+set where your shell profile sets it, then restart the app.
+
 ## Updates
 
 Use **Help → Check for Updates…** or **Settings → About**. The app never checks by itself. It shows the new version and

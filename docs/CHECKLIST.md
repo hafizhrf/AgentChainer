@@ -1987,7 +1987,15 @@ first.
 
 ### Compatibility
 
-- [ ] **X-14** Test the packaged app behind an HTTP proxy (`NODE_USE_ENV_PROXY=1` is set; spike S1).
+- [x] **X-14** Test the packaged app behind an HTTP proxy (`NODE_USE_ENV_PROXY=1` is set; spike S1).
+      — evidence: `scripts/proxy-smoke.mjs` (2026-11-05). It runs the packaged sidecar's first-run SDK download three
+      ways, with a local CONNECT proxy that records its tunnels:
+      - through the proxy: it succeeds, and the proxy saw `registry.npmjs.org:443`;
+      - through a dead proxy: it fails with "offline or blocked by a proxy?", so nothing goes around it;
+      - with `NO_PROXY=registry.npmjs.org`: it succeeds directly.
+
+      It passed on macOS here, and runs in CI's Build & launch jobs on macOS, Windows and Ubuntu (this PR's checks).
+      INSTALL's "Behind a proxy" and COMPATIBILITY say where to set the variables: the login shell's environment.
 - [x] **X-08** Compatibility matrix in the docs (OS versions, CLI versions, SDK version). The health check enforces the minimum CLI version.
       — evidence: [COMPATIBILITY.md](COMPATIBILITY.md), covering:
       - OS and WebView, with what was checked by hand and in CI;
@@ -2004,6 +2012,11 @@ first.
 - [ ] **X-09** Every decision that is expensive to reverse gets an ADR, and this checklist stays current.
 - [ ] **X-10** User docs, a contributor guide, and good-first-issues tagged for each milestone.
 - [ ] **X-11** Review [RISKS](RISKS.md) at every milestone boundary.
+      - Reviewed 2026-11-05:
+        - R-08, R-09, R-10, R-12, R-14 and R-15 are updated to what's built;
+        - a new R-18 covers third-party outages.
+
+        The box stays open: the review repeats every milestone.
 
 ### Accessibility & i18n
 

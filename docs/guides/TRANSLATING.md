@@ -4,6 +4,25 @@ The UI's text lives in `apps/desktop/src/i18n/locales/<language>/<area>.json`
 ([ADR-0011](../adr/0011-ui-text-catalogs.md), X-13). English (`en/`) is the source. A translation has the same files
 and the same keys. `pnpm test` fails when one is missing, extra, empty, or changes a `{{value}}` or a `<tag>`.
 
+## Where the text lives
+
+| Catalogs | What they hold | Loaded |
+|---|---|---|
+| `apps/desktop/src/i18n/locales/<language>/` | The UI. `menu.json` and `native.json` are also read by the Rust core (the macOS menu, its errors). | Indonesian in its own chunk |
+| `packages/protocol/src/locales/<language>.json` | Text the UI and the sidecar share: approval reasons, agent and folder problems, cadences | Bundled |
+| `packages/sidecar/src/i18n/locales/<language>/` | The sidecar's errors, setup findings, plan reasons, apply and rollback messages, deploy and plugin messages | Bundled |
+
+One language holds for the whole process (`setLanguage` in the protocol package). The sidecar gets it from
+`AGENTCHAINER_LANGUAGE` at spawn.
+
+**Never translated:**
+- text Claude reads (prompts, guard reasons);
+- files written into a repository, commit messages, pull requests, and the evidence report;
+- log lines;
+- raw output from git, gh or the CLI.
+
+Saved records (setup runs, deploys, schedules) keep the language they were written in.
+
 ## Adding a language
 
 1. Copy `locales/en/` to `locales/<code>/` and translate the values. Add a `locales/<code>/index.ts` like the one in

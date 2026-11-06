@@ -1,6 +1,7 @@
 import { existsSync, readFileSync, realpathSync, statSync } from "node:fs";
 import path from "node:path";
 import { Document, isMap, isSeq, parseDocument } from "yaml";
+import { t } from "../i18n/index.ts";
 import { git, repoOf } from "../workspace.ts";
 import { MARKER } from "./tools.ts";
 
@@ -35,10 +36,10 @@ const read = (root: string, rel: string) => {
 /** How a pre-commit hook can be added to this workspace, or why it can't. */
 export function hookSetup(root: string): HookSetup {
   const repo = repoOf(root);
-  if (!repo) return { manager: null, reason: "Not a git repository: initialize git first." };
+  if (!repo) return { manager: null, reason: t("bootstrap.gitHooks.notRepo") };
   // The native realpath also expands Windows 8.3 short names (C:\Users\RUNNER~1), which git never prints.
   if (realpathSync.native(repo.top) !== realpathSync.native(root)) {
-    return { manager: null, reason: "Open the repository's top folder to add commit hooks." };
+    return { manager: null, reason: t("bootstrap.gitHooks.notTopFolder") };
   }
   if (LEFTHOOK.some((f) => existsSync(path.join(root, f)))) return { manager: "lefthook" };
   if (existsSync(path.join(root, PRE_COMMIT))) return { manager: "pre-commit" };
@@ -47,23 +48,16 @@ export function hookSetup(root: string): HookSetup {
   }
   const hooksPath = git(["config", "--get", "core.hooksPath"], root).stdout.trim();
   if (hooksPath) {
-    return {
-      manager: null,
-      reason: `Git uses its own hooks folder here (core.hooksPath = ${hooksPath}): add the hook there yourself.`,
-    };
+    return { manager: null, reason: t("bootstrap.gitHooks.ownHooksPath", { path: hooksPath }) };
   }
   // Worktrees and submodules keep hooks outside the workspace; a local hook belongs to the repository's own .git.
   const hooks = path.resolve(root, git(["rev-parse", "--git-path", "hooks"], root).stdout.trim());
   if (hooks !== path.join(path.resolve(root), ".git", "hooks")) {
-    return { manager: null, reason: "This repository's hooks live outside the workspace (a worktree or submodule?)." };
+    return { manager: null, reason: t("bootstrap.gitHooks.hooksOutside") };
   }
   const existing = read(root, LOCAL_HOOK);
   if (existing && !existing.includes(MARK)) {
-    return {
-      manager: null,
-      reason:
-        "There's already a pre-commit hook in .git/hooks. Add the command to it, or use a hook manager such as lefthook.",
-    };
+    return { manager: null, reason: t("bootstrap.gitHooks.existingHook") };
   }
   return { manager: "local" };
 }
@@ -113,7 +107,11 @@ export function hookChanges(
     manager === "lefthook" ? (LEFTHOOK.find((f) => existsSync(path.join(root, f))) ?? LEFTHOOK[0]) : PRE_COMMIT;
   const before = read(root, file ?? PRE_COMMIT);
   const parsed = parseDocument(before);
-  if (parsed.errors.length) throw new Error(`${file} isn't valid YAML: ${parsed.errors[0]?.message ?? ""}`);
+  if (parsed.errors.length) {
+    throw new Error(
+      t("bootstrap.gitHooks.invalidYaml", { file: file ?? PRE_COMMIT, error: parsed.errors[0]?.message ?? "" }),
+    );
+  }
   // An empty (or comment-only) config starts from a fresh document.
   const doc: Document = isMap(parsed.contents) ? parsed : new Document(manager === "lefthook" ? {} : { repos: [] });
   if (manager === "lefthook") {

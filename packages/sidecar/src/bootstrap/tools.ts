@@ -15,6 +15,7 @@ import {
 import path from "node:path";
 import type { Item } from "../catalog/schema.ts";
 import { compareVersions } from "../catalog/updates.ts";
+import { t } from "../i18n/index.ts";
 
 /**
  * Pinned release binaries (M2-15, ADR-0005): downloaded from the catalog's URL, checked against its sha256, unpacked
@@ -83,7 +84,11 @@ export async function ensureTool(
   const platform = opts.platform ?? process.platform;
   const key = opts.key === undefined ? platformKey() : opts.key;
   const asset = key ? src.assets[key] : undefined;
-  if (!key || !asset) throw new Error(`${item.name} has no build for ${key ?? `${process.platform}-${process.arch}`}.`);
+  if (!key || !asset) {
+    throw new Error(
+      t("bootstrap.tools.noBuild", { name: item.name, platform: key ?? `${process.platform}-${process.arch}` }),
+    );
+  }
   const name = binaryName(item);
   if (!name) throw new Error(`${item.id} doesn't name its binary`);
 
@@ -107,16 +112,16 @@ export async function ensureTool(
     data = new Uint8Array(await res.arrayBuffer());
   } catch (err) {
     const reason = signal.aborted
-      ? `timed out after ${Math.round(timeoutMs / 1000)} s`
+      ? t("bootstrap.tools.timedOut", { seconds: Math.round(timeoutMs / 1000) })
       : err instanceof Error
         ? err.message
         : String(err);
-    throw new Error(`Couldn't download ${item.name} ${src.version} (offline or blocked by a proxy?): ${reason}`);
+    throw new Error(t("bootstrap.tools.downloadFailed", { name: item.name, version: src.version, reason }));
   }
   const got = sha256(data);
   if (got !== asset.sha256) {
     throw new Error(
-      `${item.name} ${src.version} failed its sha256 check (expected ${asset.sha256}, got ${got}). Not installed.`,
+      t("bootstrap.tools.hashMismatch", { name: item.name, version: src.version, expected: asset.sha256, got }),
     );
   }
 
@@ -132,12 +137,16 @@ export async function ensureTool(
     if (/\.(tar\.gz|tgz|zip)$/i.test(archive)) {
       // bsdtar (macOS, Windows 10+) reads zip too; it and GNU tar refuse absolute and `..` entry paths.
       const tar = spawnSync(systemTar(), ["-xf", archive, "-C", unpacked], { encoding: "utf8" });
-      if (tar.status !== 0) throw new Error(`Unpacking ${path.basename(archive)} failed: ${tar.stderr.trim()}`);
+      if (tar.status !== 0) {
+        throw new Error(
+          t("bootstrap.tools.unpackFailed", { archive: path.basename(archive), error: tar.stderr.trim() }),
+        );
+      }
       found = findFile(unpacked, [name, `${name}.exe`], 4);
     } else {
       found = archive; // a bare binary
     }
-    if (!found) throw new Error(`${path.basename(archive)} doesn't contain ${name}`);
+    if (!found) throw new Error(t("bootstrap.tools.binaryMissing", { archive: path.basename(archive), name }));
 
     const staged = path.join(work, "version");
     mkdirSync(staged);

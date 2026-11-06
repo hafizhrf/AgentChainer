@@ -5,6 +5,7 @@ import type { PlanAction } from "@agentchainer/protocol";
 import type { Catalog, Item } from "../catalog/schema.ts";
 import { auditWorkspace } from "../detect/audit.ts";
 import { detectWorkspace } from "../detect/detect.ts";
+import { t } from "../i18n/index.ts";
 import type { CliResult } from "../installer.ts";
 import { git, literal } from "../workspace.ts";
 import { readWorkspaceText, refuseLinks } from "../workspace-files.ts";
@@ -135,7 +136,7 @@ const abs = (root: string, rel: string) => path.join(root, ...rel.split("/"));
 function insideRoot(root: string, rel: string): string {
   const parts = rel.split(/[\\/]+/);
   if (!rel || path.isAbsolute(rel) || path.win32.isAbsolute(rel) || parts.includes("..")) {
-    throw new Error(`refusing a path outside the workspace: ${rel}`);
+    throw new Error(t("bootstrap.apply.outsideWorkspace", { path: rel }));
   }
   return abs(root, rel);
 }
@@ -292,13 +293,16 @@ export async function applyActions(
   const toApply: PlanAction[] = [];
   for (const id of ids) {
     const action = plan.actions.find((a) => a.id === id);
-    if (!action)
-      results.push({ id, status: "skipped", message: "Not in the current plan (already applied?)", warnings: [] });
+    if (!action) results.push({ id, status: "skipped", message: t("bootstrap.apply.notInPlan"), warnings: [] });
     else if (action.state !== "recommended" && action.state !== "optional") {
       results.push({
         id,
         status: "skipped",
-        message: action.reason ?? `Can't be applied (${action.state}).`,
+        message:
+          action.reason ??
+          (action.state === "installed"
+            ? t("bootstrap.apply.skippedInstalled")
+            : t("bootstrap.apply.skippedUnavailable")),
         warnings: [],
       });
     }
@@ -560,11 +564,11 @@ async function applyOne(
   if (action.kind === "generator") {
     const name = action.id.slice(4);
     const proposal = ctx.proposals?.get(name);
-    if (!proposal) throw new Error("Generate a proposal first.");
+    if (!proposal) throw new Error(t("bootstrap.apply.generateFirst"));
     for (const f of proposal.files) {
       insideRoot(root, f.path);
       const current = readWorkspaceText(root, f.path);
-      if (current !== f.before) throw new Error(`${f.path} changed since the proposal was made. Generate it again.`);
+      if (current !== f.before) throw new Error(t("bootstrap.apply.proposalStale", { path: f.path }));
     }
     for (const f of proposal.files) tracker.write(rec.files, f.path, f.after);
     if (action.installCommand && ctx.install?.includes(action.id)) {
@@ -577,7 +581,8 @@ async function applyOne(
     );
     rec.checks = [...proposal.checks, ...(rec.checks ?? []), ...verification];
     const failed = verification.filter((c) => c.status === "fail");
-    for (const c of failed) rec.warnings.push(`Verification failed (${c.name}): ${c.detail}`);
+    for (const c of failed)
+      rec.warnings.push(t("bootstrap.apply.verificationFailed", { name: c.name, detail: c.detail }));
     rec.lock = {
       id: name,
       generator: GENERATORS[name]?.skill ?? name,
@@ -595,22 +600,22 @@ async function applyOne(
   const src = item.source;
 
   if (src.type === "marketplace") {
-    if (!ctx.cli) throw new Error("Claude Code CLI not found, so plugins can't be installed.");
+    if (!ctx.cli) throw new Error(t("bootstrap.apply.noCliForPlugins"));
     if (!hasMarketplace(ctx.cli.listMarketplaces().json, src.marketplace)) {
-      throw new Error(
-        `The ${src.marketplace} marketplace isn't set up in your Claude CLI. Add it in your terminal: claude plugin marketplace add ${src.repo}`,
-      );
+      throw new Error(t("bootstrap.apply.marketplaceMissing", { marketplace: src.marketplace, repo: src.repo }));
     }
     const pluginId = `${src.plugin}@${src.marketplace}`;
     tracker.watch(rec.files, ".claude/settings.json");
     const res = ctx.cli.installPlugin(pluginId, item.install.scope);
-    if (!res.ok) throw new Error(`claude plugin install failed: ${(res.stderr || res.stdout).trim().slice(0, 300)}`);
+    if (!res.ok) {
+      throw new Error(
+        t("bootstrap.apply.pluginInstallFailed", { output: (res.stderr || res.stdout).trim().slice(0, 300) }),
+      );
+    }
     rec.undo.push({ type: "plugin", pluginId, scope: item.install.scope });
     const version = pluginVersion(ctx.cli.listPlugins().json, pluginId);
     if (version && src.reviewedVersion && version !== src.reviewedVersion) {
-      rec.warnings.push(
-        `Installed ${version}, but ${src.reviewedVersion} was reviewed: the marketplace moved on. Review the changes before relying on it.`,
-      );
+      rec.warnings.push(t("bootstrap.apply.versionMovedOn", { version, reviewed: src.reviewedVersion }));
     }
     rec.lock = { ...base, installedAt: now().toISOString(), ...(version ? { version } : {}) };
     return;
@@ -622,23 +627,23 @@ async function applyOne(
     try {
       const got = treeHash(tree.dir);
       if (got !== src.sha256)
-        throw new Error(`Hash mismatch for ${item.id}: expected ${src.sha256}, got ${got}. Not installed.`);
+        throw new Error(t("bootstrap.apply.hashMismatch", { id: item.id, expected: src.sha256, got }));
       // The license the copied files need, from outside the copied folder (M2-29): checked before anything is written.
       const notice = src.license
         ? { name: path.posix.basename(src.license.path), bytes: readLicense(tree.root, src.license, item.id) }
         : null;
       const written: string[] = [];
       for (const step of item.install.steps) {
-        if (!("copy" in step)) throw new Error(`Unsupported install step for a git source: ${Object.keys(step)[0]}`);
+        if (!("copy" in step)) {
+          throw new Error(t("bootstrap.apply.unsupportedGitStep", { step: Object.keys(step)[0] ?? "" }));
+        }
         const from = path.join(tree.dir, ...step.copy.from.split("/").filter((p) => p && p !== "."));
         if (existsSync(abs(root, step.copy.to))) {
-          throw new Error(`${step.copy.to} already exists. Remove it first, or keep your own version.`);
+          throw new Error(t("bootstrap.apply.alreadyExists", { path: step.copy.to }));
         }
         const files = listFiles(from);
         if (notice && files.includes(notice.name)) {
-          throw new Error(
-            `${item.id} already has a ${notice.name} in its files, so its license can't go next to them.`,
-          );
+          throw new Error(t("bootstrap.apply.licenseClash", { id: item.id, name: notice.name }));
         }
         for (const file of files) {
           const target = `${step.copy.to}/${file}`;
@@ -662,7 +667,7 @@ async function applyOne(
     if (changes.unavailable) throw new Error(changes.unavailable);
     let archiveSha256: string | undefined;
     if (src.type === "release-asset") {
-      if (!ctx.env.toolsDir) throw new Error("AgentChainer's tools folder isn't set up. Restart the app.");
+      if (!ctx.env.toolsDir) throw new Error(t("bootstrap.steps.noToolsDir"));
       const tool = await ensureTool(item, {
         dir: ctx.env.toolsDir,
         platform: ctx.env.platform,
@@ -675,14 +680,16 @@ async function applyOne(
     for (const step of item.install.steps) {
       if ("download-binary" in step || "pre-commit-hook" in step || "merge-json" in step) continue;
       if (!("mcp-add" in step))
-        throw new Error(`Unsupported install step for a ${src.type} source: ${Object.keys(step)[0]}`);
-      if (!ctx.cli) throw new Error("Claude Code CLI not found, so MCP servers can't be registered.");
+        throw new Error(t("bootstrap.apply.unsupportedStep", { type: src.type, step: Object.keys(step)[0] ?? "" }));
+      if (!ctx.cli) throw new Error(t("bootstrap.apply.noCliForMcp"));
       const [command = "", ...args] = step["mcp-add"].command.map((a) =>
         a === "{binary}" ? (changes.binary ?? a) : a,
       );
       const name = step["mcp-add"].name;
       const res = ctx.cli.addMcp(name, item.install.scope, command, args);
-      if (!res.ok) throw new Error(`claude mcp add failed: ${(res.stderr || res.stdout).trim().slice(0, 300)}`);
+      if (!res.ok) {
+        throw new Error(t("bootstrap.apply.mcpAddFailed", { output: (res.stderr || res.stdout).trim().slice(0, 300) }));
+      }
       rec.undo.push({ type: "mcp", name, scope: item.install.scope });
     }
     rec.lock = {
@@ -695,7 +702,7 @@ async function applyOne(
     };
     return;
   }
-  throw new Error(`Installing ${src.type} sources isn't supported.`);
+  throw new Error(t("bootstrap.apply.unsupportedSource", { type: src.type }));
 }
 
 /** Lockfiles an install may rewrite; they're backed up first so a rollback restores them byte for byte. */
@@ -719,11 +726,15 @@ const LOCKFILES = [
 async function installDependencies(root: string, shown: string, rec: ActionRecord, tracker: Tracker): Promise<Check> {
   const pkg = detectWorkspace(root).packages.find((p) => p.commands.install);
   const command = pkg?.commands.install?.run;
+  const name = t("bootstrap.apply.dependenciesCheck");
   if (command !== shown) {
     return {
-      name: "dependencies installed",
+      name,
       status: "skipped",
-      detail: `the install command changed (now ${command ?? "none"}); not run`,
+      detail:
+        command !== undefined
+          ? t("bootstrap.apply.installCommandChanged", { command })
+          : t("bootstrap.apply.installCommandGone"),
     };
   }
   const dir = pkg?.path && pkg.path !== "." ? `${pkg.path}/` : "";
@@ -731,12 +742,15 @@ async function installDependencies(root: string, shown: string, rec: ActionRecor
   for (const lock of LOCKFILES) tracker.watch(rec.files, `${dir}${lock}`);
   const r = await runCommand(command, path.join(root, ...dir.split("/").filter(Boolean)), 600_000);
   tracker.settle(rec.files);
+  const values = { command, code: String(r.exitCode), seconds: (r.ms / 1000).toFixed(1) };
   return {
-    name: "dependencies installed",
+    name,
     status: r.exitCode === 0 ? "pass" : "fail",
     detail: r.timedOut
-      ? `\`${command}\` timed out after ${Math.round(r.ms / 1000)} s`
-      : `\`${command}\` exited ${r.exitCode} in ${(r.ms / 1000).toFixed(1)} s${r.exitCode === 0 ? "; installed packages stay after a rollback (git ignores them)" : `:\n${r.tail}`}`,
+      ? t("bootstrap.verify.timedOut", { command, seconds: Math.round(r.ms / 1000) })
+      : r.exitCode === 0
+        ? t("bootstrap.apply.dependenciesInstalled", values)
+        : t("bootstrap.verify.exitedWithOutput", { ...values, output: r.tail }),
   };
 }
 
@@ -744,13 +758,15 @@ function run(cwd: string, argv: string[]): void {
   const [cmd, ...args] = argv;
   if (cmd !== "git") throw new Error(`Only git commands run here: ${cmd}`);
   const r = git(args, cwd);
-  if (r.status !== 0) throw new Error(`${argv.join(" ")} failed: ${r.stderr.trim()}`);
+  if (r.status !== 0)
+    throw new Error(t("bootstrap.apply.commandFailed", { command: argv.join(" "), error: r.stderr.trim() }));
 }
 
 /**
  * Undoes one action, all or nothing: if any of its files changed since the run (and `force` isn't set), nothing is
  * touched and the conflicts are returned. Otherwise CLI changes are undone first, then files are restored, because the
- * CLI itself rewrites some of them (e.g. `plugin uninstall` edits .claude/settings.json).
+ * CLI itself rewrites some of them (e.g. `plugin uninstall` edits .claude/settings.json); what couldn't be undone is
+ * returned as `kept`.
  */
 function undoAction(
   root: string,
@@ -758,41 +774,40 @@ function undoAction(
   rec: ActionRecord,
   ctx: Pick<ApplyContext, "cli">,
   force: boolean,
-): string[] {
+): { conflicts: string[]; kept: string[] } {
   if (!force) {
     const conflicts = changedSince(root, rec.files);
-    if (conflicts.length) return conflicts;
+    if (conflicts.length) return { conflicts, kept: [] };
   }
   const kept: string[] = [];
   for (const u of [...rec.undo].reverse()) {
     if (u.type === "plugin") {
       const res = ctx.cli?.uninstallPlugin(u.pluginId, u.scope);
-      if (!res?.ok)
-        kept.push(`plugin ${u.pluginId} (uninstall it with: claude plugin uninstall ${u.pluginId} --scope ${u.scope})`);
+      if (!res?.ok) kept.push(t("bootstrap.apply.keptPlugin", { id: u.pluginId, scope: u.scope }));
     } else if (u.type === "mcp") {
       const res = ctx.cli?.removeMcp(u.name, u.scope);
-      if (!res?.ok) kept.push(`MCP server ${u.name} (remove it with: claude mcp remove --scope ${u.scope} ${u.name})`);
+      if (!res?.ok) kept.push(t("bootstrap.apply.keptMcp", { name: u.name, scope: u.scope }));
     } else if (u.type === "git-unstage-removal") {
       const r = git(["reset", "-q", "--", ...u.paths.map(literal)], root);
-      if (r.status !== 0) kept.push(`index entries for ${u.paths.join(", ")}`);
+      if (r.status !== 0) kept.push(t("bootstrap.apply.keptIndex", { paths: u.paths.join(", ") }));
     } else if (u.type === "git-init") {
       // Only an empty repository is removed: once it has commits, deleting .git would lose history.
-      if (git(["rev-parse", "--verify", "-q", "HEAD"], root).status === 0) kept.push(".git (it has commits now)");
+      if (git(["rev-parse", "--verify", "-q", "HEAD"], root).status === 0) kept.push(t("bootstrap.apply.keptGit"));
       else rmSync(abs(root, ".git"), { recursive: true, force: true });
     }
   }
   restoreFiles(root, runDir, rec.files, true);
-  return kept;
+  return { conflicts: [], kept };
 }
 
-/** Files whose content differs from what the run left behind. */
+/** Files whose content differs from what the run left behind, each with a note saying so. */
 function changedSince(root: string, files: FileRecord[]): string[] {
   return files
     .filter((rec) => {
       const file = abs(root, rec.path);
       return (existsSync(file) ? sha256(readFileSync(file)) : null) !== rec.afterSha256;
     })
-    .map((rec) => `${rec.path} (changed since it was applied)`);
+    .map((rec) => t("bootstrap.apply.changedSince", { path: rec.path }));
 }
 
 /** Restores files byte for byte. A file changed since the run is skipped (and returned) unless `force`. */
@@ -856,28 +871,31 @@ export function listRuns(root: string): RunRecord[] {
  * stay inside the workspace and the run's folder, and every CLI undo must name a plugin or server, nothing else.
  */
 function runProblem(root: string, run: RunRecord): string | null {
-  if (!/^[\w-]+$/.test(run.runId ?? "")) return "bad run id";
+  if (!/^[\w-]+$/.test(run.runId ?? "")) return t("bootstrap.apply.problemRunId");
   const files = [...(run.meta ?? []), ...(run.actions ?? []).flatMap((a) => a.files ?? [])];
   for (const f of files) {
     try {
       insideRoot(root, f.path);
     } catch {
-      return `file outside the workspace: ${f.path}`;
+      return t("bootstrap.apply.problemFileOutside", { path: f.path });
     }
     if (f.backup !== undefined && (!f.backup.startsWith("files/") || f.backup.split(/[\\/]+/).includes(".."))) {
-      return `backup outside the run: ${f.backup}`;
+      return t("bootstrap.apply.problemBackupOutside", { path: f.backup });
     }
   }
   const scopes = new Set(["project", "user", "local"]);
   for (const u of (run.actions ?? []).flatMap((a) => a.undo ?? [])) {
-    if (u.type === "plugin" && !(/^[\w.-]+@[\w.-]+$/.test(u.pluginId) && scopes.has(u.scope))) return "bad plugin undo";
-    if (u.type === "mcp" && !(/^[\w-]+$/.test(u.name) && scopes.has(u.scope))) return "bad MCP undo";
+    if (u.type === "plugin" && !(/^[\w.-]+@[\w.-]+$/.test(u.pluginId) && scopes.has(u.scope))) {
+      return t("bootstrap.apply.problemPluginUndo");
+    }
+    if (u.type === "mcp" && !(/^[\w-]+$/.test(u.name) && scopes.has(u.scope)))
+      return t("bootstrap.apply.problemMcpUndo");
     if (u.type === "git-unstage-removal") {
       for (const p of u.paths) {
         try {
           insideRoot(root, p);
         } catch {
-          return `path outside the workspace: ${p}`;
+          return t("bootstrap.apply.problemPathOutside", { path: p });
         }
       }
     }
@@ -895,27 +913,32 @@ export function rollback(
   ctx: Pick<ApplyContext, "cli">,
   opts: { actionId?: string; force?: boolean } = {},
 ): RollbackResult[] {
-  if (!/^[\w-]+$/.test(runId)) throw new Error(`Bad run id: ${runId}`);
+  if (!/^[\w-]+$/.test(runId)) throw new Error(t("bootstrap.apply.badRunId", { runId }));
   const runDir = abs(root, `${BACKUPS}/${runId}`);
   const runFile = path.join(runDir, "run.json");
-  if (!existsSync(runFile)) throw new Error(`No bootstrap run ${runId} in this workspace.`);
+  if (!existsSync(runFile)) throw new Error(t("bootstrap.apply.noRun", { runId }));
   const run = JSON.parse(readFileSync(runFile, "utf8")) as RunRecord;
   const problem = runProblem(root, run);
-  if (problem) throw new Error(`Run ${runId} wasn't recorded by AgentChainer (${problem}), so nothing was changed.`);
+  if (problem) throw new Error(t("bootstrap.apply.notRecorded", { runId, problem }));
   const force = opts.force ?? false;
   const results: RollbackResult[] = [];
   const targets = run.actions.filter((a) => a.status === "applied" && (!opts.actionId || a.id === opts.actionId));
   if (opts.actionId && targets.length === 0)
-    throw new Error(`${opts.actionId} isn't an applied action of run ${runId}.`);
+    throw new Error(t("bootstrap.apply.notApplied", { actionId: opts.actionId, runId }));
 
   for (const rec of [...targets].reverse()) {
     try {
-      const kept = undoAction(root, runDir, rec, ctx, force);
-      const conflict = kept.some((k) => k.includes("changed since"));
+      const { conflicts, kept } = undoAction(root, runDir, rec, ctx, force);
+      const conflict = conflicts.length > 0;
+      const left = [...conflicts, ...kept];
       rec.status = conflict ? rec.status : "rolled-back";
       results.push(
-        kept.length
-          ? { id: rec.id, status: conflict ? "conflict" : "kept", message: `Not restored: ${kept.join("; ")}` }
+        left.length
+          ? {
+              id: rec.id,
+              status: conflict ? "conflict" : "kept",
+              message: t("bootstrap.apply.notRestored", { items: left.join("; ") }),
+            }
           : { id: rec.id, status: "rolled-back" },
       );
     } catch (err) {
@@ -928,7 +951,11 @@ export function rollback(
     // Nothing of the run is left: restore the lockfile and .agentchainer/.gitignore, then drop the backups.
     const conflicts = restoreFiles(root, runDir, run.meta, force);
     if (conflicts.length)
-      results.push({ id: "lockfile", status: "conflict", message: `Not restored: ${conflicts.join("; ")}` });
+      results.push({
+        id: "lockfile",
+        status: "conflict",
+        message: t("bootstrap.apply.notRestored", { items: conflicts.join("; ") }),
+      });
     else {
       rmSync(runDir, { recursive: true, force: true });
       pruneEmptyDirs(root, abs(root, BACKUPS));

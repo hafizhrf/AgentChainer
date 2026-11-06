@@ -2190,6 +2190,12 @@ first.
           - The Indonesian E2E phase finds a setup plan action whose title comes from the sidecar.
         - **Checked by hand:** the packaged sidecar answers "Metode tidak dikenal" and zod's "Input tidak valid" with
           `AGENTCHAINER_LANGUAGE=id`, and English without it.
+        - **Evidence:** CI run [42162258699](https://github.com/hafizhrf/AgentChainer/actions/runs/42162258699)
+          (#136), on Ubuntu and on Windows:
+          - X-06: 5/5;
+          - X-12: 8/8;
+          - the pseudo-locale: 5/5;
+          - Bahasa Indonesia: 5/5, including the plan action titled by the sidecar.
       - **Part 2, still open:**
         - **2b, task results:** run outcomes, step and merge-gate labels, triage details, lessons. They go into PRs
           and evidence, so they need an English copy and a translated one. Also the deploy smoke details and

@@ -2168,11 +2168,33 @@ first.
           - **The run before** found that the runner skipped a phase after a failed one, which is fixed.
           - It also flagged the language names in Settings in the pseudo-locale. They're named in themselves on
             purpose, so they're data.
+      - **Part 2a, the messages shown live (2026-11-06):** in English and Bahasa Indonesia.
+        - **One engine, in the protocol package:** each catalog registers with it, so one `setLanguage` switches all
+          of a process's text.
+        - **The sidecar:**
+          - It gets the language at spawn (`AGENTCHAINER_LANGUAGE`).
+          - About 400 messages in 8 area catalogs: errors, setup findings, plan titles and reasons, apply and
+            rollback messages, verify checks, deploy hints and problems, plugin warnings.
+          - zod's validation messages follow the language too.
+        - **The protocol package's shared texts:** approval reasons, agent and folder problems, cadences.
+        - **The Rust core:** its command errors (`native.json`) and the menu, through `i18n.rs`.
+        - **No logic on words:**
+          - the scheduler skips a run by a typed `AlreadyRunning`, not by the error's words;
+          - a rollback's conflicts are a list, not a search for "changed since".
+        - **Stays English:** text Claude reads, files written into a repository, commits and PRs, log lines, and raw
+          tool output.
+        - **Guards:**
+          - every catalog's parity;
+          - a sidecar test that fails on a literal error. 22 internal errors are allowlisted, each with why; two
+            that become run outcomes wait for part 2b.
+          - The Indonesian E2E phase finds a setup plan action whose title comes from the sidecar.
+        - **Checked by hand:** the packaged sidecar answers "Metode tidak dikenal" and zod's "Input tidak valid" with
+          `AGENTCHAINER_LANGUAGE=id`, and English without it.
       - **Part 2, still open:**
-        - the sidecar's prose: findings, plan reasons, run outcomes, about 290 error sites;
-        - the protocol's shared texts: approval reasons, `agentProblems`, `folderProblems`, `cadenceText`;
-        - the catalog YAML's prose;
-        - the Rust commands' errors.
+        - **2b, task results:** run outcomes, step and merge-gate labels, triage details, lessons. They go into PRs
+          and evidence, so they need an English copy and a translated one. Also the deploy smoke details and
+          plugin warnings that evidence copies, and `generate-workflow`'s retry reason.
+        - **2c:** the catalog YAML's prose.
         - Also: weekday names in `schedules.ts` stay `en-US`, and enum values shown as words (risk, scope, state)
           arrive as received.
         - Then a second language, with its Language setting.

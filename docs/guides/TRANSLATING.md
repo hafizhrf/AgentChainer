@@ -70,6 +70,8 @@ These are what Indonesian developers say. They're written lowercase inside a sen
 >
 > git's verbs and places: push, pull, fetch, stage, unstage, checkout, fast-forward, stash, rebase, squash, remote,
 > upstream, working tree, HEAD.
+>
+> Tools' words: linter, formatter, test runner, symlink, registry, image (Docker), front matter, exit code.
 
 Indonesian grammar goes around them: "Session baru", "Tutup session", "di-deploy", "di-commit", "Sudah di-push",
 "Rencana setup", "Rollback run".
@@ -153,5 +155,14 @@ Indonesian grammar goes around them: "Session baru", "Tutup session", "di-deploy
 | Self-test / Screenshot | Uji mandiri / Tangkapan layar |
 | Repository | Repositori |
 | e.g. | mis. |
+| Diverged (branches) / Detached | Bercabang / detached |
+| Reinstall / Timed out / Integrity check | Pasang ulang / Melewati batas waktu / Pemeriksaan integritas |
+| Drafting (a step) / Drafting the contract | Penyusunan draf / Menyusun draf kontrak |
+| Linked (to a provider) / Site | Ditautkan / Situs |
+| Untitled session | Session tanpa judul |
+| Proposal / Hook manager | Usulan / Pengelola hook |
+| Pinned (a version) / Backup / Undo | Di-pin / Cadangan / Pembatalan |
+| Dependencies / A check (CI, PR) / Role | Dependensi / Pemeriksaan / Peran |
+| Revise / Your own agent | Revisi / Agent milik Anda |
 
 When a term isn't here, translate it the way the nearest entry does, then add it to this table in the same PR.

@@ -49,6 +49,7 @@ import {
   unstage,
 } from "./git.ts";
 import { githubStatus, systemGh } from "./github.ts";
+import { t } from "./i18n/index.ts";
 import {
   addMcpServer,
   installPlugin,
@@ -63,7 +64,6 @@ import { listRules, removeRule } from "./permissions.ts";
 import { cliError, installListed, listPluginsFor, parseDetails, uninstallListed, updateListed } from "./plugins.ts";
 import { CHAT_TOOLS, loadProfile, type ProfileOptions, profileOptions, profileSummaries } from "./profiles.ts";
 import { log, notify, RpcFailure, serve } from "./rpc.ts";
-import "./i18n/index.ts";
 import { type AgentSdkModule, loadSdk } from "./sdk-loader.ts";
 import { ASK_FIRST, Session } from "./session.ts";
 import { replayEvents, retention, toSessionInfo } from "./stored-sessions.ts";
@@ -132,7 +132,7 @@ const sessions = new Map<string, Session>();
 function requireSession(sessionId: string): Session {
   const session = sessions.get(sessionId);
   if (!session) {
-    throw new RpcFailure(RpcErrorCode.noSession, "This session isn't running. Resume it from the session list.");
+    throw new RpcFailure(RpcErrorCode.noSession, t("rpc.session.notRunning"));
   }
   return session;
 }
@@ -186,19 +186,18 @@ function cliFor(cwd: string): Cli | null {
 /** The user's CLI for the Plugins page (UX-10); every call fails clearly when the CLI isn't found. */
 function pluginsCli(cwd: string) {
   const claude = findClaude();
-  if (!claude)
-    throw new RpcFailure(RpcErrorCode.invalidParams, "Claude Code CLI not found, so plugins can't be listed.");
+  if (!claude) throw new RpcFailure(RpcErrorCode.invalidParams, t("rpc.claude.noCliForPlugins"));
   return pluginCli(claude, cwd);
 }
 
 function requireFolder(cwd: string): void {
-  if (!existsSync(cwd)) throw new RpcFailure(RpcErrorCode.invalidParams, `Folder not found: ${cwd}`);
+  if (!existsSync(cwd)) throw new RpcFailure(RpcErrorCode.invalidParams, t("rpc.folder.notFound", { path: cwd }));
 }
 
 /** The SDK and the CLI, for methods that make model calls. */
 async function claude(): Promise<Claude> {
   const claudePath = findClaude();
-  if (!claudePath) throw new RpcFailure(RpcErrorCode.claudeNotFound, "Claude Code CLI not found.");
+  if (!claudePath) throw new RpcFailure(RpcErrorCode.claudeNotFound, t("rpc.claude.notFound"));
   const { sdk } = await prepareSdk();
   return { sdk, claudePath };
 }
@@ -241,7 +240,7 @@ const scheduler = new Scheduler({
       return;
     }
     // Starting needs the SDK, which is async: the checks that can refuse a run are made first, here.
-    if (runningTask(taskId)) throw new AlreadyRunning("The task is already running.");
+    if (runningTask(taskId)) throw new AlreadyRunning(t("rpc.task.alreadyRunning"));
     // Like Run again: the model of the task's last run, so a schedule never switches it to a costlier one.
     const model = schedulable(cwd, taskId).run?.model;
     void claude().then(
@@ -270,15 +269,15 @@ const scheduler = new Scheduler({
  */
 function draftEvents(cwd: string, id: string) {
   const sessionId = `draft-${id}-${Date.now()}`;
-  const task = { id, cwd, stepId: "draft", label: "Drafting the contract", role: "planner" };
+  const task = { id, cwd, stepId: "draft", label: t("rpc.task.draftingContract"), role: "planner" };
   return (m: SDKMessage) => {
     for (const event of normalize(m)) notify("agent.event", { sessionId, event, task });
   };
 }
 
-function rejectIfOpen(sessionId: string, action: string): void {
+function rejectIfOpen(sessionId: string): void {
   if (sessions.has(sessionId)) {
-    throw new RpcFailure(RpcErrorCode.sessionOpen, `Close this session's tab before you ${action} it.`);
+    throw new RpcFailure(RpcErrorCode.sessionOpen, t("rpc.session.closeTabBeforeDelete"));
   }
 }
 
@@ -303,7 +302,7 @@ serve(
       if (protocolVersion !== PROTOCOL_VERSION) {
         throw new RpcFailure(
           RpcErrorCode.protocolMismatch,
-          `Protocol mismatch: the app speaks v${protocolVersion}, the agent runtime v${PROTOCOL_VERSION}. Reinstall AgentChainer.`,
+          t("rpc.protocol.mismatch", { app: protocolVersion, runtime: PROTOCOL_VERSION }),
         );
       }
       const claudePath = findClaude();
@@ -345,7 +344,7 @@ serve(
     }) => {
       // A Team chat (M8-03) runs workers on the person's budget, so it needs a cap for them all.
       if (team && !maxBudgetUsd) {
-        throw new RpcFailure(RpcErrorCode.invalidParams, "A Team chat needs a budget cap for it and its workers.");
+        throw new RpcFailure(RpcErrorCode.invalidParams, t("rpc.team.needsBudget"));
       }
       // A multi-folder workspace's other folders (M8-01): the same rules as the New workspace dialog, and they exist.
       if (folders?.length) {
@@ -355,10 +354,10 @@ serve(
       }
       const claudePath = findClaude();
       if (!claudePath) {
-        throw new RpcFailure(RpcErrorCode.claudeNotFound, "Claude Code CLI not found. See docs/guides/AUTH_SETUP.md.");
+        throw new RpcFailure(RpcErrorCode.claudeNotFound, t("rpc.claude.notFoundSeeGuide"));
       }
       if (resume && sessions.has(resume)) {
-        throw new RpcFailure(RpcErrorCode.sessionOpen, "This session is already open in another tab.");
+        throw new RpcFailure(RpcErrorCode.sessionOpen, t("rpc.session.alreadyOpen"));
       }
       // An agent profile (M8-04): its instructions come before the chat's own, and only its tools are there. A Team
       // chat keeps its MCP tools, the app's own among them.
@@ -465,7 +464,7 @@ serve(
 
     "permission.respond": ({ sessionId, requestId, ...answer }) => {
       if (!requireSession(sessionId).respond(requestId, answer)) {
-        throw new RpcFailure(RpcErrorCode.noPendingPermission, `No pending permission request ${requestId}`);
+        throw new RpcFailure(RpcErrorCode.noPendingPermission, t("rpc.permission.noPending", { requestId }));
       }
       return { ok: true };
     },
@@ -501,7 +500,7 @@ serve(
     },
 
     "session.delete": async ({ cwd, sessionId }) => {
-      rejectIfOpen(sessionId, "delete");
+      rejectIfOpen(sessionId);
       const { sdk } = await prepareSdk();
       await sdk.deleteSession(sessionId, { dir: cwd });
       return { ok: true };
@@ -586,7 +585,7 @@ serve(
     },
 
     "workspace.scan": ({ cwd }) => {
-      if (!existsSync(cwd)) throw new RpcFailure(RpcErrorCode.invalidParams, `Folder not found: ${cwd}`);
+      if (!existsSync(cwd)) throw new RpcFailure(RpcErrorCode.invalidParams, t("rpc.folder.notFound", { path: cwd }));
       const profile = detectWorkspace(cwd);
       return { profile, findings: auditWorkspace(cwd, profile) };
     },
@@ -622,7 +621,7 @@ serve(
     "bootstrap.generate": async ({ cwd, action, model }) => {
       requireFolder(cwd);
       const claudePath = findClaude();
-      if (!claudePath) throw new RpcFailure(RpcErrorCode.claudeNotFound, "Claude Code CLI not found.");
+      if (!claudePath) throw new RpcFailure(RpcErrorCode.claudeNotFound, t("rpc.claude.notFound"));
       const { sdk } = await prepareSdk();
       const name = action.replace(/^gen:/, "");
       // Workflow checks use actionlint, fetched (pinned) on first use.
@@ -769,7 +768,7 @@ serve(
 
     "git.draftMessage": async ({ cwd }) => {
       const claudePath = findClaude();
-      if (!claudePath) throw new RpcFailure(RpcErrorCode.claudeNotFound, "Claude Code CLI not found.");
+      if (!claudePath) throw new RpcFailure(RpcErrorCode.claudeNotFound, t("rpc.claude.notFound"));
       const { sdk } = await prepareSdk();
       return { message: await draftMessage(sdk, claudePath, cwd) };
     },

@@ -1,4 +1,5 @@
 import { runGuarded } from "../bootstrap/verify.ts";
+import { t } from "../i18n/index.ts";
 import { smokeCommand } from "../tasks/gates.ts";
 
 export type Smoke = { ok: boolean; how: "script" | "http"; detail: string };
@@ -17,14 +18,17 @@ export async function runSmoke(code: string, url: string, fetchImpl: typeof fetc
       ok: r.exitCode === 0 && !r.timedOut,
       how: "script",
       detail: r.timedOut
-        ? `\`${command}\` timed out.`
-        : `\`${command}\` exited ${r.exitCode}${tail ? `: ${tail}` : ""}`,
+        ? t("deploy.smoke.timedOut", { command })
+        : tail
+          ? t("deploy.smoke.exitedWithOutput", { command, code: String(r.exitCode), tail })
+          : t("deploy.smoke.exited", { command, code: String(r.exitCode) }),
     };
   }
   try {
     const res = await fetchImpl(url, { method: "GET", redirect: "follow", signal: AbortSignal.timeout(30_000) });
-    return { ok: res.ok, how: "http", detail: `GET ${url} answered ${res.status}.` };
+    return { ok: res.ok, how: "http", detail: t("deploy.smoke.answered", { url, status: res.status }) };
   } catch (err) {
-    return { ok: false, how: "http", detail: `GET ${url} failed: ${err instanceof Error ? err.message : String(err)}` };
+    const error = err instanceof Error ? err.message : String(err);
+    return { ok: false, how: "http", detail: t("deploy.smoke.failed", { url, error }) };
   }
 }

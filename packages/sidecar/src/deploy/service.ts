@@ -9,6 +9,7 @@ import {
   RpcErrorCode,
 } from "@agentchainer/protocol";
 import { AC_DIR, ensureIgnored } from "../ac-dir.ts";
+import { t } from "../i18n/index.ts";
 import { RpcFailure } from "../rpc.ts";
 import { loadTask } from "../tasks/store.ts";
 import { codeRootIn } from "../tasks/worktree.ts";
@@ -30,18 +31,30 @@ const DEPLOYS = "deploys";
 export type Clis = { resolve: (name: string) => Cli | null; runner: (cli: Cli) => RunCli; fetch?: typeof fetch };
 const realClis: Clis = { resolve: (n) => resolveCli(n), runner: cliRunner };
 
-const HINTS: Record<string, string> = {
-  vercel: "Install it with `npm i -g vercel`, then sign in with `vercel login` in a terminal.",
-  cloudflare: "Install it with `npm i -g wrangler`, then sign in with `wrangler login` in a terminal.",
-  firebase: "Install it with `npm i -g firebase-tools`, then sign in with `firebase login` in a terminal.",
-  fly: "Install flyctl (fly.io/docs/flyctl/install), then sign in with `fly auth login` in a terminal.",
-  docker: "Install Docker (docs.docker.com/get-docker), then sign in to the registry with `docker login <registry>`.",
-};
-/** What "not signed in" means, when it isn't `<cli> login`. */
-const SIGNED_OUT: Record<string, string> = {
-  fly: "Sign in with `fly auth login` in a terminal.",
-  docker: "Docker isn't running. Start it, and sign in to the registry with `docker login <registry>`.",
-};
+/** How to install the provider's CLI and sign in. */
+function installHint(a: Adapter): string {
+  switch (a.id) {
+    case "vercel":
+      return t("deploy.hint.npm", { package: "vercel", cli: "vercel" });
+    case "cloudflare":
+      return t("deploy.hint.npm", { package: "wrangler", cli: "wrangler" });
+    case "firebase":
+      return t("deploy.hint.npm", { package: "firebase-tools", cli: "firebase" });
+    case "fly":
+      return t("deploy.hint.fly");
+    case "docker":
+      return t("deploy.hint.docker");
+    default:
+      return t("deploy.hint.installCli", { cli: a.cli });
+  }
+}
+
+/** What "not signed in" means: `<cli> login` unless the provider has its own. */
+function signedOutHint(a: Adapter): string {
+  if (a.id === "fly") return t("deploy.hint.signIn", { command: "fly auth login" });
+  if (a.id === "docker") return t("deploy.hint.dockerNotRunning");
+  return t("deploy.hint.signIn", { command: `${a.cli} login` });
+}
 
 async function targetOf(a: Adapter, root: string, clis: Clis): Promise<DeployTarget | null> {
   const found = a.detect(root);
@@ -55,12 +68,10 @@ async function targetOf(a: Adapter, root: string, clis: Clis): Promise<DeployTar
     ...(a.projectName(root) ? { project: a.projectName(root) ?? "" } : {}),
   };
   const cli = clis.resolve(a.cli);
-  if (!cli) return { ...base, state: "missing", hint: HINTS[a.id] ?? `Install the ${a.cli} CLI.` };
+  if (!cli) return { ...base, state: "missing", hint: installHint(a) };
   if (found.problem) return { ...base, state: "not-linked", hint: found.problem };
   const signedIn = await a.signedIn(clis.runner(cli), root);
-  return signedIn
-    ? { ...base, state: "ready" }
-    : { ...base, state: "signed-out", hint: SIGNED_OUT[a.id] ?? `Sign in with \`${a.cli} login\` in a terminal.` };
+  return signedIn ? { ...base, state: "ready" } : { ...base, state: "signed-out", hint: signedOutHint(a) };
 }
 
 /** The providers `root` can deploy to. */
@@ -102,13 +113,13 @@ const busy = new Set<string>();
 
 function adapterOf(id: DeployTarget["adapter"]): Adapter {
   const adapter = ADAPTERS.find((a) => a.id === id);
-  if (!adapter) throw invalid(`Unknown deploy provider: ${id}.`);
+  if (!adapter) throw invalid(t("deploy.service.unknownProvider", { id }));
   return adapter;
 }
 
 async function exclusive<T>(root: string, adapter: Adapter, work: () => Promise<T>): Promise<T> {
   const key = `${root}\0${adapter.id}`;
-  if (busy.has(key)) throw invalid(`A ${adapter.label} deploy is already running in this workspace.`);
+  if (busy.has(key)) throw invalid(t("deploy.service.alreadyRunning", { label: adapter.label }));
   busy.add(key);
   try {
     return await work();
@@ -119,7 +130,7 @@ async function exclusive<T>(root: string, adapter: Adapter, work: () => Promise<
 
 function cliOf(adapter: Adapter, clis: Clis): Cli {
   const cli = clis.resolve(adapter.cli);
-  if (!cli) throw invalid(`The ${adapter.cli} CLI isn't installed.`);
+  if (!cli) throw invalid(t("deploy.service.cliMissing", { cli: adapter.cli }));
   return cli;
 }
 
@@ -155,11 +166,11 @@ async function runDeploy(
       status: "failed",
       error:
         r.status === 0
-          ? "The deploy finished, but its result couldn't be read from the output."
+          ? t("deploy.service.unreadableResult")
           : adapter.id === "cloudflare" &&
               base.env === "preview" &&
               /does not exist|not found|deploy.*first/i.test(tail)
-            ? `The Worker hasn't been deployed yet, so it has no versions to preview. Deploy it once yourself (\`wrangler deploy\`), then preview from here. (${tail})`
+            ? t("deploy.cloudflare.notDeployedYet", { tail })
             : tail || `exit ${r.status}`,
     };
   } else {
@@ -185,13 +196,16 @@ export async function deployPreview(
   now = () => new Date(),
 ): Promise<DeployRecord> {
   const adapter = adapterOf(adapterId);
-  if (!adapter.environments.includes("preview"))
-    throw invalid(`${adapter.label} has no previews; deploy to production instead.`);
+  if (!adapter.environments.includes("preview")) {
+    throw invalid(t("deploy.service.noPreviews", { label: adapter.label }));
+  }
   const task = loadTask(root, taskId);
   const wt = task.worktree;
   const code = wt && !wt.removed && existsSync(wt.path) ? codeRootIn(root, wt.path) : root;
   const target = await targetOf(adapter, root, clis);
-  if (target?.state !== "ready") throw invalid(target?.hint ?? `This workspace isn't set up for ${adapter.label}.`);
+  if (target?.state !== "ready") {
+    throw invalid(target?.hint ?? t("deploy.service.notSetUp", { label: adapter.label }));
+  }
   return exclusive(root, adapter, () => {
     adapter.prepare(root, code);
     // Preview aliases are lowercase letters, digits and dashes; the task id's random part keeps it short and unique.
@@ -248,13 +262,13 @@ export async function productionPlan(
   const current = liveProduction(root, adapter.id);
   const problem =
     target?.state !== "ready"
-      ? (target?.hint ?? `This workspace isn't set up for ${adapter.label}.`)
+      ? (target?.hint ?? t("deploy.service.notSetUp", { label: adapter.label }))
       : !commit
-        ? "The workspace has no commits yet."
+        ? t("deploy.plan.noCommits")
         : branch === "HEAD"
-          ? "The workspace isn't on a branch (detached HEAD). Check out the branch to deploy."
+          ? t("deploy.plan.detached")
           : dirty
-            ? "The workspace has uncommitted changes. Production deploys a clean tree: commit or stash them first."
+            ? t("deploy.plan.uncommitted")
             : undefined;
   return {
     adapter: adapter.id,
@@ -278,7 +292,7 @@ const productionContext = (root: string, commit: string): DeployContext => ({
 });
 
 function checkTyped(plan: DeployPlan, typed: string): void {
-  if (typed.trim() !== plan.project) throw invalid(`Type the project's name, ${plan.project}, to confirm.`);
+  if (typed.trim() !== plan.project) throw invalid(t("deploy.production.typeName", { project: plan.project }));
 }
 
 /**
@@ -297,7 +311,7 @@ export async function deployProduction(
   if (plan.problem) throw invalid(plan.problem);
   checkTyped(plan, confirm.typed);
   if (plan.commit !== confirm.commit) {
-    throw invalid("The branch has moved since the plan was shown. Check the plan again before deploying.");
+    throw invalid(t("deploy.production.branchMoved"));
   }
   return exclusive(root, adapter, () => {
     const ctx = productionContext(root, plan.commit);
@@ -333,20 +347,18 @@ export async function rollbackDeploy(
   now = () => new Date(),
 ): Promise<DeployRecord> {
   const record = listDeploys(root).find((r) => r.id === id);
-  if (!record) throw invalid("That deploy isn't recorded in this workspace.");
+  if (!record) throw invalid(t("deploy.rollback.notRecorded"));
   if (record.env !== "production" || record.status !== "done") {
-    throw invalid("Only a production deploy that worked can be rolled back; previews don't take traffic.");
+    throw invalid(t("deploy.rollback.onlyProduction"));
   }
   const adapter = adapterOf(record.adapter);
   if (liveProduction(root, adapter.id)?.id !== record.id) {
-    throw invalid("A newer production deploy is live. Roll that one back instead.");
+    throw invalid(t("deploy.rollback.newerIsLive"));
   }
   const to = record.previous;
   const args = adapter.rollbackArgs(to?.deploymentId);
   if (!args) {
-    throw invalid(
-      `The app has no record of the ${adapter.label} deploy before this one, so there's nothing to go back to here. Roll back in the provider's console.`,
-    );
+    throw invalid(t("deploy.rollback.noPrevious", { label: adapter.label }));
   }
   checkTyped(await productionPlan(root, adapter.id, clis), typed);
   const cli = cliOf(adapter, clis);

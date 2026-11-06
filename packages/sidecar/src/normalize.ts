@@ -1,5 +1,6 @@
 import type { AgentEvent, SlashCommand as ProtocolSlashCommand } from "@agentchainer/protocol";
 import type { ModelUsage, SDKMessage, SlashCommand } from "@anthropic-ai/claude-agent-sdk";
+import { t } from "./i18n/index.ts";
 
 /**
  * Maps one raw SDK message to zero or more normalized events (ARCHITECTURE §5.2).
@@ -226,5 +227,7 @@ export function summarize(content: unknown): string {
             .map((part) => (part && typeof part === "object" && "text" in part ? String(part.text) : ""))
             .join("\n")
         : "";
-  return text.length > 4000 ? `${text.slice(0, 4000)}\n… (${text.length - 4000} more chars)` : text;
+  return text.length > 4000
+    ? `${text.slice(0, 4000)}\n${t("rpc.tool.moreChars", { chars: text.length - 4000 })}`
+    : text;
 }

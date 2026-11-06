@@ -11,6 +11,7 @@ import {
   type RpcFrame,
   type RpcRequest,
 } from "@agentchainer/protocol";
+import { t } from "./i18n/index.ts";
 
 /** One handler per protocol method. Params arrive validated against the method's schema (M1-02). */
 export type Handlers = {
@@ -72,11 +73,16 @@ export async function dispatch(line: string, handlers: Handlers, write: Write): 
   }
   const fail = (code: number, message: string) => write({ jsonrpc: "2.0", id: req.id, error: { code, message } });
 
-  if (!isMethodName(req.method)) return fail(RpcErrorCode.methodNotFound, `Unknown method ${req.method}`);
+  if (!isMethodName(req.method)) {
+    return fail(RpcErrorCode.methodNotFound, t("rpc.dispatch.unknownMethod", { method: String(req.method) }));
+  }
   const schema = methodSchemas[req.method];
   const params = schema.params.safeParse(req.params ?? {});
   if (!params.success) {
-    return fail(RpcErrorCode.invalidParams, `Invalid params for ${req.method}: ${describeIssues(params.error)}`);
+    return fail(
+      RpcErrorCode.invalidParams,
+      t("rpc.dispatch.invalidParams", { method: req.method, issues: describeIssues(params.error) }),
+    );
   }
 
   try {
@@ -84,7 +90,10 @@ export async function dispatch(line: string, handlers: Handlers, write: Write): 
     const handler = handlers[req.method] as (p: unknown) => unknown;
     const result = schema.result.safeParse(await handler(params.data));
     if (!result.success) {
-      return fail(RpcErrorCode.internal, `Invalid result from ${req.method}: ${describeIssues(result.error)}`);
+      return fail(
+        RpcErrorCode.internal,
+        t("rpc.dispatch.invalidResult", { method: req.method, issues: describeIssues(result.error) }),
+      );
     }
     write({ jsonrpc: "2.0", id: req.id, result: result.data });
   } catch (err) {

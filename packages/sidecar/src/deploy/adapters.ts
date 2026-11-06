@@ -2,6 +2,7 @@ import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from
 import path from "node:path";
 import { type DeployTarget, DockerImageSchema } from "@agentchainer/protocol";
 import { AC_DIR } from "../ac-dir.ts";
+import { t } from "../i18n/index.ts";
 import type { RunResult } from "../run-async.ts";
 import type { RunCli } from "./cli.ts";
 
@@ -79,7 +80,7 @@ export const vercel: Adapter = {
     if (existsSync(path.join(root, "vercel.json"))) {
       return {
         config: "vercel.json",
-        problem: "The project isn't linked to Vercel yet: run `vercel link` in the workspace.",
+        problem: t("deploy.vercel.notLinked"),
       };
     }
     return null;
@@ -126,7 +127,7 @@ export const cloudflare: Adapter = {
     if (/pages_build_output_dir/.test(readFileSync(path.join(root, config), "utf8"))) {
       return {
         config,
-        problem: "This is a Cloudflare Pages project; Pages deploys come later. Workers are supported.",
+        problem: t("deploy.cloudflare.pagesProject"),
       };
     }
     return { config };
@@ -194,13 +195,13 @@ export const firebase: Adapter = {
     if (Array.isArray(config.hosting) && config.hosting.length > 1) {
       return {
         config: "firebase.json",
-        problem: "This project has several Hosting sites; one site is supported for now.",
+        problem: t("deploy.firebase.severalSites"),
       };
     }
     if (!firebaseProject(root)) {
       return {
         config: "firebase.json",
-        problem: "The project has no default Firebase project: run `firebase use --add` in the workspace.",
+        problem: t("deploy.firebase.noDefaultProject"),
       };
     }
     return { config: "firebase.json" };
@@ -262,7 +263,7 @@ export const fly: Adapter = {
   detect(root) {
     if (!existsSync(path.join(root, "fly.toml"))) return null;
     if (!flyApp(root)) {
-      return { config: "fly.toml", problem: "fly.toml has no `app` name: run `fly launch` or set `app` in fly.toml." };
+      return { config: "fly.toml", problem: t("deploy.fly.noAppName") };
     }
     return { config: "fly.toml" };
   },
@@ -310,13 +311,16 @@ const dockerTag = (commit: string) => commit.slice(0, 12);
  */
 export const docker: Adapter = {
   id: "docker",
-  label: "Docker image",
+  // A getter: the label is in the app's language, which is set after this module loads.
+  get label() {
+    return t("deploy.docker.label");
+  },
   cli: "docker",
   environments: ["production"],
   detect(root) {
     if (!existsSync(path.join(root, "Dockerfile"))) return null;
     if (!dockerImage(root)) {
-      return { config: "Dockerfile", problem: "Name the image to push to, e.g. `ghcr.io/you/app`." };
+      return { config: "Dockerfile", problem: t("deploy.docker.noImage") };
     }
     return { config: "Dockerfile" };
   },

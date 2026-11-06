@@ -1,5 +1,6 @@
 import { lstatSync, readFileSync } from "node:fs";
 import path from "node:path";
+import { t } from "./i18n/index.ts";
 
 /**
  * Workspace files the app reads or writes itself (setup fixes, catalog items, generated files, its own folder) must
@@ -25,7 +26,7 @@ export function linkIn(root: string, rel: string): string | null {
 /** Throws when `rel` goes through a symbolic link, before the app writes, backs up or deletes it. */
 export function refuseLinks(root: string, rel: string): void {
   const link = linkIn(root, rel);
-  if (link) throw new Error(`${link} is a symbolic link, so AgentChainer won't write through it.`);
+  if (link) throw new Error(t("git.files.symlink", { path: link }));
 }
 
 /** Previews read at most this much of a file. */

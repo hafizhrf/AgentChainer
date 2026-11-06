@@ -5,6 +5,7 @@ import { hasSecret, type Lesson, type LessonSource } from "@agentchainer/protoco
 import { z } from "zod";
 import { AC_DIR, ensureIgnored } from "../ac-dir.ts";
 import { applyFileEdits } from "../bootstrap/apply.ts";
+import { t } from "../i18n/index.ts";
 import type { AgentSdkModule } from "../sdk-loader.ts";
 import type { Evidence } from "./evidence.ts";
 
@@ -214,14 +215,14 @@ export function withLessons(before: string, lessons: { text: string }[], from: s
 /** What the lessons would make of CLAUDE.md, for the diff the person reads before applying. */
 export function previewLessons(root: string, taskId: string, ids: string[], from: string) {
   const chosen = storedLessons(root, taskId).filter((l) => ids.includes(l.id));
-  if (!chosen.length) throw new Error("Pick at least one lesson.");
+  if (!chosen.length) throw new Error(t("tasks.lessons.pickOne"));
   for (const l of chosen) {
-    if (HOME_PATH.test(l.text)) throw new Error("A lesson names a home-folder path; it can't go into CLAUDE.md.");
-    if (hasSecret(l.text)) throw new Error("A lesson looks like it holds a key or token; it can't go into CLAUDE.md.");
+    if (HOME_PATH.test(l.text)) throw new Error(t("tasks.lessons.homePath"));
+    if (hasSecret(l.text)) throw new Error(t("tasks.lessons.secret"));
   }
   const before = readClaudeMd(root);
   const after = withLessons(before, chosen, from);
-  if (after.split("\n").length > 300) throw new Error("CLAUDE.md would pass 300 lines; trim it before adding lessons.");
+  if (after.split("\n").length > 300) throw new Error(t("tasks.lessons.tooLong"));
   return { path: claudeMdPath(root), before, after };
 }
 

@@ -1,6 +1,7 @@
 import { type AgentDefinition, agentProblems, MCP_TOOL_ENTRY, toolList } from "@agentchainer/protocol";
 import { listAgents } from "./agents.ts";
 import { READ_TOOLS } from "./guard.ts";
+import { t } from "./i18n/index.ts";
 
 /**
  * Running an agent profile (M8-04, docs/design/agent-profiles.md): a project or user agent's prompt, model and tools
@@ -21,10 +22,10 @@ export const CHAT_TOOLS = ["AskUserQuestion", "EnterPlanMode", "ExitPlanMode", "
 export function loadProfile(root: string, configDir: string, name: string): Profile {
   const agents = listAgents(root, configDir);
   const agent = agents.find((a) => a.name === name && a.scope === "project") ?? agents.find((a) => a.name === name);
-  if (!agent) throw new Error(`There is no agent profile named ${name}.`);
-  if (agent.error) throw new Error(`The agent profile ${name} can't be read: ${agent.error}`);
+  if (!agent) throw new Error(t("agents.profiles.notFound", { name }));
+  if (agent.error) throw new Error(t("agents.profiles.unreadable", { name, error: agent.error }));
   const problems = agentProblems(agent);
-  if (problems.length) throw new Error(`The agent profile ${name} needs fixing first: ${problems.join(" ")}`);
+  if (problems.length) throw new Error(t("agents.profiles.needsFixing", { name, problems: problems.join(" ") }));
   const tools = toolList(agent.tools);
   return {
     name: agent.name,

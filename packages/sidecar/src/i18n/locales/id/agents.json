@@ -1,1 +1,16 @@
-{}
+{
+  "agents.file.noFrontMatter": "File ini tidak diawali dengan --- front matter ---.",
+  "agents.file.frontMatterNotMap": "Front matter-nya bukan sebuah map.",
+  "agents.file.noName": "Agent ini tidak punya nama.",
+  "agents.file.noDescription": "Agent ini tidak punya deskripsi.",
+  "agents.save.nameTaken": "Agent bernama {{name}} sudah ada.",
+  "agents.find.noProjectAgent": "Tidak ada agent proyek bernama {{name}}.",
+  "agents.find.noUserAgent": "Tidak ada agent milik Anda bernama {{name}}.",
+  "agents.history.create": "Buat agent {{name}}",
+  "agents.history.rename": "Ganti nama agent {{name}}",
+  "agents.history.edit": "Edit agent {{name}}",
+  "agents.history.delete": "Hapus agent {{name}}",
+  "agents.profiles.notFound": "Tidak ada profil agent bernama {{name}}.",
+  "agents.profiles.unreadable": "Profil agent {{name}} tidak dapat dibaca: {{error}}",
+  "agents.profiles.needsFixing": "Profil agent {{name}} perlu diperbaiki dulu: {{problems}}"
+}

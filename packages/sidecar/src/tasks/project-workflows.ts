@@ -5,6 +5,7 @@ import { type ProjectWorkflowProblem, type TaskRun, TIERS, type TierWorkflow } f
 import { parse, stringify } from "yaml";
 import { z } from "zod";
 import { AC_DIR } from "../ac-dir.ts";
+import { t } from "../i18n/index.ts";
 import {
   checkReadRoles,
   type Library,
@@ -56,8 +57,8 @@ export function effectiveLibrary(root: string, shipped: Library): EffectiveLibra
     const file = `${WORKFLOWS_DIR}/${name}`;
     try {
       const stat = lstatSync(path.join(dir, name));
-      if (!stat.isFile()) throw new Error("not a regular file (links aren't followed)");
-      if (stat.size > MAX_BYTES) throw new Error(`larger than ${MAX_BYTES / 1024} KB`);
+      if (!stat.isFile()) throw new Error(t("tasks.projectWorkflows.notRegularFile"));
+      if (stat.size > MAX_BYTES) throw new Error(t("tasks.projectWorkflows.tooLarge", { kb: MAX_BYTES / 1024 }));
       const text = readFileSync(path.join(dir, name), "utf8");
       const origin: ProjectOrigin = { source: "project", file, hash: hashOf(text) };
       const workflow = parseProjectWorkflow(name, text, shipped);
@@ -77,7 +78,9 @@ export function parseProjectWorkflow(name: string, text: string, shipped: Librar
   try {
     data = parse(text);
   } catch (err) {
-    throw new Error(`not valid YAML: ${err instanceof Error ? err.message : String(err)}`);
+    throw new Error(
+      t("tasks.projectWorkflows.invalidYaml", { error: err instanceof Error ? err.message : String(err) }),
+    );
   }
   if (name === "xl.yaml") {
     const xl = XlWorkflowSchema.safeParse(data);
@@ -88,7 +91,7 @@ export function parseProjectWorkflow(name: string, text: string, shipped: Librar
   const w = WorkflowSchema.safeParse(data);
   if (!w.success) throw new Error(z.prettifyError(w.error));
   const expected = `${w.data.tier.toLowerCase()}.yaml`;
-  if (name !== expected) throw new Error(`a ${w.data.tier} workflow goes in ${expected}`);
+  if (name !== expected) throw new Error(t("tasks.projectWorkflows.wrongFile", { tier: w.data.tier, file: expected }));
   checkReadRoles(readStepsOf(w.data), shipped.roles);
   return w.data;
 }
@@ -135,7 +138,7 @@ export function workflowSource(
     return { yaml: readFileSync(abs, "utf8"), source: "project", file };
   }
   const app = tier === "XL" ? shipped.xl : shipped.workflows[tier];
-  if (!app) throw new Error(`This version of the app has no ${tier} workflow.`);
+  if (!app) throw new Error(t("tasks.projectWorkflows.noAppWorkflow", { tier }));
   const header = [
     `# The app's ${tier} workflow (${app.id} v${app.version}), as a starting point.`,
     `# Saved as ${file}, it replaces the app's ${tier} workflow in this project; share it through git.`,
@@ -148,7 +151,7 @@ export function workflowSource(
 export function checkWorkflowText(tier: Tier, yaml: string, shipped: Library): string | null {
   try {
     const w = parseProjectWorkflow(fileOf(tier), yaml, shipped);
-    if (w.tier !== tier) return `This is a ${w.tier} workflow, not ${tier}.`;
+    if (w.tier !== tier) return t("tasks.projectWorkflows.wrongTier", { found: w.tier, tier });
     return null;
   } catch (err) {
     return err instanceof Error ? err.message : String(err);
@@ -163,24 +166,24 @@ export function saveProjectWorkflow(root: string, tier: Tier, yaml: string | nul
     return;
   }
   const error = checkWorkflowText(tier, yaml, shipped);
-  if (error) throw new Error(`The workflow can't be saved: ${error}`);
+  if (error) throw new Error(t("tasks.projectWorkflows.cantSave", { error }));
   mkdirSync(path.dirname(abs), { recursive: true });
   if (existsSync(abs) && !lstatSync(abs).isFile())
-    throw new Error(`${WORKFLOWS_DIR}/${fileOf(tier)} isn't a regular file.`);
+    throw new Error(t("tasks.projectWorkflows.notRegular", { file: `${WORKFLOWS_DIR}/${fileOf(tier)}` }));
   writeFileSync(abs, yaml.endsWith("\n") ? yaml : `${yaml}\n`);
 }
 
 /** Import: a workflow file the person picked; only its text, at most the size a project file may have. */
 export function readWorkflowFile(file: string): string {
-  if (!/\.ya?ml$/i.test(file)) throw new Error("Pick a .yaml file.");
+  if (!/\.ya?ml$/i.test(file)) throw new Error(t("tasks.projectWorkflows.pickYaml"));
   const stat = statSync(file);
-  if (!stat.isFile()) throw new Error("That isn't a file.");
-  if (stat.size > MAX_BYTES) throw new Error(`The file is larger than ${MAX_BYTES / 1024} KB.`);
+  if (!stat.isFile()) throw new Error(t("tasks.projectWorkflows.notAFile"));
+  if (stat.size > MAX_BYTES) throw new Error(t("tasks.projectWorkflows.fileTooLarge", { kb: MAX_BYTES / 1024 }));
   return readFileSync(file, "utf8");
 }
 
 /** Export: writes the YAML where the person picked in the save dialog. */
 export function writeWorkflowFile(file: string, yaml: string): void {
-  if (!/\.ya?ml$/i.test(file)) throw new Error("Export to a .yaml file.");
+  if (!/\.ya?ml$/i.test(file)) throw new Error(t("tasks.projectWorkflows.exportYaml"));
   writeFileSync(file, yaml.endsWith("\n") ? yaml : `${yaml}\n`);
 }

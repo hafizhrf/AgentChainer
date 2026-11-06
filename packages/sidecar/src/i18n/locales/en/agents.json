@@ -1,1 +1,16 @@
-{}
+{
+  "agents.file.noFrontMatter": "It doesn't start with --- front matter ---.",
+  "agents.file.frontMatterNotMap": "Its front matter isn't a map.",
+  "agents.file.noName": "It has no name.",
+  "agents.file.noDescription": "It has no description.",
+  "agents.save.nameTaken": "An agent named {{name}} already exists.",
+  "agents.find.noProjectAgent": "There is no project agent named {{name}}.",
+  "agents.find.noUserAgent": "There is no user agent named {{name}}.",
+  "agents.history.create": "Create agent {{name}}",
+  "agents.history.rename": "Rename agent {{name}}",
+  "agents.history.edit": "Edit agent {{name}}",
+  "agents.history.delete": "Delete agent {{name}}",
+  "agents.profiles.notFound": "There is no agent profile named {{name}}.",
+  "agents.profiles.unreadable": "The agent profile {{name}} can't be read: {{error}}",
+  "agents.profiles.needsFixing": "The agent profile {{name}} needs fixing first: {{problems}}"
+}

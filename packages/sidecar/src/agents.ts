@@ -10,6 +10,7 @@ import {
 } from "@agentchainer/protocol";
 import { parse, stringify } from "yaml";
 import { applyFileEdits } from "./bootstrap/apply.ts";
+import { t } from "./i18n/index.ts";
 import shippedLibrary from "./tasks/library.json" with { type: "json" };
 import { LibrarySchema } from "./tasks/library.ts";
 
@@ -27,9 +28,10 @@ type Parsed = { fields: Record<string, unknown>; prompt: string };
 
 function parseAgentFile(text: string): Parsed {
   const m = /^---\n([\s\S]*?)\n---\n?([\s\S]*)$/.exec(text.replace(/\r\n/g, "\n"));
-  if (!m) throw new Error("It doesn't start with --- front matter ---.");
+  if (!m) throw new Error(t("agents.file.noFrontMatter"));
   const fields = parse(m[1] ?? "") as unknown;
-  if (!fields || typeof fields !== "object" || Array.isArray(fields)) throw new Error("Its front matter isn't a map.");
+  if (!fields || typeof fields !== "object" || Array.isArray(fields))
+    throw new Error(t("agents.file.frontMatterNotMap"));
   return { fields: fields as Record<string, unknown>, prompt: (m[2] ?? "").trim() };
 }
 
@@ -39,8 +41,8 @@ function readAgent(file: string, scope: AgentDefinition["scope"], display: strin
   try {
     const { fields, prompt } = parseAgentFile(readFileSync(file, "utf8"));
     const { name: own, description, tools, model } = fields;
-    if (typeof own !== "string" || !own) throw new Error("It has no name.");
-    if (typeof description !== "string" || !description) throw new Error("It has no description.");
+    if (typeof own !== "string" || !own) throw new Error(t("agents.file.noName"));
+    if (typeof description !== "string" || !description) throw new Error(t("agents.file.noDescription"));
     return {
       ...base,
       name: own,
@@ -118,11 +120,12 @@ export function saveAgent(
   const from = previousName ?? agent.name;
   const target = path.join(root, ...fileOf(agent.name).split("/"));
   const source = path.join(root, ...fileOf(from).split("/"));
-  if (from !== agent.name && existsSync(target)) throw new Error(`An agent named ${agent.name} already exists.`);
-  if (previousName === undefined && existsSync(target)) throw new Error(`An agent named ${agent.name} already exists.`);
+  if (from !== agent.name && existsSync(target)) throw new Error(t("agents.save.nameTaken", { name: agent.name }));
+  if (previousName === undefined && existsSync(target))
+    throw new Error(t("agents.save.nameTaken", { name: agent.name }));
   let keep: Record<string, unknown> = {};
   if (previousName !== undefined) {
-    if (!existsSync(source)) throw new Error(`There is no project agent named ${previousName}.`);
+    if (!existsSync(source)) throw new Error(t("agents.find.noProjectAgent", { name: previousName }));
     try {
       keep = parseAgentFile(readFileSync(source, "utf8")).fields;
     } catch {
@@ -133,14 +136,13 @@ export function saveAgent(
     { path: fileOf(agent.name), content: renderAgent(agent, keep) },
   ];
   if (from !== agent.name) edits.push({ path: fileOf(from), content: null });
-  const verb = previousName === undefined ? "Create" : from !== agent.name ? "Rename" : "Edit";
-  return applyFileEdits(
-    root,
-    { id: `agent:${agent.name}`, title: `${verb} agent ${agent.name}` },
-    edits,
-    catalogVersion,
-    now,
-  );
+  const title =
+    previousName === undefined
+      ? t("agents.history.create", { name: agent.name })
+      : from !== agent.name
+        ? t("agents.history.rename", { name: agent.name })
+        : t("agents.history.edit", { name: agent.name });
+  return applyFileEdits(root, { id: `agent:${agent.name}`, title }, edits, catalogVersion, now);
 }
 
 /** A user agent, written through a temporary file so a failed write never leaves half a file. */
@@ -148,10 +150,11 @@ function saveUserAgent(dir: string, agent: AgentInput, previousName?: string): u
   refuseProblems(agent, namesIn(dir, previousName ?? agent.name));
   const target = path.join(dir, `${agent.name}.md`);
   const source = path.join(dir, `${previousName ?? agent.name}.md`);
-  if (previousName === undefined && existsSync(target)) throw new Error(`An agent named ${agent.name} already exists.`);
+  if (previousName === undefined && existsSync(target))
+    throw new Error(t("agents.save.nameTaken", { name: agent.name }));
   let keep: Record<string, unknown> = {};
   if (previousName !== undefined) {
-    if (!existsSync(source)) throw new Error(`There is no user agent named ${previousName}.`);
+    if (!existsSync(source)) throw new Error(t("agents.find.noUserAgent", { name: previousName }));
     try {
       keep = parseAgentFile(readFileSync(source, "utf8")).fields;
     } catch {
@@ -176,15 +179,15 @@ export function deleteAgent(
 ): string | undefined {
   if (scope === "user") {
     const file = path.join(configDir, "agents", `${name}.md`);
-    if (!existsSync(file)) throw new Error(`There is no user agent named ${name}.`);
+    if (!existsSync(file)) throw new Error(t("agents.find.noUserAgent", { name }));
     rmSync(file);
     return undefined;
   }
   if (!existsSync(path.join(root, ...fileOf(name).split("/"))))
-    throw new Error(`There is no project agent named ${name}.`);
+    throw new Error(t("agents.find.noProjectAgent", { name }));
   return applyFileEdits(
     root,
-    { id: `agent:${name}`, title: `Delete agent ${name}` },
+    { id: `agent:${name}`, title: t("agents.history.delete", { name }) },
     [{ path: fileOf(name), content: null }],
     catalogVersion,
     now,

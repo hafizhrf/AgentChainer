@@ -4,6 +4,7 @@ import path from "node:path";
 import { type Cadence, nextRun, type Schedule, ScheduleSchema } from "@agentchainer/protocol";
 import { z } from "zod";
 import { AC_DIR, ensureIgnored } from "../ac-dir.ts";
+import { t } from "../i18n/index.ts";
 
 /** Shared with the UI, which previews the next run times. */
 export { cadenceText, nextRun } from "@agentchainer/protocol";
@@ -99,7 +100,7 @@ export class Scheduler {
     // Refused here rather than at its time: an XL task, a draft, a task with no approved contract.
     this.host.start(cwd, input.taskId, true);
     const old = input.id ? all.find((s) => s.id === input.id) : undefined;
-    if (input.id && !old) throw new Error(`There is no schedule ${input.id}.`);
+    if (input.id && !old) throw new Error(t("tasks.schedules.notFound", { id: input.id }));
     const schedule: Schedule = {
       id: old?.id ?? randomUUID().slice(0, 8),
       cwd,
@@ -119,7 +120,7 @@ export class Scheduler {
 
   delete(cwd: string, id: string): void {
     const all = loadSchedules(cwd);
-    if (!all.some((s) => s.id === id)) throw new Error(`There is no schedule ${id}.`);
+    if (!all.some((s) => s.id === id)) throw new Error(t("tasks.schedules.notFound", { id }));
     writeSchedules(
       cwd,
       all.filter((s) => s.id !== id),
@@ -130,7 +131,7 @@ export class Scheduler {
   /** Runs it now; its next time stays as it was. */
   runNow(cwd: string, id: string): Schedule {
     const s = loadSchedules(cwd).find((x) => x.id === id);
-    if (!s) throw new Error(`There is no schedule ${id}.`);
+    if (!s) throw new Error(t("tasks.schedules.notFound", { id }));
     return this.fire(s, false, s.nextAt);
   }
 

@@ -1,6 +1,7 @@
 import { GATE_KINDS, STEP_INPUTS, TIERS, WORKFLOW_ROLES } from "@agentchainer/protocol";
 import { parse } from "yaml";
 import { z } from "zod";
+import { t } from "../i18n/index.ts";
 
 /**
  * The task library (M3-04, M3-05): a workflow template per tier (`catalog/workflows/*.yaml`) and the role prompts
@@ -196,7 +197,7 @@ export const readStepsOf = (w: Workflow): { w: string; s: AgentStep }[] =>
 export function checkReadRoles(steps: { w: string; s: AgentStep }[], roles: Library["roles"]): void {
   for (const { w, s } of steps) {
     if (s.access === "read" && roles[s.role]?.tools !== "Read, Grep, Glob") {
-      throw new Error(`${w}/${s.id}: a read step's role must list tools: Read, Grep, Glob`);
+      throw new Error(t("tasks.library.readRoleTools", { workflow: w, step: s.id }));
     }
   }
 }

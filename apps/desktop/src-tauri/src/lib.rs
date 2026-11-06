@@ -2,6 +2,7 @@ mod applog;
 mod diagnostics;
 mod editor;
 mod history;
+mod i18n;
 mod menu;
 mod pty;
 mod redact;
@@ -116,7 +117,7 @@ fn open_in_editor(
             editor::Opening::AsText => editor::text_command(&file)
                 .spawn()
                 .map(|_| ())
-                .map_err(|e| format!("couldn't open it as text: {e}")),
+                .map_err(|e| i18n::tr("native.openAsText", &[("error", &e.to_string())])),
         },
     }
 }
@@ -187,7 +188,7 @@ fn diagnostics_export(app: AppHandle, path: String, ui: serde_json::Value) -> Re
         .extension()
         .is_some_and(|e| e.eq_ignore_ascii_case("json"));
     if !is_json || !target.parent().is_some_and(|d| d.is_dir()) {
-        return Err("Choose a .json file in an existing folder.".into());
+        return Err(i18n::tr("native.diagnosticsPath", &[]));
     }
     diagnostics::export(&app, target, ui)
 }
@@ -219,7 +220,7 @@ impl HistoryState {
     fn get(&self) -> Result<&History, String> {
         self.0
             .as_ref()
-            .map_err(|e| format!("cost history unavailable: {e}"))
+            .map_err(|e| i18n::tr("native.costHistory", &[("error", &e.to_string())]))
     }
 }
 
@@ -295,10 +296,15 @@ pub fn run() {
     // The native menu bar on macOS only; Windows and Linux get the UI's title bar with its menus (UX-15).
     #[cfg(target_os = "macos")]
     let app = app
-        .menu(|app| menu::build(app, settings::load(app).language.as_deref()))
+        .menu(|app| {
+            i18n::init(settings::load(app).language.as_deref());
+            menu::build(app)
+        })
         .on_menu_event(menu::on_event);
     let app = app
         .setup(|app| {
+            // The core's own text follows the UI's language (X-13); a change restarts the app.
+            i18n::init(settings::load(app.handle()).language.as_deref());
             if let Ok(dir) = app.path().app_log_dir() {
                 applog::init(&dir);
             }

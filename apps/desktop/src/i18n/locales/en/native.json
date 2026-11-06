@@ -1,0 +1,20 @@
+{
+  "native.openAsText": "couldn't open it as text: {{error}}",
+  "native.diagnosticsPath": "Choose a .json file in an existing folder.",
+  "native.costHistory": "cost history unavailable: {{error}}",
+  "native.noConfigDir": "no app config dir: {{error}}",
+  "native.claudePathAbsolute": "The Claude CLI path must be absolute: {{path}}",
+  "native.claudePathMissing": "No file at the Claude CLI path: {{path}}",
+  "native.createDir": "create {{path}}: {{error}}",
+  "native.write": "write {{path}}: {{error}}",
+  "native.save": "save {{path}}: {{error}}",
+  "native.runtimeStarting": "The agent runtime is starting…",
+  "native.sidecarWrite": "sidecar write failed: {{error}}",
+  "native.noDataDir": "no app data dir: {{error}}",
+  "native.unknownEditor": "unknown editor: {{editor}}",
+  "native.notLocalFile": "not a local file: {{file}}",
+  "native.fileNotFound": "file not found: {{file}}",
+  "native.wouldRun": "the default app would run it instead of showing it. Choose an editor in Settings to open it as text.",
+  "native.notAFolder": "not a folder: {{path}}",
+  "native.noTerminal": "couldn't find a terminal app to open"
+}

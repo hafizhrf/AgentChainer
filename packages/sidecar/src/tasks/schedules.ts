@@ -45,6 +45,12 @@ function writeSchedules(root: string, schedules: Schedule[]): void {
 }
 
 /** What the Scheduler needs of the app: starting a task's run, and telling the UI. */
+/**
+ * Thrown by a host when the task's last run is still going: the scheduled run is skipped, not failed. A type, not the
+ * message's words, which follow the app's language (X-13).
+ */
+export class AlreadyRunning extends Error {}
+
 export type SchedulerHost = {
   /**
    * Starts the task's run as a scheduled one; throws with a reason when it can't (not approved, XL, already running).
@@ -153,7 +159,7 @@ export class Scheduler {
       lastRun = { at, state: "started", late };
     } catch (err) {
       const reason = err instanceof Error ? err.message : String(err);
-      lastRun = { at, state: /already running/i.test(reason) ? "skipped" : "failed-to-start", late, reason };
+      lastRun = { at, state: err instanceof AlreadyRunning ? "skipped" : "failed-to-start", late, reason };
     }
     const next: Schedule = { ...s, nextAt, lastRun };
     const all = loadSchedules(s.cwd);

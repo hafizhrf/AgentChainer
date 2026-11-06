@@ -17,7 +17,12 @@ pub fn command(editor: &str, file: &str, line: u32) -> Result<Option<Command>, S
             launcher("idea"),
             vec!["--line".into(), line.to_string(), file.into()],
         ),
-        other => return Err(format!("unknown editor: {other}")),
+        other => {
+            return Err(crate::i18n::tr(
+                "native.unknownEditor",
+                &[("editor", other)],
+            ));
+        }
     };
     let mut cmd = Command::new(program);
     cmd.args(args)
@@ -45,11 +50,11 @@ fn launcher(name: &'static str) -> &'static str {
 pub fn check_file(file: &str) -> Result<(), String> {
     // A network or device path (`\\server\share`, `\\?\…`) would reach out just by being checked.
     if file.starts_with("\\\\") || file.starts_with("//") {
-        return Err(format!("not a local file: {file}"));
+        return Err(crate::i18n::tr("native.notLocalFile", &[("file", file)]));
     }
     let path = Path::new(file);
     if !path.is_absolute() || !path.exists() {
-        return Err(format!("file not found: {file}"));
+        return Err(crate::i18n::tr("native.fileNotFound", &[("file", file)]));
     }
     Ok(())
 }
@@ -178,10 +183,7 @@ pub fn check_openable(file: &str) -> Result<Opening, String> {
         || executable
         || (!as_text && SCRIPTS.contains(&ext.as_str()))
     {
-        return Err(
-            "the default app would run it instead of showing it. Choose an editor in Settings to open it as text."
-                .into(),
-        );
+        return Err(crate::i18n::tr("native.wouldRun", &[]));
     }
     Ok(if SHOWN.contains(&ext.as_str()) || !as_text {
         Opening::Default

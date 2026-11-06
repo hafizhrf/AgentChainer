@@ -1,8 +1,16 @@
 import { existsSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
-import { folderProblems, PROTOCOL_VERSION, RpcErrorCode, type Task } from "@agentchainer/protocol";
+import {
+  asLanguage,
+  folderProblems,
+  PROTOCOL_VERSION,
+  RpcErrorCode,
+  setLanguage,
+  type Task,
+} from "@agentchainer/protocol";
 import type { SDKMessage } from "@anthropic-ai/claude-agent-sdk";
+import { z } from "zod";
 import pkg from "../package.json" with { type: "json" };
 import { agentTemplates } from "./agent-templates.ts";
 import { deleteAgent, listAgents, saveAgent } from "./agents.ts";
@@ -55,6 +63,7 @@ import { listRules, removeRule } from "./permissions.ts";
 import { cliError, installListed, listPluginsFor, parseDetails, uninstallListed, updateListed } from "./plugins.ts";
 import { CHAT_TOOLS, loadProfile, type ProfileOptions, profileOptions, profileSummaries } from "./profiles.ts";
 import { log, notify, RpcFailure, serve } from "./rpc.ts";
+import "./i18n/index.ts";
 import { type AgentSdkModule, loadSdk } from "./sdk-loader.ts";
 import { ASK_FIRST, Session } from "./session.ts";
 import { replayEvents, retention, toSessionInfo } from "./stored-sessions.ts";
@@ -70,7 +79,7 @@ import {
   writeWorkflowFile,
 } from "./tasks/project-workflows.ts";
 import type { SessionHost } from "./tasks/runner.ts";
-import { Scheduler } from "./tasks/schedules.ts";
+import { AlreadyRunning, Scheduler } from "./tasks/schedules.ts";
 import {
   acceptRisk,
   approveSubtasks,
@@ -232,7 +241,7 @@ const scheduler = new Scheduler({
       return;
     }
     // Starting needs the SDK, which is async: the checks that can refuse a run are made first, here.
-    if (runningTask(taskId)) throw new Error("The task is already running.");
+    if (runningTask(taskId)) throw new AlreadyRunning("The task is already running.");
     // Like Run again: the model of the task's last run, so a schedule never switches it to a costlier one.
     const model = schedulable(cwd, taskId).run?.model;
     void claude().then(
@@ -281,6 +290,12 @@ function prepareSdk() {
 }
 
 // Params arrive validated against the protocol schemas (rpc.ts), so handlers can trust their shape.
+// The app's language (X-13), passed at spawn from the settings; a change restarts the app. The catalogs are bundled,
+// so it applies at once, before the first request. zod's own messages (invalid params) follow it.
+const language = asLanguage(process.env.AGENTCHAINER_LANGUAGE);
+void setLanguage(language);
+if (language === "id") z.config(z.locales.id());
+
 serve(
   {
     "system.hello": ({ protocolVersion }) => {

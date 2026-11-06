@@ -1,4 +1,6 @@
 import { z } from "zod";
+import { currentLocale } from "./i18n.ts";
+import { t } from "./messages.ts";
 
 /**
  * Contract between the UI (via the Rust relay) and the sidecar, as zod schemas (checklist M1-02).
@@ -62,7 +64,7 @@ const RulesSchema = z.object({ allow: z.array(z.string()), ask: z.array(z.string
 /** An agent's name, which is also its file name in `.claude/agents/` (M4-06). */
 export const AgentNameSchema = z
   .string()
-  .regex(/^[a-z0-9][a-z0-9-]{0,63}$/, "Use lowercase letters, digits and hyphens, up to 64 characters.");
+  .regex(/^[a-z0-9][a-z0-9-]{0,63}$/, { error: () => t("protocol.agent.nameFormat") });
 
 /** Where an agent lives: the project's `.claude/agents/`, or the user's `~/.claude/agents/` (both editable, M8-04). */
 export const AgentScopeSchema = z.enum(["project", "user"]);
@@ -141,22 +143,25 @@ export function agentProblems(
 ): string[] {
   const problems: string[] = [];
   const name = AgentNameSchema.safeParse(agent.name);
-  if (!name.success) problems.push(`Name: ${name.error.issues[0]?.message ?? "not a valid name"}`);
-  else if (taken.includes(agent.name)) problems.push(`Name: an agent named ${agent.name} already exists here.`);
-  if (!agent.description.trim()) problems.push("Description: say when Claude should use this agent.");
-  else if (agent.description.length > 2000) problems.push("Description: keep it under 2,000 characters.");
-  if (!agent.prompt.trim()) problems.push("Prompt: write the agent's instructions.");
-  else if (agent.prompt.length > 100_000) problems.push("Prompt: keep it under 100,000 characters.");
+  if (!name.success)
+    problems.push(
+      t("protocol.agent.name", { problem: name.error.issues[0]?.message ?? t("protocol.agent.notValidName") }),
+    );
+  else if (taken.includes(agent.name)) problems.push(t("protocol.agent.nameTaken", { name: agent.name }));
+  if (!agent.description.trim()) problems.push(t("protocol.agent.descriptionMissing"));
+  else if (agent.description.length > 2000) problems.push(t("protocol.agent.descriptionLong"));
+  if (!agent.prompt.trim()) problems.push(t("protocol.agent.promptMissing"));
+  else if (agent.prompt.length > 100_000) problems.push(t("protocol.agent.promptLong"));
   const model = agent.model?.trim();
   if (model && !(AGENT_MODELS as readonly string[]).includes(model) && !/^claude-[a-z0-9.-]+(\[1m\])?$/.test(model)) {
-    problems.push(`Model: ${model} isn't inherit, haiku, sonnet, opus, fable or a claude-… model id.`);
+    problems.push(t("protocol.agent.modelUnknown", { model }));
   }
   const tools = toolList(agent.tools);
   const unknown = tools.filter((t) => !BUILT_IN_TOOLS.has(t) && !MCP_TOOL_ENTRY.test(t));
   if (unknown.length)
-    problems.push(`Tools: ${unknown.join(", ")} ${unknown.length > 1 ? "aren't" : "isn't"} a known tool.`);
-  const repeated = tools.filter((t, i) => tools.indexOf(t) !== i);
-  if (repeated.length) problems.push(`Tools: ${[...new Set(repeated)].join(", ")} listed twice.`);
+    problems.push(t("protocol.agent.toolsUnknown", { count: unknown.length, tools: unknown.join(", ") }));
+  const repeated = tools.filter((tool, i) => tools.indexOf(tool) !== i);
+  if (repeated.length) problems.push(t("protocol.agent.toolsRepeated", { tools: [...new Set(repeated)].join(", ") }));
   return problems;
 }
 
@@ -685,32 +690,35 @@ const at = (clock: string) => clock.split(":").map(Number) as [number, number];
 export function nextRun(cadence: Cadence, after: Date): Date {
   if (cadence.kind === "hourly") {
     // On the hour, every N hours counted from midnight: 1 → every hour, 6 → 00:00, 06:00, 12:00, 18:00.
-    const t = new Date(after);
-    t.setMinutes(0, 0, 0);
-    do t.setHours(t.getHours() + 1);
-    while (t.getHours() % cadence.every !== 0 || t <= after);
-    return t;
+    const when = new Date(after);
+    when.setMinutes(0, 0, 0);
+    do when.setHours(when.getHours() + 1);
+    while (when.getHours() % cadence.every !== 0 || when <= after);
+    return when;
   }
   const [h, m] = at(cadence.at);
-  const t = new Date(after);
-  t.setHours(h, m, 0, 0);
+  const when = new Date(after);
+  when.setHours(h, m, 0, 0);
   // Day by day through the calendar (setDate keeps the local time across daylight-saving changes).
   for (let i = 0; i < 8; i++) {
-    const allowed = cadence.kind === "daily" || cadence.days.includes(t.getDay());
-    if (allowed && t > after) return t;
-    t.setDate(t.getDate() + 1);
-    t.setHours(h, m, 0, 0);
+    const allowed = cadence.kind === "daily" || cadence.days.includes(when.getDay());
+    if (allowed && when > after) return when;
+    when.setDate(when.getDate() + 1);
+    when.setHours(h, m, 0, 0);
   }
-  throw new Error("No run time in the next week.");
+  throw new Error(t("protocol.cadence.noRunTime"));
 }
 
 /** The cadence in words: "Every 6 hours", "Daily at 02:00", "Mon, Wed at 09:30". */
 export function cadenceText(c: Cadence): string {
-  if (c.kind === "hourly") return c.every === 1 ? "Every hour" : `Every ${c.every} hours`;
-  if (c.kind === "daily") return `Daily at ${c.at}`;
-  const names = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+  if (c.kind === "hourly")
+    return c.every === 1 ? t("protocol.cadence.everyHour") : t("protocol.cadence.everyHours", { n: c.every });
+  if (c.kind === "daily") return t("protocol.cadence.dailyAt", { at: c.at });
+  // Day names in the language (2023-01-01 was a Sunday): "Mon", "Sen".
+  const name = (d: number) => new Date(2023, 0, 1 + d).toLocaleDateString(currentLocale(), { weekday: "short" });
   const days = [...c.days].sort((a, b) => ((a + 6) % 7) - ((b + 6) % 7));
-  return `${days.length === 7 ? "Every day" : days.map((d) => names[d]).join(", ")} at ${c.at}`;
+  const which = days.length === 7 ? t("protocol.cadence.everyDay") : days.map(name).join(", ");
+  return t("protocol.cadence.daysAt", { days: which, at: c.at });
 }
 
 /**
@@ -1066,10 +1074,9 @@ export const MergeMethodSchema = z.enum(["merge", "squash", "rebase"]);
 export const DockerImageSchema = z
   .string()
   .trim()
-  .regex(
-    /^[a-z0-9]+(?:[._-][a-z0-9]+)*(?:\.[a-z0-9-]+)*(?::\d+)?(?:\/[a-z0-9]+(?:[._-][a-z0-9]+)*)+$/,
-    "An image like ghcr.io/you/app: lowercase, with the registry or namespace, and no tag.",
-  );
+  .regex(/^[a-z0-9]+(?:[._-][a-z0-9]+)*(?:\.[a-z0-9-]+)*(?::\d+)?(?:\/[a-z0-9]+(?:[._-][a-z0-9]+)*)+$/, {
+    error: () => t("protocol.deploy.imageFormat"),
+  });
 
 /** The deploy providers (M6-01). */
 export const DeployAdapterSchema = z.enum(["vercel", "cloudflare", "firebase", "fly", "docker"]);
@@ -2276,4 +2283,18 @@ export {
   type RiskLevel,
 } from "./approval.ts";
 export { folderKey, folderProblems } from "./folders.ts";
+export {
+  asLanguage,
+  catalog,
+  currentLanguage,
+  currentLocale,
+  type KeyOf,
+  LANGUAGES,
+  type Language,
+  type Params,
+  type RichPart,
+  setLanguage,
+  setPseudo,
+  translationProblems,
+} from "./i18n.ts";
 export { hasSecret, redactForLog, redactSecrets, redactValue } from "./redact.ts";

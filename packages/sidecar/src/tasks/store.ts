@@ -21,6 +21,7 @@ import {
   TriageSchema,
 } from "@agentchainer/protocol";
 import { AC_DIR, ensureIgnored } from "../ac-dir.ts";
+import { t } from "../i18n/index.ts";
 import { RpcFailure } from "../rpc.ts";
 
 /**
@@ -39,7 +40,8 @@ function tasksRoot(root: string): string {
 
 /** The task's folder, after checking the id (it becomes part of a path). */
 function taskDir(root: string, id: string): string {
-  if (!TaskIdSchema.safeParse(id).success) throw new RpcFailure(RpcErrorCode.invalidParams, `Not a task id: ${id}`);
+  if (!TaskIdSchema.safeParse(id).success)
+    throw new RpcFailure(RpcErrorCode.invalidParams, t("tasks.store.notTaskId", { id }));
   return path.join(tasksRoot(root), id);
 }
 
@@ -47,7 +49,7 @@ function taskDir(root: string, id: string): string {
 function requireRealDir(root: string, dir: string): void {
   const inside = path.relative(realpathSync(root), realpathSync(dir));
   if (lstatSync(dir).isSymbolicLink() || inside.startsWith("..") || path.isAbsolute(inside)) {
-    throw new RpcFailure(RpcErrorCode.invalidParams, "The task folder isn't a folder inside the workspace.");
+    throw new RpcFailure(RpcErrorCode.invalidParams, t("tasks.store.folderOutside"));
   }
 }
 
@@ -100,14 +102,15 @@ export function saveTask(root: string, task: Task): void {
 
 export function loadTask(root: string, id: string): Task {
   const dir = taskDir(root, id);
-  if (!existsSync(path.join(dir, "task.json"))) throw new RpcFailure(RpcErrorCode.invalidParams, `No task ${id}.`);
+  if (!existsSync(path.join(dir, "task.json")))
+    throw new RpcFailure(RpcErrorCode.invalidParams, t("tasks.store.notFound", { id }));
   requireRealDir(root, dir);
   const optional = (name: string) => (existsSync(path.join(dir, name)) ? readJson(path.join(dir, name)) : null);
   const meta = MetaSchema.safeParse(readJson(path.join(dir, "task.json")));
   const contract = TaskContractSchema.nullable().safeParse(optional("contract.json"));
   const triage = TriageSchema.nullable().safeParse(optional("triage.json"));
   if (!meta.success || !contract.success || !triage.success || meta.data.id !== id) {
-    throw new RpcFailure(RpcErrorCode.invalidParams, `Task ${id} can't be read: its files aren't valid.`);
+    throw new RpcFailure(RpcErrorCode.invalidParams, t("tasks.store.unreadable", { id }));
   }
   return { ...meta.data, contract: contract.data, triage: triage.data };
 }

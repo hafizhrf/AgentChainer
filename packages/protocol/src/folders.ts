@@ -1,3 +1,4 @@
+import { t } from "./messages.ts";
 /**
  * A multi-folder workspace's folders (M8-01, docs/design/workspaces-and-fleet.md §5.1): the rules the New workspace
  * dialog and the sidecar both apply, so a session never gets a folder the dialog would refuse. Paths are compared as
@@ -26,14 +27,15 @@ export function folderProblems(folders: string[], home: string | null): string[]
   for (const [i, dir] of folders.entries()) {
     const key = keys[i] ?? "";
     const name = dir.trim() || "(empty)";
-    if (!isAbsolute(dir)) problems.push(`${name}: use a full path.`);
-    else if (isRoot(key)) problems.push(`${name}: a whole drive is too much to hand an agent.`);
-    else if (homeKey && key === homeKey) problems.push(`${name}: your home folder is too much to hand an agent.`);
-    else if (keys.indexOf(key) !== i) problems.push(`${name} is in the list twice.`);
+    if (!isAbsolute(dir)) problems.push(t("protocol.folders.fullPath", { name }));
+    else if (isRoot(key)) problems.push(t("protocol.folders.wholeDrive", { name }));
+    else if (homeKey && key === homeKey) problems.push(t("protocol.folders.home", { name }));
+    else if (keys.indexOf(key) !== i) problems.push(t("protocol.folders.twice", { name }));
     else {
       // A root is refused on its own; it isn't also reported as what the others are inside.
       const outer = keys.find((k, j) => j !== i && !isRoot(k) && within(key, k));
-      if (outer !== undefined) problems.push(`${name} is inside ${folders[keys.indexOf(outer)]}, which is already in.`);
+      if (outer !== undefined)
+        problems.push(t("protocol.folders.nested", { name, outer: folders[keys.indexOf(outer)] ?? "" }));
     }
   }
   return problems;

@@ -77,11 +77,11 @@ impl Sidecar {
             .map_err(|_| "sidecar lock poisoned")?;
         let Some(stdin) = guard.as_mut() else {
             let reason = self.inner.last_error.lock().ok().and_then(|e| e.clone());
-            return Err(reason.unwrap_or_else(|| "The agent runtime is starting…".into()));
+            return Err(reason.unwrap_or_else(|| crate::i18n::tr("native.runtimeStarting", &[])));
         };
         writeln!(stdin, "{frame}")
             .and_then(|()| stdin.flush())
-            .map_err(|e| format!("sidecar write failed: {e}"))
+            .map_err(|e| crate::i18n::tr("native.sidecarWrite", &[("error", &e.to_string())]))
     }
 
     /// Kills the current process; the supervisor starts a fresh one immediately (UI health ping, settings change).
@@ -168,8 +168,13 @@ fn run_once(
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
-    if let Some(path) = settings::load(&inner.app).claude_path {
+    let saved = settings::load(&inner.app);
+    if let Some(path) = saved.claude_path {
         cmd.env("AGENTCHAINER_CLAUDE_PATH", path);
+    }
+    // The UI's language (X-13), for the sidecar's own messages; a change restarts the app, and so the sidecar.
+    if let Some(language) = saved.language {
+        cmd.env("AGENTCHAINER_LANGUAGE", language);
     }
     #[cfg(windows)]
     {
@@ -258,7 +263,7 @@ fn command(app: &AppHandle) -> Result<(Command, String), String> {
     let data_dir = app
         .path()
         .app_data_dir()
-        .map_err(|e| format!("no app data dir: {e}"))?;
+        .map_err(|e| crate::i18n::tr("native.noDataDir", &[("error", &e.to_string())]))?;
     // Downloaded catalog tools (M2-15) live here in dev builds too.
     let tools_dir = data_dir.join("tools");
 

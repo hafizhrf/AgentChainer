@@ -10,6 +10,7 @@ import {
 } from "./bootstrap/apply.ts";
 import { type Catalog, type Item, REQUIRED_REVIEWS } from "./catalog/schema.ts";
 import { compareVersions } from "./catalog/updates.ts";
+import { t } from "./i18n/index.ts";
 import type { CliResult, PluginCli } from "./installer.ts";
 
 /**
@@ -214,12 +215,12 @@ export function confirmOf(res: CliResult): { command: string; sha256: string } |
   const command =
     typeof cmd === "string" ? cmd : Array.isArray(cmd) ? cmd.map(String).join(" ") : JSON.stringify(shown);
   const archive = str(shown.archiveUrl);
-  return { command: archive ? `${command} (fetches ${archive})` : command, sha256 };
+  return { command: archive ? t("plugins.confirm.fetches", { command, archive }) : command, sha256 };
 }
 
 export function cliError(what: string, res: CliResult): Error {
   const message = str(asObject(res.json)?.message) ?? (res.stderr || res.stdout).trim();
-  return new Error(`${what} failed: ${message.slice(0, 400) || `exit ${res.status}`}`);
+  return new Error(t("plugins.cli.failed", { command: what, detail: message.slice(0, 400) || `exit ${res.status}` }));
 }
 
 /** The listing, kept per workspace for the app session: it takes the CLI a few seconds. */
@@ -263,9 +264,7 @@ async function versionAfter(cli: PluginCli, res: CliResult, id: string): Promise
 function reviewedWarning(item: Item | undefined, version: string | undefined): string[] {
   const src = item?.source;
   if (src?.type !== "marketplace" || !src.reviewedVersion || !version || version === src.reviewedVersion) return [];
-  return [
-    `Installed ${version}, but ${src.reviewedVersion} was reviewed: the marketplace moved on. Review the changes before relying on it.`,
-  ];
+  return [t("plugins.review.versionMoved", { version, reviewed: src.reviewedVersion })];
 }
 
 /**
@@ -288,7 +287,7 @@ export async function installListed(
   const out: { confirm?: PluginChange; version?: string; warnings: string[] } = { warnings: [] };
   const runId = await recordPluginInstall(
     root,
-    { id: `plugin:${id}`, title: `Install ${item?.name ?? plugin} (plugin)`, scope },
+    { id: `plugin:${id}`, title: t("plugins.install.title", { name: item?.name ?? plugin }), scope },
     async () => {
       const res = await cli.install(id, scope, acceptCommand);
       if (!res.ok) {

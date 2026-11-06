@@ -3,6 +3,7 @@ import { existsSync, readdirSync, readFileSync, rmSync, statSync } from "node:fs
 import path from "node:path";
 import type { FileDiff, FileStatus, Hunk, WorkspaceFile, WorkspaceFiles } from "@agentchainer/protocol";
 import { RpcErrorCode } from "@agentchainer/protocol";
+import { t } from "./i18n/index.ts";
 import { RpcFailure } from "./rpc.ts";
 import { type RunResult, runAsync } from "./run-async.ts";
 
@@ -87,9 +88,13 @@ export function gitAsync(
   });
 }
 
+/** A git or gh command that failed, with what it said: its own words, or its exit status. */
+export const commandFailed = (command: string, detail: string) =>
+  new Error(t("git.command.failed", { command, detail }));
+
 export function gitOrThrow(args: string[], cwd: string, input?: string): string {
   const r = git(args, cwd, input);
-  if (r.status !== 0) throw new Error(`git ${args[0]} failed: ${r.stderr.trim() || `exit ${r.status}`}`);
+  if (r.status !== 0) throw commandFailed(`git ${args[0]}`, r.stderr.trim() || `exit ${r.status}`);
   return r.stdout;
 }
 
@@ -100,7 +105,7 @@ export function gitOrThrow(args: string[], cwd: string, input?: string): string 
 export function insideWorkspace(cwd: string, rel: string): string {
   const parts = rel.split(/[\\/]+/);
   if (!rel || path.isAbsolute(rel) || path.win32.isAbsolute(rel) || parts.includes("..")) {
-    throw new RpcFailure(RpcErrorCode.invalidParams, `Path must be inside the workspace: ${rel}`);
+    throw new RpcFailure(RpcErrorCode.invalidParams, t("git.workspace.outsidePath", { path: rel }));
   }
   return path.join(cwd, ...parts);
 }
@@ -174,12 +179,12 @@ function branchOf(cwd: string): string | null {
   const named = git(["symbolic-ref", "--short", "-q", "HEAD"], cwd);
   if (named.status === 0) return named.stdout.trim();
   const sha = git(["rev-parse", "--short", "HEAD"], cwd);
-  return sha.status === 0 ? `detached at ${sha.stdout.trim()}` : null;
+  return sha.status === 0 ? t("git.repo.detachedAt", { sha: sha.stdout.trim() }) : null;
 }
 
 /** Files of the workspace with their git status: tracked + untracked, minus ignored (M1-25). */
 export function listFiles(cwd: string): WorkspaceFiles {
-  if (!existsSync(cwd)) throw new Error(`Folder not found: ${cwd}`);
+  if (!existsSync(cwd)) throw new Error(t("git.repo.folderNotFound", { path: cwd }));
   const repo = repoOf(cwd);
   if (!repo) {
     const files = walk(cwd);
@@ -297,14 +302,14 @@ export function parseHunks(diff: string): ParsedHunk[] {
 export function revert(cwd: string, rel: string, hunk?: number): void {
   const abs = insideWorkspace(cwd, rel);
   const repo = repoOf(cwd);
-  if (!repo) throw new RpcFailure(RpcErrorCode.invalidParams, "Reverting needs a git repository.");
+  if (!repo) throw new RpcFailure(RpcErrorCode.invalidParams, t("git.revert.noRepo"));
   const entry = statusUnder(cwd, repo).get(rel);
-  if (!entry) throw new RpcFailure(RpcErrorCode.invalidParams, `${rel} has no changes to revert.`);
+  if (!entry) throw new RpcFailure(RpcErrorCode.invalidParams, t("git.revert.noChanges", { path: rel }));
 
   if (hunk !== undefined) {
     const diff = gitOrThrow(["diff", "--no-color", "--no-ext-diff", "-U0", "HEAD", "--", literal(rel)], cwd);
     const target = parseHunks(diff)[hunk];
-    if (!target) throw new RpcFailure(RpcErrorCode.invalidParams, "That change no longer exists. Refresh the diff.");
+    if (!target) throw new RpcFailure(RpcErrorCode.invalidParams, t("git.revert.hunkGone"));
     const header = diff.slice(0, diff.indexOf("\n@@") + 1);
     const patch = `${header}${target.header}\n${target.lines.join("\n")}\n`;
     // Patch paths are relative to the repo root, so apply from there. Only the working tree changes.
@@ -331,7 +336,7 @@ export function revert(cwd: string, rel: string, hunk?: number): void {
 
 /** Offered when the workspace isn't a git repository yet (M1-06). */
 export function gitInit(cwd: string): void {
-  if (!existsSync(cwd)) throw new Error(`Folder not found: ${cwd}`);
-  if (repoOf(cwd)) throw new RpcFailure(RpcErrorCode.invalidParams, "This folder is already in a git repository.");
+  if (!existsSync(cwd)) throw new Error(t("git.repo.folderNotFound", { path: cwd }));
+  if (repoOf(cwd)) throw new RpcFailure(RpcErrorCode.invalidParams, t("git.repo.alreadyARepo"));
   gitOrThrow(["init", "-q"], cwd);
 }

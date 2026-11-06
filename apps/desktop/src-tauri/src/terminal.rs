@@ -53,5 +53,5 @@ pub fn open(dir: Option<String>) -> Result<(), String> {
             return Ok(());
         }
     }
-    Err("couldn't find a terminal app to open".into())
+    Err(crate::i18n::tr("native.noTerminal", &[]))
 }

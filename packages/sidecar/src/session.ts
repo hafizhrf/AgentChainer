@@ -23,6 +23,7 @@ import type {
   SDKUserMessage,
 } from "@anthropic-ai/claude-agent-sdk";
 import { checkToolCall, READ_TOOLS, readOnlyHook } from "./guard.ts";
+import { t } from "./i18n/index.ts";
 import { command, normalize } from "./normalize.ts";
 import { alwaysUpdates, describeUpdates, retarget } from "./permissions.ts";
 import { log } from "./rpc.ts";
@@ -555,7 +556,7 @@ export class Session {
     } finally {
       this.ended = true;
       this.touch();
-      for (const w of this.waiters.splice(0)) w.reject(new Error("The session ended before its turn finished."));
+      for (const w of this.waiters.splice(0)) w.reject(new Error(t("rpc.session.endedMidTurn")));
       this.callbacks.onEnd();
     }
   }

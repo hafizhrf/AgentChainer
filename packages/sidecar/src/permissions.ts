@@ -2,6 +2,7 @@ import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "
 import path from "node:path";
 import type { AlwaysScope, RuleScope } from "@agentchainer/protocol";
 import type { PermissionRuleValue, PermissionUpdate } from "@anthropic-ai/claude-agent-sdk";
+import { t } from "./i18n/index.ts";
 
 /**
  * "Always allow" rules (M1-17/M1-20, UX-05). They live in the workspace's `.claude/settings.local.json`, which Claude
@@ -44,7 +45,7 @@ export function alwaysUpdates(suggestions: PermissionUpdate[] | undefined): Perm
 export function describeUpdates(updates: PermissionUpdate[]): string[] {
   return updates.flatMap((u) => {
     if (u.type === "addRules") return u.rules.map(ruleText);
-    if (u.type === "addDirectories") return u.directories.map((d) => `Access to ${d}`);
+    if (u.type === "addDirectories") return u.directories.map((d) => t("rpc.permissions.accessTo", { path: d }));
     return [];
   });
 }
@@ -53,7 +54,9 @@ function readSettings(cwd: string, scope: RuleScope): Record<string, unknown> {
   const file = settingsPath(cwd, scope);
   if (!existsSync(file)) return {};
   const parsed: unknown = JSON.parse(readFileSync(file, "utf8"));
-  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) throw new Error(`${file} is not a JSON object.`);
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+    throw new Error(t("rpc.permissions.notAnObject", { file }));
+  }
   return parsed as Record<string, unknown>;
 }
 
@@ -71,7 +74,7 @@ export function removeRule(cwd: string, behavior: Behavior, rule: string, scope:
   const perms = settings.permissions as Record<string, unknown> | undefined;
   const list = strings(perms?.[behavior]);
   const file = settingsPath(cwd, scope);
-  if (!perms || !list.includes(rule)) throw new Error(`No ${behavior} rule ${rule} in ${file}.`);
+  if (!perms || !list.includes(rule)) throw new Error(t("rpc.permissions.noRule", { behavior, rule, file }));
   perms[behavior] = list.filter((r) => r !== rule);
   mkdirSync(path.dirname(file), { recursive: true });
   const tmp = `${file}.${process.pid}.tmp`;

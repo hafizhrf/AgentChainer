@@ -89,6 +89,31 @@ Predefined items get their text from it too.
 
 **Still English:** text the sidecar and the Rust core return (X-13 part 2).
 
+### Addendum (2026-11-06): the sidecar's, the protocol's and the core's messages (X-13 part 2a)
+
+**One engine, several catalogs:**
+- The engine (interpolation, plurals, rich parts, pseudo) moved into `packages/protocol/src/i18n.ts`.
+- Each catalog registers itself, and `setLanguage` switches them all: one language per process.
+- The UI has its catalog. The protocol package has one for the texts both sides share (approval reasons, agent and
+  folder problems, cadences). The sidecar has one per area.
+- A catalog's `english()` gives the English text whatever the language, for files, commits and pull requests.
+
+**The language reaches the other processes at startup; a change restarts the app:**
+- **The sidecar:** the core passes `AGENTCHAINER_LANGUAGE` from the settings when it spawns the sidecar.
+  - Its catalogs are bundled, so `setLanguage` applies before the first request. A CommonJS bundle has no top-level
+    await.
+  - zod's own messages follow the language (`z.locales.id`).
+- **The Rust core:** it reads the language from the settings once, for its errors (`native.json`) and the menu.
+
+**No logic on words:** the scheduler told "already running" from other failures by matching the error's text. It now
+checks a typed error (`AlreadyRunning`).
+
+**Saved records** (setup runs' messages, deploy records, schedule reasons) keep the language they were written in.
+
+**Later, in their own rounds:**
+- task results (run outcomes, step and merge-gate labels, the evidence report), which also go into pull requests;
+- the catalog's YAML prose.
+
 ## Alternatives considered
 
 | Option | Pros | Cons | Why not chosen |

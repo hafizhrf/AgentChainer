@@ -166,7 +166,7 @@ fn path(app: &AppHandle) -> Result<PathBuf, String> {
     let dir = app
         .path()
         .app_config_dir()
-        .map_err(|e| format!("no app config dir: {e}"))?;
+        .map_err(|e| crate::i18n::tr("native.noConfigDir", &[("error", &e.to_string())]))?;
     Ok(dir.join("settings.json"))
 }
 
@@ -185,9 +185,15 @@ pub fn load(app: &AppHandle) -> Settings {
 pub fn claude_path_problem(path: &str) -> Option<String> {
     let p = std::path::Path::new(path);
     if !p.is_absolute() {
-        Some(format!("The Claude CLI path must be absolute: {path}"))
+        Some(crate::i18n::tr(
+            "native.claudePathAbsolute",
+            &[("path", path)],
+        ))
     } else if !p.is_file() {
-        Some(format!("No file at the Claude CLI path: {path}"))
+        Some(crate::i18n::tr(
+            "native.claudePathMissing",
+            &[("path", path)],
+        ))
     } else {
         None
     }
@@ -197,12 +203,36 @@ pub fn save(app: &AppHandle, settings: Settings) -> Result<Settings, String> {
     let settings = settings.normalized();
     let target = path(app)?;
     if let Some(dir) = target.parent() {
-        std::fs::create_dir_all(dir).map_err(|e| format!("create {}: {e}", dir.display()))?;
+        std::fs::create_dir_all(dir).map_err(|e| {
+            crate::i18n::tr(
+                "native.createDir",
+                &[
+                    ("path", &dir.display().to_string()),
+                    ("error", &e.to_string()),
+                ],
+            )
+        })?;
     }
     let text = serde_json::to_string_pretty(&settings).map_err(|e| e.to_string())?;
     let tmp = target.with_extension("json.tmp");
-    std::fs::write(&tmp, text).map_err(|e| format!("write {}: {e}", tmp.display()))?;
-    std::fs::rename(&tmp, &target).map_err(|e| format!("save {}: {e}", target.display()))?;
+    std::fs::write(&tmp, text).map_err(|e| {
+        crate::i18n::tr(
+            "native.write",
+            &[
+                ("path", &tmp.display().to_string()),
+                ("error", &e.to_string()),
+            ],
+        )
+    })?;
+    std::fs::rename(&tmp, &target).map_err(|e| {
+        crate::i18n::tr(
+            "native.save",
+            &[
+                ("path", &target.display().to_string()),
+                ("error", &e.to_string()),
+            ],
+        )
+    })?;
     Ok(settings)
 }
 

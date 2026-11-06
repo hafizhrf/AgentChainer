@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { after, describe, it } from "node:test";
 import type { Schedule } from "@agentchainer/protocol";
-import { cadenceText, LATE_MS, loadSchedules, nextRun, Scheduler } from "./schedules.ts";
+import { AlreadyRunning, cadenceText, LATE_MS, loadSchedules, nextRun, Scheduler } from "./schedules.ts";
 
 const dirs: string[] = [];
 after(() => {
@@ -55,11 +55,11 @@ function setup(start = local(2026, 11, 3, 1, 0)) {
   let now = start;
   const started: string[] = [];
   const changed: Schedule[] = [];
-  const refuse = new Map<string, string>();
+  const refuse = new Map<string, string | Error>();
   const s = new Scheduler({
     start: (_cwd, taskId, check) => {
       const reason = refuse.get(taskId);
-      if (reason) throw new Error(reason);
+      if (reason) throw typeof reason === "string" ? new Error(reason) : reason;
       if (!check) started.push(taskId);
     },
     title: (_cwd, taskId) => `Task ${taskId}`,
@@ -129,7 +129,7 @@ describe("the scheduler (M8-05)", () => {
     const root = tmp();
     const { s, started, refuse, at } = setup(local(2026, 11, 3, 1, 0));
     s.save(root, { taskId: TASK, cadence: { kind: "hourly", every: 1 }, enabled: true });
-    refuse.set(TASK, "The task is already running.");
+    refuse.set(TASK, new AlreadyRunning("The task is already running."));
     at(local(2026, 11, 3, 2, 0));
     s.tick();
     assert.deepEqual(loadSchedules(root)[0]?.lastRun?.state, "skipped");

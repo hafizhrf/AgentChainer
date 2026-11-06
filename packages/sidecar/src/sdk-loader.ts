@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import type * as AgentSdk from "@anthropic-ai/claude-agent-sdk";
 import { systemTar } from "./bootstrap/tools.ts";
+import { t } from "./i18n/index.ts";
 import { log } from "./rpc.ts";
 import pin from "./sdk-pin.json" with { type: "json" };
 import type { SdkPin } from "./sdk-pin.ts";
@@ -90,16 +91,14 @@ export async function ensureSdk(
     data = res.ok ? new Uint8Array(await res.arrayBuffer()) : new Uint8Array();
   } catch (err) {
     if (signal.aborted) {
-      throw new Error(
-        `Downloading the Claude Agent SDK timed out after ${Math.round(timeoutMs / 1000)} s. Check your connection and try again.`,
-      );
+      throw new Error(t("rpc.sdk.timedOut", { seconds: Math.round(timeoutMs / 1000) }));
     }
     const reason = err instanceof Error ? err.message : String(err);
-    throw new Error(`Couldn't download the Claude Agent SDK (offline or blocked by a proxy?): ${reason}`);
+    throw new Error(t("rpc.sdk.unreachable", { reason }));
   }
-  if (!res.ok) throw new Error(`Downloading the Claude Agent SDK failed: HTTP ${res.status}`);
+  if (!res.ok) throw new Error(t("rpc.sdk.httpError", { status: res.status }));
   if (sriOf(data) !== p.integrity) {
-    throw new Error("The downloaded Claude Agent SDK failed its integrity check, so it was not loaded.");
+    throw new Error(t("rpc.sdk.integrity"));
   }
 
   // Extract into a temp dir and rename, so a crash never leaves a half-written SDK that looks valid.
@@ -113,7 +112,7 @@ export async function ensureSdk(
   if (tar.status !== 0) {
     rmSync(tmp, { recursive: true, force: true });
     throw new Error(
-      `Extracting the Claude Agent SDK failed: ${tar.stderr || tar.error?.message || `tar exit ${tar.status}`}`,
+      t("rpc.sdk.extractFailed", { detail: tar.stderr || tar.error?.message || `tar exit ${tar.status}` }),
     );
   }
   rmSync(tgz);

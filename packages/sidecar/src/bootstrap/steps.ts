@@ -1,4 +1,5 @@
 import type { Item } from "../catalog/schema.ts";
+import { t } from "../i18n/index.ts";
 import { readWorkspaceText } from "../workspace-files.ts";
 import { type HookFile, hookChanges, hookScope, hookSetup } from "./git-hooks.ts";
 import { binaryName, toolPath } from "./tools.ts";
@@ -22,7 +23,7 @@ export function itemChanges(root: string, item: Item, env: { toolsDir: string | 
   const out: ItemChanges = { files: [], commands: [], scope: item.install.scope, binary: null };
   const name = binaryName(item);
   if (name) {
-    if (!env.toolsDir) return { ...out, unavailable: "AgentChainer's tools folder isn't set up. Restart the app." };
+    if (!env.toolsDir) return { ...out, unavailable: t("bootstrap.steps.noToolsDir") };
     out.binary = toolPath(env.toolsDir, item, env.platform);
   }
   const argv = (args: string[]) => args.map((a) => (a === "{binary}" ? (out.binary ?? a) : a));
@@ -67,16 +68,20 @@ export function itemChanges(root: string, item: Item, env: { toolsDir: string | 
  * file (`permissions.allow`, `ask`, `deny`) keep their rules and gain the new ones, so an item can add a deny rule
  * (M2-31). Anything else, other arrays included (an MCP server's `args`), is replaced.
  */
-export function mergeJson(text: string, value: Record<string, unknown>, label = "the file"): string {
+export function mergeJson(
+  text: string,
+  value: Record<string, unknown>,
+  label: string = t("bootstrap.steps.theFile"),
+): string {
   let base: unknown = {};
   if (text.trim()) {
     try {
       base = JSON.parse(text);
     } catch {
-      throw new Error(`${label} isn't valid JSON, so it can't be merged into. Fix it first.`);
+      throw new Error(t("bootstrap.steps.invalidJson", { label }));
     }
   }
-  if (!isObject(base)) throw new Error(`${label} doesn't hold a JSON object.`);
+  if (!isObject(base)) throw new Error(t("bootstrap.steps.notObject", { label }));
   return `${JSON.stringify(merge(base, value), null, 2)}\n`;
 }
 

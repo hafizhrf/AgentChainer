@@ -2,8 +2,9 @@ import { existsSync } from "node:fs";
 import { homedir } from "node:os";
 import path from "node:path";
 import { type GitHubStatus, type PrCheck, redactForLog } from "@agentchainer/protocol";
+import { t } from "./i18n/index.ts";
 import { runAsync } from "./run-async.ts";
-import { git } from "./workspace.ts";
+import { commandFailed, git } from "./workspace.ts";
 
 /**
  * GitHub through the user's own `gh` CLI (M5-02, docs/design/git-workflow.md §4). Like the `claude` CLI (ADR-0002),
@@ -111,9 +112,9 @@ export async function createPr(
 ): Promise<PrView> {
   const args = ["pr", "create", "--base", pr.base, "--head", pr.head, "--title", pr.title, "--body-file", pr.bodyFile];
   const r = await gh(pr.draft ? [...args, "--draft"] : args, root);
-  if (r.status !== 0) throw new Error(`gh pr create failed: ${(r.stderr || r.stdout).trim() || `exit ${r.status}`}`);
+  if (r.status !== 0) throw commandFailed("gh pr create", (r.stderr || r.stdout).trim() || `exit ${r.status}`);
   const made = await findPr(gh, root, pr.head);
-  if (!made) throw new Error(`gh made the pull request, but it can't be read back: ${r.stdout.trim()}`);
+  if (!made) throw new Error(t("git.github.unreadablePr", { output: r.stdout.trim() }));
   return made;
 }
 
@@ -129,7 +130,7 @@ export async function prChecks(gh: Gh, root: string, pr: number): Promise<PrChec
   const out = r.stdout.trim();
   if (out.startsWith("[")) return JSON.parse(out) as PrCheck[];
   if (/no checks reported/i.test(r.stderr)) return [];
-  throw new Error(`gh pr checks failed: ${(r.stderr || r.stdout).trim() || `exit ${r.status}`}`);
+  throw commandFailed("gh pr checks", (r.stderr || r.stdout).trim() || `exit ${r.status}`);
 }
 
 /** The state of the PR on GitHub, and the commit its head points at. */
@@ -139,7 +140,7 @@ export async function prState(
   pr: number,
 ): Promise<{ state: string; draft: boolean; headSha: string }> {
   const r = await gh(["pr", "view", String(pr), "--json", "state,isDraft,headRefOid"], root);
-  if (r.status !== 0) throw new Error(`gh pr view failed: ${(r.stderr || r.stdout).trim() || `exit ${r.status}`}`);
+  if (r.status !== 0) throw commandFailed("gh pr view", (r.stderr || r.stdout).trim() || `exit ${r.status}`);
   const v = JSON.parse(r.stdout) as { state: string; isDraft: boolean; headRefOid: string };
   return { state: v.state, draft: v.isDraft, headSha: v.headRefOid };
 }
@@ -161,7 +162,7 @@ export const MAX_LOG_CHARS = 32_000;
  */
 export async function failedJobLog(gh: Gh, root: string, job: string): Promise<string> {
   const r = await gh(["run", "view", "--job", job, "--log-failed"], root);
-  if (r.status !== 0) throw new Error(`gh run view failed: ${(r.stderr || r.stdout).trim() || `exit ${r.status}`}`);
+  if (r.status !== 0) throw commandFailed("gh run view", (r.stderr || r.stdout).trim() || `exit ${r.status}`);
   const log = r.stdout.length > MAX_LOG_CHARS ? `…\n${r.stdout.slice(-MAX_LOG_CHARS)}` : r.stdout;
   return redact(log);
 }
@@ -174,7 +175,7 @@ export async function mergeMethods(gh: Gh, root: string): Promise<{ methods: Met
     ["repo", "view", "--json", "mergeCommitAllowed,squashMergeAllowed,rebaseMergeAllowed,viewerDefaultMergeMethod"],
     root,
   );
-  if (r.status !== 0) throw new Error(`gh repo view failed: ${(r.stderr || r.stdout).trim() || `exit ${r.status}`}`);
+  if (r.status !== 0) throw commandFailed("gh repo view", (r.stderr || r.stdout).trim() || `exit ${r.status}`);
   const v = JSON.parse(r.stdout) as {
     mergeCommitAllowed: boolean;
     squashMergeAllowed: boolean;
@@ -205,10 +206,10 @@ export async function mergePullRequest(
 ): Promise<void> {
   if (draft) {
     const ready = await gh(["pr", "ready", String(pr)], root);
-    if (ready.status !== 0) throw new Error(`gh pr ready failed: ${(ready.stderr || ready.stdout).trim()}`);
+    if (ready.status !== 0) throw commandFailed("gh pr ready", (ready.stderr || ready.stdout).trim());
   }
   const r = await gh(["pr", "merge", String(pr), `--${method}`, "--match-head-commit", headSha], root);
-  if (r.status !== 0) throw new Error(`gh pr merge failed: ${(r.stderr || r.stdout).trim() || `exit ${r.status}`}`);
+  if (r.status !== 0) throw commandFailed("gh pr merge", (r.stderr || r.stdout).trim() || `exit ${r.status}`);
 }
 
 /**

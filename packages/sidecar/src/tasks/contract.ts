@@ -9,6 +9,7 @@ import {
 import type { SDKMessage } from "@anthropic-ai/claude-agent-sdk";
 import { generatorHook } from "../bootstrap/generate.ts";
 import { guarded } from "../bootstrap/workspace-guard.ts";
+import { t } from "../i18n/index.ts";
 import type { AgentSdkModule } from "../sdk-loader.ts";
 import { smokeCommand } from "./gates.ts";
 
@@ -238,10 +239,11 @@ export async function draftContract(
       opts.onMessage?.(m);
       if (m.type !== "result") continue;
       costUsd += m.total_cost_usd;
-      if (m.subtype !== "success") return { contract: null, error: `Drafting stopped: ${m.subtype}.` };
+      if (m.subtype !== "success")
+        return { contract: null, error: t("tasks.contract.draftingStopped", { reason: m.subtype }) };
       return { contract: normalizeContract(request, m.structured_output, gates) };
     }
-    return { contract: null, error: "Drafting ended without a result." };
+    return { contract: null, error: t("tasks.contract.noResult") };
   });
   return { ...result, costUsd };
 }

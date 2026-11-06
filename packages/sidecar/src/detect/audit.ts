@@ -2,6 +2,7 @@ import { existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import type { Finding, WorkspaceProfile } from "@agentchainer/protocol";
 import { AC_DIR, ensureIgnored } from "../ac-dir.ts";
+import { type MessageKey, t } from "../i18n/index.ts";
 import { git, repoOf } from "../workspace.ts";
 
 /**
@@ -9,23 +10,23 @@ import { git, repoOf } from "../workspace.ts";
  * plan (M2-11) offers for it; there is no score without actions behind it. Reads files and git state only.
  */
 
-/** Fix actions, by id. The bootstrap plan maps each to catalog items or a generator. */
+/** Fix actions, by id, with the keys of their labels. The bootstrap plan maps each to catalog items or a generator. */
 export const FIXES = {
-  "generate-claude-md": "Generate CLAUDE.md",
-  "update-claude-md": "Update CLAUDE.md",
-  "link-agents-md": "Import AGENTS.md from CLAUDE.md",
-  "setup-hooks": "Add format/lint hooks",
-  "scaffold-tests": "Scaffold tests",
-  "add-linter": "Add a linter",
-  "add-formatter": "Add a formatter",
-  "generate-ci": "Generate a CI workflow",
-  "smoke-test": "Add a smoke test",
-  "stop-tests": "Run the tests when Claude stops",
-  "fix-gitignore": "Ignore env and secret files",
-  "untrack-env": "Stop tracking .env",
-  "git-init": "Initialize git",
-  "add-remote": "Add a git remote (manual)",
-} as const;
+  "generate-claude-md": "detect.audit.fixGenerateClaudeMd",
+  "update-claude-md": "detect.audit.fixUpdateClaudeMd",
+  "link-agents-md": "detect.audit.fixLinkAgentsMd",
+  "setup-hooks": "detect.audit.fixSetupHooks",
+  "scaffold-tests": "detect.audit.fixScaffoldTests",
+  "add-linter": "detect.audit.fixAddLinter",
+  "add-formatter": "detect.audit.fixAddFormatter",
+  "generate-ci": "detect.audit.fixGenerateCi",
+  "smoke-test": "detect.audit.fixSmokeTest",
+  "stop-tests": "detect.audit.fixStopTests",
+  "fix-gitignore": "detect.audit.fixGitignore",
+  "untrack-env": "detect.audit.fixUntrackEnv",
+  "git-init": "detect.audit.fixGitInit",
+  "add-remote": "detect.audit.fixAddRemote",
+} as const satisfies Record<string, MessageKey>;
 export type FixAction = keyof typeof FIXES;
 
 /** CLAUDE.md files over this many lines cost context in every session. */
@@ -62,35 +63,40 @@ export function auditWorkspace(root: string, profile: WorkspaceProfile): Finding
       id: "claude-md.missing",
       area: "agent",
       status: "missing",
-      title: "No CLAUDE.md",
-      detail: "Claude starts every session without your commands, architecture or conventions.",
+      title: t("detect.audit.claudeMdMissingTitle"),
+      detail: t("detect.audit.claudeMdMissingDetail"),
       fix: "generate-claude-md",
     });
   } else {
     const lines = claudeMd.split("\n").length;
     const testRun = firstRun("test");
-    const problems = [
-      lines > LONG_CLAUDE_MD
-        ? `${lines} lines long (it's loaded into every session; aim for under ${LONG_CLAUDE_MD})`
-        : null,
-      testRun && !claudeMd.includes(testRun) ? `doesn't mention the test command (\`${testRun}\`)` : null,
-    ].filter((p): p is string => p !== null);
+    const long = lines > LONG_CLAUDE_MD;
+    const noTest = testRun !== undefined && !claudeMd.includes(testRun);
+    const values = { lines, max: LONG_CLAUDE_MD, command: testRun ?? "" };
+    const problem = long
+      ? noTest
+        ? t("detect.audit.claudeMdLongNoTest", values)
+        : t("detect.audit.claudeMdLong", values)
+      : noTest
+        ? t("detect.audit.claudeMdNoTest", values)
+        : null;
+    const file = { path: claudeMdPath ?? "" };
     checks.push(
-      problems.length
+      problem
         ? {
             id: "claude-md.stale",
             area: "agent",
             status: "warn",
-            title: `${claudeMdPath} needs attention`,
-            detail: `It ${problems.join(" and ")}.`,
+            title: t("detect.audit.claudeMdStaleTitle", file),
+            detail: problem,
             fix: "update-claude-md",
           }
         : {
             id: "claude-md.ok",
             area: "agent",
             status: "ok",
-            title: `${claudeMdPath} present`,
-            detail: `${lines} lines.`,
+            title: t("detect.audit.claudeMdOkTitle", file),
+            detail: t("detect.audit.claudeMdOkDetail", { lines }),
           },
     );
   }
@@ -99,8 +105,8 @@ export function auditWorkspace(root: string, profile: WorkspaceProfile): Finding
       id: "agents-md.unlinked",
       area: "agent",
       status: "warn",
-      title: "AGENTS.md isn't imported by CLAUDE.md",
-      detail: "Claude Code reads CLAUDE.md, not AGENTS.md; the two can drift apart.",
+      title: t("detect.audit.agentsMdUnlinkedTitle"),
+      detail: t("detect.audit.agentsMdUnlinkedDetail"),
       fix: "link-agents-md",
     });
   }
@@ -113,15 +119,15 @@ export function auditWorkspace(root: string, profile: WorkspaceProfile): Finding
           id: "hooks.ok",
           area: "agent",
           status: "ok",
-          title: "Edit hooks configured",
-          detail: "`.claude/settings.json` has PostToolUse hooks.",
+          title: t("detect.audit.hooksOkTitle"),
+          detail: t("detect.audit.hooksOkDetail"),
         }
       : {
           id: "hooks.missing",
           area: "agent",
           status: "missing",
-          title: "No format/lint hook on edits",
-          detail: "Claude's edits aren't formatted or linted until someone runs the tools by hand.",
+          title: t("detect.audit.hooksMissingTitle"),
+          detail: t("detect.audit.hooksMissingDetail"),
           fix: "setup-hooks",
         },
   );
@@ -132,8 +138,8 @@ export function auditWorkspace(root: string, profile: WorkspaceProfile): Finding
       id: "stop-hook.missing",
       area: "agent",
       status: "info",
-      title: "Tests don't run when Claude stops",
-      detail: `A Stop hook can run \`${testCommand}\` after each turn and send failures back to Claude to fix.`,
+      title: t("detect.audit.stopHookMissingTitle"),
+      detail: t("detect.audit.stopHookMissingDetail", { command: testCommand }),
       fix: "stop-tests",
     });
   }
@@ -141,78 +147,107 @@ export function auditWorkspace(root: string, profile: WorkspaceProfile): Finding
   const agents = list(".claude/agents").filter((a) => a.endsWith(".md"));
   const mcp = parseJson(read(".mcp.json"));
   const mcpServers = Object.keys((mcp?.mcpServers ?? {}) as object);
+  // An unreadable .mcp.json lists no servers, so it never has names to show.
+  const counts = { skills: skills.length, agents: agents.length, servers: mcpServers.length };
   checks.push({
     id: "claude-dir.inventory",
     area: "agent",
     status: "info",
-    title: "Project skills, agents and MCP servers",
-    detail: `${skills.length} skill(s), ${agents.length} agent(s), ${mcpServers.length} MCP server(s)${
-      mcpServers.length ? ` (${mcpServers.join(", ")})` : ""
-    }${exists(".mcp.json") && !mcp ? "; .mcp.json isn't valid JSON" : ""}.`,
+    title: t("detect.audit.inventoryTitle"),
+    detail:
+      exists(".mcp.json") && !mcp
+        ? t("detect.audit.inventoryDetailBadMcp", counts)
+        : mcpServers.length
+          ? t("detect.audit.inventoryDetailNamed", { ...counts, names: mcpServers.join(", ") })
+          : t("detect.audit.inventoryDetail", counts),
   });
 
   // Project quality.
   const testRun = firstRun("test");
   checks.push(
     testRun
-      ? { id: "tests.ok", area: "quality", status: "ok", title: "Test command found", detail: `\`${testRun}\`` }
+      ? {
+          id: "tests.ok",
+          area: "quality",
+          status: "ok",
+          title: t("detect.audit.testsOkTitle"),
+          detail: `\`${testRun}\``,
+        }
       : {
           id: "tests.missing",
           area: "quality",
           status: "missing",
-          title: "No test command",
-          detail: "Neither you nor Claude can check a change by running tests.",
+          title: t("detect.audit.testsMissingTitle"),
+          detail: t("detect.audit.testsMissingDetail"),
           fix: "scaffold-tests",
         },
   );
   const lintRun = firstRun("lint");
   checks.push(
     lintRun
-      ? { id: "lint.ok", area: "quality", status: "ok", title: "Lint command found", detail: `\`${lintRun}\`` }
+      ? { id: "lint.ok", area: "quality", status: "ok", title: t("detect.audit.lintOkTitle"), detail: `\`${lintRun}\`` }
       : {
           id: "lint.missing",
           area: "quality",
           status: "warn",
-          title: "No linter",
-          detail: "Common mistakes in Claude's edits won't be caught automatically.",
+          title: t("detect.audit.lintMissingTitle"),
+          detail: t("detect.audit.lintMissingDetail"),
           fix: "add-linter",
         },
   );
   const formatRun = firstRun("format");
   checks.push(
     formatRun
-      ? { id: "format.ok", area: "quality", status: "ok", title: "Format command found", detail: `\`${formatRun}\`` }
+      ? {
+          id: "format.ok",
+          area: "quality",
+          status: "ok",
+          title: t("detect.audit.formatOkTitle"),
+          detail: `\`${formatRun}\``,
+        }
       : {
           id: "format.missing",
           area: "quality",
           status: "warn",
-          title: "No formatter",
-          detail: "Edits keep whatever style they were written in, which makes diffs noisy.",
+          title: t("detect.audit.formatMissingTitle"),
+          detail: t("detect.audit.formatMissingDetail"),
           fix: "add-formatter",
         },
   );
   checks.push(
     profile.ci.length
-      ? { id: "ci.ok", area: "quality", status: "ok", title: "CI configured", detail: profile.ci.join(", ") }
+      ? {
+          id: "ci.ok",
+          area: "quality",
+          status: "ok",
+          title: t("detect.audit.ciOkTitle"),
+          detail: profile.ci.join(", "),
+        }
       : {
           id: "ci.missing",
           area: "quality",
           status: "missing",
-          title: "No CI",
-          detail: "Nothing checks a change once it leaves your machine.",
+          title: t("detect.audit.ciMissingTitle"),
+          detail: t("detect.audit.ciMissingDetail"),
           fix: "generate-ci",
         },
   );
   const smoke = list("scripts").find((n) => /^smoke([-_.][\w.-]*)?\.(sh|ps1|mjs|js|ts|py)$/.test(n));
   checks.push(
     smoke
-      ? { id: "smoke.ok", area: "quality", status: "ok", title: "Smoke test present", detail: `scripts/${smoke}` }
+      ? {
+          id: "smoke.ok",
+          area: "quality",
+          status: "ok",
+          title: t("detect.audit.smokeOkTitle"),
+          detail: `scripts/${smoke}`,
+        }
       : {
           id: "smoke.missing",
           area: "quality",
           status: "missing",
-          title: "No smoke test",
-          detail: "There's no quick check that the app still starts after a change.",
+          title: t("detect.audit.smokeMissingTitle"),
+          detail: t("detect.audit.smokeMissingDetail"),
           fix: "smoke-test",
         },
   );
@@ -224,8 +259,8 @@ export function auditWorkspace(root: string, profile: WorkspaceProfile): Finding
       id: "git.missing",
       area: "git",
       status: "missing",
-      title: "Not a git repository",
-      detail: "Changes can't be reviewed, reverted or rewound safely.",
+      title: t("detect.audit.gitMissingTitle"),
+      detail: t("detect.audit.gitMissingDetail"),
       fix: "git-init",
     });
   } else {
@@ -239,8 +274,8 @@ export function auditWorkspace(root: string, profile: WorkspaceProfile): Finding
         id: "env.tracked",
         area: "hygiene",
         status: "warn",
-        title: `${trackedEnv.join(", ")} is committed`,
-        detail: "Env files often hold secrets; anything committed stays in the history.",
+        title: t("detect.audit.envTrackedTitle", { files: trackedEnv.join(", ") }),
+        detail: t("detect.audit.envTrackedDetail"),
         fix: "untrack-env",
       });
     }
@@ -250,15 +285,15 @@ export function auditWorkspace(root: string, profile: WorkspaceProfile): Finding
             id: "gitignore.ok",
             area: "hygiene",
             status: "ok",
-            title: ".env is ignored",
-            detail: ".gitignore covers env files.",
+            title: t("detect.audit.gitignoreOkTitle"),
+            detail: t("detect.audit.gitignoreOkDetail"),
           }
         : {
             id: "gitignore.env",
             area: "hygiene",
             status: "missing",
-            title: ".env isn't ignored",
-            detail: "A secret dropped into .env would be committed with the next `git add .`.",
+            title: t("detect.audit.gitignoreEnvTitle"),
+            detail: t("detect.audit.gitignoreEnvDetail"),
             fix: "fix-gitignore",
           },
     );
@@ -269,20 +304,20 @@ export function auditWorkspace(root: string, profile: WorkspaceProfile): Finding
             id: "remote.ok",
             area: "git",
             status: "ok",
-            title: "Git remote set",
+            title: t("detect.audit.remoteOkTitle"),
             detail: remotes.split("\n").join(", "),
           }
         : {
             id: "remote.missing",
             area: "git",
             status: "info",
-            title: "No git remote",
-            detail: "Pushing, pull requests and hosted CI need one.",
+            title: t("detect.audit.remoteMissingTitle"),
+            detail: t("detect.audit.remoteMissingDetail"),
             fix: "add-remote",
           },
     );
   }
-  return checks.map(({ fix, ...c }) => (fix ? { ...c, fix: { action: fix, label: FIXES[fix] } } : c));
+  return checks.map(({ fix, ...c }) => (fix ? { ...c, fix: { action: fix, label: t(FIXES[fix]) } } : c));
 }
 
 function parseJson(text: string | null): Record<string, unknown> | null {

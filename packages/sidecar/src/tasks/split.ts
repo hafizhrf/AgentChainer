@@ -1,6 +1,7 @@
 import type { GateKind, TaskContract, WorkspaceProfile } from "@agentchainer/protocol";
 import { generatorHook } from "../bootstrap/generate.ts";
 import { guarded } from "../bootstrap/workspace-guard.ts";
+import { t } from "../i18n/index.ts";
 import type { AgentSdkModule } from "../sdk-loader.ts";
 import { availableGates, DRAFT_JSON_SCHEMA, normalizeContract, workspaceLines } from "./contract.ts";
 import type { AgentStep } from "./library.ts";
@@ -189,15 +190,15 @@ export async function proposeSplit(
     for await (const m of q) {
       if (m.type !== "result") continue;
       costUsd += m.total_cost_usd;
-      if (m.subtype !== "success") return { subtasks: [], error: `The split stopped: ${m.subtype}.` };
+      if (m.subtype !== "success") return { subtasks: [], error: t("tasks.split.stopped", { reason: m.subtype }) };
       const subtasks = normalizeSplit(
         m.structured_output,
         gates,
         folders.map((f) => f.name),
       );
-      return subtasks.length ? { subtasks } : { subtasks, error: "The split proposed no sub-tasks." };
+      return subtasks.length ? { subtasks } : { subtasks, error: t("tasks.split.none") };
     }
-    return { subtasks: [], error: "The split ended without a result." };
+    return { subtasks: [], error: t("tasks.split.noResult") };
   });
   return { ...result, costUsd };
 }

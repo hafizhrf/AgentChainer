@@ -39,7 +39,7 @@ impl Ptys {
         sink: impl Fn(PtyEvent) + Send + 'static,
     ) -> Result<u32, String> {
         if !std::path::Path::new(cwd).is_dir() {
-            return Err(format!("not a folder: {cwd}"));
+            return Err(crate::i18n::tr("native.notAFolder", &[("path", cwd)]));
         }
         let pair = native_pty_system()
             .openpty(size(cols, rows))

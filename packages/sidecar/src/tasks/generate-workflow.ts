@@ -1,4 +1,5 @@
 import { GATE_KINDS, STEP_INPUTS, type TaskContract, WORKFLOW_ROLES } from "@agentchainer/protocol";
+import { t } from "../i18n/index.ts";
 import type { AgentSdkModule } from "../sdk-loader.ts";
 import type { Library } from "./library.ts";
 import { checkWorkflowText } from "./project-workflows.ts";
@@ -109,12 +110,12 @@ export async function generateWorkflow(
       if (m.type !== "result") continue;
       costUsd += m.total_cost_usd;
       if (m.subtype !== "success")
-        return { yaml: null, summary: "", error: `Generating stopped: ${m.subtype}.`, costUsd };
+        return { yaml: null, summary: "", error: t("tasks.generateWorkflow.stopped", { reason: m.subtype }), costUsd };
       answer = (m.structured_output ?? null) as typeof answer;
     }
     const yaml = typeof answer?.yaml === "string" ? stripFences(answer.yaml) : "";
     const summary = typeof answer?.summary === "string" ? answer.summary.trim() : "";
-    if (!yaml) return { yaml: null, summary, error: "The answer had no workflow.", costUsd };
+    if (!yaml) return { yaml: null, summary, error: t("tasks.generateWorkflow.noWorkflow"), costUsd };
     const error = checkWorkflowText(tier, yaml, shipped);
     if (!error) return { yaml: yaml.endsWith("\n") ? yaml : `${yaml}\n`, summary, costUsd };
     previous = { yaml, error };
@@ -122,7 +123,7 @@ export async function generateWorkflow(
   return {
     yaml: null,
     summary: "",
-    error: `The generated workflow didn't pass the checks: ${previous?.error}`,
+    error: t("tasks.generateWorkflow.failedChecks", { error: String(previous?.error) }),
     costUsd,
   };
 }

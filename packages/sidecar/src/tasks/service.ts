@@ -35,6 +35,7 @@ import {
   prChecks,
   prState,
 } from "../github.ts";
+import { t } from "../i18n/index.ts";
 import { log, RpcFailure } from "../rpc.ts";
 import { runAsync } from "../run-async.ts";
 import type { AgentSdkModule } from "../sdk-loader.ts";
@@ -93,13 +94,13 @@ const invalid = (message: string) => new RpcFailure(RpcErrorCode.invalidParams, 
 const running = new Map<string, AbortController>();
 
 async function cancellable<T>(id: string, fn: (controller: AbortController) => Promise<T>): Promise<T> {
-  if (running.has(id)) throw invalid("Claude is already working on this task's contract.");
+  if (running.has(id)) throw invalid(t("tasks.service.alreadyDrafting"));
   const controller = new AbortController();
   running.set(id, controller);
   try {
     return await fn(controller);
   } catch (err) {
-    if (controller.signal.aborted) throw new RpcFailure(RpcErrorCode.cancelled, "Stopped.");
+    if (controller.signal.aborted) throw new RpcFailure(RpcErrorCode.cancelled, t("tasks.service.stopped"));
     throw err;
   } finally {
     running.delete(id);
@@ -114,7 +115,7 @@ export function cancelTask(id: string): boolean {
 }
 
 function requireDraft(task: Task): void {
-  if (task.state !== "draft") throw invalid("The contract is approved. Revise it to make changes.");
+  if (task.state !== "draft") throw invalid(t("tasks.service.contractApproved"));
 }
 
 /**
@@ -123,7 +124,7 @@ function requireDraft(task: Task): void {
  */
 export function newTask(root: string, request: string, context?: string, folders: string[] = []): Task {
   const text = request.trim();
-  if (!text) throw invalid("Describe the task first.");
+  if (!text) throw invalid(t("tasks.service.describeFirst"));
   const task = createTask(root, text, availableGates(detectWorkspace(root), root));
   if (!context?.trim() && !folders.length) return task;
   const extra: Task = {
@@ -178,7 +179,7 @@ export async function draftTask(
 ): Promise<Task> {
   const task = loadTask(root, id);
   requireDraft(task);
-  if (feedback !== undefined && !task.contract) throw invalid("Draft the contract first.");
+  if (feedback !== undefined && !task.contract) throw invalid(t("tasks.service.draftFirst"));
   return cancellable(id, async (controller) => {
     const profile = detectWorkspace(root);
     const draft = await draftContract(claude.sdk, claude.claudePath, root, task.request, profile, {
@@ -199,14 +200,14 @@ export async function draftTask(
     };
     if (!draft.contract) {
       saveTask(root, drafted);
-      throw new Error(draft.error ?? "Drafting failed.");
+      throw new Error(draft.error ?? t("tasks.service.draftingFailed"));
     }
-    const t = await triage(root, task.request, draft.contract, claude, controller);
+    const triaged = await triage(root, task.request, draft.contract, claude, controller);
     const next: Task = {
       ...drafted,
       contract: draft.contract,
-      triage: t.triage,
-      costUsd: drafted.costUsd + t.costUsd,
+      triage: triaged.triage,
+      costUsd: drafted.costUsd + triaged.costUsd,
       updatedAt: new Date().toISOString(),
     };
     saveTask(root, next);
@@ -220,12 +221,12 @@ export async function retriageTask(root: string, id: string, edited: TaskContrac
   requireDraft(task);
   const contract = normalizeContract(task.request, edited, task.availableGates);
   return cancellable(id, async (controller) => {
-    const t = await triage(root, task.request, contract, claude, controller);
+    const triaged = await triage(root, task.request, contract, claude, controller);
     const next: Task = {
       ...task,
       contract,
-      triage: t.triage,
-      costUsd: task.costUsd + t.costUsd,
+      triage: triaged.triage,
+      costUsd: task.costUsd + triaged.costUsd,
       updatedAt: new Date().toISOString(),
     };
     saveTask(root, next);
@@ -250,17 +251,17 @@ export function approveTask(
 ): Task {
   const task = loadTask(root, id);
   requireDraft(task);
-  if (!task.contract || !task.triage) throw invalid("Draft the contract first.");
+  if (!task.contract || !task.triage) throw invalid(t("tasks.service.draftFirst"));
   const contract = normalizeContract(task.request, edited, task.availableGates);
   if (comparable(contract) !== comparable(task.contract)) {
-    throw invalid("The contract changed after triage. Run triage again before approving.");
+    throw invalid(t("tasks.service.contractChanged"));
   }
-  if (task.parent && tier === "XL") throw invalid("A sub-task runs as S, M or L.");
-  if (!contract.objective) throw invalid("Write the objective first.");
-  if (contract.acceptanceCriteria.length === 0) throw invalid("Add at least one acceptance criterion.");
+  if (task.parent && tier === "XL") throw invalid(t("tasks.service.subtaskTier"));
+  if (!contract.objective) throw invalid(t("tasks.service.objectiveFirst"));
+  if (contract.acceptanceCriteria.length === 0) throw invalid(t("tasks.service.criterionFirst"));
   const why = reason?.trim() ?? "";
   if (tier !== task.triage.proposed && !why) {
-    throw invalid(`Say why this task should be ${tier} rather than the proposed ${task.triage.proposed}.`);
+    throw invalid(t("tasks.service.tierReason", { tier, proposed: task.triage.proposed }));
   }
   const { override: _previous, ...proposal } = task.triage;
   const at = now.toISOString();
@@ -283,7 +284,7 @@ export function approveTask(
 /** Reopens an approved contract for editing. Unchanged, it can be approved again without a new triage. */
 export function reviseTask(root: string, id: string, now = new Date()): Task {
   const task = loadTask(root, id);
-  if (runs.has(id)) throw invalid("The task is running. Stop it first.");
+  if (runs.has(id)) throw invalid(t("tasks.service.runningStopFirst"));
   if (task.state === "draft" || !task.contract) return task;
   const { approvedAt: _approved, ...contract } = task.contract;
   // A new contract makes the last run's results meaningless.
@@ -330,7 +331,7 @@ function flowOf(task: Task): Workflow | null {
     const w = parseProjectWorkflow(`${tier.toLowerCase()}.yaml`, task.flow.yaml, library);
     return "split" in w ? null : w;
   } catch (err) {
-    throw invalid(`The task's own flow can't run: ${err instanceof Error ? err.message : String(err)}`);
+    throw invalid(t("tasks.service.flowCantRun", { error: err instanceof Error ? err.message : String(err) }));
   }
 }
 
@@ -343,10 +344,10 @@ export async function proposeFlow(root: string, id: string, claude: Claude, mode
   requireDraft(task);
   const tier = task.triage?.chosen;
   const contract = task.contract;
-  if (!contract || !tier) throw invalid("Draft the contract first.");
-  if (tier === "XL") throw invalid("An XL task's sub-tasks each follow their own tier's flow.");
+  if (!contract || !tier) throw invalid(t("tasks.service.draftFirst"));
+  if (tier === "XL") throw invalid(t("tasks.service.xlFlow"));
   const current = workflowsOf(root).library.workflows[tier];
-  if (!current) throw invalid(`${tier} tasks have no workflow in this version of the app.`);
+  if (!current) throw invalid(t("tasks.service.noWorkflow", { tier }));
   return cancellable(id, async (controller) => {
     const r = await generateWorkflow(
       claude.sdk,
@@ -367,7 +368,7 @@ export async function proposeFlow(root: string, id: string, claude: Claude, mode
       updatedAt: at,
     };
     saveTask(root, next);
-    if (!r.yaml) throw invalid(r.error ?? "No flow was proposed.");
+    if (!r.yaml) throw invalid(r.error ?? t("tasks.service.noFlowProposed"));
     return next;
   });
 }
@@ -397,7 +398,7 @@ function keptWorkflow<T>(
     // Reported below.
   }
   if (!parsed.success || !parsed.data) {
-    throw invalid(`The copy of the project's workflow this run started with (${ref?.file}) is missing or damaged.`);
+    throw invalid(t("tasks.service.keptWorkflowDamaged", { file: String(ref?.file) }));
   }
   return parsed.data;
 }
@@ -407,14 +408,14 @@ export function runWorkflow(root: string, task: Task): Workflow {
   const ref = task.run?.workflow;
   if (ref?.source === "project" || ref?.source === "task") return keptWorkflow(root, task, WorkflowSchema);
   const workflow = Object.values(library.workflows).find((w) => w.id === ref?.id);
-  if (!workflow) throw invalid(`The workflow ${ref?.id} isn't in this version of the app.`);
+  if (!workflow) throw invalid(t("tasks.service.workflowNotInApp", { id: String(ref?.id) }));
   return workflow;
 }
 
 /** The XL workflow an XL run started with. */
 function runXlWorkflow(root: string, task: Task): XlWorkflow {
   if (task.run?.workflow.source === "project") return keptWorkflow(root, task, XlWorkflowSchema);
-  if (!library.xl) throw invalid("This version of the app has no XL workflow.");
+  if (!library.xl) throw invalid(t("tasks.service.noXlWorkflow"));
   return library.xl;
 }
 
@@ -476,11 +477,11 @@ export function listTasksLive(root: string): TaskSummary[] {
  * that was never merged. A sub-task goes only with its XL task.
  */
 export function deleteTaskSafe(root: string, id: string): void {
-  if (runs.has(id)) throw invalid("The task is running. Stop it first.");
+  if (runs.has(id)) throw invalid(t("tasks.service.runningStopFirst"));
   const task = loadTask(root, id);
-  if (task.parent) throw invalid("A sub-task goes with its XL task: delete that one instead.");
+  if (task.parent) throw invalid(t("tasks.service.subtaskDelete"));
   const children = (task.subtasks ?? []).map((c) => loadTask(root, c));
-  if (children.some((c) => runs.has(c.id))) throw invalid("A sub-task is running. Stop the task first.");
+  if (children.some((c) => runs.has(c.id))) throw invalid(t("tasks.service.subtaskRunning"));
   for (const t of [...children, task]) {
     if (t.worktree && !t.worktree.removed) removeWorktree(t.folder?.path ?? root, t.worktree.path);
     removeFolderWorktrees(t);
@@ -507,12 +508,11 @@ const STARTABLE = new Set<Task["state"]>(["ready", "done", "accepted", "failed",
 export function schedulable(root: string, id: string): Task {
   const task = present(loadTask(root, id));
   if (!task.contract?.approvedAt || !task.triage) {
-    throw invalid("Approve the task's contract and tier first: a schedule runs an approved task.");
+    throw invalid(t("tasks.service.scheduleApproveFirst"));
   }
-  if (task.triage.chosen === "XL")
-    throw invalid("An XL task can't be scheduled: each run's split needs your approval.");
-  if (task.parent) throw invalid("A sub-task runs with its XL task; schedule a task of its own.");
-  if (task.state === "interrupted") throw invalid("Its last run was interrupted: resume or stop it first.");
+  if (task.triage.chosen === "XL") throw invalid(t("tasks.service.scheduleXl"));
+  if (task.parent) throw invalid(t("tasks.service.scheduleSubtask"));
+  if (task.state === "interrupted") throw invalid(t("tasks.service.scheduleInterrupted"));
   return task;
 }
 
@@ -676,17 +676,17 @@ export function startTask(
   now = new Date(),
 ): Task {
   const task = present(loadTask(root, id));
-  if (runs.has(id)) throw invalid("The task is already running.");
+  if (runs.has(id)) throw invalid(t("tasks.service.alreadyRunning"));
   if (opts.scheduled) schedulable(root, id);
   if (!STARTABLE.has(task.state) || !task.contract?.approvedAt || !task.triage) {
-    throw invalid("Approve the contract and the tier first.");
+    throw invalid(t("tasks.service.approveFirst"));
   }
   if (task.triage.chosen === "XL") return startXl(root, task, host, opts, notify, now);
   if (task.parent) requireOwnRun(task);
   const eff = workflowsOf(root);
   const own = flowOf(task);
   const workflow = own ?? eff.library.workflows[task.triage.chosen];
-  if (!workflow) throw invalid(`${task.triage.chosen} tasks have no workflow in this version of the app.`);
+  if (!workflow) throw invalid(t("tasks.service.noWorkflow", { tier: task.triage.chosen }));
   // A sub-task runs in the worktree its XL task made; any other task gets its own, in each of its folders (M8-01).
   const primary = task.parent ? { task, fresh: false } : taskBranch(root, task);
   const folders = task.parent ? { task: primary.task, fresh: [] } : branchFolders(primary.task);
@@ -709,16 +709,16 @@ export function startTask(
 
 /** A sub-task runs on its own only in its worktree, and not while its XL task runs. */
 function requireOwnRun(task: Task): void {
-  if (task.parent && runs.has(task.parent.id)) throw invalid("Its XL task is running: sub-tasks run from there.");
+  if (task.parent && runs.has(task.parent.id)) throw invalid(t("tasks.service.parentRunning"));
   if (!task.worktree || task.worktree.removed || !existsSync(task.worktree.path)) {
-    throw invalid("Sub-tasks run from their XL task: run or continue that one.");
+    throw invalid(t("tasks.service.runFromParent"));
   }
 }
 
 /** Continues an interrupted run from the step it stopped in. */
 export function resumeTask(root: string, id: string, host: SessionHost, notify: (task: Task) => void): Task {
   const task = present(loadTask(root, id));
-  if (task.state !== "interrupted" || !task.run) throw invalid("Only an interrupted run can be resumed.");
+  if (task.state !== "interrupted" || !task.run) throw invalid(t("tasks.service.onlyInterrupted"));
   if (task.triage?.chosen === "XL") return continueTask(root, id, host, notify);
   if (task.parent) requireOwnRun(task);
   const running: Task = { ...task, state: "running" };
@@ -738,8 +738,8 @@ export function resumeTask(root: string, id: string, host: SessionHost, notify: 
  */
 export function messageRun(id: string, text: string): boolean {
   const run = runs.get(id);
-  if (!run) throw invalid("The task isn't running.");
-  if (!run.message?.(text)) throw invalid("No step is working right now; send it once a step is running.");
+  if (!run) throw invalid(t("tasks.service.notRunning"));
+  if (!run.message?.(text)) throw invalid(t("tasks.service.noStepWorking"));
   return true;
 }
 
@@ -760,7 +760,7 @@ export function shutdownRuns(): void {
 /** XL runs in worktrees: the workspace must be in git, with a commit to branch from. */
 function requireRepoWithCommit(root: string): void {
   if (!repoOf(root) || !headOf(root)) {
-    throw invalid("XL tasks run in git worktrees: this workspace needs a git repository with at least one commit.");
+    throw invalid(t("tasks.service.xlNeedsRepo"));
   }
 }
 
@@ -774,14 +774,14 @@ const subtasksOf = (root: string, task: Task) => (task.subtasks ?? []).map((id) 
 export async function splitTask(root: string, id: string, claude: Claude, model?: string): Promise<Task> {
   const task = present(loadTask(root, id));
   if (task.triage?.chosen !== "XL" || !task.contract?.approvedAt || task.state !== "ready") {
-    throw invalid("Approve the contract with tier XL first.");
+    throw invalid(t("tasks.service.approveXlFirst"));
   }
   requireRepoWithCommit(root);
   const xl = workflowsOf(root).library.xl;
-  if (!xl) throw invalid("This version of the app has no XL workflow.");
+  if (!xl) throw invalid(t("tasks.service.noXlWorkflow"));
   const previous = subtasksOf(root, task);
   if (previous.some((c) => c.run || (c.state !== "draft" && c.state !== "ready"))) {
-    throw invalid("Sub-tasks have run already, so the split stays. Discard the task to start over.");
+    throw invalid(t("tasks.service.splitStays"));
   }
   const contract = task.contract;
   const budgetUsd = task.triage.budgetUsd;
@@ -849,7 +849,7 @@ export async function splitTask(root: string, id: string, claude: Claude, model?
 /** Approves every draft sub-task as drafted: its contract and its tier. */
 export function approveSubtasks(root: string, id: string, now = new Date()): Task {
   const task = loadTask(root, id);
-  if (!task.subtasks?.length) throw invalid("Split the task first.");
+  if (!task.subtasks?.length) throw invalid(t("tasks.service.splitFirst"));
   for (const child of subtasksOf(root, task)) {
     if (child.state !== "draft" || !child.contract || !child.triage) continue;
     try {
@@ -864,7 +864,11 @@ export function approveSubtasks(root: string, id: string, now = new Date()): Tas
       );
     } catch (err) {
       throw invalid(
-        `Sub-task ${(child.parent?.index ?? 0) + 1} (${child.title ?? child.request}): ${err instanceof Error ? err.message : String(err)}`,
+        t("tasks.service.subtaskError", {
+          n: (child.parent?.index ?? 0) + 1,
+          title: child.title ?? child.request,
+          error: err instanceof Error ? err.message : String(err),
+        }),
       );
     }
   }
@@ -881,17 +885,17 @@ function startXl(
 ): Task {
   const eff = workflowsOf(root);
   const xl = eff.library.xl;
-  if (!xl) throw invalid("This version of the app has no XL workflow.");
-  if (task.state !== "ready") throw invalid("An XL run that stopped goes on with Continue.");
+  if (!xl) throw invalid(t("tasks.service.noXlWorkflow"));
+  if (task.state !== "ready") throw invalid(t("tasks.service.xlContinue"));
   requireRepoWithCommit(root);
   const children = subtasksOf(root, task);
   if (!children.length || children.some((c) => c.state !== "ready")) {
-    throw invalid("Split the task and approve every sub-task first.");
+    throw invalid(t("tasks.service.approveSubtasksFirst"));
   }
   // A multi-folder XL task branches in each of its folders, which must be in git too (M8-01); the run sets them up.
   for (const f of task.folders ?? []) {
     if (!repoOf(f.path) || !headOf(f.path)) {
-      throw invalid(`XL tasks run in git worktrees: ${f.name} needs a git repository with at least one commit.`);
+      throw invalid(t("tasks.service.xlFolderNeedsRepo", { folder: f.name }));
     }
   }
   const branched = branchFolders(task).task;
@@ -911,10 +915,10 @@ function startXl(
 /** Picks a stopped, failed or interrupted XL run up again: merged sub-tasks are skipped, the others run. */
 export function continueTask(root: string, id: string, host: SessionHost, notify: (task: Task) => void): Task {
   const task = present(loadTask(root, id));
-  if (task.triage?.chosen !== "XL" || !task.run) throw invalid("Only an XL run can be continued.");
-  if (runs.has(id)) throw invalid("The task is already running.");
+  if (task.triage?.chosen !== "XL" || !task.run) throw invalid(t("tasks.service.onlyXlContinues"));
+  if (runs.has(id)) throw invalid(t("tasks.service.alreadyRunning"));
   if (!["failed", "unverified", "cancelled", "interrupted"].includes(task.state)) {
-    throw invalid("Only a stopped, failed or interrupted XL run can be continued.");
+    throw invalid(t("tasks.service.continueWhich"));
   }
   const { endedAt: _ended, outcome: _outcome, ...run } = task.run;
   const running: Task = { ...task, state: "running", run, updatedAt: new Date().toISOString() };
@@ -933,7 +937,7 @@ function launchXl(
   resume: boolean,
 ): Promise<Task> {
   const run = task.run;
-  if (!run) throw invalid("The XL task hasn't started.");
+  if (!run) throw invalid(t("tasks.service.xlNotStarted"));
   const xl = runXlWorkflow(root, task);
   const world = gitWorld(root, {
     load: (id) => present(loadTask(root, id)),
@@ -997,16 +1001,16 @@ export function mergeResult(
   now = new Date(),
 ): { merged: boolean; conflicts: string[]; into: string } {
   const task = present(loadTask(root, id));
-  if (!task.worktree || task.parent) throw invalid("This task has no branch of its own to merge.");
-  if (runs.has(id)) throw invalid("The task is running. Stop it first.");
+  if (!task.worktree || task.parent) throw invalid(t("tasks.service.noOwnBranch"));
+  if (runs.has(id)) throw invalid(t("tasks.service.runningStopFirst"));
   if (task.state !== "done" && task.state !== "accepted") {
-    throw invalid("Merge once the run is Done, or accept its risk first.");
+    throw invalid(t("tasks.service.mergeNotFinished"));
   }
-  if (hasTrackedChanges(root)) throw invalid("Commit or stash your changes first: the merge would mix with them.");
+  if (hasTrackedChanges(root)) throw invalid(t("tasks.service.mergeDirty"));
   // A multi-folder task merges into each of its folders' current branches too (M8-01), the primary folder last.
   const others = (task.folders ?? []).filter((f) => f.worktree && !f.worktree.removed);
   for (const f of others) {
-    if (hasTrackedChanges(f.path)) throw invalid(`Commit or stash your changes in ${f.name} first.`);
+    if (hasTrackedChanges(f.path)) throw invalid(t("tasks.service.mergeDirtyFolder", { folder: f.name }));
   }
   for (const f of others) {
     const wt = f.worktree;
@@ -1045,7 +1049,7 @@ function commitIn(code: string, task: Task, untrackedBefore: string[], title?: s
   try {
     commitAll(code, message, untrackedBefore);
   } catch (err) {
-    throw invalid(`Committing the task's changes failed: ${err instanceof Error ? err.message : String(err)}`);
+    throw invalid(t("tasks.service.commitFailed", { error: err instanceof Error ? err.message : String(err) }));
   }
 }
 
@@ -1078,8 +1082,8 @@ export function overlapsOf(root: string, id: string): { taskId: string; title: s
  */
 export function cleanupTask(root: string, id: string, deleteBranches: boolean): void {
   const task = loadTask(root, id);
-  if (task.parent) throw invalid("A sub-task's worktree goes with its XL task.");
-  if (runs.has(id)) throw invalid("The task is running. Stop it first.");
+  if (task.parent) throw invalid(t("tasks.service.subtaskWorktree"));
+  if (runs.has(id)) throw invalid(t("tasks.service.runningStopFirst"));
   for (const t of [...subtasksOf(root, task), task]) {
     const wt = t.worktree;
     if (!wt) continue;
@@ -1110,13 +1114,13 @@ const MAX_PR_BODY = 60_000;
 /** A task that can become a PR: ended Done or accepted, with its own branch and a worktree to commit from. */
 function shippable(root: string, id: string): Task & { worktree: NonNullable<Task["worktree"]> } {
   const task = present(loadTask(root, id));
-  if (task.parent) throw invalid("A sub-task's work goes in with its XL task's branch.");
-  if (runs.has(id)) throw invalid("The task is running. Stop it first.");
+  if (task.parent) throw invalid(t("tasks.service.subtaskBranch"));
+  if (runs.has(id)) throw invalid(t("tasks.service.runningStopFirst"));
   if (task.state !== "done" && task.state !== "accepted") {
-    throw invalid("Create a PR once the run is Done, or accept its risk first.");
+    throw invalid(t("tasks.service.prNotFinished"));
   }
   const wt = task.worktree;
-  if (!wt || wt.removed || !existsSync(wt.path)) throw invalid("The task has no worktree to push from.");
+  if (!wt || wt.removed || !existsSync(wt.path)) throw invalid(t("tasks.service.noWorktreeToPush"));
   return { ...task, worktree: wt };
 }
 
@@ -1138,7 +1142,7 @@ export function shortTitle(objective: string): string {
 /** The branch a task's PR goes into: the one it started from, else the workspace's current branch. */
 function prBase(root: string, task: Task): string {
   const base = task.worktree?.from ?? (git(["symbolic-ref", "--short", "-q", "HEAD"], root).stdout.trim() || null);
-  if (!base) throw invalid("The workspace isn't on a branch, so the PR has no base. Check one out first.");
+  if (!base) throw invalid(t("tasks.service.noBase"));
   return base;
 }
 
@@ -1216,17 +1220,17 @@ export async function createTaskPr(
   if (!gh || status.state !== "ready") {
     throw invalid(
       status.state === "missing"
-        ? "The GitHub CLI (gh) isn't installed."
+        ? t("tasks.service.ghMissing")
         : status.state === "no-remote"
-          ? "The repository has no origin remote on GitHub."
-          : `gh isn't signed in to ${status.host}. Run \`gh auth login\` in a terminal.`,
+          ? t("tasks.service.noOrigin")
+          : t("tasks.service.ghSignedOut", { host: String(status.host) }),
     );
   }
   const base = prBase(root, task);
   const head = task.worktree.branch;
   commitResult(root, task);
   if (git(["rev-list", "--count", `${base}..${head}`], root).stdout.trim() === "0") {
-    throw invalid(`${head} has no commits that ${base} doesn't have: there is nothing to propose.`);
+    throw invalid(t("tasks.service.nothingToPropose", { head, base }));
   }
   // A multi-folder task's other repositories get their own PRs (M8-01). Every check runs before anything is pushed.
   const others = await otherRepos(task, gh);
@@ -1323,14 +1327,14 @@ async function otherRepos(task: Task, gh: Gh): Promise<OtherRepo[]> {
     if (!wt || wt.removed || !existsSync(wt.path)) continue;
     commitIn(dir, task, wt.untracked);
     const base = wt.from ?? (git(["symbolic-ref", "--short", "-q", "HEAD"], folder.path).stdout.trim() || null);
-    if (!base) throw invalid(`${folder.name} isn't on a branch, so its PR has no base. Check one out there first.`);
+    if (!base) throw invalid(t("tasks.service.folderNoBase", { folder: folder.name }));
     if (git(["rev-list", "--count", `${base}..${wt.branch}`], folder.path).stdout.trim() === "0") continue;
     const status = await githubStatus(folder.path, gh);
     if (status.state !== "ready") {
       throw invalid(
         status.state === "no-remote"
-          ? `${folder.name} has changes, but its repository has no origin remote on GitHub.`
-          : `gh can't open a PR for ${folder.name} (${status.state}).`,
+          ? t("tasks.service.folderNoOrigin", { folder: folder.name })
+          : t("tasks.service.folderCantOpenPr", { folder: folder.name, state: status.state }),
       );
     }
     out.push({ folder, code: dir, base, head: wt.branch });
@@ -1347,7 +1351,7 @@ async function requireNoSecrets(code: string, base: string, head: string, prefix
   const scan = await scanSecretsAsync(code, changed);
   if (scan.ran && scan.flagged.length) {
     const files = scan.flagged.map((f) => `${prefix}${f}`).join(", ");
-    throw invalid(`gitleaks flagged possible secrets in ${files}. Remove them before pushing.`);
+    throw invalid(t("tasks.service.secretsFound", { files }));
   }
 }
 
@@ -1372,8 +1376,8 @@ export function otherPrBody(task: Task, folder: string, mainUrl: string | null):
 
 function withPr(root: string, id: string, gh: Gh | null): { task: Task; pr: NonNullable<Task["pr"]>; gh: Gh } {
   const task = present(loadTask(root, id));
-  if (!task.pr) throw invalid("The task has no pull request yet.");
-  if (!gh) throw invalid("The GitHub CLI (gh) isn't installed.");
+  if (!task.pr) throw invalid(t("tasks.service.noPr"));
+  if (!gh) throw invalid(t("tasks.service.ghMissing"));
   return { task, pr: task.pr, gh };
 }
 
@@ -1386,10 +1390,9 @@ export async function prStatus(root: string, id: string, gh: Gh | null) {
 /** The failed steps' log of one of the PR's checks, named by its link, which must be one of the PR's. */
 export async function ciLog(root: string, id: string, link: string, gh: Gh | null): Promise<string> {
   const { pr, gh: run } = withPr(root, id, gh);
-  if (!(await prChecks(run, root, pr.number)).some((c) => c.link === link))
-    throw invalid("That isn't one of the PR's checks.");
+  if (!(await prChecks(run, root, pr.number)).some((c) => c.link === link)) throw invalid(t("tasks.service.notACheck"));
   const job = jobOf(link);
-  if (!job) throw invalid("Only GitHub Actions logs can be read here. Open the check's page instead.");
+  if (!job) throw invalid(t("tasks.service.actionsOnly"));
   return failedJobLog(run, root, job);
 }
 
@@ -1410,14 +1413,12 @@ export async function fixCiTask(
   const { pr, gh: run } = withPr(root, id, gh);
   const fixes = pr.fixes ?? [];
   if (fixes.length >= MAX_CI_FIXES) {
-    throw invalid(
-      `This PR had its ${MAX_CI_FIXES} Fix CI rounds. Look at the failure yourself, or run the task again.`,
-    );
+    throw invalid(t("tasks.service.fixCiCap", { max: MAX_CI_FIXES }));
   }
   const check = (await prChecks(run, root, pr.number)).find((c) => c.link === link);
-  if (check?.bucket !== "fail") throw invalid("That check isn't failing.");
+  if (check?.bucket !== "fail") throw invalid(t("tasks.service.checkNotFailing"));
   const job = jobOf(link);
-  if (!job) throw invalid("Only GitHub Actions logs can be read here. Open the check's page instead.");
+  if (!job) throw invalid(t("tasks.service.actionsOnly"));
   const log = await failedJobLog(run, root, job);
   const running: Task = { ...task, state: "running", updatedAt: now.toISOString() };
   saveTask(root, running);
@@ -1635,7 +1636,7 @@ export async function reviewPrTask(
   const head = (await prState(run, root, pr.number)).headSha;
   const code = codeRootIn(root, task.worktree.path);
   if (git(["rev-parse", "HEAD"], code).stdout.trim() !== head) {
-    throw invalid("The task's worktree isn't at the PR's head, so its diff isn't what the PR holds.");
+    throw invalid(t("tasks.service.worktreeNotAtHead"));
   }
   const running: Task = { ...task, state: "running", updatedAt: now.toISOString() };
   saveTask(root, running);
@@ -1678,14 +1679,14 @@ export async function mergePrTask(
   now = new Date(),
 ): Promise<Task> {
   const { pr, gh: run } = withPr(root, id, gh);
-  if (runs.has(id)) throw invalid("The task is running. Wait for it to end.");
-  if (pr.merged) throw invalid("The PR is merged already.");
+  if (runs.has(id)) throw invalid(t("tasks.service.runningWait"));
+  if (pr.merged) throw invalid(t("tasks.service.prMerged"));
   const g = await mergeGates(root, id, run);
-  if (g.headSha !== opts.headSha) throw invalid("The PR changed since you checked its gates. Check them again.");
-  if (!g.methods.includes(opts.method)) throw invalid(`The repository doesn't allow ${opts.method} merges.`);
+  if (g.headSha !== opts.headSha) throw invalid(t("tasks.service.prChanged"));
+  if (!g.methods.includes(opts.method)) throw invalid(t("tasks.service.methodNotAllowed", { method: opts.method }));
   const held = g.gates.filter((x) => HOLDS.has(x.state));
   if (held.length && !opts.acceptReason?.trim()) {
-    throw invalid(`Merge is held back by: ${held.map((x) => x.label).join(", ")}. Say why it's fine to merge anyway.`);
+    throw invalid(t("tasks.service.mergeHeld", { gates: held.map((x) => x.label).join(", ") }));
   }
   await mergePullRequest(run, root, pr.number, opts.method, opts.headSha, g.draft);
   const at = now.toISOString();
@@ -1715,12 +1716,12 @@ export async function mergePrTask(
 /** Ends a failed or unverified run as accepted with risk, with the user's reason; the report keeps it. */
 export function acceptRisk(root: string, id: string, reason: string, now = new Date()): Task {
   const task = present(loadTask(root, id));
-  if (runs.has(id)) throw invalid("The task is running. Stop it first.");
+  if (runs.has(id)) throw invalid(t("tasks.service.runningStopFirst"));
   if ((task.state !== "failed" && task.state !== "unverified") || !task.run) {
-    throw invalid("Only a failed or unverified run can be accepted with risk.");
+    throw invalid(t("tasks.service.acceptWhich"));
   }
   const why = reason.trim();
-  if (!why) throw invalid("Say why the risk is acceptable.");
+  if (!why) throw invalid(t("tasks.service.riskReason"));
   const at = now.toISOString();
   const next: Task = {
     ...task,
@@ -1805,7 +1806,7 @@ function scanSecretsAcross(code: string, own: FileChange[], task: Task): Secrets
 
 /** Builds the evidence from the task's records and writes `evidence.json` and `evidence.md` in its folder. */
 export function writeEvidence(root: string, task: Task, now = new Date()): { markdown: string; path: string } {
-  if (!task.run) throw invalid("The task hasn't run yet.");
+  if (!task.run) throw invalid(t("tasks.service.notRunYet"));
   // XL tasks and sub-tasks changed their worktree, where the files their setup installed don't count.
   const code = codeRootOf(root, task);
   const stats = fileStats(code, task.run.base, task.worktree?.untracked ?? task.run.untrackedAtStart);
@@ -1887,7 +1888,7 @@ export function evidenceOf(root: string, id: string): Evidence {
 
 export function taskEvidence(root: string, id: string): { markdown: string; path: string } {
   const task = present(loadTask(root, id));
-  if (!task.run || task.state === "running") throw invalid("The report is written when the run ends.");
+  if (!task.run || task.state === "running") throw invalid(t("tasks.service.reportAtEnd"));
   const stored = readTaskFile(root, id, "evidence.md");
   let generatedAt = Number.NaN;
   try {

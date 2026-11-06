@@ -1,0 +1,6 @@
+{
+  "plugins.cli.failed": "{{command}} gagal: {{detail}}",
+  "plugins.confirm.fetches": "{{command}} (mengambil {{archive}})",
+  "plugins.install.title": "Pasang {{name}} (plugin)",
+  "plugins.review.versionMoved": "Terpasang {{version}}, tetapi yang ditinjau adalah {{reviewed}}: marketplace sudah beralih ke versi baru. Tinjau perubahannya sebelum mengandalkannya."
+}

@@ -7,6 +7,7 @@ import { writeFileSync } from "node:fs";
 import path from "node:path";
 import { after, before, describe, it } from "node:test";
 import { LANGUAGES, setLocale, t } from "../../apps/desktop/src/i18n/index.ts";
+import { t as sidecarText } from "../../packages/sidecar/src/i18n/index.ts";
 import { axeViolations, blocking } from "./axe.mjs";
 import { KEY, WebDriver, waitFor, xpathString } from "./webdriver.mjs";
 
@@ -61,6 +62,18 @@ describe("Bahasa Indonesia (X-13)", () => {
     await (await app.button(t("home.view.openSetup"), { timeout: 60_000 })).click();
     await app.findText(t("setup.page.title"), { tag: "h1" });
     assert.deepEqual(await look("workspace-settings"), []);
+  });
+
+  it("shows the sidecar's own text in Indonesian: a setup plan action", async () => {
+    // The action's title comes from the sidecar, which gets the language at spawn (AGENTCHAINER_LANGUAGE).
+    await (
+      await app.find(
+        `//nav[contains(@class, 'setup-nav')]//button[contains(normalize-space(.), ${xpathString(t("setup.page.navPlan"))})]`,
+      )
+    ).click();
+    const title = sidecarText("bootstrap.plan.fixGitignoreTitle");
+    await app.find(`//input[@aria-label=${xpathString(t("setup.plan.include", { title }))}]`, { timeout: 60_000 });
+    assert.deepEqual(await look("setup-plan"), []);
   });
 
   it("opens the command palette in Indonesian", async () => {

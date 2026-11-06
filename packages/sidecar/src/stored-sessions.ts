@@ -1,6 +1,7 @@
 import type { AgentEvent, SessionInfo } from "@agentchainer/protocol";
 // Types only: the SDK itself is loaded at runtime by sdk-loader.ts.
 import type { SDKSessionInfo, SessionMessage } from "@anthropic-ai/claude-agent-sdk";
+import { t } from "./i18n/index.ts";
 import { summarize } from "./normalize.ts";
 import type { AgentSdkModule } from "./sdk-loader.ts";
 
@@ -15,7 +16,7 @@ export const DEFAULT_RETENTION_DAYS = 30;
 export function toSessionInfo(s: SDKSessionInfo): SessionInfo {
   return {
     sessionId: s.sessionId,
-    title: s.customTitle || s.summary || s.firstPrompt || "Untitled session",
+    title: s.customTitle || s.summary || s.firstPrompt || t("rpc.session.untitled"),
     lastModified: s.lastModified,
     ...(s.createdAt !== undefined ? { createdAt: s.createdAt } : {}),
     ...(s.gitBranch ? { gitBranch: s.gitBranch } : {}),

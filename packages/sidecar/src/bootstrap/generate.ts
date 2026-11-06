@@ -7,6 +7,7 @@ import type { HookCallback } from "@anthropic-ai/claude-agent-sdk";
 import { parse as parseYaml } from "yaml";
 import type { Item } from "../catalog/schema.ts";
 import { checkToolCall, readsInside } from "../guard.ts";
+import { t } from "../i18n/index.ts";
 import type { AgentSdkModule } from "../sdk-loader.ts";
 import { repoOf } from "../workspace.ts";
 import { readWorkspaceText } from "../workspace-files.ts";
@@ -184,20 +185,47 @@ const OUTPUT_SCHEMA = {
 const MAX_FILES = 10;
 const MAX_FILE_BYTES = 200_000;
 
+/**
+ * A proposal the validation refuses. The message is for the person, in the app's language; `forClaude` says the same in
+ * English, for the feedback of the next attempt.
+ */
+class ProposalRefused extends Error {
+  readonly forClaude: string;
+  constructor(message: string, forClaude: string) {
+    super(message);
+    this.forClaude = forClaude;
+  }
+}
+
 /** Validates the structured output: shape, sizes, and that every path is one this generator may write. */
 export function toProposedFiles(root: string, spec: Spec, output: unknown): ProposedFile[] {
   const files = (output as { files?: unknown })?.files;
-  if (!Array.isArray(files) || files.length === 0) throw new Error("The generator proposed no files.");
-  if (files.length > MAX_FILES) throw new Error(`The generator proposed ${files.length} files; at most ${MAX_FILES}.`);
+  if (!Array.isArray(files) || files.length === 0) {
+    throw new ProposalRefused(t("bootstrap.generate.noFiles"), "The generator proposed no files.");
+  }
+  if (files.length > MAX_FILES) {
+    throw new ProposalRefused(
+      t("bootstrap.generate.tooManyFiles", { files: files.length, max: MAX_FILES }),
+      `The generator proposed ${files.length} files; at most ${MAX_FILES}.`,
+    );
+  }
   return files.map((f: { path?: unknown; content?: unknown }) => {
     // Models sometimes answer with absolute paths; inside the workspace those are fine as relative ones.
     const raw = String(f.path ?? "");
     const rel = (path.isAbsolute(raw) ? path.relative(root, raw) : raw).replace(/\\/g, "/").replace(/^\.\//, "");
     if (!rel || rel.split("/").includes("..") || path.isAbsolute(rel) || !spec.allow.some((re) => re.test(rel))) {
-      throw new Error(`The generator proposed a path it may not write: ${rel || "(empty)"}`);
+      throw new ProposalRefused(
+        rel ? t("bootstrap.generate.pathNotAllowed", { path: rel }) : t("bootstrap.generate.emptyPath"),
+        `The generator proposed a path it may not write: ${rel || "(empty)"}`,
+      );
     }
     const after = String(f.content ?? "");
-    if (Buffer.byteLength(after) > MAX_FILE_BYTES) throw new Error(`${rel} is larger than ${MAX_FILE_BYTES} bytes.`);
+    if (Buffer.byteLength(after) > MAX_FILE_BYTES) {
+      throw new ProposalRefused(
+        t("bootstrap.generate.tooLarge", { path: rel, max: MAX_FILE_BYTES }),
+        `${rel} is larger than ${MAX_FILE_BYTES} bytes.`,
+      );
+    }
     return { path: rel, before: readWorkspaceText(root, rel), after };
   });
 }
@@ -220,9 +248,9 @@ export async function generate(
   opts: GenerateOptions = {},
 ): Promise<Proposal> {
   const spec = GENERATORS[action];
-  if (!spec) throw new Error(`No generator for ${action}.`);
+  if (!spec) throw new Error(t("bootstrap.generate.noGenerator", { action }));
   const skill = (skills as Record<string, string>)[spec.skill];
-  if (!skill) throw new Error(`Skill ${spec.skill} is missing from this build.`);
+  if (!skill) throw new Error(t("bootstrap.generate.skillMissing", { skill: spec.skill }));
   // Commands can have side effects; outside git the guard can't undo them, so no commands there.
   const allowed = repoOf(root) ? allowedCommands(profile) : [];
   const { result, reverted } = await guarded(root, () =>
@@ -293,7 +321,7 @@ async function attempts(
     for await (const m of q) {
       if (m.type !== "result") continue;
       costUsd += m.total_cost_usd;
-      if (m.subtype !== "success") throw new Error(`The generator stopped: ${m.subtype}.`);
+      if (m.subtype !== "success") throw new Error(t("bootstrap.generate.stopped", { reason: m.subtype }));
       output = m.structured_output;
       summary = String((output as { summary?: unknown })?.summary ?? m.result ?? "");
     }
@@ -303,7 +331,8 @@ async function attempts(
     } catch (err) {
       // A proposal outside the generator's paths is a fixable mistake: say so and try again.
       if (attempt >= maxAttempts) throw err;
-      feedback = `- ${err instanceof Error ? err.message : String(err)}. You may propose only: ${spec.allowText}.`;
+      const problem = err instanceof ProposalRefused ? err.forClaude : err instanceof Error ? err.message : String(err);
+      feedback = `- ${problem}. You may propose only: ${spec.allowText}.`;
       continue;
     }
     const checks = spec.check(root, files, profile, opts.tools ?? NO_TOOLS);

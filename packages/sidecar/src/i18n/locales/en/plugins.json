@@ -1,0 +1,6 @@
+{
+  "plugins.cli.failed": "{{command}} failed: {{detail}}",
+  "plugins.confirm.fetches": "{{command}} (fetches {{archive}})",
+  "plugins.install.title": "Install {{name}} (plugin)",
+  "plugins.review.versionMoved": "Installed {{version}}, but {{reviewed}} was reviewed: the marketplace moved on. Review the changes before relying on it."
+}

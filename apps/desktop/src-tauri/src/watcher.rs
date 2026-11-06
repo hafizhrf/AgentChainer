@@ -41,9 +41,9 @@ impl Watchers {
         // Events carry resolved paths (e.g. /private/var on macOS), so compare against the resolved root.
         let root = PathBuf::from(&cwd)
             .canonicalize()
-            .map_err(|_| format!("not a folder: {cwd}"))?;
+            .map_err(|_| crate::i18n::tr("native.notAFolder", &[("path", &cwd)]))?;
         if !root.is_dir() {
-            return Err(format!("not a folder: {cwd}"));
+            return Err(crate::i18n::tr("native.notAFolder", &[("path", &cwd)]));
         }
         let (tx, rx) = mpsc::channel::<PathBuf>();
         // Links aren't followed: a repo's `x -> /` would otherwise watch the whole disk (security review, 2026-11-04).

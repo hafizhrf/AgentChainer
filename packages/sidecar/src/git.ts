@@ -1,9 +1,10 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { RpcErrorCode } from "@agentchainer/protocol";
+import { t } from "./i18n/index.ts";
 import { RpcFailure } from "./rpc.ts";
 import type { AgentSdkModule } from "./sdk-loader.ts";
-import { git, gitAsync, gitOrThrow, insideWorkspace, repoOf } from "./workspace.ts";
+import { commandFailed, git, gitAsync, gitOrThrow, insideWorkspace, repoOf } from "./workspace.ts";
 
 /**
  * The git panel's operations (M1-30), on the system `git` CLI. There is no force push: no code path here passes
@@ -31,7 +32,7 @@ const NETWORK = { env: { GIT_TERMINAL_PROMPT: "0" }, timeoutMs: 120_000 };
 
 function requireRepo(cwd: string) {
   const repo = repoOf(cwd);
-  if (!repo) throw new RpcFailure(RpcErrorCode.invalidParams, "This folder isn't a git repository.");
+  if (!repo) throw new RpcFailure(RpcErrorCode.invalidParams, t("git.repo.notARepo"));
   return repo;
 }
 
@@ -83,7 +84,7 @@ function conflicted(cwd: string): string[] {
 
 function requireBranchName(cwd: string, branch: string): void {
   if (git(["check-ref-format", "--branch", branch], cwd).status !== 0 || branch.startsWith("-")) {
-    throw new RpcFailure(RpcErrorCode.invalidParams, `Not a valid branch name: ${branch}`);
+    throw new RpcFailure(RpcErrorCode.invalidParams, t("git.branch.invalidName", { branch }));
   }
 }
 
@@ -95,7 +96,7 @@ export function switchBranch(cwd: string, branch: string, create: boolean, track
   requireRepo(cwd);
   if (track) {
     if (!branches(cwd).remote.includes(branch)) {
-      throw new RpcFailure(RpcErrorCode.invalidParams, `Not a remote branch: ${branch}`);
+      throw new RpcFailure(RpcErrorCode.invalidParams, t("git.branch.notRemote", { branch }));
     }
     gitOrThrow(["switch", "--track", branch], cwd);
     return;
@@ -108,25 +109,22 @@ export function switchBranch(cwd: string, branch: string, create: boolean, track
 export async function fetchAll(cwd: string): Promise<string> {
   requireRepo(cwd);
   const r = await gitAsync(["fetch", "--all", "--prune"], cwd, NETWORK);
-  if (r.status !== 0) throw new Error(`git fetch failed: ${r.stderr.trim() || `exit ${r.status}`}`);
+  if (r.status !== 0) throw commandFailed("git fetch", r.stderr.trim() || `exit ${r.status}`);
   return (r.stderr || r.stdout).trim();
 }
 
 /** Brings in the upstream's new commits, fast-forward only: never a merge commit made behind the user's back. */
 export async function pull(cwd: string): Promise<string> {
   const { current, upstream } = branches(cwd);
-  if (!current) throw new RpcFailure(RpcErrorCode.invalidParams, "Not on a branch (detached HEAD).");
-  if (!upstream) throw new RpcFailure(RpcErrorCode.invalidParams, `${current} has no upstream yet: push it first.`);
+  if (!current) throw new RpcFailure(RpcErrorCode.invalidParams, t("git.branch.detached"));
+  if (!upstream) throw new RpcFailure(RpcErrorCode.invalidParams, t("git.branch.noUpstream", { branch: current }));
   const r = await gitAsync(["pull", "--ff-only"], cwd, NETWORK);
   if (r.status !== 0) {
     const err = r.stderr.trim();
     if (/fast-forward|diverg/i.test(err)) {
-      throw new RpcFailure(
-        RpcErrorCode.invalidParams,
-        `${current} and ${upstream} have diverged, so a fast-forward pull isn't possible. Merge ${upstream} into ${current} from the branch menu, or rebase in a terminal.`,
-      );
+      throw new RpcFailure(RpcErrorCode.invalidParams, t("git.pull.diverged", { current, upstream }));
     }
-    throw new Error(`git pull failed: ${err || `exit ${r.status}`}`);
+    throw commandFailed("git pull", err || `exit ${r.status}`);
   }
   return (r.stdout || r.stderr).trim();
 }
@@ -139,12 +137,12 @@ export function deleteBranch(cwd: string, branch: string, force: boolean): { del
   requireRepo(cwd);
   requireBranchName(cwd, branch);
   if (branches(cwd).current === branch) {
-    throw new RpcFailure(RpcErrorCode.invalidParams, `${branch} is checked out: switch to another branch first.`);
+    throw new RpcFailure(RpcErrorCode.invalidParams, t("git.branch.checkedOut", { branch }));
   }
   const r = git(["branch", force ? "-D" : "-d", branch], cwd);
   if (r.status === 0) return { deleted: true, unmerged: false };
   if (!force && /not fully merged/i.test(r.stderr)) return { deleted: false, unmerged: true };
-  throw new Error(`git branch failed: ${r.stderr.trim() || `exit ${r.status}`}`);
+  throw commandFailed("git branch", r.stderr.trim() || `exit ${r.status}`);
 }
 
 export function renameBranch(cwd: string, from: string, to: string): void {
@@ -164,12 +162,12 @@ export function merge(cwd: string, branch: string): { merged: boolean; conflicts
   const known = ["refs/heads/", "refs/remotes/"].some(
     (prefix) => git(["rev-parse", "-q", "--verify", `${prefix}${branch}`], cwd).status === 0,
   );
-  if (!known) throw new RpcFailure(RpcErrorCode.invalidParams, `No branch ${branch}.`);
+  if (!known) throw new RpcFailure(RpcErrorCode.invalidParams, t("git.branch.notFound", { branch }));
   const r = git(["merge", "--no-edit", branch], cwd, undefined, { env: { GIT_MERGE_AUTOEDIT: "no" } });
   if (r.status === 0) return { merged: true, conflicts: [] };
   const conflicts = conflicted(cwd);
   if (conflicts.length) return { merged: false, conflicts };
-  throw new Error(`git merge failed: ${(r.stderr || r.stdout).trim() || `exit ${r.status}`}`);
+  throw commandFailed("git merge", (r.stderr || r.stdout).trim() || `exit ${r.status}`);
 }
 
 /** Abandons the merge in progress and puts the branch back as it was before it. */
@@ -195,9 +193,9 @@ export function unstage(cwd: string, paths: string[]): void {
 /** Commits what is staged and returns the new commit's short sha. */
 export function commit(cwd: string, message: string): string {
   requireRepo(cwd);
-  if (!message.trim()) throw new RpcFailure(RpcErrorCode.invalidParams, "The commit message is empty.");
+  if (!message.trim()) throw new RpcFailure(RpcErrorCode.invalidParams, t("git.commit.emptyMessage"));
   if (git(["diff", "--cached", "--quiet"], cwd).status === 0) {
-    throw new RpcFailure(RpcErrorCode.invalidParams, "Nothing is staged. Stage the files to commit first.");
+    throw new RpcFailure(RpcErrorCode.invalidParams, t("git.commit.nothingStaged"));
   }
   gitOrThrow(["commit", "-q", "-F", "-"], cwd, message);
   return gitOrThrow(["rev-parse", "--short", "HEAD"], cwd).trim();
@@ -206,10 +204,10 @@ export function commit(cwd: string, message: string): string {
 /** Pushes the current branch; a branch without an upstream is pushed to `origin` and tracked. Never forced. */
 export async function push(cwd: string): Promise<string> {
   const { upstream, current } = branches(cwd);
-  if (!current) throw new RpcFailure(RpcErrorCode.invalidParams, "Not on a branch (detached HEAD).");
+  if (!current) throw new RpcFailure(RpcErrorCode.invalidParams, t("git.branch.detached"));
   const args = upstream ? ["push"] : ["push", "-u", "origin", current];
   const r = await gitAsync(args, cwd, NETWORK);
-  if (r.status !== 0) throw new Error(`git push failed: ${r.stderr.trim() || `exit ${r.status}`}`);
+  if (r.status !== 0) throw commandFailed("git push", r.stderr.trim() || `exit ${r.status}`);
   return (r.stderr || r.stdout).trim();
 }
 
@@ -226,7 +224,7 @@ export async function pushBranch(cwd: string, branch: string, config: string[] =
     `refs/heads/${branch}:refs/heads/${branch}`,
   ];
   const r = await gitAsync(args, cwd, NETWORK);
-  if (r.status !== 0) throw new Error(`git push failed: ${r.stderr.trim() || `exit ${r.status}`}`);
+  if (r.status !== 0) throw commandFailed("git push", r.stderr.trim() || `exit ${r.status}`);
   return (r.stderr || r.stdout).trim();
 }
 
@@ -237,7 +235,7 @@ const MAX_DIFF_CHARS = 24_000;
 export function draftContext(cwd: string): { stat: string; diff: string; log: string } {
   requireRepo(cwd);
   const stat = gitOrThrow(["diff", "--cached", "--stat"], cwd).trim();
-  if (!stat) throw new RpcFailure(RpcErrorCode.invalidParams, "Nothing is staged. Stage the files to commit first.");
+  if (!stat) throw new RpcFailure(RpcErrorCode.invalidParams, t("git.commit.nothingStaged"));
   const full = gitOrThrow(["diff", "--cached", "--no-color", "--no-ext-diff"], cwd);
   const diff = full.length > MAX_DIFF_CHARS ? `${full.slice(0, MAX_DIFF_CHARS)}\n… (diff truncated)` : full;
   const log = git(["log", "-10", "--format=%s"], cwd).stdout.trim();
@@ -290,8 +288,8 @@ export async function draftMessage(sdk: AgentSdkModule, claudePath: string, cwd:
   });
   for await (const m of q) {
     if (m.type !== "result") continue;
-    if (m.subtype !== "success") throw new Error(`Drafting the commit message failed (${m.subtype}).`);
+    if (m.subtype !== "success") throw new Error(t("git.draft.failed", { subtype: m.subtype }));
     return cleanDraft(m.result);
   }
-  throw new Error("Drafting the commit message ended without a result.");
+  throw new Error(t("git.draft.noResult"));
 }

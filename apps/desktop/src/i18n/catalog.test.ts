@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { test } from "node:test";
+import { translationProblems } from "@agentchainer/protocol";
 import { CATALOGS } from "./index.ts";
 import { CATALOGS as INDONESIAN } from "./locales/id/index.ts";
 
@@ -55,26 +56,11 @@ test("the props a person reads are never literal text in a component", () => {
   assert.deepEqual(found, []);
 });
 
-const PLURAL = /_(zero|one|two|few|many|other)$/;
-const values = (text: string) => [...text.matchAll(/\{\{(\w+)\}\}/g)].map((m) => m[1]).sort();
-const tags = (text: string) => [...text.matchAll(/<(\w+)>/g)].map((m) => m[1]).sort();
-
 for (const [name, translated] of Object.entries({ id: INDONESIAN })) {
   test(`${name}: every English key is translated, with the same values and tags, and nothing extra`, () => {
     const english: Record<string, string> = Object.assign({}, ...Object.values(CATALOGS));
     const ours: Record<string, string> = Object.assign({}, ...Object.values(translated));
-    // A plural needs only the forms the language has: Indonesian has "other" only.
-    const wanted = (key: string) => (PLURAL.test(key) ? key.replace(PLURAL, "_other") : key);
-    const missing = [...new Set(Object.keys(english).map(wanted))].filter((k) => !(k in ours));
-    const extra = Object.keys(ours).filter((k) => !(k in english));
-    const empty = Object.keys(ours).filter((k) => !ours[k]?.trim());
-    const differs = Object.keys(ours)
-      .filter((k) => k in english)
-      .filter((k) => {
-        const [a, b] = [english[k] ?? "", ours[k] ?? ""];
-        return values(a).join() !== values(b).join() || tags(a).join() !== tags(b).join();
-      });
-    assert.deepEqual({ missing, extra, empty, differs }, { missing: [], extra: [], empty: [], differs: [] });
+    assert.deepEqual(translationProblems(english, ours), { missing: [], extra: [], empty: [], differs: [] });
   });
 
   test(`${name}: every key lives in its area's file`, () => {

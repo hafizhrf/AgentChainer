@@ -2,6 +2,7 @@ import { type ChildProcess, spawn } from "node:child_process";
 import { existsSync } from "node:fs";
 import path from "node:path";
 import { detectWorkspace } from "../detect/detect.ts";
+import { t } from "../i18n/index.ts";
 import type { Check } from "./generate.ts";
 import { STOP_SCRIPT } from "./stop-hook.ts";
 import { guarded } from "./workspace-guard.ts";
@@ -106,12 +107,19 @@ export function scriptCommand(script: string): string {
   return `sh ${script}`;
 }
 
+/** How a command ended, in words: timed out, or its exit code and time (and its output when it failed). */
+function commandDetail(r: CommandRun): string {
+  const values = { command: r.command, code: String(r.exitCode), seconds: (r.ms / 1000).toFixed(1) };
+  if (r.timedOut) return t("bootstrap.verify.timedOut", { command: r.command, seconds: Math.round(r.ms / 1000) });
+  return r.exitCode === 0
+    ? t("bootstrap.verify.exited", values)
+    : t("bootstrap.verify.exitedWithOutput", { ...values, output: r.tail });
+}
+
 const asCheck = (name: string, r: CommandRun): Check => ({
   name,
   status: r.exitCode === 0 ? "pass" : "fail",
-  detail: r.timedOut
-    ? `\`${r.command}\` timed out after ${Math.round(r.ms / 1000)} s`
-    : `\`${r.command}\` exited ${r.exitCode} in ${(r.ms / 1000).toFixed(1)} s${r.exitCode === 0 ? "" : `:\n${r.tail}`}`,
+  detail: commandDetail(r),
 });
 
 /** Post-apply checks per generator: tests run, smoke scripts run, others were checked before applying. */
@@ -120,46 +128,46 @@ export async function verifyApplied(root: string, action: string, files: string[
     // Re-detect: the scaffold just added the test command.
     const pkg = detectWorkspace(root).packages.find((p) => p.commands.test);
     if (!pkg?.commands.test)
-      return [{ name: "test command", status: "fail", detail: "no test command detected after applying" }];
+      return [{ name: t("bootstrap.verify.testCommand"), status: "fail", detail: t("bootstrap.verify.noTestCommand") }];
     const r = await runGuarded(
       root,
       pkg.commands.test.run,
       path.join(root, ...pkg.path.split("/").filter((p) => p !== ".")),
       300_000,
     );
-    const check = asCheck("tests run", r);
+    const check = asCheck(t("bootstrap.verify.testsRun"), r);
     if (check.status === "fail" && /not found|cannot find|ENOENT|No module named/i.test(r.tail)) {
-      check.detail += "\nThe runner may not be installed yet: run the project's install command, then the tests.";
+      check.detail += `\n${t("bootstrap.verify.runnerMissing")}`;
     }
     return [check];
   }
   if (action === "smoke-test") {
     const script = files.find((f) => f.startsWith("scripts/smoke."));
     if (!script || !existsSync(path.join(root, ...script.split("/")))) {
-      return [{ name: "smoke script", status: "fail", detail: "no scripts/smoke.* was written" }];
+      return [{ name: t("bootstrap.verify.smokeScript"), status: "fail", detail: t("bootstrap.verify.noSmokeScript") }];
     }
-    return [asCheck("smoke test runs", await runGuarded(root, scriptCommand(script), root, 120_000))];
+    return [asCheck(t("bootstrap.verify.smokeRuns"), await runGuarded(root, scriptCommand(script), root, 120_000))];
   }
   if (action === "stop-tests") {
     // Run the hook as Claude Code would (no hook input on stdin): exit 0 when tests pass, 2 when they fail.
     const r = await runGuarded(root, `sh ${STOP_SCRIPT}`, root, 300_000, { CLAUDE_PROJECT_DIR: root });
     const seconds = (r.ms / 1000).toFixed(1);
-    if (r.timedOut || (r.exitCode !== 0 && r.exitCode !== 2)) return [asCheck("stop hook runs", r)];
+    if (r.timedOut || (r.exitCode !== 0 && r.exitCode !== 2)) return [asCheck(t("bootstrap.verify.stopHookRuns"), r)];
     return [
       {
-        name: "stop hook runs",
+        name: t("bootstrap.verify.stopHookRuns"),
         status: "pass",
         detail:
           r.exitCode === 0
-            ? `the tests pass (${seconds} s)`
-            : `the hook works; the tests fail now (${seconds} s), so Claude will be asked to fix them when it stops`,
+            ? t("bootstrap.verify.testsPass", { seconds })
+            : t("bootstrap.verify.hookWorksTestsFail", { seconds }),
       },
       ...(r.ms > 60_000
         ? [
             {
-              name: "stop hook speed",
+              name: t("bootstrap.verify.stopHookSpeed"),
               status: "fail" as const,
-              detail: `the tests take ${seconds} s, which every turn will wait for; consider a faster test command`,
+              detail: t("bootstrap.verify.slowTests", { seconds }),
             },
           ]
         : []),

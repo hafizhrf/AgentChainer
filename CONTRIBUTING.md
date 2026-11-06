@@ -188,7 +188,11 @@ and in Bahasa Indonesia.
 - **What stays English:**
   - text sent to Claude, in constants commented "sent to Claude";
   - code, commands and ids;
-  - prose the sidecar or the Rust core returns.
+  - files written into a repository, commits and pull requests.
+- **The sidecar and the core too:** an error or message the sidecar sends to the UI goes through its `t()`
+  (`packages/sidecar/src/i18n/`), and its test fails on a literal one. The protocol package's shared texts use its own
+  catalog. The Rust core's errors use `i18n::tr` with `native.json`. See
+  [TRANSLATING.md](docs/guides/TRANSLATING.md#where-the-text-lives).
 - **What catches mistakes:**
   - `pnpm lint` fails on text between tags (`noJsxLiterals`).
   - `pnpm test` fails on a literal `label`, `title`, `placeholder` or `aria-label`, on an unused key, and on a key in

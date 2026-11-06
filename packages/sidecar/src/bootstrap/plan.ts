@@ -2,6 +2,7 @@ import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import type { BootstrapPlan, Finding, PlanAction, WorkspaceProfile } from "@agentchainer/protocol";
 import { type Catalog, type Item, type Profile, REQUIRED_REVIEWS } from "../catalog/schema.ts";
+import { type MessageKey, t } from "../i18n/index.ts";
 import shippedLibrary from "../tasks/library.json" with { type: "json" };
 import { LibrarySchema, renderRoleFile } from "../tasks/library.ts";
 import { git, repoOf } from "../workspace.ts";
@@ -35,30 +36,16 @@ export type PlanEnv = {
 /** The block "Ignore env and secret files" appends to .gitignore. */
 export const GITIGNORE_ENV_BLOCK = "\n# Env files can hold secrets (keep examples)\n.env\n.env.*\n!.env.example\n";
 
-const GENERATOR_TEXT: Record<string, { title: string; why: string }> = {
-  "generate-claude-md": {
-    title: "Generate CLAUDE.md",
-    why: "Gives Claude your real commands, an architecture map and conventions at the start of every session.",
-  },
-  "update-claude-md": {
-    title: "Update CLAUDE.md",
-    why: "Brings CLAUDE.md back in line with the commands the project actually uses, and keeps it short.",
-  },
-  "setup-hooks": {
-    title: "Add format and lint hooks",
-    why: "Formats and lints every file Claude edits, so mistakes surface while Claude can still fix them.",
-  },
-  "scaffold-tests": {
-    title: "Scaffold tests",
-    why: "Adds a test runner and one example test, so changes can be checked by running them.",
-  },
-  "add-linter": { title: "Add a linter", why: "Catches common mistakes in Claude's edits automatically." },
-  "add-formatter": { title: "Add a formatter", why: "Keeps edits in one style, so diffs show only real changes." },
-  "generate-ci": {
-    title: "Generate a CI workflow",
-    why: "Checks every change on GitHub Actions: install, lint, typecheck, test, build.",
-  },
-  "smoke-test": { title: "Add a smoke test", why: "A quick check that the app still starts after a change." },
+/** The generators' titles and reasons, as message keys: the text is looked up when a plan is built. */
+const GENERATOR_TEXT: Record<string, { title: MessageKey; why: MessageKey }> = {
+  "generate-claude-md": { title: "bootstrap.plan.generateClaudeMdTitle", why: "bootstrap.plan.generateClaudeMdWhy" },
+  "update-claude-md": { title: "bootstrap.plan.updateClaudeMdTitle", why: "bootstrap.plan.updateClaudeMdWhy" },
+  "setup-hooks": { title: "bootstrap.plan.setupHooksTitle", why: "bootstrap.plan.setupHooksWhy" },
+  "scaffold-tests": { title: "bootstrap.plan.scaffoldTestsTitle", why: "bootstrap.plan.scaffoldTestsWhy" },
+  "add-linter": { title: "bootstrap.plan.addLinterTitle", why: "bootstrap.plan.addLinterWhy" },
+  "add-formatter": { title: "bootstrap.plan.addFormatterTitle", why: "bootstrap.plan.addFormatterWhy" },
+  "generate-ci": { title: "bootstrap.plan.generateCiTitle", why: "bootstrap.plan.generateCiWhy" },
+  "smoke-test": { title: "bootstrap.plan.smokeTestTitle", why: "bootstrap.plan.smokeTestWhy" },
 };
 
 export function buildPlan(
@@ -99,14 +86,11 @@ export function buildPlan(
     const base = {
       id: `gen:${action}`,
       kind: "generator" as const,
-      title: gen.title,
-      why: gen.why,
+      title: t(gen.title),
+      why: t(gen.why),
       risk: "medium" as const,
       scope: "project" as const,
-      permissions: [
-        "Generating runs a Claude session that can only read this workspace and run its test, lint, typecheck and build commands",
-        "It proposes files; nothing is written until you apply the proposal",
-      ],
+      permissions: [t("bootstrap.plan.generatorSession"), t("bootstrap.plan.generatorProposes")],
       secrets: [],
     };
     const proposal = proposals.get(action);
@@ -131,11 +115,11 @@ export function buildPlan(
         ...base,
         preview: {
           type: "note",
-          text: "Generate a proposal to see the exact files. Claude reads the project and proposes them; you review the diff here.",
+          text: t("bootstrap.plan.generatorPreview"),
         },
         state: "unavailable",
         selected: false,
-        reason: available ? "Generate a proposal first (it costs a model call)." : "This generator comes later.",
+        reason: available ? t("bootstrap.plan.generateFirst") : t("bootstrap.plan.generatorLater"),
         generatable: available,
       });
     }
@@ -170,8 +154,8 @@ function rolesAction(root: string): PlanAction | null {
   return {
     id: "fix:install-agents",
     kind: "fix",
-    title: "Install AgentChainer's task roles",
-    why: "The roles tasks run with (implementer, architect, reviewers, planners) as project agents, so the CLI and other Claude surfaces can use them too.",
+    title: t("bootstrap.plan.installRolesTitle"),
+    why: t("bootstrap.plan.installRolesWhy"),
     risk: "low",
     scope: "project",
     permissions: [],
@@ -190,8 +174,8 @@ function fixActions(root: string, fixes: Set<string>, profile: WorkspaceProfile)
     actions.push({
       ...base,
       id: "fix:git-init",
-      title: "Initialize git",
-      why: "Every later change can then be reviewed, reverted and rewound.",
+      title: t("bootstrap.plan.gitInitTitle"),
+      why: t("bootstrap.plan.gitInitWhy"),
       preview: { type: "commands", commands: [["git", "init"]] },
       state: "recommended",
       selected: true,
@@ -204,8 +188,8 @@ function fixActions(root: string, fixes: Set<string>, profile: WorkspaceProfile)
     actions.push({
       ...base,
       id: "fix:untrack-env",
-      title: "Stop tracking env files",
-      why: "Keeps the files on disk but out of future commits. They stay in past commits: rotate any secret they held.",
+      title: t("bootstrap.plan.untrackEnvTitle"),
+      why: t("bootstrap.plan.untrackEnvWhy"),
       preview: { type: "commands", commands: [["git", "rm", "--cached", "--", ...tracked]] },
       state: "recommended",
       selected: true,
@@ -216,8 +200,8 @@ function fixActions(root: string, fixes: Set<string>, profile: WorkspaceProfile)
     actions.push({
       ...base,
       id: "fix:fix-gitignore",
-      title: "Ignore env and secret files",
-      why: "A secret dropped into .env won't be committed by the next `git add .`.",
+      title: t("bootstrap.plan.fixGitignoreTitle"),
+      why: t("bootstrap.plan.fixGitignoreWhy"),
       preview: {
         type: "diff",
         path: ".gitignore",
@@ -235,8 +219,8 @@ function fixActions(root: string, fixes: Set<string>, profile: WorkspaceProfile)
       actions.push({
         ...base,
         id: "fix:stop-tests",
-        title: "Run the tests when Claude stops",
-        why: `After each turn, \`${target.run}\` runs; if tests fail, Claude gets the failures and fixes them before stopping. Slow test suites make every turn slower.`,
+        title: t("bootstrap.plan.stopTestsTitle"),
+        why: t("bootstrap.plan.stopTestsWhy", { command: target.run }),
         preview: { type: "files", files: files.map(({ path: p, before, after }) => ({ path: p, before, after })) },
         // Optional: it changes how every turn ends.
         state: "recommended",
@@ -250,8 +234,8 @@ function fixActions(root: string, fixes: Set<string>, profile: WorkspaceProfile)
     actions.push({
       ...base,
       id: "fix:link-agents-md",
-      title: "Import AGENTS.md from CLAUDE.md",
-      why: "Claude Code reads CLAUDE.md; importing AGENTS.md keeps one source of instructions for every agent.",
+      title: t("bootstrap.plan.linkAgentsMdTitle"),
+      why: t("bootstrap.plan.linkAgentsMdWhy"),
       preview: { type: "diff", path: file, before, after: `@AGENTS.md\n\n${before}` },
       state: "recommended",
       selected: true,
@@ -275,13 +259,16 @@ function itemAction(root: string, item: Item, p: Profile, suggestedProfile: bool
     state = "installed";
   } else if (!item.platforms.includes(env.platform as never) || (src.type === "release-asset" && !asset)) {
     state = "unavailable";
-    reason = `Not available on ${env.platform}${src.type === "release-asset" ? ` (${env.arch})` : ""}.`;
+    reason =
+      src.type === "release-asset"
+        ? t("bootstrap.plan.notAvailableOnArch", { platform: env.platform, arch: env.arch })
+        : t("bootstrap.plan.notAvailableOn", { platform: env.platform });
   } else if (reviews < needed) {
     state = "unavailable";
-    reason = `Not reviewed yet: needs ${needed - reviews} more maintainer review(s) against docs/CATALOG.md §4.`;
+    reason = t("bootstrap.plan.notReviewed", { reviews: needed - reviews });
   } else if (missing.length) {
     state = "unavailable";
-    reason = missing.map((r) => `Needs \`${r.tool}\` on PATH (${r.hint}).`).join(" ");
+    reason = missing.map((r) => t("bootstrap.plan.needsTool", { tool: r.tool, hint: r.hint })).join(" ");
   } else if (changes.unavailable) {
     state = "unavailable";
     reason = changes.unavailable;
@@ -291,17 +278,29 @@ function itemAction(root: string, item: Item, p: Profile, suggestedProfile: bool
     src.type === "release-asset" && asset
       ? [
           ...item.permissions,
-          `Downloads ${binaryName(item) ?? item.name} ${src.version} for ${key} from ${new URL(asset.url).host} (sha256 ${asset.sha256.slice(0, 12)}…) into AgentChainer's tools folder; it stays there after a rollback`,
+          t("bootstrap.plan.downloads", {
+            binary: binaryName(item) ?? item.name,
+            version: src.version,
+            platform: key ?? "",
+            host: new URL(asset.url).host,
+            sha256: asset.sha256.slice(0, 12),
+          }),
         ]
       : item.permissions;
   const source =
     src.type === "marketplace"
-      ? `${pluginId}${src.reviewedVersion ? `, reviewed v${src.reviewedVersion}` : ""} at ${src.reviewedRef.slice(0, 7)}`
+      ? src.reviewedVersion
+        ? t("bootstrap.plan.sourceReviewed", {
+            plugin: pluginId ?? "",
+            version: src.reviewedVersion,
+            ref: src.reviewedRef.slice(0, 7),
+          })
+        : t("bootstrap.plan.sourceAt", { source: pluginId ?? "", ref: src.reviewedRef.slice(0, 7) })
       : src.type === "git"
-        ? `${src.repo} at ${src.ref.slice(0, 7)}`
+        ? t("bootstrap.plan.sourceAt", { source: src.repo, ref: src.ref.slice(0, 7) })
         : src.type === "release-asset" || src.type === "npm"
           ? `${"name" in src ? src.name : src.repo} ${src.version}`
-          : "this repository";
+          : t("bootstrap.plan.sourceThisRepository");
   return {
     id: `item:${item.id}`,
     kind: "catalog",
@@ -393,10 +392,20 @@ function notePreview(item: Item): string {
   const src = item.source;
   const targets = item.install.steps.flatMap((s) => ("copy" in s ? [s.copy.to] : []));
   if (src.type === "git" && targets.length) {
-    const license = src.license
-      ? `, with its license notice (${src.license.path}, sha256 ${src.license.sha256.slice(0, 12)}…)`
-      : "";
-    return `Copies ${src.path} from ${src.repo} at ${src.ref.slice(0, 7)} into ${targets.join(", ")}${license}, after checking it against the pinned tree sha256 (${src.sha256.slice(0, 12)}…). Nothing else changes.`;
+    const values = {
+      path: src.path,
+      repo: src.repo,
+      ref: src.ref.slice(0, 7),
+      targets: targets.join(", "),
+      sha256: src.sha256.slice(0, 12),
+    };
+    return src.license
+      ? t("bootstrap.plan.copiesWithLicense", {
+          ...values,
+          license: src.license.path,
+          licenseSha256: src.license.sha256.slice(0, 12),
+        })
+      : t("bootstrap.plan.copies", values);
   }
   return item.install.steps.map((s) => Object.keys(s)[0]).join(", ");
 }

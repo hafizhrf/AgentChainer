@@ -29,8 +29,8 @@
   "deploy.rollback.newerIsLive": "Deploy production yang lebih baru sedang live. Rollback yang itu saja.",
   "deploy.rollback.noPrevious": "Aplikasi tidak memiliki catatan deploy {{label}} sebelum yang ini, jadi tidak ada versi sebelumnya yang bisa dipulihkan dari sini. Lakukan rollback di konsol penyedia.",
   "deploy.smoke.timedOut": "`{{command}}` melewati batas waktu.",
-  "deploy.smoke.exited": "`{{command}}` keluar dengan kode {{code}}",
-  "deploy.smoke.exitedWithOutput": "`{{command}}` keluar dengan kode {{code}}: {{tail}}",
+  "deploy.smoke.exited": "`{{command}}` keluar dengan exit code {{code}}",
+  "deploy.smoke.exitedWithOutput": "`{{command}}` keluar dengan exit code {{code}}: {{tail}}",
   "deploy.smoke.answered": "GET {{url}} menjawab {{status}}.",
   "deploy.smoke.failed": "GET {{url}} gagal: {{error}}"
 }

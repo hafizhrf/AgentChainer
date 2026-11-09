@@ -2,6 +2,7 @@ import { type Cadence, nextRun, type Schedule, type Task } from "@agentchainer/p
 import { isPermissionGranted, requestPermission, sendNotification } from "@tauri-apps/plugin-notification";
 import { approxUsd } from "./i18n/format.ts";
 import { currentLocale, t } from "./i18n/index.ts";
+import { localized } from "./i18n/shown.ts";
 
 /**
  * Scheduled flows in the UI (M8-05, docs/design/scheduled-flows.md): what the person is told about scheduled runs, as
@@ -54,7 +55,11 @@ export function scheduledRunEnded(
   return {
     title: t("graph.schedules.runEnded", { how: ended(task.state) }),
     body: task.run.outcome
-      ? t("graph.schedules.endedBodyOutcome", { name: name.slice(0, 80), outcome: task.run.outcome, cost })
+      ? t("graph.schedules.endedBodyOutcome", {
+          name: name.slice(0, 80),
+          outcome: localized(task.run.outcome, task.run.outcomeRef),
+          cost,
+        })
       : t("graph.schedules.endedBody", { name: name.slice(0, 80), cost }),
   };
 }

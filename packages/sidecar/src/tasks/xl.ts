@@ -1,6 +1,16 @@
-import type { GateKind, GateRun, StepRun, Task, TaskRun } from "@agentchainer/protocol";
+import {
+  type GateKind,
+  type GateRun,
+  type MessageRef,
+  type ResultKey,
+  resultRef,
+  type StepRun,
+  type Task,
+  type TaskRun,
+} from "@agentchainer/protocol";
 import type { XlWorkflow } from "./library.ts";
 import { failing, kinds } from "./orchestrator.ts";
+import { result } from "./result.ts";
 
 /**
  * XL runs (M3-07, planner.md §8). The task gets its own branch and worktree; each approved sub-task runs its own tier's
@@ -63,12 +73,45 @@ export type XlDeps = {
   resume?: boolean;
 };
 
-const ENDS: Partial<Record<Task["state"], string>> = {
-  failed: "failed",
-  unverified: "wasn't verified",
-  cancelled: "was stopped",
-  interrupted: "was interrupted",
+const ENDS: Partial<Record<Task["state"], ResultKey>> = {
+  failed: "xl.ends.failed",
+  unverified: "xl.ends.unverified",
+  cancelled: "xl.ends.cancelled",
+  interrupted: "xl.ends.interrupted",
 };
+
+/**
+ * A text the run records (X-13 part 2b): in English, with its ref when the sidecar wrote it, so the app shows it in its
+ * language. Without one (a branch name, an error's message, a record from before refs) it shows as written.
+ */
+type Said = { text: string; ref?: MessageRef | undefined };
+/** As a value in another result: its ref, so the whole sentence renders in one language, or its text. */
+const value = (s: Said) => s.ref ?? s.text;
+const noted = (s: Said) => ({ note: s.text, noteRef: s.ref });
+const labelled = (s: Said) => ({ label: s.text, labelRef: s.ref });
+/** A run's outcome as said: with its ref when it was written with one. */
+const outcomeOf = (r: TaskRun | null | undefined): Said | undefined =>
+  r?.outcome === undefined ? undefined : { text: r.outcome, ref: r.outcomeRef };
+/** An error's message, with the ref an error from a result carries (`git merge failed: …`). */
+function failure(err: unknown): Said {
+  const ref = (err as { ref?: unknown } | null)?.ref;
+  return {
+    text: err instanceof Error ? err.message : String(err),
+    ref:
+      ref && typeof ref === "object" && typeof (ref as MessageRef).key === "string" ? (ref as MessageRef) : undefined,
+  };
+}
+
+/** The note a run that picks up gives the steps it was cut off in: this one's, a task run's, or, before refs, the text. */
+const INTERRUPTED = ["xl.note.interrupted", "run.note.interrupted"];
+const interrupted = (s: StepRun) => (s.noteRef ? INTERRUPTED.includes(s.noteRef.key) : s.note === "Interrupted");
+
+/** Notes as one, "; " between them; each keeps its own ref. */
+function joined(parts: Said[]): Said {
+  const [first, ...rest] = parts;
+  if (!first) return { text: "" };
+  return rest.length ? result("xl.note.list", { first: value(first), rest: value(joined(rest)) }) : first;
+}
 
 export class XlOrchestrator {
   private task: Task;
@@ -101,12 +144,13 @@ export class XlOrchestrator {
   }
 
   async run(): Promise<Task> {
-    const stopped = "Stopped by the user. The worktrees are left as they are.";
+    const stopped = result("xl.outcome.stoppedByUser");
     try {
       if (this.d.resume) {
+        const note = noted(result("xl.note.interrupted"));
         this.commit((r) => ({
           steps: r.steps.map((s) =>
-            s.status === "running" ? { ...s, status: "failed", endedAt: this.at(), note: "Interrupted" } : s,
+            s.status === "running" ? { ...s, status: "failed", endedAt: this.at(), ...note } : s,
           ),
         }));
       }
@@ -119,7 +163,7 @@ export class XlOrchestrator {
       return await this.integrate(code);
     } catch (err) {
       if (this.cancelled) return this.end("cancelled", stopped);
-      return this.end("failed", `Stopped on an error: ${err instanceof Error ? err.message : String(err)}`);
+      return this.end("failed", result("xl.outcome.error", { error: value(failure(err)) }));
     }
   }
 
@@ -156,20 +200,24 @@ export class XlOrchestrator {
     );
   }
 
-  private end(state: Task["state"], outcome?: string): Task {
+  private end(state: Task["state"], outcome?: Said): Task {
     this.commit(
-      (r) => ({
-        endedAt: this.at(),
-        outcome: outcome ?? r.outcome ?? "The run failed.",
-        steps: r.steps.map((s) => (s.status === "running" ? { ...s, status: "cancelled", endedAt: this.at() } : s)),
-      }),
+      (r) => {
+        const said = outcome ?? outcomeOf(r) ?? result("xl.outcome.failed");
+        return {
+          endedAt: this.at(),
+          outcome: said.text,
+          outcomeRef: said.ref,
+          steps: r.steps.map((s) => (s.status === "running" ? { ...s, status: "cancelled", endedAt: this.at() } : s)),
+        };
+      },
       { state },
     );
     return this.task;
   }
 
-  private fail(outcome: string): false {
-    this.commit(() => ({ outcome }));
+  private fail(outcome: Said): false {
+    this.commit(() => ({ outcome: outcome.text, outcomeRef: outcome.ref }));
     return false;
   }
 
@@ -181,10 +229,10 @@ export class XlOrchestrator {
     let wt = this.task.worktree;
     if (!wt || wt.removed || !world.exists(wt.path)) {
       const base = wt?.base ?? world.head();
-      const id = this.begin({ step: "setup", label: "Task branch", kind: "setup" });
+      const id = this.begin({ step: "setup", ...labelled(result("xl.label.taskBranch")), kind: "setup" });
       if (!base) {
-        this.finish(id, { status: "failed", note: "No commit to start from." });
-        this.fail("The repository has no commit to branch from. Commit once, then run the task again.");
+        this.finish(id, { status: "failed", ...noted(result("xl.note.noCommit")) });
+        this.fail(result("xl.outcome.noCommit"));
         return null;
       }
       const added = world.worktree(this.task.id, base);
@@ -194,29 +242,34 @@ export class XlOrchestrator {
         return null;
       }
       if (setup && (setup.exitCode !== 0 || setup.timedOut)) {
-        this.finish(id, { status: "failed", note: setupNote(setup) });
-        this.fail(`Setting up the task branch failed: ${setupNote(setup)}`);
+        const ran = setupResult(setup);
+        this.finish(id, { status: "failed", ...noted(ran) });
+        this.fail(result("xl.outcome.setupFailed", { setup: ran.ref }));
         return null;
       }
       wt = { path: added.path, branch: added.branch, base, untracked: world.untracked(added.code) };
       this.commit(() => ({ base }), { worktree: wt });
       // A multi-folder task's branches in its other folders were made with the run (M8-01); they're set up here.
-      const notes = [setup ? `${added.branch}; ${setupNote(setup)}` : added.branch];
+      const notes: Said[] = [{ text: added.branch }, ...(setup ? [setupResult(setup)] : [])];
       for (const f of this.folders()) {
         const ready = await world.setup(f.code, this.abort.signal);
         if (ready && (ready.exitCode !== 0 || ready.timedOut)) {
-          this.finish(id, { status: "failed", note: `${f.name}: ${setupNote(ready)}` });
-          this.fail(`Setting up the task branch in ${f.name} failed: ${setupNote(ready)}`);
+          const ran = setupResult(ready).ref;
+          this.finish(id, {
+            status: "failed",
+            ...noted(result("xl.note.folderSetup", { folder: f.name, setup: ran })),
+          });
+          this.fail(result("xl.outcome.setupFailedIn", { folder: f.name, setup: ran }));
           return null;
         }
-        if (ready) notes.push(`${f.name}: ${setupNote(ready)}`);
+        if (ready) notes.push(result("xl.note.folderSetup", { folder: f.name, setup: setupResult(ready).ref }));
       }
-      this.finish(id, { status: "done", note: notes.join("; ") });
+      this.finish(id, { status: "done", ...noted(joined(notes)) });
     }
     const code = world.codeOf(wt.path);
     // A baseline that finished counts; one the app was cut off in runs again.
-    if (!this.rec.steps.some((s) => s.kind === "baseline" && s.status !== "running" && s.note !== "Interrupted")) {
-      const id = this.begin({ step: "baseline", label: "Gates before the task", kind: "baseline" });
+    if (!this.rec.steps.some((s) => s.kind === "baseline" && s.status !== "running" && !interrupted(s))) {
+      const id = this.begin({ step: "baseline", ...labelled(result("xl.label.baseline")), kind: "baseline" });
       const { runs, notRun } = await this.gates(code, 0);
       this.commit(() => ({ baseline: runs, notRun }));
       if (this.cancelled) {
@@ -226,7 +279,13 @@ export class XlOrchestrator {
       const failed = failing(runs);
       this.finish(id, {
         status: failed.length ? "failed" : "done",
-        note: !runs.length ? "No gates to run." : failed.length ? `Already failing: ${kinds(failed)}.` : "All passed.",
+        ...noted(
+          !runs.length
+            ? result("xl.note.noGates")
+            : failed.length
+              ? result("xl.note.alreadyFailing", { gates: kinds(failed) })
+              : result("xl.note.allPassed"),
+        ),
       });
     }
     return code;
@@ -248,7 +307,7 @@ export class XlOrchestrator {
     const ids = this.task.subtasks ?? [];
     const merged = this.merged();
     const running = new Map<string, Promise<Ended>>();
-    let stop: string | null = null;
+    let stop: Said | null = null;
 
     const start = () => {
       let progressed = true;
@@ -276,11 +335,13 @@ export class XlOrchestrator {
       running.delete(id);
       this.children.delete(id);
       const ok = child.state === "done";
+      // Why it ended: its setup's failure, or its own run's outcome, quoted with its ref.
+      const said = note ?? outcomeOf(child.run);
       this.finish(
         entry,
         {
           status: this.cancelled || child.state === "cancelled" ? "cancelled" : ok ? "done" : "failed",
-          ...((note ?? child.run?.outcome) ? { note: note ?? child.run?.outcome } : {}),
+          ...(said?.text ? noted(said) : {}),
         },
         child.run?.costUsd ?? 0,
       );
@@ -292,12 +353,16 @@ export class XlOrchestrator {
       } else
         stop =
           stop ??
-          `${this.name(child)} ${ENDS[child.state] ?? "didn't finish"}: ${note ?? child.run?.outcome ?? "no outcome"}. Open it to run it again or accept its risk, then Continue.`;
+          result("xl.outcome.subtaskEnded", {
+            ...this.named(child),
+            ends: resultRef(ENDS[child.state] ?? "xl.ends.unfinished"),
+            why: value(said ?? result("xl.phrase.noOutcome")),
+          });
       start();
     }
     if (this.cancelled) return false;
     if (stop) return this.fail(stop);
-    if (ids.some((id) => !merged.has(id))) return this.fail("Some sub-tasks wait for others that couldn't run.");
+    if (ids.some((id) => !merged.has(id))) return this.fail(result("xl.outcome.waiting"));
     return true;
   }
 
@@ -307,7 +372,7 @@ export class XlOrchestrator {
     let child = stored;
     const entry = this.begin({
       step: `subtask-${this.number(child)}`,
-      label: this.name(child),
+      ...labelled(result("xl.label.subtask", this.named(child))),
       kind: "subtask",
       taskId: child.id,
     });
@@ -318,7 +383,8 @@ export class XlOrchestrator {
       const added = world.worktree(child.id, from, repo);
       const setup = await world.setup(added.code, this.abort.signal);
       if (setup && (setup.exitCode !== 0 || setup.timedOut)) {
-        return { id: child.id, entry, child: { ...child, state: "failed" }, note: `Setup failed: ${setupNote(setup)}` };
+        const note = result("xl.note.setupFailed", { setup: setupResult(setup).ref });
+        return { id: child.id, entry, child: { ...child, state: "failed" }, note };
       }
       child = {
         ...child,
@@ -333,21 +399,24 @@ export class XlOrchestrator {
   }
 
   /** Commits the sub-task on its branch and merges it into the task branch; why the run stops, or null. */
-  private merge(primary: string, child: Task, merged: Set<string>): string | null {
+  private merge(primary: string, child: Task, merged: Set<string>): Said | null {
     const { world } = this.d;
     const n = this.number(child);
+    const named = this.named(child);
     // Into the task's branch in the sub-task's own folder (M8-01).
     const repo = child.folder?.path;
     const into = repo ? this.folders().find((f) => f.name === child.folder?.name)?.code : primary;
-    const id = this.begin({ step: `merge-${n}`, label: `Merge sub-task ${n}`, kind: "merge", taskId: child.id });
+    const label = labelled(result("xl.label.merge", { n }));
+    const id = this.begin({ step: `merge-${n}`, ...label, kind: "merge", taskId: child.id });
     const wt = child.worktree;
     if (!wt) {
-      this.finish(id, { status: "failed", note: "It has no worktree." });
-      return `${this.name(child)} has no worktree to merge.`;
+      this.finish(id, { status: "failed", ...noted(result("xl.note.noWorktree")) });
+      return result("xl.outcome.noWorktree", named);
     }
     if (!into) {
-      this.finish(id, { status: "failed", note: `The task has no branch in ${child.folder?.name}.` });
-      return `${this.name(child)} works in ${child.folder?.name}, where the task has no branch.`;
+      const folder = String(child.folder?.name);
+      this.finish(id, { status: "failed", ...noted(result("xl.note.noBranchIn", { folder })) });
+      return result("xl.outcome.noBranchIn", { ...named, folder });
     }
     const accepted = child.state === "accepted";
     try {
@@ -360,13 +429,14 @@ export class XlOrchestrator {
       }
       const r = world.merge(into, wt.branch, `Merge sub-task ${n}: ${child.title ?? child.request}`);
       if (!r.merged) {
-        this.finish(id, { status: "failed", note: `Conflicts in ${r.conflicts.join(", ")}.` });
-        return `Merging ${this.name(child, "sub-task")} conflicts in ${r.conflicts.join(", ")}. The merge is left in progress in the task's worktree: resolve and commit it there, or abort it, then Continue.`;
+        const files = r.conflicts.join(", ");
+        this.finish(id, { status: "failed", ...noted(result("xl.note.conflicts", { files })) });
+        return result("xl.outcome.conflicts", { ...named, files });
       }
     } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      this.finish(id, { status: "failed", note: message });
-      return `${this.name(child)} couldn't be merged: ${message}`;
+      const error = failure(err);
+      this.finish(id, { status: "failed", ...noted(error) });
+      return result("xl.outcome.mergeFailed", { ...named, error: value(error) });
     }
     let kept = false;
     if (!wt.removed && world.exists(wt.path)) {
@@ -379,11 +449,8 @@ export class XlOrchestrator {
         kept = true;
       }
     }
-    const note = [
-      accepted ? "Merged; it was accepted with risk." : "Merged.",
-      kept ? "Its worktree is left for Clean up." : "",
-    ];
-    this.finish(id, { status: "done", note: note.filter(Boolean).join(" ") });
+    const done = result(accepted ? "xl.note.mergedAccepted" : "xl.note.merged");
+    this.finish(id, { status: "done", ...noted(kept ? result("xl.note.worktreeKept", { merged: done.ref }) : done) });
     merged.add(child.id);
     return null;
   }
@@ -423,8 +490,9 @@ export class XlOrchestrator {
     return (this.task.subtasks ?? []).indexOf(child.id) + 1;
   }
 
-  private name(child: Task, word = "Sub-task"): string {
-    return `${word} ${this.number(child)} (${child.title ?? child.request})`;
+  /** A sub-task's number and title, for the results that name it: "Sub-task 2 (Add the route)". */
+  private named(child: Task): { n: number; title: string } {
+    return { n: this.number(child), title: child.title ?? child.request };
   }
 
   /* ---------- Integration ---------- */
@@ -432,12 +500,12 @@ export class XlOrchestrator {
   /** The gates on the merged task branch: Done only when nothing fails that didn't fail before the task. */
   private async integrate(code: string): Promise<Task> {
     const round = Math.max(-1, ...this.rec.gates.map((g) => g.round)) + 1;
-    const id = this.begin({ step: "integration", label: "Integration gates", kind: "gates" });
+    const id = this.begin({ step: "integration", ...labelled(result("xl.label.integration")), kind: "gates" });
     const { runs, notRun } = await this.gates(code, round);
     this.commit((r) => ({ gates: [...r.gates, ...runs], notRun }));
     if (this.cancelled) {
       this.finish(id, { status: "cancelled" });
-      return this.end("cancelled", "Stopped by the user. The worktrees are left as they are.");
+      return this.end("cancelled", result("xl.outcome.stoppedByUser"));
     }
     const failed = failing(runs);
     const before = (g: GateRun) =>
@@ -446,32 +514,38 @@ export class XlOrchestrator {
     const old = failed.filter(before);
     this.finish(id, {
       status: failed.length ? "failed" : "done",
-      note: !runs.length ? "No gates to run." : failed.length ? `Failed: ${kinds(failed)}.` : "All passed.",
+      ...noted(
+        !runs.length
+          ? result("xl.note.noGates")
+          : failed.length
+            ? result("xl.note.gatesFailed", { gates: kinds(failed) })
+            : result("xl.note.allPassed"),
+      ),
     });
-    const branch = this.task.worktree?.branch ?? "the task branch";
-    if (!runs.length) {
-      return this.end(
-        "unverified",
-        `Every sub-task was merged into ${branch}, but no gate ran on it: nothing proved it.`,
-      );
-    }
+    const branch = this.task.worktree?.branch ?? resultRef("xl.phrase.taskBranch");
+    if (!runs.length) return this.end("unverified", result("xl.outcome.unverified", { branch }));
     if (fresh.length) {
-      return this.end("failed", `The merged branch ${branch} fails ${kinds(fresh)}, which passed before the task.`);
+      return this.end("failed", result("xl.outcome.newFailures", { branch, gates: kinds(fresh) }));
     }
     if (old.length) {
-      const were =
-        new Set(old.map((g) => g.kind)).size === 1
-          ? "was already failing before the task and still fails"
-          : "were already failing before the task and still fail";
-      return this.end("failed", `${kinds(old)} ${were}. Accept the risk if that's expected.`);
+      const count = new Set(old.map((g) => g.kind)).size;
+      return this.end("failed", result("xl.outcome.stillFailing", { count, gates: kinds(old) }));
     }
-    return this.end("done", `Every sub-task was merged into ${branch}, and every gate passed on it.`);
+    return this.end("done", result("xl.outcome.done", { branch }));
   }
 }
 
 /** A sub-task's run that ended; `note` says why when it never got to run (its setup failed). */
-type Ended = { id: string; entry: string; child: Task; note?: string };
+type Ended = { id: string; entry: string; child: Task; note?: Said };
+
+/** A setup command's run in a sentence, in English and as a ref (X-13 part 2b). */
+export function setupResult(s: SetupRun) {
+  const seconds = (s.durationMs / 1000).toFixed(1);
+  return s.timedOut
+    ? result("xl.setup.timedOut", { command: s.command, seconds })
+    : result("xl.setup.exited", { command: s.command, code: String(s.exitCode), seconds });
+}
 
 export function setupNote(s: SetupRun): string {
-  return `\`${s.command}\` ${s.timedOut ? "timed out" : `exited ${s.exitCode}`} in ${(s.durationMs / 1000).toFixed(1)} s`;
+  return setupResult(s).text;
 }

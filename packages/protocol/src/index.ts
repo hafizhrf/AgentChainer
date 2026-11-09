@@ -170,6 +170,19 @@ export const LessonSourceSchema = z.enum(["gate", "format", "review", "guard", "
 export type LessonSource = z.infer<typeof LessonSourceSchema>;
 
 /**
+ * A text the sidecar wrote into a task's results, and how to show it in another language (X-13 part 2b): a key of
+ * the results catalog (`results/`) and its values, which may be such texts in turn. Stored next to the English text,
+ * which stays what pull requests, evidence and Claude get.
+ */
+export type MessageRef = { key: string; params?: Record<string, string | number | MessageRef> | undefined };
+export const MessageRefSchema: z.ZodType<MessageRef> = z.lazy(() =>
+  z.object({
+    key: z.string(),
+    params: z.record(z.string(), z.union([z.string(), z.number(), MessageRefSchema])).optional(),
+  }),
+);
+
+/**
  * A suggested CLAUDE.md line from a finished task (M8-06, docs/design/lessons.md), with the run's records it comes
  * from. Nothing is written until the person approves it.
  */
@@ -177,7 +190,9 @@ export const LessonSchema = z.object({
   id: z.string(),
   text: z.string(),
   why: z.string(),
-  sources: z.array(z.object({ source: LessonSourceSchema, ref: z.string(), text: z.string() })),
+  sources: z.array(
+    z.object({ source: LessonSourceSchema, ref: z.string(), text: z.string(), textRef: MessageRefSchema.optional() }),
+  ),
 });
 export type Lesson = z.infer<typeof LessonSchema>;
 
@@ -638,6 +653,7 @@ export const TriageSignalSchema = z.object({
   /** The rule: risk-keywords, breadth, scope, repo-size, tests or new-areas. */
   signal: z.string(),
   detail: z.string(),
+  detailRef: MessageRefSchema.optional(),
   /** The lowest tier this signal allows; null when it only informs. */
   floor: TierSchema.nullable(),
 });
@@ -650,14 +666,22 @@ export const TriageSchema = z.object({
   floor: TierSchema,
   /** The cheap model's classification; null when it failed (`modelError`), and the proposal is then the floor. */
   model: z
-    .object({ tier: TierSchema, rationale: z.string(), confidence: z.enum(["low", "medium", "high"]) })
+    .object({
+      tier: TierSchema,
+      rationale: z.string(),
+      /** Set when the sidecar wrote the rationale itself (a split's sub-task), not the model. */
+      rationaleRef: MessageRefSchema.optional(),
+      confidence: z.enum(["low", "medium", "high"]),
+    })
     .nullable(),
   modelError: z.string().optional(),
+  modelErrorRef: MessageRefSchema.optional(),
   /** The higher of the model's tier and the floor: a risk keyword can't be talked down. */
   proposed: TierSchema,
   /** What the task runs at: the proposal, unless the user picked another tier with a reason. */
   chosen: TierSchema,
-  override: z.object({ reason: z.string().min(1) }).optional(),
+  /** `reasonRef` is set when the sidecar gave the reason (a split's sub-tasks), not the person. */
+  override: z.object({ reason: z.string().min(1), reasonRef: MessageRefSchema.optional() }).optional(),
   /**
    * The task's spend cap, defaulting by tier; null for no cap (the person's choice). Each step's own limit from its
    * workflow still applies.
@@ -774,6 +798,8 @@ export const StepRunSchema = z.object({
   /** The template step it belongs to. */
   step: z.string(),
   label: z.string(),
+  /** Set for a label the sidecar wrote ("Task branch"); a workflow's own labels are the workflow's words. */
+  labelRef: MessageRefSchema.optional(),
   /** XL adds `setup` (the task branch's worktree), `subtask` (a sub-task's run, see `taskId`) and `merge`. */
   kind: z.enum(["agent", "fix", "gates", "baseline", "setup", "subtask", "merge"]),
   /** The sub-task a `subtask` or `merge` entry is about. */
@@ -788,6 +814,7 @@ export const StepRunSchema = z.object({
   costUsd: z.number(),
   /** What happened, in a sentence: the failing gates, the must-fix findings, an error. */
   note: z.string().optional(),
+  noteRef: MessageRefSchema.optional(),
 });
 export type StepRun = z.infer<typeof StepRunSchema>;
 
@@ -871,8 +898,9 @@ export const TaskRunSchema = z.object({
   /** Set when the user accepted a failed or unverified run's risk (M3-10). */
   acceptance: z.object({ reason: z.string().min(1), at: z.string() }).optional(),
   costUsd: z.number(),
-  /** Why the run ended, in a sentence. */
+  /** Why the run ended, in a sentence, in English; `outcomeRef` shows it in the app's language. */
   outcome: z.string().optional(),
+  outcomeRef: MessageRefSchema.optional(),
   /** A schedule started it (M8-05), not a person. */
   trigger: z.literal("schedule").optional(),
 });
@@ -2298,3 +2326,11 @@ export {
   translationProblems,
 } from "./i18n.ts";
 export { hasSecret, redactForLog, redactSecrets, redactValue } from "./redact.ts";
+export {
+  RESULTS,
+  RESULTS_INDONESIAN,
+  type ResultKey,
+  resultEnglish,
+  resultRef,
+  resultText,
+} from "./results/index.ts";

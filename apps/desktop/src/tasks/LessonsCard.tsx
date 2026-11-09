@@ -3,6 +3,7 @@ import { GraduationCap, Loader2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { t } from "../i18n/index.ts";
 import { Rich } from "../i18n/Rich.tsx";
+import { localized } from "../i18n/shown.ts";
 import { request } from "../sidecar.ts";
 import { lineDiff } from "../textdiff.ts";
 
@@ -164,7 +165,7 @@ export function LessonsCard({ task, cwd }: { task: Task; cwd: string }) {
                 {l.sources.length > 0 && (
                   <div className="lesson-sources">
                     {l.sources.map((s) => (
-                      <span key={s.ref} className="chip" title={s.text}>
+                      <span key={s.ref} className="chip" title={localized(s.text, s.textRef)}>
                         {SOURCE_TEXT[s.source]}: {s.ref.split(":").slice(1).join(":")}
                       </span>
                     ))}

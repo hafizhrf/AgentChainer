@@ -164,5 +164,18 @@ Indonesian grammar goes around them: "Session baru", "Tutup session", "di-deploy
 | Pinned (a version) / Backup / Undo | Di-pin / Cadangan / Pembatalan |
 | Dependencies / A check (CI, PR) / Role | Dependensi / Pemeriksaan / Peran |
 | Revise / Your own agent | Revisi / Agent milik Anda |
+| Turn ran out / Its budget ran out | Semua gilirannya terpakai / Anggarannya habis |
+| Stopped by the user / Left as it is | Dihentikan oleh Anda / Dibiarkan apa adanya |
+| `cmd` exited N | `cmd` keluar dengan exit code N |
+| Error / Conflicts | Kesalahan / Konflik |
+| Must-fix / Should-fix / Note (review findings) | Wajib diperbaiki / Sebaiknya diperbaiki / Catatan |
+| Finding / Review findings | Temuan / Temuan tinjauan |
+| Fix: … / Fix CI: … (steps) | Perbaiki: … / Perbaiki CI: … |
+| Local gates / Integration gates | Gate lokal / Gate integrasi |
+| Task branch | Branch task |
+| Request / Outcome / Verdict / Estimates | Permintaan / Hasil / Keputusan / Perkiraan |
+| New / Modified / Deleted (files) / Binary | Baru / Diubah / Dihapus / Biner |
+| Secrets scan / Security notes | Pemindaian secret / Catatan keamanan |
+| Remaining risks and manual steps | Risiko tersisa dan langkah manual |
 
 When a term isn't here, translate it the way the nearest entry does, then add it to this table in the same PR.

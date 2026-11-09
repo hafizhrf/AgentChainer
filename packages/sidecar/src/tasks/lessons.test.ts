@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { after, describe, it } from "node:test";
-import type { GateRun } from "@agentchainer/protocol";
+import { type GateRun, resultEnglish, resultText, setLanguage } from "@agentchainer/protocol";
 import { listRuns, rollback } from "../bootstrap/apply.ts";
 import { copyFixture, removeFixtureCopies } from "../detect/fixture-copy.ts";
 import type { AgentSdkModule } from "../sdk-loader.ts";
@@ -133,6 +133,47 @@ describe("lesson signals (M8-06)", () => {
   it("finds nothing in a clean run", () => {
     assert.deepEqual(lessonSignals(evidence()), []);
   });
+
+  it("gives the app's own signals a ref that says in English what the text says; the implementer's words have none", async () => {
+    const signals = lessonSignals(rich());
+    for (const s of signals.filter((s) => s.source !== "notes")) {
+      assert.ok(s.textRef, s.ref);
+      assert.equal(resultEnglish(s.textRef), s.text, s.ref);
+    }
+    assert.equal(signals.find((s) => s.source === "notes")?.textRef, undefined);
+    await setLanguage("id");
+    try {
+      assert.deepEqual(
+        signals.map((s) => (s.textRef ? resultText(s.textRef) : s.text)),
+        [
+          "`pnpm typecheck` gagal, lalu lulus setelah diperbaiki:\nsrc/a.ts(3,1): error TS2304: Cannot find name 'x'.",
+          "Formatter menulis ulang 2 file: src/a.ts, src/b.ts",
+          "must-fix di src/cart.js: Rounds half down; the spec says half up.",
+          "Bash `rm -rf dist` diblokir: a recursive delete",
+          "Anda menolak Bash `npm publish`",
+          "The cart module has no types.",
+        ],
+      );
+    } finally {
+      await setLanguage("en");
+    }
+  });
+
+  it("clips a long signal and its ref alike, or drops the ref when the cut can't be said the same way", () => {
+    const long = "x".repeat(400);
+    const e = rich();
+    e.gates.runs = [gate("typecheck", 0, 2, { tail: long }), gate("typecheck", 1, 0)];
+    e.security.approvals = [{ ...e.security.approvals[0], target: long } as (typeof e.security.approvals)[number]];
+    const signals = lessonSignals(e);
+    const fixed = signals.find((s) => s.source === "gate");
+    assert.equal(fixed?.text.length, 301);
+    assert.ok(fixed?.text.endsWith("x…"));
+    assert.ok(fixed?.textRef, "the cut falls in git's output, which ends the message");
+    assert.equal(resultEnglish(fixed.textRef), fixed.text);
+    const denied = signals.find((s) => s.source === "approval");
+    assert.equal(denied?.text.length, 301);
+    assert.equal(denied?.textRef, undefined, "the cut falls before the closing backtick");
+  });
 });
 
 describe("lesson duplicates (M8-06)", () => {
@@ -189,6 +230,7 @@ describe("lessons in CLAUDE.md (M8-06)", () => {
     assert.deepEqual(dismissedLessons(root), ["Never publish from a task."]);
     assert.deepEqual(storedLessons(root, id), []);
     assert.equal(listRuns(root)[0]?.runId, runId);
+    assert.equal(listRuns(root)[0]?.actions[0]?.title, "Add 1 lesson to CLAUDE.md");
     const undone = rollback(root, runId, { cli: null });
     assert.ok(
       undone.every((r) => r.status === "rolled-back"),
@@ -252,6 +294,14 @@ describe("suggesting lessons (M8-06)", () => {
     const r = await suggestLessons(claude, root, "2026-11-03-0000cccc", evidence());
     assert.deepEqual([r.lessons, r.costUsd, calls.length], [[], 0, 0]);
     assert.match(r.note ?? "", /Nothing in this run/);
+    // The note is live, never stored: it comes in the app's language.
+    await setLanguage("id");
+    try {
+      const again = await suggestLessons(claude, root, "2026-11-03-0000cccc", evidence());
+      assert.match(again.note ?? "", /^Tidak ada yang mengarah ke pelajaran dalam run ini/);
+    } finally {
+      await setLanguage("en");
+    }
   });
 
   it("keeps the model's new lessons with their sources, and drops ones CLAUDE.md or a dismissal already has", async () => {
@@ -281,5 +331,9 @@ describe("suggesting lessons (M8-06)", () => {
       storedLessons(root, id).map((l) => l.text),
       ["Round money half up, as the spec says."],
     );
+    // A source's ref is stored with it, so the lesson's sources show in the app's language when read back.
+    const source = storedLessons(root, id)[0]?.sources[0];
+    assert.equal(source?.textRef?.key, "lessons.signal.reviewIn");
+    assert.deepEqual(source, r.lessons[0]?.sources[0]);
   });
 });

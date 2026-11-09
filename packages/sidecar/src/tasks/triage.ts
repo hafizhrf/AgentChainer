@@ -1,4 +1,6 @@
 import {
+  type MessageRef,
+  resultRef,
   type TaskContract,
   TIERS,
   type Tier,
@@ -8,6 +10,7 @@ import {
 } from "@agentchainer/protocol";
 import { z } from "zod";
 import type { AgentSdkModule } from "../sdk-loader.ts";
+import { result } from "./result.ts";
 
 /**
  * Triage (M3-03, planner.md §4): deterministic signals set a floor, a cheap model proposes a tier, and the proposal is
@@ -110,6 +113,9 @@ export function isTestPath(area: string): boolean {
   );
 }
 
+/** A signal's detail: the English the classification prompt gets, and its ref for the app (X-13 part 2b). */
+const detailOf = (r: { text: string; ref: MessageRef }) => ({ detail: r.text, detailRef: r.ref });
+
 /**
  * The deterministic signals and the floor they set. Keywords are read from the request and the parts of the contract
  * that describe the work (objective, criteria, risks, areas), not from constraints or out-of-scope, which name what
@@ -127,14 +133,20 @@ export function signals(input: SignalInput): { signals: TriageSignal[]; floor: T
   ].join("\n");
 
   const risky = found(work, RISK_KEYWORDS);
-  if (risky.length) out.push({ signal: "risk-keywords", detail: `Mentions ${risky.join(", ")}.`, floor: "L" });
+  if (risky.length) {
+    const detail = result("triage.signal.riskKeywords", { words: risky.join(", ") });
+    out.push({ signal: "risk-keywords", ...detailOf(detail), floor: "L" });
+  }
 
   const broad = found(`${request}\n${contract.objective}`, BREADTH_PHRASES);
-  if (broad.length) out.push({ signal: "breadth", detail: `Says “${broad.join("”, “")}”.`, floor: "L" });
+  if (broad.length) {
+    const detail = result("triage.signal.breadth", { phrases: broad.join("”, “") });
+    out.push({ signal: "breadth", ...detailOf(detail), floor: "L" });
+  }
 
   const areas = contract.affectedAreas.map(staticPrefix);
   if (areas.length === 0) {
-    out.push({ signal: "scope", detail: "No affected areas listed.", floor: null });
+    out.push({ signal: "scope", ...detailOf(result("triage.signal.noAreas")), floor: null });
   } else {
     // An area belongs to its package in a monorepo, otherwise to its top-level folder; root files belong to ".".
     const packages = profile.packages.map((p) => p.path).filter((p) => p !== ".");
@@ -145,23 +157,33 @@ export function signals(input: SignalInput): { signals: TriageSignal[]; floor: T
     const roots = new Set(areas.filter((a) => !isTestPath(a)).map(rootOf));
     const covers = (a: string, f: string) => (a ? f === a || f.startsWith(`${a}/`) : !f.includes("/"));
     const under = files.filter((f) => areas.some((a) => covers(a, f))).length;
-    const detail = `${areas.length} area${areas.length === 1 ? "" : "s"} in ${roots.size} top-level part${roots.size === 1 ? "" : "s"} (${[...roots].join(", ")}), ${under} existing file${under === 1 ? "" : "s"}.`;
+    const detail = result("triage.signal.scope", {
+      areas: resultRef("triage.signal.areas", { count: areas.length }),
+      parts: resultRef("triage.signal.parts", { count: roots.size }),
+      roots: [...roots].join(", "),
+      files: resultRef("triage.signal.existingFiles", { count: under }),
+    });
     const floor: Tier | null = roots.size >= 4 || under >= AREA_FILES_FOR_L ? "L" : roots.size >= 2 ? "M" : null;
-    out.push({ signal: "scope", detail, floor });
+    out.push({ signal: "scope", ...detailOf(detail), floor });
     const missing = contract.affectedAreas.filter((_, i) => {
       const a = areas[i] ?? "";
       return a !== "" && !files.some((f) => covers(a, f));
     });
-    if (missing.length)
-      out.push({ signal: "new-areas", detail: `New or not found: ${missing.join(", ")}.`, floor: null });
+    if (missing.length) {
+      const detail = result("triage.signal.newAreas", { areas: missing.join(", ") });
+      out.push({ signal: "new-areas", ...detailOf(detail), floor: null });
+    }
   }
 
   if (truncated || files.length > REPO_FILES_FOR_M) {
-    out.push({ signal: "repo-size", detail: `${truncated ? "More than " : ""}${files.length} files.`, floor: "M" });
+    const detail = truncated
+      ? result("triage.signal.repoSizeOver", { files: files.length })
+      : result("triage.signal.repoSize", { files: files.length });
+    out.push({ signal: "repo-size", ...detailOf(detail), floor: "M" });
   }
 
   const tests = profile.packages.some((p) => p.commands.test);
-  if (!tests) out.push({ signal: "tests", detail: "No test command detected.", floor: null });
+  if (!tests) out.push({ signal: "tests", ...detailOf(result("triage.signal.noTests")), floor: null });
 
   const floor = out.reduce<Tier>((t, s) => (s.floor ? maxTier(t, s.floor) : t), "S");
   return { signals: out, floor };
@@ -224,15 +246,19 @@ function jsonIn(text: string): unknown {
   }
 }
 
-/** The cheap model's tier (haiku, no tools). Never throws for a failed call: it returns the error instead. */
+/**
+ * The cheap model's tier (haiku, no tools). Never throws for a failed call: it returns the error instead, with its ref
+ * when the sidecar wrote it (an exception's message stays as it is).
+ */
 export async function classify(
   sdk: AgentSdkModule,
   claudePath: string,
   root: string,
   prompt: string,
   abortController?: AbortController,
-): Promise<{ model: Classification | null; error?: string; costUsd: number }> {
+): Promise<{ model: Classification | null; error?: string; errorRef?: MessageRef; costUsd: number }> {
   let costUsd = 0;
+  const failed = (r: { text: string; ref: MessageRef }) => ({ model: null, error: r.text, errorRef: r.ref, costUsd });
   try {
     const q = sdk.query({
       prompt,
@@ -252,12 +278,12 @@ export async function classify(
     for await (const m of q) {
       if (m.type !== "result") continue;
       costUsd += m.total_cost_usd;
-      if (m.subtype !== "success") return { model: null, error: `The classification stopped: ${m.subtype}.`, costUsd };
+      if (m.subtype !== "success") return failed(result("triage.modelError.stopped", { subtype: m.subtype }));
       const parsed = ClassificationSchema.safeParse(m.structured_output ?? jsonIn(m.result));
       if (parsed.success) return { model: parsed.data, costUsd };
-      return { model: null, error: "The classification wasn't a valid answer.", costUsd };
+      return failed(result("triage.modelError.invalid"));
     }
-    return { model: null, error: "The classification ended without a result.", costUsd };
+    return failed(result("triage.modelError.noResult"));
   } catch (err) {
     if (abortController?.signal.aborted) throw err;
     return { model: null, error: err instanceof Error ? err.message : String(err), costUsd };
@@ -267,7 +293,7 @@ export async function classify(
 /** Combines the signals and the model's tier into a triage record; the proposal is the default choice. */
 export function triageRecord(
   found: { signals: TriageSignal[]; floor: Tier },
-  model: { model: Classification | null; error?: string },
+  model: { model: Triage["model"]; error?: string; errorRef?: MessageRef },
   now = new Date(),
 ): Triage {
   const proposed = model.model ? maxTier(model.model.tier, found.floor) : found.floor;
@@ -275,7 +301,7 @@ export function triageRecord(
     signals: found.signals,
     floor: found.floor,
     model: model.model,
-    ...(model.error ? { modelError: model.error } : {}),
+    ...(model.error ? { modelError: model.error, ...(model.errorRef ? { modelErrorRef: model.errorRef } : {}) } : {}),
     proposed,
     chosen: proposed,
     budgetUsd: DEFAULT_BUDGET_USD[proposed],

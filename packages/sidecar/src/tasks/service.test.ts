@@ -1,11 +1,20 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import {
+  copyFileSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  realpathSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { after, describe, it } from "node:test";
 import { fileURLToPath } from "node:url";
-import { RpcErrorCode } from "@agentchainer/protocol";
+import { RpcErrorCode, resultEnglish, resultText, setLanguage } from "@agentchainer/protocol";
 import { copyFixture, removeFixtureCopies } from "../detect/fixture-copy.ts";
 import type { Gh, GhResult } from "../github.ts";
 import type { AgentSdkModule } from "../sdk-loader.ts";
@@ -14,6 +23,7 @@ import { branchFolders } from "./folders.ts";
 import shipped from "./library.json" with { type: "json" };
 import { LibrarySchema } from "./library.ts";
 import { newRun } from "./orchestrator.ts";
+import { result } from "./result.ts";
 import {
   acceptRisk,
   approveSubtasks,
@@ -32,9 +42,11 @@ import {
   messageRun,
   newTask,
   overlapsOf,
+  prBody,
   proposeFlow,
   prPreview,
   prStatus,
+  readyBranch,
   retriageTask,
   reviseTask,
   shortTitle,
@@ -226,6 +238,38 @@ describe("task flow", () => {
     assert.doesNotMatch(again, /First\./);
   });
 
+  it("shows the report in the app's language, while evidence.md and the PR body stay English (X-13)", async () => {
+    const root = copyFixture("sample-app");
+    const created = newTask(root, "Fix total()");
+    const workflow = LibrarySchema.parse(shipped).workflows.S;
+    if (!workflow) throw new Error("no S workflow");
+    const run = newRun(workflow, { permissionMode: "default", base: null, untrackedAtStart: [] }, new Date());
+    saveTask(root, {
+      ...created,
+      state: "failed",
+      updatedAt: "2026-10-30T01:00:00.000Z",
+      run: { ...run, outcome: "X." },
+    });
+    const { markdown: english, path } = taskEvidence(root, created.id);
+    await setLanguage("id");
+    try {
+      const shown = taskEvidence(root, created.id).markdown;
+      assert.match(shown, /^# Bukti task: Fix total\(\)\n/);
+      assert.match(shown, /- \*\*Hasil:\*\* \*\*Gagal\.\*\* X\./);
+      assert.equal(readFileSync(path, "utf8"), english);
+      const body = prBody(root, loadTask(root, created.id));
+      assert.match(body, /## Evidence\n\n- \*\*Request:\*\* Fix total\(\)/);
+      assert.doesNotMatch(body, /Permintaan|Hasil/);
+      // A report written before its prose had refs is shown as it was written.
+      const json = join(root, ".agentchainer", "tasks", created.id, "evidence.json");
+      const { refs: _, ...old } = JSON.parse(readFileSync(json, "utf8"));
+      writeFileSync(json, JSON.stringify(old));
+      assert.equal(taskEvidence(root, created.id).markdown, english);
+    } finally {
+      await setLanguage("en");
+    }
+  });
+
   it("splits an approved XL task into draft sub-tasks with their own triage, shown only on its page", async () => {
     const root = copyFixture("sample-app");
     const created = newTask(root, "Coupons and quantities");
@@ -284,6 +328,91 @@ describe("task flow", () => {
     assert.throws(() => deleteTaskSafe(root, first.id), /delete that one instead/);
     deleteTaskSafe(root, created.id);
     assert.equal(existsSync(join(root, ".agentchainer", "tasks", first.id)), false, "deleted with its XL task");
+  });
+
+  it("keeps the reasons the split gives through approval, shown in the app's language (X-13)", async () => {
+    const root = copyFixture("sample-app");
+    const created = newTask(root, "Coupons");
+    saveTask(root, { ...approvedXl(created), id: created.id });
+    const subtask = { title: "Fix total()", request: "Fix total()", tier: "M", dependsOn: [], contract: DRAFT };
+    const sdk = {
+      query: () =>
+        (async function* () {
+          yield {
+            type: "result",
+            subtype: "success",
+            total_cost_usd: 0,
+            result: "",
+            structured_output: { subtasks: [subtask] },
+          };
+        })(),
+    } as unknown as AgentSdkModule;
+    const split = await splitTask(root, created.id, { sdk, claudePath: "claude" });
+    const child = loadTask(root, split.subtasks?.[0] ?? "");
+    if (!child.triage?.model?.rationaleRef) throw new Error("no rationale ref");
+    assert.equal(resultEnglish(child.triage.model.rationaleRef), "Proposed by the split.");
+    // A sub-task proposed as XL runs as L, with the split's reason; approving it as drafted keeps the reason's ref.
+    const reason = result("triage.split.overrideReason");
+    const override = { reason: reason.text, reasonRef: reason.ref };
+    saveTask(root, { ...child, triage: { ...child.triage, proposed: "XL", chosen: "L", override } });
+    approveSubtasks(root, created.id);
+    const approved = loadTask(root, child.id);
+    assert.equal(approved.state, "ready");
+    assert.deepEqual(approved.triage?.override, override);
+    await setLanguage("id");
+    try {
+      assert.equal(resultText(reason.ref), "Sub-task berjalan sebagai S, M, atau L.");
+      assert.equal(resultText(child.triage.model.rationaleRef), "Diusulkan oleh pemecahan task.");
+    } finally {
+      await setLanguage("en");
+    }
+    // A reason the person writes is theirs: it has no ref.
+    reviseTask(root, child.id);
+    const own = approveTask(root, child.id, approved.contract ?? DRAFT_CONTRACT, "M", "Smaller than it looks", 3);
+    assert.deepEqual(own.triage?.override, { reason: "Smaller than it looks" });
+  });
+
+  it("loads a task recorded before its results had refs, as written (X-13)", () => {
+    const root = copyFixture("sample-app");
+    const created = newTask(root, "Coupons");
+    const workflow = LibrarySchema.parse(shipped).workflows.S;
+    if (!workflow) throw new Error("no S workflow");
+    const at = "2026-10-30T00:00:00.000Z";
+    const run = {
+      ...newRun(workflow, { permissionMode: "default", base: null, untrackedAtStart: [] }, new Date(at)),
+      outcome: "Every gate passed after the last change.",
+      steps: [
+        {
+          id: "baseline",
+          step: "baseline",
+          label: "Gates before the task",
+          kind: "baseline" as const,
+          status: "done" as const,
+          startedAt: at,
+          costUsd: 0,
+          note: "All passed.",
+        },
+      ],
+    };
+    const triage = {
+      signals: [{ signal: "tests", detail: "No test command detected.", floor: null }],
+      floor: "S" as const,
+      model: null,
+      modelError: "The classification ended without a result.",
+      proposed: "XL" as const,
+      chosen: "L" as const,
+      override: { reason: "Sub-tasks run as S, M or L." },
+      budgetUsd: 5,
+      at,
+    };
+    saveTask(root, { ...created, state: "done", contract: DRAFT_CONTRACT, triage, run });
+    const dir = join(root, ".agentchainer", "tasks", created.id);
+    for (const file of ["task.json", "triage.json"]) {
+      assert.doesNotMatch(readFileSync(join(dir, file), "utf8"), /Ref"/, `${file} has no refs`);
+    }
+    const loaded = loadTask(root, created.id);
+    assert.deepEqual(loaded.run, run);
+    assert.deepEqual(loaded.triage, triage);
   });
 
   it("merges a finished XL task's branch only into a clean tree, and cleans its worktrees up", () => {
@@ -364,6 +493,37 @@ describe("a branch for every task (M5-01)", () => {
     const again = taskBranch(root, first.task);
     assert.equal(again.fresh, false, "a re-run keeps its worktree");
     assert.equal(again.task.worktree?.path, first.task.worktree?.path);
+  });
+
+  it("notes the task's branch, and that the workspace's uncommitted changes aren't on it (X-13)", async () => {
+    // No install command, so nothing runs in the worktree.
+    const root = realpathSync(mkdtempSync(join(tmpdir(), "ac-branch-")));
+    try {
+      git(root, "init", "-q", "-b", "main");
+      writeFileSync(join(root, "README.md"), "# Coupons\n");
+      git(root, "add", "-A");
+      git(root, "commit", "-q", "-m", "init");
+      const { task } = taskBranch(root, newTask(root, "Coupons"));
+      const signal = new AbortController().signal;
+      const branch = branchOf(task.id);
+      assert.deepEqual(await readyBranch(root, task, signal), { ok: true, note: branch }, "a branch name as it is");
+      writeFileSync(join(root, "README.md"), "# Coupons, edited\n");
+      const r = await readyBranch(root, task, signal);
+      assert.equal(r.note, `${branch}; your uncommitted changes in the workspace aren't on this branch`);
+      assert.ok(r.noteRef);
+      assert.equal(resultEnglish(r.noteRef), r.note);
+      await setLanguage("id");
+      try {
+        assert.equal(
+          resultText(r.noteRef),
+          `${branch}; perubahan Anda yang belum di-commit di workspace tidak ada di branch ini`,
+        );
+      } finally {
+        await setLanguage("en");
+      }
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
   });
 
   it("runs in the workspace when it has no git repository", () => {
@@ -628,6 +788,40 @@ describe("pull requests (M5-02)", () => {
       /## Pull request[\s\S]*Merged by a person \(squash\)[\s\S]*accepted: Reviewed by hand\./,
     );
     await assert.rejects(mergePrTask(root, id, { method: "squash", headSha: sha }, gh), /merged already/);
+  });
+
+  it("shows the merge gates in the app's language, the run's outcome too when it has a ref (X-13)", async () => {
+    const { root, gh, checks } = world();
+    const { id } = doneWithChange(root);
+    const t = await createTaskPr(root, id, { title: "Add coupons", draft: true }, gh);
+    const run = t.run;
+    if (!run) throw new Error("no run");
+    checks.push({
+      name: "test",
+      workflow: "test",
+      state: "SUCCESS",
+      bucket: "pass",
+      link: "https://x/actions/runs/1/job/2",
+    });
+    const outcome = result("run.outcome.everyGatePassed");
+    saveTask(root, { ...t, run: { ...run, outcome: outcome.text, outcomeRef: outcome.ref } });
+    await setLanguage("id");
+    try {
+      const g = await mergeGates(root, id, gh);
+      const by = Object.fromEntries(g.gates.map((x) => [x.id, [x.label, x.detail]]));
+      assert.deepEqual(by.local, ["Gate lokal", "Semua gate lulus setelah perubahan terakhir."]);
+      assert.deepEqual(by.review, ["Tinjauan PR", "Belum ada tinjauan independen untuk PR ini."]);
+      assert.deepEqual(by.ci, ["CI", "1 pemeriksaan lulus."]);
+      assert.equal(by.secrets?.[0], "Secret (gitleaks)");
+      // What holds Merge back is named as the gates are shown.
+      await assert.rejects(mergePrTask(root, id, { method: "squash", headSha: g.headSha }, gh), /Tinjauan PR/);
+      // An outcome recorded before refs is quoted as written.
+      saveTask(root, { ...loadTask(root, id), run: { ...run, outcome: "Every gate passed after the last change." } });
+      const older = await mergeGates(root, id, gh);
+      assert.equal(older.gates.find((x) => x.id === "local")?.detail, "Every gate passed after the last change.");
+    } finally {
+      await setLanguage("en");
+    }
   });
 
   it("counts the run's own review for the head it pushed", async () => {

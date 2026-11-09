@@ -1,0 +1,18 @@
+{
+  "triage.signal.riskKeywords": "Menyebut {{words}}.",
+  "triage.signal.breadth": "Memuat “{{phrases}}”.",
+  "triage.signal.noAreas": "Tidak ada area terdampak yang dicantumkan.",
+  "triage.signal.scope": "{{areas}} di {{parts}} ({{roots}}), {{files}}.",
+  "triage.signal.areas_other": "{{count}} area",
+  "triage.signal.parts_other": "{{count}} bagian tingkat atas",
+  "triage.signal.existingFiles_other": "{{count}} file yang sudah ada",
+  "triage.signal.newAreas": "Baru atau tidak ditemukan: {{areas}}.",
+  "triage.signal.repoSize": "{{files}} file.",
+  "triage.signal.repoSizeOver": "Lebih dari {{files}} file.",
+  "triage.signal.noTests": "Tidak ada perintah test yang terdeteksi.",
+  "triage.modelError.stopped": "Klasifikasi berhenti: {{subtype}}.",
+  "triage.modelError.invalid": "Klasifikasi bukan jawaban yang valid.",
+  "triage.modelError.noResult": "Klasifikasi berakhir tanpa hasil.",
+  "triage.split.rationale": "Diusulkan oleh pemecahan task.",
+  "triage.split.overrideReason": "Sub-task berjalan sebagai S, M, atau L."
+}

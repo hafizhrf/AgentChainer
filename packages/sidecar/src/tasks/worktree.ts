@@ -3,6 +3,7 @@ import path from "node:path";
 import { TaskIdSchema } from "@agentchainer/protocol";
 import { AC_DIR, ensureIgnored } from "../ac-dir.ts";
 import { git, gitOrThrow, repoOf } from "../workspace.ts";
+import { result } from "./result.ts";
 
 /**
  * XL's worktrees (M3-07): one for the task and one per sub-task, under `.agentchainer/worktrees/` (git-ignored), each on
@@ -73,13 +74,20 @@ export function commitAll(dir: string, message: string, untrackedBefore: string[
   return gitOrThrow(["rev-parse", "HEAD"], dir).trim();
 }
 
-/** Merges `branch` into the worktree's branch, always as a merge commit. Conflicts leave the merge in progress. */
+/**
+ * Merges `branch` into the worktree's branch, always as a merge commit. Conflicts leave the merge in progress. Any
+ * other failure throws, in English with git's own output, and with the `ref` the XL run stores to show it translated.
+ */
 export function mergeInto(dir: string, branch: string, message: string): { merged: boolean; conflicts: string[] } {
   const r = git(["merge", "--no-ff", "-m", message, branch], dir, undefined, { env: { GIT_MERGE_AUTOEDIT: "no" } });
   if (r.status === 0) return { merged: true, conflicts: [] };
   const conflicts = git(["diff", "--name-only", "--diff-filter=U"], dir).stdout.split("\n").filter(Boolean);
   if (conflicts.length) return { merged: false, conflicts };
-  throw new Error(`git merge failed: ${(r.stderr || r.stdout).trim() || `exit ${r.status}`}`);
+  const output = (r.stderr || r.stdout).trim();
+  const failed = output
+    ? result("xl.note.gitMergeFailed", { output })
+    : result("xl.note.gitMergeExited", { status: String(r.status) });
+  throw Object.assign(new Error(failed.text), { ref: failed.ref });
 }
 
 /** Whether the workspace has changes to tracked files, which a merge into it could mix with. */

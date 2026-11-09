@@ -1,18 +1,26 @@
-import type {
-  ApprovalRecord,
-  DeployRecord,
-  GateKind,
-  GateRun,
-  GuardBlock,
-  Task,
-  TaskRun,
+import {
+  type ApprovalRecord,
+  type DeployRecord,
+  type GateKind,
+  type GateRun,
+  type GuardBlock,
+  type MessageRef,
+  type ResultKey,
+  resultEnglish,
+  resultRef,
+  type Task,
+  type TaskRun,
 } from "@agentchainer/protocol";
 import type { Review } from "./orchestrator.ts";
+import { result } from "./result.ts";
 
 /**
  * The evidence report (M3-09, planner.md §9): built only from what the run recorded, never from what Claude says about
  * itself, except where it's labeled as Claude's statement (a file's purpose, the implementer's notes). Gate results
  * are the commands' real exit codes; a gate that didn't run is said to have not run, never to have passed.
+ *
+ * Its prose is stored in English next to `MessageRef`s (X-13 part 2b): `evidence.md` and pull requests get the
+ * English rendering, the task page the app's language (`renderEvidence`'s `render`).
  */
 
 export type FileChange = {
@@ -23,7 +31,17 @@ export type FileChange = {
   removed: number | null;
 };
 
-export type SecretsScan = { ran: false; why: string } | { ran: true; scanned: number; flagged: string[] };
+/** `whyRef` shows why it didn't run in the app's language; reports from before have none. */
+export type SecretsScan =
+  | { ran: false; why: string; whyRef?: MessageRef }
+  | { ran: true; scanned: number; flagged: string[] };
+
+/** A scan that didn't run, from its result. */
+export const notScanned = (why: { text: string; ref: MessageRef }): SecretsScan => ({
+  ran: false,
+  why: why.text,
+  whyRef: why.ref,
+});
 
 /** An XL task's sub-task, as its own report sums it up (M3-07). */
 export type SubtaskSummary = {
@@ -33,6 +51,7 @@ export type SubtaskSummary = {
   state: Task["state"];
   costUsd: number;
   outcome: string | null;
+  outcomeRef?: MessageRef;
   /** Its own report, relative to the workspace. */
   report: string;
 };
@@ -48,8 +67,15 @@ export type EvidenceInput = {
   subtasks?: SubtaskSummary[];
   /** The task's deploys (M6), newest first. */
   deploys?: DeployRecord[];
+  /** An XL task's approvals and guard blocks, from its sub-tasks' steps, in place of its own run's. */
+  records?: { approvals: EvidenceApproval[]; guardBlocks: GuardBlock[] };
+  /** An XL task's implementers' notes, from its sub-tasks, in place of the summary's `## Notes`. */
+  notes?: { text: string; ref: MessageRef }[];
   now: Date;
 };
+
+/** An approval as the report lists it: an XL task's are marked with their sub-task (`labelRef`). */
+export type EvidenceApproval = ApprovalRecord & { labelRef?: MessageRef };
 
 export type CriterionResult = {
   id: string;
@@ -57,10 +83,16 @@ export type CriterionResult = {
   check: string;
   status: "proved" | "failed" | "not-run" | "met" | "not-met" | "unclear" | "manual";
   detail: string;
+  detailRef?: MessageRef;
 };
 
 export type Evidence = {
   version: 1;
+  /**
+   * Set when the report's prose has `MessageRef`s next to the English (X-13 part 2b), so the app can show it in its
+   * language. A report from before is shown as it was written.
+   */
+  refs?: true;
   generatedAt: string;
   task: {
     id: string;
@@ -69,25 +101,38 @@ export type Evidence = {
     tier: string;
     proposed: string;
     overrideReason?: string;
+    /** Set when the sidecar gave the reason (a split's sub-tasks), not the person. */
+    overrideReasonRef?: MessageRef;
     /** null: the person ran it with no budget. */
     budgetUsd: number | null;
     approvedAt?: string;
     /** The workflow the run used, and the project's file when it replaced the app's (M6-04). */
     workflow?: TaskRun["workflow"];
   };
-  outcome: { state: Task["state"]; text: string; acceptance?: { reason: string; at: string } };
+  outcome: { state: Task["state"]; text: string; ref?: MessageRef; acceptance?: { reason: string; at: string } };
   files: (FileChange & { purpose: string | null })[];
   subtasks: SubtaskSummary[];
   /** An XL run's merges of its sub-tasks into the task branch. */
-  merges: { label: string; status: string; note: string | null }[];
+  merges: { label: string; labelRef?: MessageRef; status: string; note: string | null; noteRef?: MessageRef }[];
   gates: { baseline: GateRun[]; runs: GateRun[]; notRun: GateKind[]; preexisting: string[]; fixedByTask: string[] };
   criteria: CriterionResult[];
   review: Review | null;
   /** Why there's no review, when there isn't one. */
   noReview: string | null;
-  security: { guardBlocks: GuardBlock[]; approvals: ApprovalRecord[]; secrets: SecretsScan };
-  risks: { contract: string[]; fromImplementer: string[]; manual: string[] };
-  cost: { steps: { label: string; durationMs: number | null; costUsd: number }[]; runUsd: number; totalUsd: number };
+  noReviewRef?: MessageRef;
+  security: { guardBlocks: GuardBlock[]; approvals: EvidenceApproval[]; secrets: SecretsScan };
+  risks: {
+    contract: string[];
+    fromImplementer: string[];
+    /** `fromImplementer`'s refs, by index: an XL task's notes, each marked with its sub-task. */
+    fromImplementerRefs?: MessageRef[];
+    manual: string[];
+  };
+  cost: {
+    steps: { label: string; labelRef?: MessageRef; durationMs: number | null; costUsd: number }[];
+    runUsd: number;
+    totalUsd: number;
+  };
   /** The task's pull request (M5): its review, its Fix CI rounds and how a person merged it. */
   pr?: Task["pr"];
   /** The task's deploys (M6). */
@@ -132,56 +177,71 @@ function purposeOf(path: string, known: Map<string, string>): string | null {
   return bare ? purposeOf(bare, known) : null;
 }
 
+type Text = ReturnType<typeof result>;
+type Params = Record<string, string | number | MessageRef>;
+
 /** Why a run has no review: its tier has none, the run ended first, or the answer couldn't be read. */
-function reviewAbsence(task: Task): string {
-  if (task.triage?.chosen === "S") return "Tier S has no independent review.";
-  if (task.triage?.chosen === "XL") return "XL tasks are reviewed per sub-task: see their reports.";
+function reviewAbsence(task: Task): Text {
+  if (task.triage?.chosen === "S") return result("evidence.noReview.tierS");
+  if (task.triage?.chosen === "XL") return result("evidence.noReview.xl");
   if (!task.run?.steps.some((s) => s.role === "independent-reviewer" && s.kind === "agent"))
-    return "The independent review didn't run: the run ended before it.";
-  return "The review's answer couldn't be read.";
+    return result("evidence.noReview.didntRun");
+  return result("evidence.noReview.unreadable");
 }
+
+const exitOf = (g: GateRun): MessageRef =>
+  typeof g.exitCode === "number"
+    ? resultRef("evidence.gate.exit", { code: g.exitCode })
+    : resultRef("evidence.gate.exitNone");
+
+/** Texts separated by commas, each still shown in the app's language. */
+const listOf = (items: MessageRef[]): MessageRef =>
+  items.reduceRight((rest, first) => resultRef("evidence.list.more", { first, rest }));
 
 function criterion(
   task: Task,
   review: Review | null,
-  noReview: string | null,
+  noReview: Text | null,
   c: { id: string; text: string; check: string },
 ): CriterionResult {
-  const base = { id: c.id, text: c.text, check: c.check };
+  const judged = (status: CriterionResult["status"], detail: Text): CriterionResult => ({
+    id: c.id,
+    text: c.text,
+    check: c.check,
+    status,
+    detail: detail.text,
+    detailRef: detail.ref,
+  });
   const run = task.run;
   if (c.check.startsWith("gate:")) {
     const kind = c.check.slice(5);
     const runs = run?.gates.filter((g) => g.kind === kind) ?? [];
     if (!runs.length) {
-      return {
-        ...base,
-        status: "not-run",
-        detail: run?.notRun.includes(kind as GateKind)
-          ? `${kind} has no command in this workspace.`
-          : `${kind} didn't run.`,
-      };
+      return judged(
+        "not-run",
+        run?.notRun.includes(kind as GateKind)
+          ? result("evidence.criterion.noCommand", { gate: kind })
+          : result("evidence.criterion.didntRun", { gate: kind }),
+      );
     }
     const last = Math.max(...runs.map((g) => g.round));
     const latest = runs.filter((g) => g.round === last);
     const bad = latest.filter(failed);
+    if (!bad.length) return judged("proved", result("evidence.criterion.passed", { gate: kind, round: last + 1 }));
     const before = bad.every((g) => run?.baseline.some((b) => failed(b) && gateKey(b) === gateKey(g)));
-    return bad.length
-      ? {
-          ...base,
-          status: "failed",
-          detail: `${kind} failed in round ${last + 1} (${bad.map((g) => `exit ${g.exitCode ?? "none"}`).join(", ")}).${
-            before ? ` It already failed before the task, so this criterion isn't proved either way.` : ""
-          }`,
-        }
-      : { ...base, status: "proved", detail: `${kind} passed in round ${last + 1}, after the last change.` };
+    const params = { gate: kind, round: last + 1, exits: listOf(bad.map(exitOf)) };
+    return judged(
+      "failed",
+      before ? result("evidence.criterion.failedBefore", params) : result("evidence.criterion.failed", params),
+    );
   }
   if (c.check === "review") {
-    const judged = review?.criteria.find((r) => r.id === c.id);
-    if (!judged) return { ...base, status: "not-run", detail: noReview ?? "The reviewer didn't judge it." };
-    const status = judged.met === "yes" ? "met" : judged.met === "no" ? "not-met" : "unclear";
-    return { ...base, status, detail: `Reviewer: ${judged.why}` };
+    const verdict = review?.criteria.find((r) => r.id === c.id);
+    if (!verdict) return judged("not-run", noReview ?? result("evidence.criterion.notJudged"));
+    const status = verdict.met === "yes" ? "met" : verdict.met === "no" ? "not-met" : "unclear";
+    return judged(status, result("evidence.criterion.reviewer", { why: verdict.why }));
   }
-  return { ...base, status: "manual", detail: "Manual: not checked by AgentChainer." };
+  return judged("manual", result("evidence.criterion.manual"));
 }
 
 const RISK_ORDER = { high: 0, medium: 1, low: 2 } as const;
@@ -194,6 +254,8 @@ export function buildEvidence({
   secrets,
   subtasks = [],
   deploys,
+  records,
+  notes,
   now,
 }: EvidenceInput): Evidence {
   const noReview = review ? null : reviewAbsence(task);
@@ -207,8 +269,14 @@ export function buildEvidence({
   const fixedByTask = preexisting
     .filter((b) => latest.some((g) => g.kind === b.kind && g.package === b.package && !failed(g)))
     .map(gateKey);
+  const override = triage?.override;
+  const outcome: { text: string; ref?: MessageRef } =
+    run?.outcome === undefined
+      ? result("evidence.outcome.notRun")
+      : { text: run.outcome, ...(run.outcomeRef ? { ref: run.outcomeRef } : {}) };
   return {
     version: 1,
+    refs: true,
     generatedAt: now.toISOString(),
     task: {
       id: task.id,
@@ -216,21 +284,28 @@ export function buildEvidence({
       objective: contract?.objective ?? "",
       tier: triage?.chosen ?? "",
       proposed: triage?.proposed ?? "",
-      ...(triage?.override ? { overrideReason: triage.override.reason } : {}),
+      ...(override ? { overrideReason: override.reason } : {}),
+      ...(override?.reasonRef ? { overrideReasonRef: override.reasonRef } : {}),
       budgetUsd: triage ? triage.budgetUsd : 0,
       ...(contract?.approvedAt ? { approvedAt: contract.approvedAt } : {}),
       ...(run ? { workflow: run.workflow } : {}),
     },
     outcome: {
       state: task.state,
-      text: run?.outcome ?? "The task hasn't run.",
+      ...outcome,
       ...(run?.acceptance ? { acceptance: run.acceptance } : {}),
     },
     files: files.map((f) => ({ ...f, purpose: purposeOf(f.path, known) })),
     subtasks,
     merges: (run?.steps ?? [])
       .filter((s) => s.kind === "merge")
-      .map((s) => ({ label: s.label, status: s.status, note: s.note ?? null })),
+      .map((s) => ({
+        label: s.label,
+        ...(s.labelRef ? { labelRef: s.labelRef } : {}),
+        status: s.status,
+        note: s.note ?? null,
+        ...(s.noteRef ? { noteRef: s.noteRef } : {}),
+      })),
     gates: {
       baseline: run?.baseline ?? [],
       runs: run?.gates ?? [],
@@ -240,20 +315,25 @@ export function buildEvidence({
     },
     criteria: (contract?.acceptanceCriteria ?? []).map((c) => criterion(task, review, noReview, c)),
     review,
-    noReview,
+    noReview: noReview?.text ?? null,
+    ...(noReview ? { noReviewRef: noReview.ref } : {}),
     security: {
-      guardBlocks: run?.guardBlocks ?? [],
-      approvals: [...(run?.approvals ?? [])].sort((a, b) => RISK_ORDER[a.risk] - RISK_ORDER[b.risk]),
+      guardBlocks: run ? (records?.guardBlocks ?? run.guardBlocks) : [],
+      approvals: [...(run ? (records?.approvals ?? run.approvals) : [])].sort(
+        (a, b) => RISK_ORDER[a.risk] - RISK_ORDER[b.risk],
+      ),
       secrets,
     },
     risks: {
       contract: contract?.risks ?? [],
-      fromImplementer: sectionLines(summary, "Notes"),
+      fromImplementer: notes ? notes.map((n) => n.text) : sectionLines(summary, "Notes"),
+      ...(notes ? { fromImplementerRefs: notes.map((n) => n.ref) } : {}),
       manual: (contract?.acceptanceCriteria ?? []).filter((c) => c.check === "manual").map((c) => c.text),
     },
     cost: {
       steps: (run?.steps ?? []).map((s) => ({
         label: s.label,
+        ...(s.labelRef ? { labelRef: s.labelRef } : {}),
         durationMs: s.endedAt ? Date.parse(s.endedAt) - Date.parse(s.startedAt) : null,
         costUsd: s.costUsd,
       })),
@@ -265,174 +345,301 @@ export function buildEvidence({
   };
 }
 
-const STATE_TEXT: Partial<Record<Task["state"], string>> = {
-  done: "Done",
-  failed: "Failed",
-  unverified: "Not verified",
-  cancelled: "Stopped",
-  accepted: "Accepted with risk",
-  running: "Running",
-  interrupted: "Interrupted",
+/** The words for a recorded value, by the value; one this doesn't know is shown as it is. */
+const STATE_TEXT: Partial<Record<string, ResultKey>> = {
+  done: "evidence.state.done",
+  failed: "evidence.state.failed",
+  unverified: "evidence.state.unverified",
+  cancelled: "evidence.state.cancelled",
+  accepted: "evidence.state.accepted",
+  running: "evidence.state.running",
+  interrupted: "evidence.state.interrupted",
+  // An XL task's sub-tasks its run never reached.
+  draft: "evidence.state.draft",
+  ready: "evidence.state.ready",
 };
 
-const CRITERION_TEXT: Record<CriterionResult["status"], string> = {
-  proved: "proved by a gate",
-  failed: "gate failed",
-  "not-run": "not checked",
-  met: "met (reviewer)",
-  "not-met": "not met (reviewer)",
-  unclear: "unclear (reviewer)",
-  manual: "manual",
+const CRITERION_TEXT: Partial<Record<string, ResultKey>> = {
+  proved: "evidence.criterionStatus.proved",
+  failed: "evidence.criterionStatus.failed",
+  "not-run": "evidence.criterionStatus.notRun",
+  met: "evidence.criterionStatus.met",
+  "not-met": "evidence.criterionStatus.notMet",
+  unclear: "evidence.criterionStatus.unclear",
+  manual: "evidence.criterionStatus.manual",
+};
+
+/** A step's status (a merge without a note), and a Fix CI round's. */
+const STEP_TEXT: Partial<Record<string, ResultKey>> = {
+  running: "evidence.step.running",
+  done: "evidence.step.done",
+  failed: "evidence.step.failed",
+  cancelled: "evidence.step.cancelled",
+};
+
+const FILE_TEXT: Partial<Record<string, ResultKey>> = {
+  new: "evidence.file.new",
+  modified: "evidence.file.modified",
+  deleted: "evidence.file.deleted",
+};
+
+const VERDICT_TEXT: Partial<Record<string, ResultKey>> = {
+  approve: "evidence.verdict.approve",
+  "changes-requested": "evidence.verdict.changesRequested",
+  unreadable: "evidence.verdict.unreadable",
+};
+
+const SEVERITY_TEXT: Partial<Record<string, ResultKey>> = {
+  "must-fix": "evidence.severity.mustFix",
+  "should-fix": "evidence.severity.shouldFix",
+  note: "evidence.severity.note",
+};
+
+const RISK_TEXT: Partial<Record<string, ResultKey>> = {
+  high: "evidence.risk.high",
+  medium: "evidence.risk.medium",
+  low: "evidence.risk.low",
+};
+
+const named = (words: Partial<Record<string, ResultKey>>, value: string): MessageRef | string => {
+  const key = words[value];
+  return key ? resultRef(key) : value;
 };
 
 const cell = (s: string) => s.replace(/\|/g, "\\|").replace(/\n/g, " ");
 const usd = (n: number) => `≈$${n.toFixed(n < 0.1 ? 4 : 2)}`;
-const seconds = (ms: number | null) => (ms === null ? "—" : `${(ms / 1000).toFixed(ms < 10_000 ? 1 : 0)} s`);
 
-function gateRow(g: GateRun, when: string): string {
-  return `| ${when} | ${g.kind} | \`${cell(g.command)}\` | ${g.package === "." ? "root" : cell(g.package)} | ${g.timedOut ? "timed out" : `exit ${g.exitCode ?? "none"}`} | ${seconds(g.durationMs)} |`;
-}
-
-/** The report as markdown: what's exported and shown on the task page. */
-export function renderEvidence(e: Evidence): string {
+/**
+ * The report as markdown: what's exported and shown on the task page. `render` writes each line and each text that
+ * has a ref: English (the default) for `evidence.md` and pull requests, `resultText` for the task page in the app's
+ * language. Texts without a ref (Claude's, the person's, a report's from before) are shown as they were stored.
+ */
+export function renderEvidence(e: Evidence, render: (ref: MessageRef) => string = resultEnglish): string {
   const out: string[] = [];
   const add = (...lines: string[]) => out.push(...lines);
-  add(`# Task evidence: ${e.task.objective || e.task.request}`, "");
-  add(`- **Request:** ${e.task.request}`);
+  const r = (key: ResultKey, params?: Params) => render(resultRef(key, params));
+  const text = (value: MessageRef | string) => (typeof value === "string" ? value : render(value));
+  const shown = (stored: string, ref: MessageRef | undefined) => (ref ? render(ref) : stored);
+  const seconds = (ms: number | null) =>
+    ms === null ? "—" : r("evidence.time.seconds", { n: (ms / 1000).toFixed(ms < 10_000 ? 1 : 0) });
+  const gateRow = (g: GateRun, when: string) =>
+    `| ${when} | ${g.kind} | \`${cell(g.command)}\` | ${g.package === "." ? r("evidence.gate.root") : cell(g.package)} | ${g.timedOut ? r("evidence.gate.timedOut") : render(exitOf(g))} | ${seconds(g.durationMs)} |`;
+  const round = (g: GateRun) => r("evidence.gate.round", { n: g.round + 1 });
+
+  add(r("evidence.report.title", { title: e.task.objective || e.task.request }), "");
+  add(r("evidence.report.request", { request: e.task.request }));
+  const budget =
+    e.task.budgetUsd === null
+      ? resultRef("evidence.report.noBudget")
+      : resultRef("evidence.report.budget", { usd: e.task.budgetUsd });
   add(
-    `- **Tier:** ${e.task.tier}${e.task.tier !== e.task.proposed ? ` (proposed ${e.task.proposed}; changed because: ${e.task.overrideReason ?? "no reason"})` : ""}, ${e.task.budgetUsd === null ? "no budget" : `budget $${e.task.budgetUsd}`}`,
+    e.task.tier !== e.task.proposed
+      ? r("evidence.report.tierChanged", {
+          tier: e.task.tier,
+          proposed: e.task.proposed,
+          reason: e.task.overrideReasonRef ?? e.task.overrideReason ?? resultRef("evidence.report.noReason"),
+          budget,
+        })
+      : r("evidence.report.tier", { tier: e.task.tier, budget }),
   );
-  if (e.task.approvedAt) add(`- **Contract approved:** ${e.task.approvedAt}`);
+  if (e.task.approvedAt) add(r("evidence.report.approved", { at: e.task.approvedAt }));
   const w = e.task.workflow;
   if (w) {
+    const params = { id: w.id, version: w.version, file: String(w.file), hash: String(w.hash) };
     add(
-      `- **Workflow:** ${w.id} v${w.version}, ${w.source === "task" ? `the task's own flow (at ${w.hash})` : w.source === "project" ? `the project's own (\`${w.file}\` at ${w.hash})` : "the app's"}`,
+      w.source === "task"
+        ? r("evidence.report.workflowTask", params)
+        : w.source === "project"
+          ? r("evidence.report.workflowProject", params)
+          : r("evidence.report.workflowApp", params),
     );
   }
-  add(`- **Outcome:** **${STATE_TEXT[e.outcome.state] ?? e.outcome.state}.** ${e.outcome.text}`);
+  add(
+    r("evidence.report.outcome", {
+      state: named(STATE_TEXT, e.outcome.state),
+      text: e.outcome.ref ?? e.outcome.text,
+    }),
+  );
   if (e.outcome.acceptance) {
-    add(`- **Risk accepted** by the user at ${e.outcome.acceptance.at}: ${e.outcome.acceptance.reason}`);
+    add(r("evidence.report.riskAccepted", { at: e.outcome.acceptance.at, reason: e.outcome.acceptance.reason }));
   }
   if (e.subtasks.length) {
-    add("", "## Sub-tasks", "", "Each ran its own tier's workflow in its own worktree and has its own report.", "");
-    add("| # | Sub-task | Tier | Outcome | Cost | Report |", "|---|---|---|---|---|---|");
+    add("", r("evidence.report.subtasks"), "", r("evidence.report.subtasksIntro"), "");
+    add(r("evidence.report.subtasksTable"), "|---|---|---|---|---|---|");
     for (const t of e.subtasks) {
+      const outcome = t.outcomeRef ? render(t.outcomeRef) : t.outcome;
       add(
-        `| ${t.number} | ${cell(t.title)} | ${t.tier ?? "–"} | ${STATE_TEXT[t.state] ?? t.state}${t.outcome ? `: ${cell(t.outcome)}` : ""} | ${usd(t.costUsd)} | \`${cell(t.report)}\` |`,
+        `| ${t.number} | ${cell(t.title)} | ${t.tier ?? "–"} | ${text(named(STATE_TEXT, t.state))}${outcome ? `: ${cell(outcome)}` : ""} | ${usd(t.costUsd)} | \`${cell(t.report)}\` |`,
       );
     }
     const failedMerges = e.merges.filter((m) => m.status !== "done");
     if (failedMerges.length) add("");
-    for (const m of failedMerges) add(`- ${m.label}: ${m.note ?? m.status}`);
+    for (const m of failedMerges) {
+      const why = m.note === null ? text(named(STEP_TEXT, m.status)) : shown(m.note, m.noteRef);
+      add(`- ${shown(m.label, m.labelRef)}: ${why}`);
+    }
   }
-  add("", "## Changed files", "");
-  if (!e.files.length) add("No files changed since the task started.");
+  add("", r("evidence.report.changedFiles"), "");
+  if (!e.files.length) add(r("evidence.report.noFiles"));
   else {
-    add("| File | Change | + | − | Purpose (from the implementer) |", "|---|---|---|---|---|");
+    add(r("evidence.report.filesTable"), "|---|---|---|---|---|");
     for (const f of e.files) {
+      const binary = r("evidence.file.binary");
       add(
-        `| \`${cell(f.path)}\` | ${f.status} | ${f.added ?? "binary"} | ${f.removed ?? "binary"} | ${cell(f.purpose ?? "no explanation")} |`,
+        `| \`${cell(f.path)}\` | ${text(named(FILE_TEXT, f.status))} | ${f.added ?? binary} | ${f.removed ?? binary} | ${cell(f.purpose ?? r("evidence.file.noPurpose"))} |`,
       );
     }
   }
-  add("", "## Gates", "", "Run by AgentChainer, with the commands' real exit codes.", "");
-  if (!e.gates.baseline.length && !e.gates.runs.length) add("No gate ran.");
+  add("", r("evidence.report.gates"), "", r("evidence.report.gatesIntro"), "");
+  if (!e.gates.baseline.length && !e.gates.runs.length) add(r("evidence.report.noGates"));
   else {
-    add("| When | Gate | Command | Package | Result | Time |", "|---|---|---|---|---|---|");
-    for (const g of e.gates.baseline) add(gateRow(g, "before the task"));
-    for (const g of e.gates.runs) add(gateRow(g, `round ${g.round + 1}`));
+    add(r("evidence.report.gatesTable"), "|---|---|---|---|---|---|");
+    for (const g of e.gates.baseline) add(gateRow(g, r("evidence.gate.before")));
+    for (const g of e.gates.runs) add(gateRow(g, round(g)));
   }
-  if (e.gates.notRun.length)
-    add("", `Not run, no command detected: ${e.gates.notRun.join(", ")}. They don't count as passed.`);
-  if (e.gates.preexisting.length) add("", `Already failing before the task: ${e.gates.preexisting.join(", ")}.`);
-  if (e.gates.fixedByTask.length)
-    add("", `Failing before the task and passing now: ${e.gates.fixedByTask.join(", ")}.`);
+  if (e.gates.notRun.length) add("", r("evidence.report.notRun", { gates: e.gates.notRun.join(", ") }));
+  if (e.gates.preexisting.length) {
+    add("", r("evidence.report.preexisting", { gates: e.gates.preexisting.join(", ") }));
+  }
+  if (e.gates.fixedByTask.length) {
+    add("", r("evidence.report.fixedByTask", { gates: e.gates.fixedByTask.join(", ") }));
+  }
   const failures = [
-    ...e.gates.baseline.filter(failed).map((g) => ({ g, when: "before the task" })),
-    ...e.gates.runs.filter(failed).map((g) => ({ g, when: `round ${g.round + 1}` })),
+    ...e.gates.baseline.filter(failed).map((g) => ({ g, when: r("evidence.gate.before") })),
+    ...e.gates.runs.filter(failed).map((g) => ({ g, when: round(g) })),
   ];
   // Plain markdown, no HTML: the app renders the report without raw HTML. The fence outgrows any backticks in the log.
   for (const { g, when } of failures.slice(-4)) {
-    const tail = g.tail || "(no output)";
+    const tail = g.tail || r("evidence.gate.noOutput");
     const fence = "`".repeat(Math.max(3, ...[...tail.matchAll(/`+/g)].map((m) => m[0].length + 1)));
+    const log = { gate: g.kind, when, command: g.command };
     add(
       "",
-      `**${g.kind} log, ${when}** (\`${g.command}\`${g.package === "." ? "" : ` in ${g.package}`}):`,
+      g.package === "." ? r("evidence.report.log", log) : r("evidence.report.logIn", { ...log, package: g.package }),
       "",
       fence,
       tail,
       fence,
     );
   }
-  add("", "## Acceptance criteria", "");
-  for (const c of e.criteria) add(`- **${c.id}** ${c.text}: _${CRITERION_TEXT[c.status]}._ ${c.detail}`);
-  if (!e.criteria.length) add("None.");
-  add("", "## Review", "");
-  if (!e.review) add(e.noReview ?? "No review.");
-  else {
-    add(`Verdict: **${e.review.verdict}**.`, "");
-    for (const f of e.review.findings) add(`- ${f.severity}${f.file ? ` · \`${f.file}\`` : ""}: ${f.text}`);
-    if (!e.review.findings.length) add("No findings.");
+  add("", r("evidence.report.criteria"), "");
+  for (const c of e.criteria) {
+    add(
+      r("evidence.report.criterion", {
+        id: c.id,
+        text: c.text,
+        status: named(CRITERION_TEXT, c.status),
+        detail: c.detailRef ?? c.detail,
+      }),
+    );
   }
-  add("", "## Security notes", "");
+  if (!e.criteria.length) add(r("evidence.report.none"));
+  add("", r("evidence.report.review"), "");
+  if (!e.review) add(e.noReview === null ? r("evidence.report.noReview") : shown(e.noReview, e.noReviewRef));
+  else {
+    add(r("evidence.report.verdict", { verdict: named(VERDICT_TEXT, e.review.verdict) }), "");
+    for (const f of e.review.findings) {
+      const severity = named(SEVERITY_TEXT, f.severity);
+      add(
+        f.file
+          ? r("evidence.report.findingIn", { severity, file: f.file, text: f.text })
+          : r("evidence.report.finding", { severity, text: f.text }),
+      );
+    }
+    if (!e.review.findings.length) add(r("evidence.report.noFindings"));
+  }
+  add("", r("evidence.report.security"), "");
   if (e.security.guardBlocks.length) {
-    add("Blocked by the guard:");
+    add(r("evidence.report.guardBlocked"));
     for (const b of e.security.guardBlocks) add(`- ${b.tool} \`${cell(b.target)}\`: ${b.reason}`);
-  } else add("The guard blocked nothing.");
+  } else add(r("evidence.report.guardNothing"));
   add("");
   if (e.security.approvals.length) {
-    add("Approvals Claude asked for, riskiest first:");
+    add(r("evidence.report.approvals"));
     for (const a of e.security.approvals) {
       add(
-        `- ${a.risk} risk · ${a.tool} \`${cell(a.target)}\` (${a.label}): ${a.allowed ? (a.always ? "allowed, saved as a rule" : "allowed once") : "denied"}`,
+        r("evidence.report.approval", {
+          risk: named(RISK_TEXT, a.risk),
+          tool: a.tool,
+          target: cell(a.target),
+          label: a.labelRef ?? a.label,
+          decision: !a.allowed
+            ? resultRef("evidence.approval.denied")
+            : a.always
+              ? resultRef("evidence.approval.always")
+              : resultRef("evidence.approval.once"),
+        }),
       );
     }
-  } else add("No approvals were asked for.");
-  add("Calls your settings or the permission profile allowed without asking aren't listed.", "");
+  } else add(r("evidence.report.noApprovals"));
+  add(r("evidence.report.notListed"), "");
+  const secrets = e.security.secrets;
   add(
-    e.security.secrets.ran
-      ? e.security.secrets.flagged.length
-        ? `Secrets scan (gitleaks): possible secrets in ${e.security.secrets.flagged.map((f) => `\`${f}\``).join(", ")}.`
-        : `Secrets scan (gitleaks): nothing found in ${e.security.secrets.scanned} changed file${e.security.secrets.scanned === 1 ? "" : "s"}.`
-      : `Secrets scan: not run (${e.security.secrets.why}).`,
+    !secrets.ran
+      ? r("evidence.secrets.notRun", { why: secrets.whyRef ?? secrets.why })
+      : secrets.flagged.length
+        ? r("evidence.secrets.flagged", { files: secrets.flagged.map((f) => `\`${f}\``).join(", ") })
+        : r("evidence.secrets.clean", { count: secrets.scanned }),
   );
-  add("", "## Remaining risks and manual steps", "");
-  for (const r of e.risks.contract) add(`- From the contract: ${r}`);
-  for (const r of e.risks.fromImplementer) add(`- Claude says: ${r}`);
-  for (const m of e.risks.manual) add(`- Check by hand: ${m}`);
-  if (!e.risks.contract.length && !e.risks.fromImplementer.length && !e.risks.manual.length) add("None noted.");
+  add("", r("evidence.report.risks"), "");
+  for (const x of e.risks.contract) add(r("evidence.report.fromContract", { text: x }));
+  for (const [i, x] of e.risks.fromImplementer.entries()) {
+    add(r("evidence.report.claudeSays", { text: e.risks.fromImplementerRefs?.[i] ?? x }));
+  }
+  for (const m of e.risks.manual) add(r("evidence.report.checkByHand", { text: m }));
+  if (!e.risks.contract.length && !e.risks.fromImplementer.length && !e.risks.manual.length) {
+    add(r("evidence.report.noneNoted"));
+  }
   const pr = e.pr;
   if (pr) {
-    add("", "## Pull request", "", `- [#${pr.number}](${pr.url}): \`${pr.head}\` into \`${pr.base}\`.`);
+    add("", r("evidence.pr.heading"), "");
+    add(r("evidence.pr.link", { number: pr.number, url: pr.url, head: pr.head, base: pr.base }));
     if (pr.review) {
-      const by = pr.review.source === "run" ? "the run's review" : "a review of the PR";
       add(
-        `- Review (${by}) of \`${pr.review.headSha.slice(0, 7)}\`: ${pr.review.verdict}, ${pr.review.mustFix} must-fix finding${pr.review.mustFix === 1 ? "" : "s"}.`,
+        r("evidence.pr.review", {
+          by: resultRef(pr.review.source === "run" ? "evidence.pr.byRun" : "evidence.pr.byPr"),
+          sha: pr.review.headSha.slice(0, 7),
+          verdict: named(VERDICT_TEXT, pr.review.verdict),
+          count: pr.review.mustFix,
+        }),
       );
     }
-    for (const [i, f] of (pr.fixes ?? []).entries()) add(`- Fix CI round ${i + 1} on ${f.check}: ${f.state}.`);
+    for (const [i, f] of (pr.fixes ?? []).entries()) {
+      add(r("evidence.pr.fix", { n: i + 1, check: f.check, state: named(STEP_TEXT, f.state) }));
+    }
     if (pr.merged) {
+      const merged = { method: pr.merged.method, sha: pr.merged.sha.slice(0, 7), at: pr.merged.at };
       add(
-        `- Merged by a person (${pr.merged.method}) at \`${pr.merged.sha.slice(0, 7)}\`, ${pr.merged.at}.${pr.merged.accepted ? ` Gates not green, accepted: ${pr.merged.accepted}` : ""}`,
+        pr.merged.accepted
+          ? r("evidence.pr.mergedAccepted", { ...merged, reason: pr.merged.accepted })
+          : r("evidence.pr.merged", merged),
       );
     }
   }
   if (e.deploys?.length) {
-    add("", "## Deploys", "");
+    add("", r("evidence.deploy.heading"), "");
     for (const d of e.deploys) {
-      const smoke = d.smoke
-        ? ` Smoke test (${d.smoke.how}): ${d.smoke.ok ? "passed" : "failed"}. ${d.smoke.detail}`
-        : "";
+      const where = { env: d.env, adapter: d.adapter, commit: d.commit.slice(0, 7) };
       add(
-        d.status === "done"
-          ? `- ${d.env} on ${d.adapter} at \`${d.commit.slice(0, 7)}\`: ${d.url}.${smoke}`
-          : `- ${d.env} on ${d.adapter} at \`${d.commit.slice(0, 7)}\` failed: ${d.error ?? "no detail"}`,
+        d.status !== "done"
+          ? r("evidence.deploy.failed", { ...where, error: d.error ?? resultRef("evidence.deploy.noDetail") })
+          : d.smoke
+            ? r("evidence.deploy.doneSmoke", {
+                ...where,
+                url: String(d.url),
+                how: d.smoke.how,
+                result: resultRef(d.smoke.ok ? "evidence.deploy.smokePassed" : "evidence.deploy.smokeFailed"),
+                detail: d.smoke.detail,
+              })
+            : r("evidence.deploy.done", { ...where, url: String(d.url) }),
       );
     }
   }
-  add("", "## Cost and time", "", "| Step | Time | Cost |", "|---|---|---|");
-  for (const s of e.cost.steps) add(`| ${cell(s.label)} | ${seconds(s.durationMs)} | ${usd(s.costUsd)} |`);
-  add("", `Run ${usd(e.cost.runUsd)}; with drafting and triage ${usd(e.cost.totalUsd)}. Estimates.`, "");
-  add(`_Generated by AgentChainer at ${e.generatedAt} from the task's records._`, "");
+  add("", r("evidence.report.cost"), "", r("evidence.report.costTable"), "|---|---|---|");
+  for (const s of e.cost.steps) {
+    add(`| ${cell(shown(s.label, s.labelRef))} | ${seconds(s.durationMs)} | ${usd(s.costUsd)} |`);
+  }
+  add("", r("evidence.report.costTotal", { run: usd(e.cost.runUsd), total: usd(e.cost.totalUsd) }), "");
+  add(r("evidence.report.generated", { at: e.generatedAt }), "");
   return out.join("\n");
 }

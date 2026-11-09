@@ -1,0 +1,15 @@
+{
+  "lessons.signal.gateFixed": "`{{command}}` failed, then passed after a fix:\n{{output}}",
+  "lessons.signal.formatted": "The formatter rewrote {{n}} file(s): {{files}}",
+  "lessons.signal.review": "{{severity}}: {{text}}",
+  "lessons.signal.reviewIn": "{{severity}} in {{file}}: {{text}}",
+  "lessons.signal.guardBlocked": "{{tool}} `{{target}}` was blocked: {{reason}}",
+  "lessons.signal.denied": "The person denied {{tool}} `{{target}}`",
+  "lessons.note.noSignals": "Nothing in this run points at a lesson: no gate needed a fix, no review finding, no block or denial.",
+  "lessons.note.stopped": "The suggestion stopped: {{reason}}.",
+  "lessons.note.invalidAnswer": "The suggestion wasn't a valid answer.",
+  "lessons.note.allKnown": "No new lesson: what the run shows is already in CLAUDE.md, or was dismissed.",
+  "lessons.note.taskOnly": "Nothing in this run makes a lesson for other tasks: what it shows is about this task only.",
+  "lessons.history.title_one": "Add {{count}} lesson to {{path}}",
+  "lessons.history.title_other": "Add {{count}} lessons to {{path}}"
+}

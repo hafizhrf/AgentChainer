@@ -5790,6 +5790,9 @@
                         "detail": {
                           "type": "string"
                         },
+                        "detailRef": {
+                          "$ref": "#/$defs/__schema0"
+                        },
                         "floor": {
                           "anyOf": [
                             {
@@ -5841,6 +5844,9 @@
                           "rationale": {
                             "type": "string"
                           },
+                          "rationaleRef": {
+                            "$ref": "#/$defs/__schema0"
+                          },
                           "confidence": {
                             "type": "string",
                             "enum": [
@@ -5864,6 +5870,9 @@
                   },
                   "modelError": {
                     "type": "string"
+                  },
+                  "modelErrorRef": {
+                    "$ref": "#/$defs/__schema0"
                   },
                   "proposed": {
                     "type": "string",
@@ -5889,6 +5898,9 @@
                       "reason": {
                         "type": "string",
                         "minLength": 1
+                      },
+                      "reasonRef": {
+                        "$ref": "#/$defs/__schema0"
                       }
                     },
                     "required": [
@@ -6035,6 +6047,9 @@
                         "label": {
                           "type": "string"
                         },
+                        "labelRef": {
+                          "$ref": "#/$defs/__schema0"
+                        },
                         "kind": {
                           "type": "string",
                           "enum": [
@@ -6079,6 +6094,9 @@
                         },
                         "note": {
                           "type": "string"
+                        },
+                        "noteRef": {
+                          "$ref": "#/$defs/__schema0"
                         }
                       },
                       "required": [
@@ -6368,6 +6386,9 @@
                   },
                   "outcome": {
                     "type": "string"
+                  },
+                  "outcomeRef": {
+                    "$ref": "#/$defs/__schema0"
                   },
                   "trigger": {
                     "type": "string",
@@ -6821,7 +6842,40 @@
           "costUsd",
           "run"
         ],
-        "additionalProperties": false
+        "additionalProperties": false,
+        "$defs": {
+          "__schema0": {
+            "type": "object",
+            "properties": {
+              "key": {
+                "type": "string"
+              },
+              "params": {
+                "type": "object",
+                "propertyNames": {
+                  "type": "string"
+                },
+                "additionalProperties": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "$ref": "#/$defs/__schema0"
+                    }
+                  ]
+                }
+              }
+            },
+            "required": [
+              "key"
+            ],
+            "additionalProperties": false
+          }
+        }
       }
     },
     "task.draft": {
@@ -7041,6 +7095,9 @@
                         "detail": {
                           "type": "string"
                         },
+                        "detailRef": {
+                          "$ref": "#/$defs/__schema0"
+                        },
                         "floor": {
                           "anyOf": [
                             {
@@ -7092,6 +7149,9 @@
                           "rationale": {
                             "type": "string"
                           },
+                          "rationaleRef": {
+                            "$ref": "#/$defs/__schema0"
+                          },
                           "confidence": {
                             "type": "string",
                             "enum": [
@@ -7115,6 +7175,9 @@
                   },
                   "modelError": {
                     "type": "string"
+                  },
+                  "modelErrorRef": {
+                    "$ref": "#/$defs/__schema0"
                   },
                   "proposed": {
                     "type": "string",
@@ -7140,6 +7203,9 @@
                       "reason": {
                         "type": "string",
                         "minLength": 1
+                      },
+                      "reasonRef": {
+                        "$ref": "#/$defs/__schema0"
                       }
                     },
                     "required": [
@@ -7286,6 +7352,9 @@
                         "label": {
                           "type": "string"
                         },
+                        "labelRef": {
+                          "$ref": "#/$defs/__schema0"
+                        },
                         "kind": {
                           "type": "string",
                           "enum": [
@@ -7330,6 +7399,9 @@
                         },
                         "note": {
                           "type": "string"
+                        },
+                        "noteRef": {
+                          "$ref": "#/$defs/__schema0"
                         }
                       },
                       "required": [
@@ -7619,6 +7691,9 @@
                   },
                   "outcome": {
                     "type": "string"
+                  },
+                  "outcomeRef": {
+                    "$ref": "#/$defs/__schema0"
                   },
                   "trigger": {
                     "type": "string",
@@ -8072,7 +8147,40 @@
           "costUsd",
           "run"
         ],
-        "additionalProperties": false
+        "additionalProperties": false,
+        "$defs": {
+          "__schema0": {
+            "type": "object",
+            "properties": {
+              "key": {
+                "type": "string"
+              },
+              "params": {
+                "type": "object",
+                "propertyNames": {
+                  "type": "string"
+                },
+                "additionalProperties": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "$ref": "#/$defs/__schema0"
+                    }
+                  ]
+                }
+              }
+            },
+            "required": [
+              "key"
+            ],
+            "additionalProperties": false
+          }
+        }
       }
     },
     "task.redraft": {
@@ -8298,6 +8406,9 @@
                         "detail": {
                           "type": "string"
                         },
+                        "detailRef": {
+                          "$ref": "#/$defs/__schema0"
+                        },
                         "floor": {
                           "anyOf": [
                             {
@@ -8349,6 +8460,9 @@
                           "rationale": {
                             "type": "string"
                           },
+                          "rationaleRef": {
+                            "$ref": "#/$defs/__schema0"
+                          },
                           "confidence": {
                             "type": "string",
                             "enum": [
@@ -8372,6 +8486,9 @@
                   },
                   "modelError": {
                     "type": "string"
+                  },
+                  "modelErrorRef": {
+                    "$ref": "#/$defs/__schema0"
                   },
                   "proposed": {
                     "type": "string",
@@ -8397,6 +8514,9 @@
                       "reason": {
                         "type": "string",
                         "minLength": 1
+                      },
+                      "reasonRef": {
+                        "$ref": "#/$defs/__schema0"
                       }
                     },
                     "required": [
@@ -8543,6 +8663,9 @@
                         "label": {
                           "type": "string"
                         },
+                        "labelRef": {
+                          "$ref": "#/$defs/__schema0"
+                        },
                         "kind": {
                           "type": "string",
                           "enum": [
@@ -8587,6 +8710,9 @@
                         },
                         "note": {
                           "type": "string"
+                        },
+                        "noteRef": {
+                          "$ref": "#/$defs/__schema0"
                         }
                       },
                       "required": [
@@ -8876,6 +9002,9 @@
                   },
                   "outcome": {
                     "type": "string"
+                  },
+                  "outcomeRef": {
+                    "$ref": "#/$defs/__schema0"
                   },
                   "trigger": {
                     "type": "string",
@@ -9329,7 +9458,40 @@
           "costUsd",
           "run"
         ],
-        "additionalProperties": false
+        "additionalProperties": false,
+        "$defs": {
+          "__schema0": {
+            "type": "object",
+            "properties": {
+              "key": {
+                "type": "string"
+              },
+              "params": {
+                "type": "object",
+                "propertyNames": {
+                  "type": "string"
+                },
+                "additionalProperties": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "$ref": "#/$defs/__schema0"
+                    }
+                  ]
+                }
+              }
+            },
+            "required": [
+              "key"
+            ],
+            "additionalProperties": false
+          }
+        }
       }
     },
     "task.retriage": {
@@ -9658,6 +9820,9 @@
                         "detail": {
                           "type": "string"
                         },
+                        "detailRef": {
+                          "$ref": "#/$defs/__schema0"
+                        },
                         "floor": {
                           "anyOf": [
                             {
@@ -9709,6 +9874,9 @@
                           "rationale": {
                             "type": "string"
                           },
+                          "rationaleRef": {
+                            "$ref": "#/$defs/__schema0"
+                          },
                           "confidence": {
                             "type": "string",
                             "enum": [
@@ -9732,6 +9900,9 @@
                   },
                   "modelError": {
                     "type": "string"
+                  },
+                  "modelErrorRef": {
+                    "$ref": "#/$defs/__schema0"
                   },
                   "proposed": {
                     "type": "string",
@@ -9757,6 +9928,9 @@
                       "reason": {
                         "type": "string",
                         "minLength": 1
+                      },
+                      "reasonRef": {
+                        "$ref": "#/$defs/__schema0"
                       }
                     },
                     "required": [
@@ -9903,6 +10077,9 @@
                         "label": {
                           "type": "string"
                         },
+                        "labelRef": {
+                          "$ref": "#/$defs/__schema0"
+                        },
                         "kind": {
                           "type": "string",
                           "enum": [
@@ -9947,6 +10124,9 @@
                         },
                         "note": {
                           "type": "string"
+                        },
+                        "noteRef": {
+                          "$ref": "#/$defs/__schema0"
                         }
                       },
                       "required": [
@@ -10236,6 +10416,9 @@
                   },
                   "outcome": {
                     "type": "string"
+                  },
+                  "outcomeRef": {
+                    "$ref": "#/$defs/__schema0"
                   },
                   "trigger": {
                     "type": "string",
@@ -10689,7 +10872,40 @@
           "costUsd",
           "run"
         ],
-        "additionalProperties": false
+        "additionalProperties": false,
+        "$defs": {
+          "__schema0": {
+            "type": "object",
+            "properties": {
+              "key": {
+                "type": "string"
+              },
+              "params": {
+                "type": "object",
+                "propertyNames": {
+                  "type": "string"
+                },
+                "additionalProperties": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "$ref": "#/$defs/__schema0"
+                    }
+                  ]
+                }
+              }
+            },
+            "required": [
+              "key"
+            ],
+            "additionalProperties": false
+          }
+        }
       }
     },
     "task.approve": {
@@ -11044,6 +11260,9 @@
                         "detail": {
                           "type": "string"
                         },
+                        "detailRef": {
+                          "$ref": "#/$defs/__schema0"
+                        },
                         "floor": {
                           "anyOf": [
                             {
@@ -11095,6 +11314,9 @@
                           "rationale": {
                             "type": "string"
                           },
+                          "rationaleRef": {
+                            "$ref": "#/$defs/__schema0"
+                          },
                           "confidence": {
                             "type": "string",
                             "enum": [
@@ -11118,6 +11340,9 @@
                   },
                   "modelError": {
                     "type": "string"
+                  },
+                  "modelErrorRef": {
+                    "$ref": "#/$defs/__schema0"
                   },
                   "proposed": {
                     "type": "string",
@@ -11143,6 +11368,9 @@
                       "reason": {
                         "type": "string",
                         "minLength": 1
+                      },
+                      "reasonRef": {
+                        "$ref": "#/$defs/__schema0"
                       }
                     },
                     "required": [
@@ -11289,6 +11517,9 @@
                         "label": {
                           "type": "string"
                         },
+                        "labelRef": {
+                          "$ref": "#/$defs/__schema0"
+                        },
                         "kind": {
                           "type": "string",
                           "enum": [
@@ -11333,6 +11564,9 @@
                         },
                         "note": {
                           "type": "string"
+                        },
+                        "noteRef": {
+                          "$ref": "#/$defs/__schema0"
                         }
                       },
                       "required": [
@@ -11622,6 +11856,9 @@
                   },
                   "outcome": {
                     "type": "string"
+                  },
+                  "outcomeRef": {
+                    "$ref": "#/$defs/__schema0"
                   },
                   "trigger": {
                     "type": "string",
@@ -12075,7 +12312,40 @@
           "costUsd",
           "run"
         ],
-        "additionalProperties": false
+        "additionalProperties": false,
+        "$defs": {
+          "__schema0": {
+            "type": "object",
+            "properties": {
+              "key": {
+                "type": "string"
+              },
+              "params": {
+                "type": "object",
+                "propertyNames": {
+                  "type": "string"
+                },
+                "additionalProperties": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "$ref": "#/$defs/__schema0"
+                    }
+                  ]
+                }
+              }
+            },
+            "required": [
+              "key"
+            ],
+            "additionalProperties": false
+          }
+        }
       }
     },
     "task.revise": {
@@ -12292,6 +12562,9 @@
                         "detail": {
                           "type": "string"
                         },
+                        "detailRef": {
+                          "$ref": "#/$defs/__schema0"
+                        },
                         "floor": {
                           "anyOf": [
                             {
@@ -12343,6 +12616,9 @@
                           "rationale": {
                             "type": "string"
                           },
+                          "rationaleRef": {
+                            "$ref": "#/$defs/__schema0"
+                          },
                           "confidence": {
                             "type": "string",
                             "enum": [
@@ -12366,6 +12642,9 @@
                   },
                   "modelError": {
                     "type": "string"
+                  },
+                  "modelErrorRef": {
+                    "$ref": "#/$defs/__schema0"
                   },
                   "proposed": {
                     "type": "string",
@@ -12391,6 +12670,9 @@
                       "reason": {
                         "type": "string",
                         "minLength": 1
+                      },
+                      "reasonRef": {
+                        "$ref": "#/$defs/__schema0"
                       }
                     },
                     "required": [
@@ -12537,6 +12819,9 @@
                         "label": {
                           "type": "string"
                         },
+                        "labelRef": {
+                          "$ref": "#/$defs/__schema0"
+                        },
                         "kind": {
                           "type": "string",
                           "enum": [
@@ -12581,6 +12866,9 @@
                         },
                         "note": {
                           "type": "string"
+                        },
+                        "noteRef": {
+                          "$ref": "#/$defs/__schema0"
                         }
                       },
                       "required": [
@@ -12870,6 +13158,9 @@
                   },
                   "outcome": {
                     "type": "string"
+                  },
+                  "outcomeRef": {
+                    "$ref": "#/$defs/__schema0"
                   },
                   "trigger": {
                     "type": "string",
@@ -13323,7 +13614,40 @@
           "costUsd",
           "run"
         ],
-        "additionalProperties": false
+        "additionalProperties": false,
+        "$defs": {
+          "__schema0": {
+            "type": "object",
+            "properties": {
+              "key": {
+                "type": "string"
+              },
+              "params": {
+                "type": "object",
+                "propertyNames": {
+                  "type": "string"
+                },
+                "additionalProperties": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "$ref": "#/$defs/__schema0"
+                    }
+                  ]
+                }
+              }
+            },
+            "required": [
+              "key"
+            ],
+            "additionalProperties": false
+          }
+        }
       }
     },
     "task.start": {
@@ -13552,6 +13876,9 @@
                         "detail": {
                           "type": "string"
                         },
+                        "detailRef": {
+                          "$ref": "#/$defs/__schema0"
+                        },
                         "floor": {
                           "anyOf": [
                             {
@@ -13603,6 +13930,9 @@
                           "rationale": {
                             "type": "string"
                           },
+                          "rationaleRef": {
+                            "$ref": "#/$defs/__schema0"
+                          },
                           "confidence": {
                             "type": "string",
                             "enum": [
@@ -13626,6 +13956,9 @@
                   },
                   "modelError": {
                     "type": "string"
+                  },
+                  "modelErrorRef": {
+                    "$ref": "#/$defs/__schema0"
                   },
                   "proposed": {
                     "type": "string",
@@ -13651,6 +13984,9 @@
                       "reason": {
                         "type": "string",
                         "minLength": 1
+                      },
+                      "reasonRef": {
+                        "$ref": "#/$defs/__schema0"
                       }
                     },
                     "required": [
@@ -13797,6 +14133,9 @@
                         "label": {
                           "type": "string"
                         },
+                        "labelRef": {
+                          "$ref": "#/$defs/__schema0"
+                        },
                         "kind": {
                           "type": "string",
                           "enum": [
@@ -13841,6 +14180,9 @@
                         },
                         "note": {
                           "type": "string"
+                        },
+                        "noteRef": {
+                          "$ref": "#/$defs/__schema0"
                         }
                       },
                       "required": [
@@ -14130,6 +14472,9 @@
                   },
                   "outcome": {
                     "type": "string"
+                  },
+                  "outcomeRef": {
+                    "$ref": "#/$defs/__schema0"
                   },
                   "trigger": {
                     "type": "string",
@@ -14583,7 +14928,40 @@
           "costUsd",
           "run"
         ],
-        "additionalProperties": false
+        "additionalProperties": false,
+        "$defs": {
+          "__schema0": {
+            "type": "object",
+            "properties": {
+              "key": {
+                "type": "string"
+              },
+              "params": {
+                "type": "object",
+                "propertyNames": {
+                  "type": "string"
+                },
+                "additionalProperties": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "$ref": "#/$defs/__schema0"
+                    }
+                  ]
+                }
+              }
+            },
+            "required": [
+              "key"
+            ],
+            "additionalProperties": false
+          }
+        }
       }
     },
     "task.proposeFlow": {
@@ -14803,6 +15181,9 @@
                         "detail": {
                           "type": "string"
                         },
+                        "detailRef": {
+                          "$ref": "#/$defs/__schema0"
+                        },
                         "floor": {
                           "anyOf": [
                             {
@@ -14854,6 +15235,9 @@
                           "rationale": {
                             "type": "string"
                           },
+                          "rationaleRef": {
+                            "$ref": "#/$defs/__schema0"
+                          },
                           "confidence": {
                             "type": "string",
                             "enum": [
@@ -14877,6 +15261,9 @@
                   },
                   "modelError": {
                     "type": "string"
+                  },
+                  "modelErrorRef": {
+                    "$ref": "#/$defs/__schema0"
                   },
                   "proposed": {
                     "type": "string",
@@ -14902,6 +15289,9 @@
                       "reason": {
                         "type": "string",
                         "minLength": 1
+                      },
+                      "reasonRef": {
+                        "$ref": "#/$defs/__schema0"
                       }
                     },
                     "required": [
@@ -15048,6 +15438,9 @@
                         "label": {
                           "type": "string"
                         },
+                        "labelRef": {
+                          "$ref": "#/$defs/__schema0"
+                        },
                         "kind": {
                           "type": "string",
                           "enum": [
@@ -15092,6 +15485,9 @@
                         },
                         "note": {
                           "type": "string"
+                        },
+                        "noteRef": {
+                          "$ref": "#/$defs/__schema0"
                         }
                       },
                       "required": [
@@ -15381,6 +15777,9 @@
                   },
                   "outcome": {
                     "type": "string"
+                  },
+                  "outcomeRef": {
+                    "$ref": "#/$defs/__schema0"
                   },
                   "trigger": {
                     "type": "string",
@@ -15834,7 +16233,40 @@
           "costUsd",
           "run"
         ],
-        "additionalProperties": false
+        "additionalProperties": false,
+        "$defs": {
+          "__schema0": {
+            "type": "object",
+            "properties": {
+              "key": {
+                "type": "string"
+              },
+              "params": {
+                "type": "object",
+                "propertyNames": {
+                  "type": "string"
+                },
+                "additionalProperties": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "$ref": "#/$defs/__schema0"
+                    }
+                  ]
+                }
+              }
+            },
+            "required": [
+              "key"
+            ],
+            "additionalProperties": false
+          }
+        }
       }
     },
     "task.dropFlow": {
@@ -16051,6 +16483,9 @@
                         "detail": {
                           "type": "string"
                         },
+                        "detailRef": {
+                          "$ref": "#/$defs/__schema0"
+                        },
                         "floor": {
                           "anyOf": [
                             {
@@ -16102,6 +16537,9 @@
                           "rationale": {
                             "type": "string"
                           },
+                          "rationaleRef": {
+                            "$ref": "#/$defs/__schema0"
+                          },
                           "confidence": {
                             "type": "string",
                             "enum": [
@@ -16125,6 +16563,9 @@
                   },
                   "modelError": {
                     "type": "string"
+                  },
+                  "modelErrorRef": {
+                    "$ref": "#/$defs/__schema0"
                   },
                   "proposed": {
                     "type": "string",
@@ -16150,6 +16591,9 @@
                       "reason": {
                         "type": "string",
                         "minLength": 1
+                      },
+                      "reasonRef": {
+                        "$ref": "#/$defs/__schema0"
                       }
                     },
                     "required": [
@@ -16296,6 +16740,9 @@
                         "label": {
                           "type": "string"
                         },
+                        "labelRef": {
+                          "$ref": "#/$defs/__schema0"
+                        },
                         "kind": {
                           "type": "string",
                           "enum": [
@@ -16340,6 +16787,9 @@
                         },
                         "note": {
                           "type": "string"
+                        },
+                        "noteRef": {
+                          "$ref": "#/$defs/__schema0"
                         }
                       },
                       "required": [
@@ -16629,6 +17079,9 @@
                   },
                   "outcome": {
                     "type": "string"
+                  },
+                  "outcomeRef": {
+                    "$ref": "#/$defs/__schema0"
                   },
                   "trigger": {
                     "type": "string",
@@ -17082,7 +17535,40 @@
           "costUsd",
           "run"
         ],
-        "additionalProperties": false
+        "additionalProperties": false,
+        "$defs": {
+          "__schema0": {
+            "type": "object",
+            "properties": {
+              "key": {
+                "type": "string"
+              },
+              "params": {
+                "type": "object",
+                "propertyNames": {
+                  "type": "string"
+                },
+                "additionalProperties": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "$ref": "#/$defs/__schema0"
+                    }
+                  ]
+                }
+              }
+            },
+            "required": [
+              "key"
+            ],
+            "additionalProperties": false
+          }
+        }
       }
     },
     "task.workflow": {
@@ -17393,6 +17879,9 @@
                         "detail": {
                           "type": "string"
                         },
+                        "detailRef": {
+                          "$ref": "#/$defs/__schema0"
+                        },
                         "floor": {
                           "anyOf": [
                             {
@@ -17444,6 +17933,9 @@
                           "rationale": {
                             "type": "string"
                           },
+                          "rationaleRef": {
+                            "$ref": "#/$defs/__schema0"
+                          },
                           "confidence": {
                             "type": "string",
                             "enum": [
@@ -17467,6 +17959,9 @@
                   },
                   "modelError": {
                     "type": "string"
+                  },
+                  "modelErrorRef": {
+                    "$ref": "#/$defs/__schema0"
                   },
                   "proposed": {
                     "type": "string",
@@ -17492,6 +17987,9 @@
                       "reason": {
                         "type": "string",
                         "minLength": 1
+                      },
+                      "reasonRef": {
+                        "$ref": "#/$defs/__schema0"
                       }
                     },
                     "required": [
@@ -17638,6 +18136,9 @@
                         "label": {
                           "type": "string"
                         },
+                        "labelRef": {
+                          "$ref": "#/$defs/__schema0"
+                        },
                         "kind": {
                           "type": "string",
                           "enum": [
@@ -17682,6 +18183,9 @@
                         },
                         "note": {
                           "type": "string"
+                        },
+                        "noteRef": {
+                          "$ref": "#/$defs/__schema0"
                         }
                       },
                       "required": [
@@ -17971,6 +18475,9 @@
                   },
                   "outcome": {
                     "type": "string"
+                  },
+                  "outcomeRef": {
+                    "$ref": "#/$defs/__schema0"
                   },
                   "trigger": {
                     "type": "string",
@@ -18424,7 +18931,40 @@
           "costUsd",
           "run"
         ],
-        "additionalProperties": false
+        "additionalProperties": false,
+        "$defs": {
+          "__schema0": {
+            "type": "object",
+            "properties": {
+              "key": {
+                "type": "string"
+              },
+              "params": {
+                "type": "object",
+                "propertyNames": {
+                  "type": "string"
+                },
+                "additionalProperties": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "$ref": "#/$defs/__schema0"
+                    }
+                  ]
+                }
+              }
+            },
+            "required": [
+              "key"
+            ],
+            "additionalProperties": false
+          }
+        }
       }
     },
     "task.acceptRisk": {
@@ -18647,6 +19187,9 @@
                         "detail": {
                           "type": "string"
                         },
+                        "detailRef": {
+                          "$ref": "#/$defs/__schema0"
+                        },
                         "floor": {
                           "anyOf": [
                             {
@@ -18698,6 +19241,9 @@
                           "rationale": {
                             "type": "string"
                           },
+                          "rationaleRef": {
+                            "$ref": "#/$defs/__schema0"
+                          },
                           "confidence": {
                             "type": "string",
                             "enum": [
@@ -18721,6 +19267,9 @@
                   },
                   "modelError": {
                     "type": "string"
+                  },
+                  "modelErrorRef": {
+                    "$ref": "#/$defs/__schema0"
                   },
                   "proposed": {
                     "type": "string",
@@ -18746,6 +19295,9 @@
                       "reason": {
                         "type": "string",
                         "minLength": 1
+                      },
+                      "reasonRef": {
+                        "$ref": "#/$defs/__schema0"
                       }
                     },
                     "required": [
@@ -18892,6 +19444,9 @@
                         "label": {
                           "type": "string"
                         },
+                        "labelRef": {
+                          "$ref": "#/$defs/__schema0"
+                        },
                         "kind": {
                           "type": "string",
                           "enum": [
@@ -18936,6 +19491,9 @@
                         },
                         "note": {
                           "type": "string"
+                        },
+                        "noteRef": {
+                          "$ref": "#/$defs/__schema0"
                         }
                       },
                       "required": [
@@ -19225,6 +19783,9 @@
                   },
                   "outcome": {
                     "type": "string"
+                  },
+                  "outcomeRef": {
+                    "$ref": "#/$defs/__schema0"
                   },
                   "trigger": {
                     "type": "string",
@@ -19678,7 +20239,40 @@
           "costUsd",
           "run"
         ],
-        "additionalProperties": false
+        "additionalProperties": false,
+        "$defs": {
+          "__schema0": {
+            "type": "object",
+            "properties": {
+              "key": {
+                "type": "string"
+              },
+              "params": {
+                "type": "object",
+                "propertyNames": {
+                  "type": "string"
+                },
+                "additionalProperties": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "$ref": "#/$defs/__schema0"
+                    }
+                  ]
+                }
+              }
+            },
+            "required": [
+              "key"
+            ],
+            "additionalProperties": false
+          }
+        }
       }
     },
     "task.evidence": {
@@ -19784,6 +20378,9 @@
                       },
                       "text": {
                         "type": "string"
+                      },
+                      "textRef": {
+                        "$ref": "#/$defs/__schema0"
                       }
                     },
                     "required": [
@@ -19815,7 +20412,40 @@
           "lessons",
           "costUsd"
         ],
-        "additionalProperties": false
+        "additionalProperties": false,
+        "$defs": {
+          "__schema0": {
+            "type": "object",
+            "properties": {
+              "key": {
+                "type": "string"
+              },
+              "params": {
+                "type": "object",
+                "propertyNames": {
+                  "type": "string"
+                },
+                "additionalProperties": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "$ref": "#/$defs/__schema0"
+                    }
+                  ]
+                }
+              }
+            },
+            "required": [
+              "key"
+            ],
+            "additionalProperties": false
+          }
+        }
       }
     },
     "task.lessonsPreview": {
@@ -19981,6 +20611,9 @@
                       },
                       "text": {
                         "type": "string"
+                      },
+                      "textRef": {
+                        "$ref": "#/$defs/__schema0"
                       }
                     },
                     "required": [
@@ -20005,7 +20638,40 @@
         "required": [
           "lessons"
         ],
-        "additionalProperties": false
+        "additionalProperties": false,
+        "$defs": {
+          "__schema0": {
+            "type": "object",
+            "properties": {
+              "key": {
+                "type": "string"
+              },
+              "params": {
+                "type": "object",
+                "propertyNames": {
+                  "type": "string"
+                },
+                "additionalProperties": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "$ref": "#/$defs/__schema0"
+                    }
+                  ]
+                }
+              }
+            },
+            "required": [
+              "key"
+            ],
+            "additionalProperties": false
+          }
+        }
       }
     },
     "task.split": {
@@ -20225,6 +20891,9 @@
                         "detail": {
                           "type": "string"
                         },
+                        "detailRef": {
+                          "$ref": "#/$defs/__schema0"
+                        },
                         "floor": {
                           "anyOf": [
                             {
@@ -20276,6 +20945,9 @@
                           "rationale": {
                             "type": "string"
                           },
+                          "rationaleRef": {
+                            "$ref": "#/$defs/__schema0"
+                          },
                           "confidence": {
                             "type": "string",
                             "enum": [
@@ -20299,6 +20971,9 @@
                   },
                   "modelError": {
                     "type": "string"
+                  },
+                  "modelErrorRef": {
+                    "$ref": "#/$defs/__schema0"
                   },
                   "proposed": {
                     "type": "string",
@@ -20324,6 +20999,9 @@
                       "reason": {
                         "type": "string",
                         "minLength": 1
+                      },
+                      "reasonRef": {
+                        "$ref": "#/$defs/__schema0"
                       }
                     },
                     "required": [
@@ -20470,6 +21148,9 @@
                         "label": {
                           "type": "string"
                         },
+                        "labelRef": {
+                          "$ref": "#/$defs/__schema0"
+                        },
                         "kind": {
                           "type": "string",
                           "enum": [
@@ -20514,6 +21195,9 @@
                         },
                         "note": {
                           "type": "string"
+                        },
+                        "noteRef": {
+                          "$ref": "#/$defs/__schema0"
                         }
                       },
                       "required": [
@@ -20803,6 +21487,9 @@
                   },
                   "outcome": {
                     "type": "string"
+                  },
+                  "outcomeRef": {
+                    "$ref": "#/$defs/__schema0"
                   },
                   "trigger": {
                     "type": "string",
@@ -21256,7 +21943,40 @@
           "costUsd",
           "run"
         ],
-        "additionalProperties": false
+        "additionalProperties": false,
+        "$defs": {
+          "__schema0": {
+            "type": "object",
+            "properties": {
+              "key": {
+                "type": "string"
+              },
+              "params": {
+                "type": "object",
+                "propertyNames": {
+                  "type": "string"
+                },
+                "additionalProperties": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "$ref": "#/$defs/__schema0"
+                    }
+                  ]
+                }
+              }
+            },
+            "required": [
+              "key"
+            ],
+            "additionalProperties": false
+          }
+        }
       }
     },
     "task.approveSubtasks": {
@@ -21473,6 +22193,9 @@
                         "detail": {
                           "type": "string"
                         },
+                        "detailRef": {
+                          "$ref": "#/$defs/__schema0"
+                        },
                         "floor": {
                           "anyOf": [
                             {
@@ -21524,6 +22247,9 @@
                           "rationale": {
                             "type": "string"
                           },
+                          "rationaleRef": {
+                            "$ref": "#/$defs/__schema0"
+                          },
                           "confidence": {
                             "type": "string",
                             "enum": [
@@ -21547,6 +22273,9 @@
                   },
                   "modelError": {
                     "type": "string"
+                  },
+                  "modelErrorRef": {
+                    "$ref": "#/$defs/__schema0"
                   },
                   "proposed": {
                     "type": "string",
@@ -21572,6 +22301,9 @@
                       "reason": {
                         "type": "string",
                         "minLength": 1
+                      },
+                      "reasonRef": {
+                        "$ref": "#/$defs/__schema0"
                       }
                     },
                     "required": [
@@ -21718,6 +22450,9 @@
                         "label": {
                           "type": "string"
                         },
+                        "labelRef": {
+                          "$ref": "#/$defs/__schema0"
+                        },
                         "kind": {
                           "type": "string",
                           "enum": [
@@ -21762,6 +22497,9 @@
                         },
                         "note": {
                           "type": "string"
+                        },
+                        "noteRef": {
+                          "$ref": "#/$defs/__schema0"
                         }
                       },
                       "required": [
@@ -22051,6 +22789,9 @@
                   },
                   "outcome": {
                     "type": "string"
+                  },
+                  "outcomeRef": {
+                    "$ref": "#/$defs/__schema0"
                   },
                   "trigger": {
                     "type": "string",
@@ -22504,7 +23245,40 @@
           "costUsd",
           "run"
         ],
-        "additionalProperties": false
+        "additionalProperties": false,
+        "$defs": {
+          "__schema0": {
+            "type": "object",
+            "properties": {
+              "key": {
+                "type": "string"
+              },
+              "params": {
+                "type": "object",
+                "propertyNames": {
+                  "type": "string"
+                },
+                "additionalProperties": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "$ref": "#/$defs/__schema0"
+                    }
+                  ]
+                }
+              }
+            },
+            "required": [
+              "key"
+            ],
+            "additionalProperties": false
+          }
+        }
       }
     },
     "task.continue": {
@@ -22721,6 +23495,9 @@
                         "detail": {
                           "type": "string"
                         },
+                        "detailRef": {
+                          "$ref": "#/$defs/__schema0"
+                        },
                         "floor": {
                           "anyOf": [
                             {
@@ -22772,6 +23549,9 @@
                           "rationale": {
                             "type": "string"
                           },
+                          "rationaleRef": {
+                            "$ref": "#/$defs/__schema0"
+                          },
                           "confidence": {
                             "type": "string",
                             "enum": [
@@ -22795,6 +23575,9 @@
                   },
                   "modelError": {
                     "type": "string"
+                  },
+                  "modelErrorRef": {
+                    "$ref": "#/$defs/__schema0"
                   },
                   "proposed": {
                     "type": "string",
@@ -22820,6 +23603,9 @@
                       "reason": {
                         "type": "string",
                         "minLength": 1
+                      },
+                      "reasonRef": {
+                        "$ref": "#/$defs/__schema0"
                       }
                     },
                     "required": [
@@ -22966,6 +23752,9 @@
                         "label": {
                           "type": "string"
                         },
+                        "labelRef": {
+                          "$ref": "#/$defs/__schema0"
+                        },
                         "kind": {
                           "type": "string",
                           "enum": [
@@ -23010,6 +23799,9 @@
                         },
                         "note": {
                           "type": "string"
+                        },
+                        "noteRef": {
+                          "$ref": "#/$defs/__schema0"
                         }
                       },
                       "required": [
@@ -23299,6 +24091,9 @@
                   },
                   "outcome": {
                     "type": "string"
+                  },
+                  "outcomeRef": {
+                    "$ref": "#/$defs/__schema0"
                   },
                   "trigger": {
                     "type": "string",
@@ -23752,7 +24547,40 @@
           "costUsd",
           "run"
         ],
-        "additionalProperties": false
+        "additionalProperties": false,
+        "$defs": {
+          "__schema0": {
+            "type": "object",
+            "properties": {
+              "key": {
+                "type": "string"
+              },
+              "params": {
+                "type": "object",
+                "propertyNames": {
+                  "type": "string"
+                },
+                "additionalProperties": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "$ref": "#/$defs/__schema0"
+                    }
+                  ]
+                }
+              }
+            },
+            "required": [
+              "key"
+            ],
+            "additionalProperties": false
+          }
+        }
       }
     },
     "task.mergeResult": {
@@ -24181,6 +25009,9 @@
                         "detail": {
                           "type": "string"
                         },
+                        "detailRef": {
+                          "$ref": "#/$defs/__schema0"
+                        },
                         "floor": {
                           "anyOf": [
                             {
@@ -24232,6 +25063,9 @@
                           "rationale": {
                             "type": "string"
                           },
+                          "rationaleRef": {
+                            "$ref": "#/$defs/__schema0"
+                          },
                           "confidence": {
                             "type": "string",
                             "enum": [
@@ -24255,6 +25089,9 @@
                   },
                   "modelError": {
                     "type": "string"
+                  },
+                  "modelErrorRef": {
+                    "$ref": "#/$defs/__schema0"
                   },
                   "proposed": {
                     "type": "string",
@@ -24280,6 +25117,9 @@
                       "reason": {
                         "type": "string",
                         "minLength": 1
+                      },
+                      "reasonRef": {
+                        "$ref": "#/$defs/__schema0"
                       }
                     },
                     "required": [
@@ -24426,6 +25266,9 @@
                         "label": {
                           "type": "string"
                         },
+                        "labelRef": {
+                          "$ref": "#/$defs/__schema0"
+                        },
                         "kind": {
                           "type": "string",
                           "enum": [
@@ -24470,6 +25313,9 @@
                         },
                         "note": {
                           "type": "string"
+                        },
+                        "noteRef": {
+                          "$ref": "#/$defs/__schema0"
                         }
                       },
                       "required": [
@@ -24759,6 +25605,9 @@
                   },
                   "outcome": {
                     "type": "string"
+                  },
+                  "outcomeRef": {
+                    "$ref": "#/$defs/__schema0"
                   },
                   "trigger": {
                     "type": "string",
@@ -25212,7 +26061,40 @@
           "costUsd",
           "run"
         ],
-        "additionalProperties": false
+        "additionalProperties": false,
+        "$defs": {
+          "__schema0": {
+            "type": "object",
+            "properties": {
+              "key": {
+                "type": "string"
+              },
+              "params": {
+                "type": "object",
+                "propertyNames": {
+                  "type": "string"
+                },
+                "additionalProperties": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "$ref": "#/$defs/__schema0"
+                    }
+                  ]
+                }
+              }
+            },
+            "required": [
+              "key"
+            ],
+            "additionalProperties": false
+          }
+        }
       }
     },
     "task.prStatus": {
@@ -25553,6 +26435,9 @@
                         "detail": {
                           "type": "string"
                         },
+                        "detailRef": {
+                          "$ref": "#/$defs/__schema0"
+                        },
                         "floor": {
                           "anyOf": [
                             {
@@ -25604,6 +26489,9 @@
                           "rationale": {
                             "type": "string"
                           },
+                          "rationaleRef": {
+                            "$ref": "#/$defs/__schema0"
+                          },
                           "confidence": {
                             "type": "string",
                             "enum": [
@@ -25627,6 +26515,9 @@
                   },
                   "modelError": {
                     "type": "string"
+                  },
+                  "modelErrorRef": {
+                    "$ref": "#/$defs/__schema0"
                   },
                   "proposed": {
                     "type": "string",
@@ -25652,6 +26543,9 @@
                       "reason": {
                         "type": "string",
                         "minLength": 1
+                      },
+                      "reasonRef": {
+                        "$ref": "#/$defs/__schema0"
                       }
                     },
                     "required": [
@@ -25798,6 +26692,9 @@
                         "label": {
                           "type": "string"
                         },
+                        "labelRef": {
+                          "$ref": "#/$defs/__schema0"
+                        },
                         "kind": {
                           "type": "string",
                           "enum": [
@@ -25842,6 +26739,9 @@
                         },
                         "note": {
                           "type": "string"
+                        },
+                        "noteRef": {
+                          "$ref": "#/$defs/__schema0"
                         }
                       },
                       "required": [
@@ -26131,6 +27031,9 @@
                   },
                   "outcome": {
                     "type": "string"
+                  },
+                  "outcomeRef": {
+                    "$ref": "#/$defs/__schema0"
                   },
                   "trigger": {
                     "type": "string",
@@ -26584,7 +27487,40 @@
           "costUsd",
           "run"
         ],
-        "additionalProperties": false
+        "additionalProperties": false,
+        "$defs": {
+          "__schema0": {
+            "type": "object",
+            "properties": {
+              "key": {
+                "type": "string"
+              },
+              "params": {
+                "type": "object",
+                "propertyNames": {
+                  "type": "string"
+                },
+                "additionalProperties": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "$ref": "#/$defs/__schema0"
+                    }
+                  ]
+                }
+              }
+            },
+            "required": [
+              "key"
+            ],
+            "additionalProperties": false
+          }
+        }
       }
     },
     "task.mergeGates": {
@@ -26903,6 +27839,9 @@
                         "detail": {
                           "type": "string"
                         },
+                        "detailRef": {
+                          "$ref": "#/$defs/__schema0"
+                        },
                         "floor": {
                           "anyOf": [
                             {
@@ -26954,6 +27893,9 @@
                           "rationale": {
                             "type": "string"
                           },
+                          "rationaleRef": {
+                            "$ref": "#/$defs/__schema0"
+                          },
                           "confidence": {
                             "type": "string",
                             "enum": [
@@ -26977,6 +27919,9 @@
                   },
                   "modelError": {
                     "type": "string"
+                  },
+                  "modelErrorRef": {
+                    "$ref": "#/$defs/__schema0"
                   },
                   "proposed": {
                     "type": "string",
@@ -27002,6 +27947,9 @@
                       "reason": {
                         "type": "string",
                         "minLength": 1
+                      },
+                      "reasonRef": {
+                        "$ref": "#/$defs/__schema0"
                       }
                     },
                     "required": [
@@ -27148,6 +28096,9 @@
                         "label": {
                           "type": "string"
                         },
+                        "labelRef": {
+                          "$ref": "#/$defs/__schema0"
+                        },
                         "kind": {
                           "type": "string",
                           "enum": [
@@ -27192,6 +28143,9 @@
                         },
                         "note": {
                           "type": "string"
+                        },
+                        "noteRef": {
+                          "$ref": "#/$defs/__schema0"
                         }
                       },
                       "required": [
@@ -27481,6 +28435,9 @@
                   },
                   "outcome": {
                     "type": "string"
+                  },
+                  "outcomeRef": {
+                    "$ref": "#/$defs/__schema0"
                   },
                   "trigger": {
                     "type": "string",
@@ -27934,7 +28891,40 @@
           "costUsd",
           "run"
         ],
-        "additionalProperties": false
+        "additionalProperties": false,
+        "$defs": {
+          "__schema0": {
+            "type": "object",
+            "properties": {
+              "key": {
+                "type": "string"
+              },
+              "params": {
+                "type": "object",
+                "propertyNames": {
+                  "type": "string"
+                },
+                "additionalProperties": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "$ref": "#/$defs/__schema0"
+                    }
+                  ]
+                }
+              }
+            },
+            "required": [
+              "key"
+            ],
+            "additionalProperties": false
+          }
+        }
       }
     },
     "task.mergePr": {
@@ -28170,6 +29160,9 @@
                         "detail": {
                           "type": "string"
                         },
+                        "detailRef": {
+                          "$ref": "#/$defs/__schema0"
+                        },
                         "floor": {
                           "anyOf": [
                             {
@@ -28221,6 +29214,9 @@
                           "rationale": {
                             "type": "string"
                           },
+                          "rationaleRef": {
+                            "$ref": "#/$defs/__schema0"
+                          },
                           "confidence": {
                             "type": "string",
                             "enum": [
@@ -28244,6 +29240,9 @@
                   },
                   "modelError": {
                     "type": "string"
+                  },
+                  "modelErrorRef": {
+                    "$ref": "#/$defs/__schema0"
                   },
                   "proposed": {
                     "type": "string",
@@ -28269,6 +29268,9 @@
                       "reason": {
                         "type": "string",
                         "minLength": 1
+                      },
+                      "reasonRef": {
+                        "$ref": "#/$defs/__schema0"
                       }
                     },
                     "required": [
@@ -28415,6 +29417,9 @@
                         "label": {
                           "type": "string"
                         },
+                        "labelRef": {
+                          "$ref": "#/$defs/__schema0"
+                        },
                         "kind": {
                           "type": "string",
                           "enum": [
@@ -28459,6 +29464,9 @@
                         },
                         "note": {
                           "type": "string"
+                        },
+                        "noteRef": {
+                          "$ref": "#/$defs/__schema0"
                         }
                       },
                       "required": [
@@ -28748,6 +29756,9 @@
                   },
                   "outcome": {
                     "type": "string"
+                  },
+                  "outcomeRef": {
+                    "$ref": "#/$defs/__schema0"
                   },
                   "trigger": {
                     "type": "string",
@@ -29201,7 +30212,40 @@
           "costUsd",
           "run"
         ],
-        "additionalProperties": false
+        "additionalProperties": false,
+        "$defs": {
+          "__schema0": {
+            "type": "object",
+            "properties": {
+              "key": {
+                "type": "string"
+              },
+              "params": {
+                "type": "object",
+                "propertyNames": {
+                  "type": "string"
+                },
+                "additionalProperties": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "$ref": "#/$defs/__schema0"
+                    }
+                  ]
+                }
+              }
+            },
+            "required": [
+              "key"
+            ],
+            "additionalProperties": false
+          }
+        }
       }
     },
     "deploy.targets": {
@@ -31239,6 +32283,9 @@
                         "detail": {
                           "type": "string"
                         },
+                        "detailRef": {
+                          "$ref": "#/$defs/__schema0"
+                        },
                         "floor": {
                           "anyOf": [
                             {
@@ -31290,6 +32337,9 @@
                           "rationale": {
                             "type": "string"
                           },
+                          "rationaleRef": {
+                            "$ref": "#/$defs/__schema0"
+                          },
                           "confidence": {
                             "type": "string",
                             "enum": [
@@ -31313,6 +32363,9 @@
                   },
                   "modelError": {
                     "type": "string"
+                  },
+                  "modelErrorRef": {
+                    "$ref": "#/$defs/__schema0"
                   },
                   "proposed": {
                     "type": "string",
@@ -31338,6 +32391,9 @@
                       "reason": {
                         "type": "string",
                         "minLength": 1
+                      },
+                      "reasonRef": {
+                        "$ref": "#/$defs/__schema0"
                       }
                     },
                     "required": [
@@ -31484,6 +32540,9 @@
                         "label": {
                           "type": "string"
                         },
+                        "labelRef": {
+                          "$ref": "#/$defs/__schema0"
+                        },
                         "kind": {
                           "type": "string",
                           "enum": [
@@ -31528,6 +32587,9 @@
                         },
                         "note": {
                           "type": "string"
+                        },
+                        "noteRef": {
+                          "$ref": "#/$defs/__schema0"
                         }
                       },
                       "required": [
@@ -31817,6 +32879,9 @@
                   },
                   "outcome": {
                     "type": "string"
+                  },
+                  "outcomeRef": {
+                    "$ref": "#/$defs/__schema0"
                   },
                   "trigger": {
                     "type": "string",
@@ -32270,7 +33335,40 @@
           "costUsd",
           "run"
         ],
-        "additionalProperties": false
+        "additionalProperties": false,
+        "$defs": {
+          "__schema0": {
+            "type": "object",
+            "properties": {
+              "key": {
+                "type": "string"
+              },
+              "params": {
+                "type": "object",
+                "propertyNames": {
+                  "type": "string"
+                },
+                "additionalProperties": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "$ref": "#/$defs/__schema0"
+                    }
+                  ]
+                }
+              }
+            },
+            "required": [
+              "key"
+            ],
+            "additionalProperties": false
+          }
+        }
       }
     },
     "task.delete": {
@@ -33374,6 +34472,9 @@
                           "detail": {
                             "type": "string"
                           },
+                          "detailRef": {
+                            "$ref": "#/$defs/__schema0"
+                          },
                           "floor": {
                             "anyOf": [
                               {
@@ -33425,6 +34526,9 @@
                             "rationale": {
                               "type": "string"
                             },
+                            "rationaleRef": {
+                              "$ref": "#/$defs/__schema0"
+                            },
                             "confidence": {
                               "type": "string",
                               "enum": [
@@ -33448,6 +34552,9 @@
                     },
                     "modelError": {
                       "type": "string"
+                    },
+                    "modelErrorRef": {
+                      "$ref": "#/$defs/__schema0"
                     },
                     "proposed": {
                       "type": "string",
@@ -33473,6 +34580,9 @@
                         "reason": {
                           "type": "string",
                           "minLength": 1
+                        },
+                        "reasonRef": {
+                          "$ref": "#/$defs/__schema0"
                         }
                       },
                       "required": [
@@ -33619,6 +34729,9 @@
                           "label": {
                             "type": "string"
                           },
+                          "labelRef": {
+                            "$ref": "#/$defs/__schema0"
+                          },
                           "kind": {
                             "type": "string",
                             "enum": [
@@ -33663,6 +34776,9 @@
                           },
                           "note": {
                             "type": "string"
+                          },
+                          "noteRef": {
+                            "$ref": "#/$defs/__schema0"
                           }
                         },
                         "required": [
@@ -33952,6 +35068,9 @@
                     },
                     "outcome": {
                       "type": "string"
+                    },
+                    "outcomeRef": {
+                      "$ref": "#/$defs/__schema0"
                     },
                     "trigger": {
                       "type": "string",
@@ -34412,7 +35531,40 @@
         "cwd",
         "task"
       ],
-      "additionalProperties": false
+      "additionalProperties": false,
+      "$defs": {
+        "__schema0": {
+          "type": "object",
+          "properties": {
+            "key": {
+              "type": "string"
+            },
+            "params": {
+              "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
+              "additionalProperties": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "$ref": "#/$defs/__schema0"
+                  }
+                ]
+              }
+            }
+          },
+          "required": [
+            "key"
+          ],
+          "additionalProperties": false
+        }
+      }
     },
     "fleet.changed": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",

@@ -2259,7 +2259,9 @@ first.
           (#138), on Ubuntu and on Windows: X-06, X-12, the pseudo-locale and Bahasa Indonesia all pass.
           - The first run stopped at the eval-report check (M7-03), since translations changed the workflows' hashes.
             That check now leaves a workflow's `i18n` block out, and the committed report still covers the steps.
-          - Release downloads from GitHub that answered HTTP 504 were re-run.
+          - **GitHub outage:** during this PR, GitHub answered HTTP 504 to release downloads, both in its runs and in a
+            re-run. That failed bootstrap on Ubuntu and macOS and the catalog source check; none of them is a required
+            check. Re-run once GitHub serves the assets again.
       - **Small leftovers** are tracked in X-15.
 - [ ] **X-15** X-13's small leftovers.
       - Deploy smoke details and plugin warnings are stored in the language of the moment. `evidence.md` copies them,

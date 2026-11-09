@@ -73,8 +73,12 @@ function treeMemory(root) {
   const kids = new Map();
   for (const p of all) kids.set(p.ppid, [...(kids.get(p.ppid) ?? []), p]);
   const tree = [];
+  // Each process once: on Windows a reused PID can make two processes each other's parent, which never ends.
+  const seen = new Set([root]);
   const walk = (pid) => {
     for (const k of kids.get(pid) ?? []) {
+      if (seen.has(k.pid)) continue;
+      seen.add(k.pid);
       tree.push(k);
       walk(k.pid);
     }

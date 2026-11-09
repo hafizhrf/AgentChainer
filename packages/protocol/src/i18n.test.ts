@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { afterEach, test } from "node:test";
 import { commandRisk } from "./approval.ts";
 import { catalog, currentLocale, setLanguage, translationProblems } from "./i18n.ts";
-import { cadenceText } from "./index.ts";
+import { cadenceText, RESULTS, RESULTS_INDONESIAN } from "./index.ts";
 import en from "./locales/en.json" with { type: "json" };
 import id from "./locales/id.json" with { type: "json" };
 
@@ -39,4 +39,15 @@ test("a translation that drops a value or a tag, misses a key, or adds one is ca
     empty: [],
     differs: ["a.x"],
   });
+});
+
+test("the results catalog's Indonesian has every English key, and every key lives in its area's file", () => {
+  const english: Record<string, string> = Object.assign({}, ...Object.values(RESULTS));
+  const indonesian: Record<string, string> = Object.assign({}, ...Object.values(RESULTS_INDONESIAN));
+  assert.deepEqual(translationProblems(english, indonesian), { missing: [], extra: [], empty: [], differs: [] });
+  for (const [name, areas] of Object.entries({ en: RESULTS, id: RESULTS_INDONESIAN })) {
+    for (const [area, catalog] of Object.entries(areas)) {
+      for (const key of Object.keys(catalog)) assert.ok(key.startsWith(`${area}.`), `${name}/${area}.json: ${key}`);
+    }
+  }
 });

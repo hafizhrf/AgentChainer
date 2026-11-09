@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { test } from "node:test";
-import { translationProblems } from "@agentchainer/protocol";
+import { RESULTS, translationProblems } from "@agentchainer/protocol";
 import { CATALOGS, INDONESIAN } from "./index.ts";
 
 // X-13: the sidecar's catalogs stay complete and used, and errors that reach a person don't grow literal text again.
@@ -85,6 +85,15 @@ test("Bahasa Indonesia has every English key, with the same values and tags, and
 test("every key is used somewhere (a plural by its name without the suffix)", () => {
   const all = sources.map((s) => s.text).join("\n");
   const unused = Object.values(CATALOGS)
+    .flatMap((c) => Object.keys(c))
+    .map((k) => k.replace(/_(zero|one|two|few|many|other)$/, ""))
+    .filter((k, i, keys) => keys.indexOf(k) === i && !all.includes(`"${k}"`));
+  assert.deepEqual(unused, []);
+});
+
+test("every task result key is used by the sidecar (X-13 part 2b)", () => {
+  const all = sources.map((s) => s.text).join("\n");
+  const unused = Object.values(RESULTS)
     .flatMap((c) => Object.keys(c))
     .map((k) => k.replace(/_(zero|one|two|few|many|other)$/, ""))
     .filter((k, i, keys) => keys.indexOf(k) === i && !all.includes(`"${k}"`));

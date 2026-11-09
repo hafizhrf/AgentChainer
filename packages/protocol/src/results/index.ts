@@ -1,4 +1,4 @@
-import { catalog, type KeyOf, type Params } from "../i18n.ts";
+import { catalog, currentLanguage, type KeyOf, type Language, type Params } from "../i18n.ts";
 import type { MessageRef } from "../index.ts";
 import evidence from "./en/evidence.json" with { type: "json" };
 import lessons from "./en/lessons.json" with { type: "json" };
@@ -33,6 +33,19 @@ type ResultParams = Record<string, string | number | MessageRef>;
 /** A result's ref, with its key checked against the catalog. */
 export const resultRef = (key: ResultKey, params?: ResultParams): MessageRef => (params ? { key, params } : { key });
 
+/**
+ * A text whose translations come with it, not from this catalog: a workflow's own step label, translated in its YAML
+ * (X-13 part 2c). `en` is the English; the app shows its language's when there is one.
+ */
+export function literalRef(texts: { en: string } & Partial<Record<Exclude<Language, "en">, string>>): MessageRef {
+  return { key: LITERAL, params: texts };
+}
+const LITERAL = "literal";
+const literal = (ref: MessageRef, language: Language) => {
+  const value = ref.params?.[language] ?? ref.params?.en;
+  return typeof value === "string" ? value : "";
+};
+
 /** Values for a template: a value that is a text in turn is rendered the same way first. */
 function resolve(params: MessageRef["params"], render: (ref: MessageRef) => string): Params | undefined {
   if (!params) return undefined;
@@ -43,10 +56,12 @@ function resolve(params: MessageRef["params"], render: (ref: MessageRef) => stri
 
 /** A result in the app's language. */
 export function resultText(ref: MessageRef): string {
+  if (ref.key === LITERAL) return literal(ref, currentLanguage());
   return results.t(ref.key as ResultKey, resolve(ref.params, resultText));
 }
 
 /** A result in English, whatever the app's language: for records, pull requests, evidence and Claude. */
 export function resultEnglish(ref: MessageRef): string {
+  if (ref.key === LITERAL) return literal(ref, "en");
   return results.english(ref.key as ResultKey, resolve(ref.params, resultEnglish));
 }

@@ -45,3 +45,13 @@ reviews:
       All 5 sha256 pins equal GitHub's digests and the upstream checksums file; SLSA provenance verified (gh
       attestation verify, darwin-x64) to release.yaml at v1.7.12 (914e7df). MIT. No network code in the binary.
       docs/catalog-reviews/2026-10-30.md
+i18n:
+  id:
+    name: "actionlint (pemeriksa GitHub Actions)"
+    summary: "Pemeriksa statis untuk file workflow GitHub Actions."
+    why: >-
+      Menangkap kesalahan di workflow CI (ekspresi yang salah, input yang tidak dikenal, error shell) sebelum gagal di
+      GitHub.
+    permissions:
+      - "Membaca file workflow yang diberikan kepadanya; tidak melakukan panggilan jaringan"
+      - "Menjalankan shellcheck dan pyflakes pada skrip run: jika keduanya ada di PATH Anda"

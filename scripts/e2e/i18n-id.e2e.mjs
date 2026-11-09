@@ -7,6 +7,7 @@ import { writeFileSync } from "node:fs";
 import path from "node:path";
 import { after, before, describe, it } from "node:test";
 import { LANGUAGES, setLocale, t } from "../../apps/desktop/src/i18n/index.ts";
+import compiled from "../../packages/sidecar/src/catalog/catalog.json" with { type: "json" };
 import { t as sidecarText } from "../../packages/sidecar/src/i18n/index.ts";
 import { axeViolations, blocking } from "./axe.mjs";
 import { KEY, WebDriver, waitFor, xpathString } from "./webdriver.mjs";
@@ -73,6 +74,9 @@ describe("Bahasa Indonesia (X-13)", () => {
     ).click();
     const title = sidecarText("bootstrap.plan.fixGitignoreTitle");
     await app.find(`//input[@aria-label=${xpathString(t("setup.plan.include", { title }))}]`, { timeout: 60_000 });
+    // A catalog item's name comes from its YAML's translation (X-13 part 2c).
+    const item = compiled.items.find((i) => i.id === "gitleaks")?.i18n?.id?.name ?? "";
+    await app.find(`//input[@aria-label=${xpathString(t("setup.plan.include", { title: item }))}]`);
     assert.deepEqual(await look("setup-plan"), []);
   });
 

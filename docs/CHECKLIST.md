@@ -2109,7 +2109,7 @@ first.
           run before found the Windows-only scrolling problem and the two test problems above.
         - Locally, in the Ubuntu 22.04 image (`scripts/e2e/Dockerfile`): 13/13 pass at 1440×900 and at 1024×768.
           With one icon button's label removed on purpose, the gate failed with `button-name` on every screen.
-- [ ] **X-13** i18n-ready strings: English first, Indonesian next.
+- [x] **X-13** i18n-ready strings: English first, Indonesian next.
       - **Part 1, the UI (2026-11-05):** all of the UI's text is in catalogs, still in English (owner decision: no
         second language, and no Language setting, until one is wanted).
         - **The catalogs:** 1,785 keys in 11 area files under `apps/desktop/src/i18n/locales/en/`, read by a small
@@ -2232,13 +2232,40 @@ first.
 
           Bootstrap exit on Windows failed on a GitHub release download (HTTP 504), the same outage as in #131, and
           passed when re-run.
-      - **Part 2, still open:**
-        - **2c:** the catalog YAML's prose, including workflow step labels.
-        - **Small leftovers:**
-          - deploy smoke details and plugin warnings are stored in the language of the moment, and evidence copies
-            them;
-          - `generate-workflow`'s retry reason to Claude follows the app's language;
-          - an English XL outcome that quotes a child's outcome ending with a full stop shows "..".
-        - Also: weekday names in `schedules.ts` stay `en-US`, and enum values shown as words (risk, scope, state)
-          arrive as received.
-        - Then a second language, with its Language setting.
+      - **Part 2c, the catalog's and workflows' prose (2026-11-09):** translations live next to the English, in the
+        same YAML, in an `i18n.id` block. A maintainer who reads both languages reviews them in the PR (owner
+        decision; CATALOG §4), and the English counts.
+        - **What's translated:**
+          - 15 items: name, summary, why, every permission, notes, and hints;
+          - 9 profiles;
+          - 4 shipped workflows: description and every step label.
+        - **Checked at build:** `build-catalog.ts` refuses a shipped file whose translation is missing a field or has
+          another number of permissions. A project's own workflow may have none.
+        - **How it reaches the screen:**
+          - The setup plan, plugin reviews and the workflow list pick the app's language in the sidecar.
+          - A workflow's step label is stored as English plus a "literal" ref carrying both texts.
+          - The canvas reads the YAML's block.
+        - **Tests:**
+          - catalog rules for missing and mismatched translations;
+          - real items, profiles and workflows in both languages;
+          - review notes kept as written;
+          - the orchestrator's labels, and the canvas labels.
+
+          The Indonesian E2E phase also finds the gitleaks item under its Indonesian name.
+        - **Live:** one S task with `AGENTCHAINER_LANGUAGE=id` (haiku, ≈$0.01).
+          - `task.json` keeps "Implement" and "Gates", shown as "Implementasi" and "Gate".
+          - `evidence.md` keeps the English.
+        - **Evidence:** CI run [42579393280](https://github.com/hafizhrf/AgentChainer/actions/runs/42579393280)
+          (#138), on Ubuntu and on Windows: X-06, X-12, the pseudo-locale and Bahasa Indonesia all pass.
+          - The first run stopped at the eval-report check (M7-03), since translations changed the workflows' hashes.
+            That check now leaves a workflow's `i18n` block out, and the committed report still covers the steps.
+          - Release downloads from GitHub that answered HTTP 504 were re-run.
+      - **Small leftovers** are tracked in X-15.
+- [ ] **X-15** X-13's small leftovers.
+      - Deploy smoke details and plugin warnings are stored in the language of the moment. `evidence.md` copies them,
+        so an English report can hold Indonesian fragments. Store them as English plus a ref, like task results.
+      - `generate-workflow`'s retry reason to Claude follows the app's language; send the English.
+      - A parallel step's group label (`StepRun.group`) shows untranslated in the run's tooltip.
+      - Enum values shown as words (risk, scope, state, confidence) arrive as received, in English.
+      - An English XL outcome that quotes a child's outcome ending with a full stop shows "..".
+      - An error quoted raw in an English outcome is in the language of the moment.

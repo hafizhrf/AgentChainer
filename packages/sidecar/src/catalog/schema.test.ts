@@ -28,6 +28,7 @@ const base: Item = {
     steps: [{ "download-binary": { binary: "x" } }, { "mcp-add": { name: "x", command: ["{binary}"] } }],
   },
   reviews: [],
+  i18n: { id: { name: "X", summary: "-", why: "-", permissions: [] } },
 };
 const problems = (item: Item) => catalogProblems({ version: "2026.10.29", items: [item], profiles: [] } as Catalog);
 
@@ -109,5 +110,18 @@ describe("git source license", () => {
     for (const bad of ["../LICENSE", "a/../../LICENSE", "/etc/passwd", "C:/x/LICENSE", "a\\..\\LICENSE", ".."]) {
       assert.equal(git(bad), false, bad);
     }
+  });
+});
+
+describe("translations (X-13)", () => {
+  it("needs every piece of a shipped item's prose in Bahasa Indonesia, no more and no less", () => {
+    const { i18n: _, ...untranslated } = base;
+    assert.match(problems(untranslated).join(), /needs its Bahasa Indonesia/);
+    const permissions = { ...base, permissions: ["Reads files"] };
+    assert.match(problems(permissions).join(), /i18n\.id\.permissions has 0, the English 1/);
+    const notes = { ...base, notes: "Only English" };
+    assert.match(problems(notes).join(), /i18n\.id\.notes must match notes/);
+    const requires = { ...base, requires: [{ tool: "uv", hint: "Install uv" }] };
+    assert.match(problems(requires).join(), /i18n\.id\.hints must cover requires: uv/);
   });
 });

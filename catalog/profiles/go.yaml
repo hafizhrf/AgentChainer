@@ -5,3 +5,7 @@ suggest:
   stacks: [go]
 items:
   - gopls-lsp
+i18n:
+  id:
+    name: "Go"
+    description: "Kecerdasan kode untuk proyek Go."

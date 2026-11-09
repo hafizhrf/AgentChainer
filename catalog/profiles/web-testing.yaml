@@ -5,3 +5,7 @@ suggest:
   optIn: true
 items:
   - playwright-mcp
+i18n:
+  id:
+    name: "Pengujian web"
+    description: "Otomatisasi browser untuk web UI, sesuai permintaan."

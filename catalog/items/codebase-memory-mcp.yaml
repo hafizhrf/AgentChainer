@@ -55,3 +55,38 @@ notes: >-
   before it's offered. Its web UI is on by default and AgentChainer leaves that setting alone, because it is shared by
   every agent on the account. Every cbm process on the machine must run the same version, so another installed version
   conflicts.
+i18n:
+  id:
+    name: "Memori codebase (MCP graf kode)"
+    summary: "Graf pengetahuan lokal dari codebase yang ditanyai Claude alih-alih membaca file satu per satu."
+    why: >-
+      Claude menjawab "siapa yang memanggil ini?" atau "apa yang rusak jika saya mengubahnya?" dari indeks kode, yang
+      lebih cepat dan memakai jauh lebih sedikit token daripada mencari file demi file.
+    permissions:
+      - >-
+        Mengindeks kode ke database lokal di ~/.cache/codebase-memory-mcp, yang dipakai bersama oleh setiap proyek dan
+        agent di akun ini
+      - >-
+        Menjalankan proses latar belakang per akun yang memantau proyek git dari session yang terbuka dan
+        mengindeksnya ulang; ia berkoordinasi lewat folder di /tmp (macOS, Linux) atau %LOCALAPPDATA% (Windows), dan
+        indeks yang diminta untuk dibangun tetap berjalan setelah permintaannya selesai
+      - >-
+        Menyajikan web UI (CBM Lens) di 127.0.0.1:9749 secara default, tanpa login: program apa pun di mesin ini dapat
+        membaca graf, menjelajahi folder, memulai indeks, atau mengubah pengaturannya di sana. `codebase-memory-mcp
+        --ui=false` mematikannya untuk setiap agent di akun ini
+      - >-
+        Claude dapat memintanya mengindeks folder mana pun di mesin ini, menghapus indeks, atau menyimpan catatan
+        desain di indeks
+      - >-
+        Menjalankan git; binary-nya tidak membuat permintaan jaringan dan tidak mengumpulkan telemetri. Asisten di
+        dalam browser milik web UI mengunduh model dari Hugging Face hanya saat Anda mengklik Download (diperiksa di
+        source 0.12.1)
+    notes: >-
+      AgentChainer tidak pernah menjalankan skrip instalasi proyek ini: skrip itu mengedit konfigurasi global setiap
+      agent coding yang ditemukannya dan menambahkan hook, agent, dan skill. Hanya binary-nya yang dipakai, didaftarkan
+      untuk workspace ini. Di-pin ulang ke 0.12.1, yang berisi perbaikan keamanan yang tidak ada di 0.11.0
+      (docs/catalog-reviews/2026-10-30.md); draf review-nya ada di
+      docs/catalog-reviews/2026-10-31-codebase-memory-mcp-0.12.1.md. Sebagai item community, ia butuh dua review
+      bertanda tangan sebelum ditawarkan. Web UI-nya aktif secara default dan AgentChainer tidak mengubah pengaturan
+      itu, karena dipakai bersama oleh setiap agent di akun ini. Setiap proses cbm di mesin harus menjalankan versi yang
+      sama, jadi versi lain yang terpasang akan bentrok.

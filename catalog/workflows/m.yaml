@@ -32,3 +32,12 @@ steps:
     output: review
     fix: { step: implement, maxRounds: 1, maxBudgetUsd: 1 }
     limits: { maxTurns: 30, maxBudgetUsd: 1 }
+i18n:
+  id:
+    description: >-
+      Rencana, implementasi, jalankan gate (dengan putaran perbaikan), lalu tinjauan independen dalam konteks baru.
+    labels:
+      plan: "Rencana"
+      implement: "Implementasi"
+      gates: "Gate"
+      review: "Tinjauan independen"

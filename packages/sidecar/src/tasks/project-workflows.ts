@@ -5,6 +5,7 @@ import { type ProjectWorkflowProblem, type TaskRun, TIERS, type TierWorkflow } f
 import { parse, stringify } from "yaml";
 import { z } from "zod";
 import { AC_DIR } from "../ac-dir.ts";
+import { workflowText } from "../catalog/text.ts";
 import { t } from "../i18n/index.ts";
 import {
   checkReadRoles,
@@ -110,7 +111,7 @@ export function tierWorkflows(eff: EffectiveLibrary): TierWorkflow[] {
       tier,
       id: w.id,
       version: w.version,
-      description: w.description,
+      description: workflowText(w).description,
       steps: "split" in w ? 1 : w.steps.length,
       ...(origin ? origin : { source: "app" as const }),
     };

@@ -36,3 +36,14 @@ reviews:
       Read the marketplace entry, README and LICENSE at f8c5e7a (1.0.0, the whole folder): Apache-2.0; a config-only
       LSP plugin that starts typescript-language-server --stdio from PATH; no hooks, MCP servers, scripts or
       telemetry. docs/catalog-reviews/2026-10-30.md
+i18n:
+  id:
+    name: "Language server TypeScript"
+    summary: "Memberi Claude kecerdasan kode TypeScript/JavaScript lewat typescript-language-server."
+    why: >-
+      Claude dapat melompat ke definisi dan melihat error tipe seperti yang dilakukan editor, alih-alih menebak dari
+      pencarian teks.
+    permissions:
+      - "Menjalankan typescript-language-server di proyek"
+    hints:
+      typescript-language-server: "npm install -g typescript-language-server typescript"

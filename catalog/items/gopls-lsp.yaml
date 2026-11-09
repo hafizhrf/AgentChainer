@@ -36,3 +36,12 @@ reviews:
       Read the marketplace entry, README and LICENSE at f8c5e7a (1.0.0, the whole folder): Apache-2.0; a config-only
       LSP plugin that starts gopls from PATH; no hooks, MCP servers, scripts or telemetry. gopls may download the
       modules go.mod lists. docs/catalog-reviews/2026-10-30.md
+i18n:
+  id:
+    name: "Language server Go (gopls)"
+    summary: "Memberi Claude kecerdasan kode dan refactoring Go lewat gopls."
+    why: "Claude dapat menjelajahi package Go dan melihat error compiler saat mengedit."
+    permissions:
+      - "Menjalankan gopls di proyek"
+    hints:
+      gopls: "go install golang.org/x/tools/gopls@latest, lalu tambahkan $(go env GOPATH)/bin ke PATH Anda"

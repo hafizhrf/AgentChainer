@@ -16,3 +16,10 @@ split:
 maxParallel: 2
 integration:
   gates: [format, lint, typecheck, test, build, smoke]
+i18n:
+  id:
+    description: >-
+      Pecah menjadi sub-task dengan kontraknya masing-masing, jalankan masing-masing di worktree sendiri dengan workflow
+      tier-nya, gabungkan ke branch task, lalu jalankan gate integrasi.
+    labels:
+      split: "Pemecahan"

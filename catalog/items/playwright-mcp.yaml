@@ -44,3 +44,23 @@ notes: >-
   Pinned to an exact version, unlike the playwright plugin, which runs @playwright/mcp@latest. Claude Code asks
   before using servers from a project's .mcp.json. Needs Google Chrome (or run npx @playwright/mcp@0.0.83
   install-browser chrome) and a display.
+i18n:
+  id:
+    name: "Browser Playwright (MCP, di-pin)"
+    summary: "MCP server Playwright dari Microsoft: Claude mengendalikan browser sungguhan untuk memeriksa web UI."
+    why: >-
+      Claude dapat membuka aplikasi Anda di browser, mengklik di dalamnya, dan membaca isi halaman, sehingga perubahan
+      UI diperiksa seperti cara seseorang memeriksanya.
+    permissions:
+      - "Menjalankan Google Chrome yang terpasang dan mengunjungi halaman yang dipilih Claude"
+      - >-
+        Menjalankan npx, yang mengunduh @playwright/mcp versi yang di-pin dan dua paket Playwright dari npm pada
+        pemakaian pertama
+      - >-
+        Memiliki tool yang menjalankan JavaScript apa pun di komputer Anda (browser_run_code_unsafe); Claude Code
+        bertanya sebelum setiap pemakaian kecuali Anda mengizinkannya
+      - "Memulai setiap session dengan profil browser baru (--isolated): tidak ada cookie atau login yang disimpan"
+    notes: >-
+      Di-pin ke versi yang pasti, tidak seperti plugin playwright yang menjalankan @playwright/mcp@latest. Claude Code
+      bertanya sebelum memakai server dari .mcp.json milik proyek. Membutuhkan Google Chrome (atau jalankan npx
+      @playwright/mcp@0.0.83 install-browser chrome) dan layar.

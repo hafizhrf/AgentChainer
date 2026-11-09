@@ -71,6 +71,18 @@ export type WorkflowStep = AgentStep | GatesStep | ParallelStep;
 export const isGates = (s: WorkflowStep): s is GatesStep => "gates" in s;
 export const isParallel = (s: WorkflowStep): s is ParallelStep => "parallel" in s;
 
+/**
+ * A workflow's words in another language (X-13): its description and its steps' labels, by step id. Optional in a
+ * project's own file; every workflow the app ships has its Bahasa Indonesia (`buildLibrary`).
+ */
+const WorkflowTextSchema = z
+  .object({
+    id: z
+      .object({ description: z.string().min(1), labels: z.record(z.string(), z.string().min(1)).default({}) })
+      .strict(),
+  })
+  .strict();
+
 export const WorkflowSchema = z
   .object({
     id: z.string().regex(/^tier-[a-z]+$/),
@@ -78,12 +90,14 @@ export const WorkflowSchema = z
     version: z.number().int().positive(),
     description: z.string().min(1),
     steps: z.array(z.union([AgentStepSchema, GatesStepSchema, ParallelStepSchema])).min(1),
+    i18n: WorkflowTextSchema.optional(),
   })
   .strict()
   .superRefine((w, ctx) => {
     const issue = (message: string) => ctx.addIssue({ code: "custom", message: `${w.id}/${message}` });
     const ids = w.steps.flatMap((s) => (isParallel(s) ? [s.id, ...s.parallel.map((m) => m.id)] : [s.id]));
     if (new Set(ids).size !== ids.length) issue("step ids must be unique");
+    for (const id of Object.keys(w.i18n?.id.labels ?? {})) if (!ids.includes(id)) issue(`i18n: no step ${id}`);
     for (const [i, s] of w.steps.entries()) {
       if (isParallel(s)) {
         // Only read steps may run at the same time: two writers would edit the same tree.
@@ -124,6 +138,7 @@ export const XlWorkflowSchema = z
     split: AgentStepSchema,
     maxParallel: z.number().int().min(1).max(4),
     integration: z.object({ gates: z.array(z.enum(GATE_KINDS)).min(1) }).strict(),
+    i18n: WorkflowTextSchema.optional(),
   })
   .strict()
   .refine((w) => w.split.access === "read" && !w.split.output && !w.split.fix, {
@@ -167,12 +182,18 @@ export function buildLibrary(workflows: Record<string, string>, roles: Record<st
     if (file === "xl.yaml") {
       const xl = XlWorkflowSchema.safeParse(parse(text));
       if (!xl.success) throw new Error(`catalog/workflows/${file} is invalid:\n${z.prettifyError(xl.error)}`);
+      untranslated(file, xl.data.i18n?.id, [xl.data.split]);
       out.xl = xl.data;
       continue;
     }
     const w = WorkflowSchema.safeParse(parse(text));
     if (!w.success) throw new Error(`catalog/workflows/${file} is invalid:\n${z.prettifyError(w.error)}`);
     if (`${w.data.tier.toLowerCase()}.yaml` !== file) throw new Error(`catalog/workflows/${file}: name it <tier>.yaml`);
+    untranslated(
+      file,
+      w.data.i18n?.id,
+      w.data.steps.flatMap((x): { id: string }[] => (isParallel(x) ? [x, ...x.parallel] : [x])),
+    );
     out.workflows[w.data.tier] = w.data;
   }
   for (const [file, text] of Object.entries(roles)) {
@@ -187,6 +208,13 @@ export function buildLibrary(workflows: Record<string, string>, roles: Record<st
     out.roles,
   );
   return out;
+}
+
+/** A shipped workflow says everything in Bahasa Indonesia too: its description and every step's label (X-13). */
+function untranslated(file: string, id: { labels: Record<string, string> } | undefined, steps: { id: string }[]) {
+  if (!id) throw new Error(`catalog/workflows/${file}: needs its Bahasa Indonesia (i18n.id)`);
+  const missing = steps.filter((s) => !id.labels[s.id]).map((s) => s.id);
+  if (missing.length) throw new Error(`catalog/workflows/${file}: i18n.id.labels misses ${missing.join(", ")}`);
 }
 
 /** A workflow's agent steps, parallel members included, with the workflow's id. */

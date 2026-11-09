@@ -20,6 +20,7 @@ import {
   sha256,
   summarize,
   wilson,
+  withoutTranslations,
 } from "./report.ts";
 import { type CaseRun, reportMatchesRun, runCase } from "./run-case.ts";
 import { type EvalCase, parseVariant, readSuite, type Variant } from "./suite.ts";
@@ -337,7 +338,7 @@ describe("report", () => {
     const inputs = libraryInputs(repoRoot);
     assert.ok("catalog/workflows/s.yaml" in inputs && "agents/ac-implementer.md" in inputs);
     const text = readFileSync(path.join(repoRoot, "catalog/workflows/s.yaml"), "utf8").replace(/\r\n/g, "\n");
-    assert.equal(inputs["catalog/workflows/s.yaml"], sha256(text));
+    assert.equal(inputs["catalog/workflows/s.yaml"], sha256(withoutTranslations(text)));
   });
 });
 
@@ -392,5 +393,15 @@ describe("report check (M7-03)", () => {
       "The report has no runs.",
     ]);
     assert.deepEqual(checkReport(report, `${md}edited`, inputs), ["report.md isn't the one report.json renders to."]);
+  });
+});
+
+describe("translations aren't a workflow change (X-13)", () => {
+  it("leaves the i18n block out of what a run reads, wherever it is, and still sees a step change", () => {
+    const steps = "id: tier-s\nsteps:\n  - id: implement\n    label: Implement\n";
+    const block = "i18n:\n  id:\n    description: Satu agent.\n    labels:\n      implement: Implementasi\n";
+    assert.equal(withoutTranslations(steps + block), steps);
+    assert.equal(withoutTranslations(`id: tier-s\n${block}steps:\n  - id: implement\n    label: Implement\n`), steps);
+    assert.notEqual(withoutTranslations(steps.replace("Implement", "Build")), steps);
   });
 });

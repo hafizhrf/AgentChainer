@@ -663,14 +663,27 @@ describe("orchestrator: results in the app's language (X-13)", () => {
       const steps = failed.run?.steps ?? [];
       assert.deepEqual(
         steps.map((s) => (s.labelRef ? resultText(s.labelRef) : s.label)),
+        // The workflow's own labels come in its translation (X-13 part 2c); the record keeps the English.
         [
           "Gate sebelum task",
+          "Implementasi",
+          "Gate",
+          "Perbaiki: test yang gagal",
+          "Gate, putaran 2",
+          "Perbaiki: test yang gagal",
+          "Gate, putaran 3",
+        ],
+      );
+      assert.deepEqual(
+        steps.map((s) => s.label),
+        [
+          "Gates before the task",
           "Implement",
           "Gates",
-          "Perbaiki: test yang gagal",
-          "Gates, putaran 2",
-          "Perbaiki: test yang gagal",
-          "Gates, putaran 3",
+          "Fix: failing test",
+          "Gates, round 2",
+          "Fix: failing test",
+          "Gates, round 3",
         ],
       );
       assert.equal(steps[2]?.note, "Failed: test.");
@@ -679,7 +692,7 @@ describe("orchestrator: results in the app's language (X-13)", () => {
       const runner = fakeRunner({ outcomes: { "start:implement": { ok: false, subtype: "error_max_turns" } } }).runner;
       const stopped = await orchestrate(task("S"), runner).o.run();
       assert.equal(stopped.run?.outcome, "Implement stopped: it used all its turns.");
-      assert.equal(shown(stopped.run?.outcomeRef), "Implement berhenti: semua gilirannya terpakai.");
+      assert.equal(shown(stopped.run?.outcomeRef), "Implementasi berhenti: semua gilirannya terpakai.");
 
       // The setup's note, quoted in the outcome, follows the language too.
       const note = resultRef("xl.setup.exited", { command: "npm ci", code: "1", seconds: "2.0" });

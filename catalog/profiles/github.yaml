@@ -5,3 +5,7 @@ suggest:
   remoteHost: github.com
 items:
   - github
+i18n:
+  id:
+    name: "GitHub"
+    description: "Untuk repositori yang di-host di GitHub."

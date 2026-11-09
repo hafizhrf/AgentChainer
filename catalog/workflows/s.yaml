@@ -15,3 +15,10 @@ steps:
     label: Gates
     gates: [format, lint, typecheck, test, build, smoke]
     fix: { step: implement, maxRounds: 2, maxBudgetUsd: 0.5 }
+i18n:
+  id:
+    description: >-
+      Satu agent mengimplementasikan kontrak, lalu gate proyek dijalankan, dengan hingga dua putaran perbaikan.
+    labels:
+      implement: "Implementasi"
+      gates: "Gate"

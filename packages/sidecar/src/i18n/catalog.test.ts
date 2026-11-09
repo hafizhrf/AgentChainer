@@ -50,6 +50,10 @@ const INTERNAL: Record<string, string> = {
     "the task library is checked by build-catalog.ts, at build time",
   "agents/${file}: name it <name>.md": "the task library is checked by build-catalog.ts, at build time",
   "agents/ac-${role}.md is missing": "the task library is checked by build-catalog.ts, at build time",
+  "catalog/workflows/${file}: needs its Bahasa Indonesia (i18n.id)":
+    "the task library is checked by build-catalog.ts, at build time",
+  'catalog/workflows/${file}: i18n.id.labels misses ${missing.join(", ")}':
+    "the task library is checked by build-catalog.ts, at build time",
   "The task has no run.": "only built for a task whose run is set",
   "The task has no contract.": "only an approved task runs",
   "No role ${step.role} in the library.": "roles are an enum, and the library holds every role",

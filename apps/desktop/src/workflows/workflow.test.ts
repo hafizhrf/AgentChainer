@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
+import { setLanguage } from "@agentchainer/protocol";
 import { freshId, insertAt, moveAt, readWorkflow, removeAt, setAt } from "./workflowDoc.ts";
 import { workflowGraph } from "./workflowGraph.ts";
 
@@ -145,5 +146,20 @@ describe("a workflow as a graph (M6-04)", () => {
 
   it("draws nothing for text that isn't a workflow yet", () => {
     assert.deepEqual(workflowGraph(null), { nodes: [], edges: [] });
+  });
+});
+
+describe("a workflow's own translation on the canvas (X-13)", () => {
+  it("shows the labels the YAML translates in the app's language, and the labels as written otherwise", async () => {
+    const yaml = `${S}\ni18n:\n  id:\n    description: Satu agent.\n    labels:\n      implement: Implementasi\n`;
+    const labels = () => workflowGraph(readWorkflow(yaml).data).nodes.map((n) => n.label);
+    assert.equal(labels()[0], "Implement");
+    await setLanguage("id");
+    try {
+      assert.equal(labels()[0], "Implementasi");
+      assert.equal(labels()[1], workflowGraph(readWorkflow(S).data).nodes[1]?.label, "a step it doesn't translate");
+    } finally {
+      await setLanguage("en");
+    }
   });
 });

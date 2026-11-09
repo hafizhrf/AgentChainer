@@ -2223,6 +2223,15 @@ first.
           - The sidecar's labels and notes render in Indonesian. The workflow's own labels ("Implement", "Gates") stay
             as written (2c).
           - `evidence.md`'s headings are English, while `task.evidence` returns Indonesian sections.
+        - **Evidence:** CI run [42572284781](https://github.com/hafizhrf/AgentChainer/actions/runs/42572284781)
+          (#137), on Ubuntu and on Windows:
+          - X-06: 5/5;
+          - X-12: 8/8;
+          - the pseudo-locale: 5/5;
+          - Bahasa Indonesia: 5/5.
+
+          Bootstrap exit on Windows failed on a GitHub release download (HTTP 504), the same outage as in #131, and
+          passed when re-run.
       - **Part 2, still open:**
         - **2c:** the catalog YAML's prose, including workflow step labels.
         - **Small leftovers:**

@@ -154,6 +154,9 @@ A change to the English shows its translation in the same diff.
 - **A step label taken from a workflow** is stored as English plus a "literal" ref that carries both texts, since
   they come from the YAML rather than a catalog. The canvas reads the YAML's block directly.
 
+**The eval report (M7-03)** hashes a workflow without its `i18n` block, since translations don't change what a run
+reads. Translating a workflow needs no new benchmark, while a change to its steps still does.
+
 ## Alternatives considered
 
 | Option | Pros | Cons | Why not chosen |

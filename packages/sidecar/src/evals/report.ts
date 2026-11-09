@@ -100,6 +100,12 @@ export function meanDiff(a: number[], b: number[]): { diff: number; interval: In
   return { diff, interval: [diff - Z * se, diff + Z * se] };
 }
 
+/**
+ * A workflow's text as a run reads it: without its translations (`i18n`, X-13), which only change what the app shows.
+ * So translating a workflow needs no new benchmark, while any change to its steps still does.
+ */
+export const withoutTranslations = (yaml: string) => yaml.replace(/^i18n:[^\n]*\n(?:(?:[ \t][^\n]*)?\n)*/m, "");
+
 /** The first-party files a task run reads: the tier workflows and the role prompts. */
 export function libraryInputs(repoRoot: string): Record<string, string> {
   const out: Record<string, string> = {};
@@ -111,7 +117,8 @@ export function libraryInputs(repoRoot: string): Record<string, string> {
       .filter((n) => n.endsWith(ext))
       .sort()) {
       // Hashed with LF line ends, so a Windows checkout and CI agree.
-      out[`${dir}/${f}`] = sha256(readFileSync(path.join(repoRoot, dir, f), "utf8").replace(/\r\n/g, "\n"));
+      const text = readFileSync(path.join(repoRoot, dir, f), "utf8").replace(/\r\n/g, "\n");
+      out[`${dir}/${f}`] = sha256(ext === ".yaml" ? withoutTranslations(text) : text);
     }
   }
   return out;

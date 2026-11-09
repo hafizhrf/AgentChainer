@@ -46,8 +46,6 @@
   "run.label.round": "{{step}}, putaran {{round}}",
   "run.fix.reviewFindings": "temuan tinjauan",
   "run.fix.failingGates": "{{kinds}} yang gagal",
-  "run.setup.exited": "`{{command}}` keluar dengan exit code {{exitCode}} dalam {{seconds}} dtk",
-  "run.setup.timedOut": "`{{command}}` melewati batas waktu setelah {{seconds}} dtk",
   "run.branch.notes": "{{first}}; {{rest}}",
   "run.branch.uncommitted": "perubahan Anda yang belum di-commit di workspace tidak ada di branch ini",
   "run.branch.folderSetup": "{{folder}}: {{branch}}, {{setup}}",

@@ -54,15 +54,8 @@ const INTERNAL: Record<string, string> = {
   "The task has no contract.": "only an approved task runs",
   "No role ${step.role} in the library.": "roles are an enum, and the library holds every role",
   "Not a task file: ${name}": "callers pass constant file names",
-};
-
-/**
- * Text that becomes a task's result (its outcome, a step's note), which also goes into pull requests: X-13 part 2b
- * stores it in English and translated, together with the rest of a run's results.
- */
-const LATER: Record<string, string> = {
-  "Sub-task ${child.id} has no workflow or worktree.": "the XL run's outcome",
-  "git merge failed: ${(r.stderr || r.stdout).trim() || ": "a sub-task merge's note and the run's outcome",
+  "Sub-task ${child.id} has no workflow or worktree.":
+    "an XL run gives every approved sub-task its worktree before it runs, and S, M and L always have a workflow",
 };
 
 test("every message is a string, in its area's file, in both languages", () => {
@@ -105,7 +98,7 @@ test("errors that reach a person aren't literal text", () => {
     /(?:new RpcFailure\([^,()]+,\s*|\binvalid\(\s*|throw new Error\(\s*|new AlreadyRunning\(\s*)(["'`])((?:\\.|(?!\1).)*)\1/g;
   const found = sources.flatMap((s) =>
     [...s.text.matchAll(LITERAL)]
-      .filter((m) => /[A-Za-z]{2}/.test(m[2] ?? "") && !((m[2] ?? "") in INTERNAL) && !((m[2] ?? "") in LATER))
+      .filter((m) => /[A-Za-z]{2}/.test(m[2] ?? "") && !((m[2] ?? "") in INTERNAL))
       .map((m) => `${s.file}: ${m[2]?.slice(0, 70)}`),
   );
   assert.deepEqual(found, []);

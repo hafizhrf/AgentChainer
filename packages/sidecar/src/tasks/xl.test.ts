@@ -417,9 +417,9 @@ describe("XL results in the app's language (X-13 part 2b)", () => {
     assert.equal(step?.note, "Setup failed: `pnpm install` exited 1 in 1.0 s");
     const indonesian = await inIndonesian(() => [done.run?.outcomeRef, step?.labelRef, step?.noteRef].map(rendered));
     assert.deepEqual(indonesian, [
-      "Sub-task 1 (A) gagal: Setup gagal: `pnpm install` selesai dengan exit code 1 dalam 1.0 dtk. Buka sub-task itu untuk menjalankannya lagi atau menerima risikonya, lalu Teruskan.",
+      "Sub-task 1 (A) gagal: Setup gagal: `pnpm install` keluar dengan exit code 1 dalam 1.0 dtk. Buka sub-task itu untuk menjalankannya lagi atau menerima risikonya, lalu Teruskan.",
       "Sub-task 1 (A)",
-      "Setup gagal: `pnpm install` selesai dengan exit code 1 dalam 1.0 dtk",
+      "Setup gagal: `pnpm install` keluar dengan exit code 1 dalam 1.0 dtk",
     ]);
   });
 
@@ -466,7 +466,7 @@ describe("XL results in the app's language (X-13 part 2b)", () => {
     assert.equal(setup?.note, `agentchainer/${PARENT}; \`pnpm install\` exited 0 in 2.5 s`);
     assert.equal(
       await inIndonesian(() => rendered(setup?.noteRef)),
-      `agentchainer/${PARENT}; \`pnpm install\` selesai dengan exit code 0 dalam 2.5 dtk`,
+      `agentchainer/${PARENT}; \`pnpm install\` keluar dengan exit code 0 dalam 2.5 dtk`,
     );
   });
 

@@ -85,7 +85,7 @@ import {
   removeWorktree,
   worktreePath,
 } from "./worktree.ts";
-import { type SetupRun, XlOrchestrator } from "./xl.ts";
+import { type SetupRun, setupResult, XlOrchestrator } from "./xl.ts";
 import { gitWorld, setupWorktree } from "./xl-world.ts";
 
 /**
@@ -589,13 +589,8 @@ function orchestratorFor(
   return orchestrator;
 }
 
-/** How a worktree's install command went, for the "Task branch" step's note: the same text as xl.ts's `setupNote`. */
-function setupRef(s: SetupRun): MessageRef {
-  const seconds = (s.durationMs / 1000).toFixed(1);
-  return s.timedOut
-    ? resultRef("run.setup.timedOut", { command: s.command, seconds })
-    : resultRef("run.setup.exited", { command: s.command, exitCode: String(s.exitCode), seconds });
-}
+/** How a worktree's install command went, for the "Task branch" step's note: xl.ts's own sentence. */
+const setupRef = (s: SetupRun): MessageRef => setupResult(s).ref;
 
 /**
  * The task's branch, ready to work in: the project's install command in its new worktree (M5-01). The note says which
@@ -1600,7 +1595,12 @@ export async function mergeGates(root: string, id: string, gh: Gh | null) {
     );
     gates.push(
       !secrets.ran
-        ? { id: "secrets", label: secretsLabel, state: "not-run", detail: secrets.why }
+        ? {
+            id: "secrets",
+            label: secretsLabel,
+            state: "not-run",
+            detail: secrets.whyRef ? resultText(secrets.whyRef) : secrets.why,
+          }
         : secrets.flagged.length
           ? {
               id: "secrets",
@@ -1622,8 +1622,8 @@ export async function mergeGates(root: string, id: string, gh: Gh | null) {
     ] as const) {
       gates.push(
         !scan.ran
-          ? { id: gid, label, state: "not-run", detail: scan.why }
-          : { id: gid, label, state: scan.findings ? "fail" : "pass", detail: scan.detail },
+          ? { id: gid, label, state: "not-run", detail: resultText(scan.whyRef) }
+          : { id: gid, label, state: scan.findings ? "fail" : "pass", detail: resultText(scan.detailRef) },
       );
     }
   }

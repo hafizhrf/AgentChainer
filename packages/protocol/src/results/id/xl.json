@@ -44,6 +44,6 @@
   "xl.note.worktreeKept": "{{merged}} Worktree-nya dibiarkan untuk dihapus lewat Bersihkan.",
   "xl.note.gitMergeFailed": "git merge gagal: {{output}}",
   "xl.note.gitMergeExited": "git merge gagal: exit code {{status}}",
-  "xl.setup.exited": "`{{command}}` selesai dengan exit code {{code}} dalam {{seconds}} dtk",
+  "xl.setup.exited": "`{{command}}` keluar dengan exit code {{code}} dalam {{seconds}} dtk",
   "xl.setup.timedOut": "`{{command}}` kehabisan waktu setelah {{seconds}} dtk"
 }

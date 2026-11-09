@@ -601,7 +601,7 @@ describe("orchestrator: results in the app's language (X-13)", () => {
     await go(task("S"), { baseline: both, gateResults: [both] });
     await go(task("S", 0.04), {});
     // The task branch's setup failing with the note the sidecar wrote, an error, a resumed run.
-    const note = resultRef("run.setup.exited", { command: "npm ci", exitCode: "1", seconds: "2.0" });
+    const note = resultRef("xl.setup.exited", { command: "npm ci", code: "1", seconds: "2.0" });
     await go(task("S"), {}, async () => ({ ok: false, note: resultEnglish(note), noteRef: note }));
     await go(task("S"), {
       onStart: () => {
@@ -682,7 +682,7 @@ describe("orchestrator: results in the app's language (X-13)", () => {
       assert.equal(shown(stopped.run?.outcomeRef), "Implement berhenti: semua gilirannya terpakai.");
 
       // The setup's note, quoted in the outcome, follows the language too.
-      const note = resultRef("run.setup.exited", { command: "npm ci", exitCode: "1", seconds: "2.0" });
+      const note = resultRef("xl.setup.exited", { command: "npm ci", code: "1", seconds: "2.0" });
       const setup = async () => ({ ok: false, note: resultEnglish(note), noteRef: note });
       const branch = await orchestrate(task("S"), fakeRunner({}).runner, false, setup).o.run();
       assert.equal(branch.run?.outcome, "Setting up the task branch failed: `npm ci` exited 1 in 2.0 s");

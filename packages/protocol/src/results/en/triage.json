@@ -1,1 +1,21 @@
-{}
+{
+  "triage.signal.riskKeywords": "Mentions {{words}}.",
+  "triage.signal.breadth": "Says “{{phrases}}”.",
+  "triage.signal.noAreas": "No affected areas listed.",
+  "triage.signal.scope": "{{areas}} in {{parts}} ({{roots}}), {{files}}.",
+  "triage.signal.areas_one": "{{count}} area",
+  "triage.signal.areas_other": "{{count}} areas",
+  "triage.signal.parts_one": "{{count}} top-level part",
+  "triage.signal.parts_other": "{{count}} top-level parts",
+  "triage.signal.existingFiles_one": "{{count}} existing file",
+  "triage.signal.existingFiles_other": "{{count}} existing files",
+  "triage.signal.newAreas": "New or not found: {{areas}}.",
+  "triage.signal.repoSize": "{{files}} files.",
+  "triage.signal.repoSizeOver": "More than {{files}} files.",
+  "triage.signal.noTests": "No test command detected.",
+  "triage.modelError.stopped": "The classification stopped: {{subtype}}.",
+  "triage.modelError.invalid": "The classification wasn't a valid answer.",
+  "triage.modelError.noResult": "The classification ended without a result.",
+  "triage.split.rationale": "Proposed by the split.",
+  "triage.split.overrideReason": "Sub-tasks run as S, M or L."
+}

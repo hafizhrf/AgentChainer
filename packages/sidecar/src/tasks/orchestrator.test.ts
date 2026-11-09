@@ -1,6 +1,15 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import type { GateKind, GateRun, Task } from "@agentchainer/protocol";
+import {
+  type GateKind,
+  type GateRun,
+  type MessageRef,
+  resultEnglish,
+  resultRef,
+  resultText,
+  setLanguage,
+  type Task,
+} from "@agentchainer/protocol";
 import shipped from "./library.json" with { type: "json" };
 import { type AgentStep, LibrarySchema, type Workflow } from "./library.ts";
 import {
@@ -535,5 +544,185 @@ describe("orchestrator", () => {
     assert.equal(done.run?.approvals.length, 1);
     assert.equal(done.run?.guardBlocks[0]?.target, "git push --force");
     assert.match(files.get("summary.md") ?? "", /## Changes/);
+  });
+});
+
+describe("orchestrator: results in the app's language (X-13)", () => {
+  /** A ref the run stored, as the app shows it. */
+  const shown = (ref: MessageRef | undefined) => {
+    assert.ok(ref, "a ref");
+    return resultText(ref);
+  };
+
+  /**
+   * Each ref renders the English stored next to it, and every outcome and note has one, as do the labels the sidecar
+   * gives (a workflow's own labels are its words). Returns the keys.
+   */
+  function refsOf(t: Task): string[] {
+    const keys: string[] = [];
+    const check = (text: string | undefined, ref: MessageRef | undefined, needed: boolean, what: string) => {
+      if (text === undefined) return;
+      if (ref) {
+        assert.equal(resultEnglish(ref), text, what);
+        keys.push(ref.key);
+      } else {
+        assert.ok(!needed, `${what} has no ref: ${text}`);
+      }
+    };
+    check(t.run?.outcome, t.run?.outcomeRef, true, "the outcome");
+    for (const s of t.run?.steps ?? []) {
+      check(s.label, s.labelRef, ["setup", "baseline", "fix"].includes(s.kind), `${s.id}'s label`);
+      check(s.note, s.noteRef, true, `${s.id}'s note`);
+    }
+    return keys;
+  }
+
+  it("writes each outcome, note and label with a ref that renders the same English", async () => {
+    const red = [gate("test", 1, 0)];
+    const ended: Task[] = [];
+    const go = async (
+      t: Task,
+      opts: Parameters<typeof fakeRunner>[0],
+      setup?: OrchestratorDeps["setup"],
+      resume = false,
+    ) => {
+      const done = await orchestrate(t, fakeRunner(opts).runner, resume, setup).o.run();
+      ended.push(done);
+      return done;
+    };
+    // Fixed after a round, and still failing after the last one.
+    const fixed = await go(task("S"), { gateResults: [[gate("lint", 1, 0), gate("test", 0, 0)]] });
+    await go(task("S"), { gateResults: [red, red, red] });
+    // A review's must-fix finding, a step that stopped, failures from before the task, a budget used up.
+    const mustFix = { verdict: "changes-requested", findings: [{ severity: "must-fix", text: "x" }], criteria: [] };
+    await go(task("M"), { outcomes: { "start:review": { structured: mustFix } } });
+    await go(task("S"), { outcomes: { "start:implement": { ok: false, subtype: "error_max_budget_usd" } } });
+    const both = [gate("test", 1, 0), gate("lint", 1, 0)];
+    await go(task("S"), { baseline: both, gateResults: [both] });
+    await go(task("S", 0.04), {});
+    // The task branch's setup failing with the note the sidecar wrote, an error, a resumed run.
+    const note = resultRef("run.setup.exited", { command: "npm ci", exitCode: "1", seconds: "2.0" });
+    await go(task("S"), {}, async () => ({ ok: false, note: resultEnglish(note), noteRef: note }));
+    await go(task("S"), {
+      onStart: () => {
+        throw new Error("boom");
+      },
+    });
+    const interrupted = task("S");
+    interrupted.run?.steps.push({
+      id: "implement",
+      step: "implement",
+      label: "Implement",
+      kind: "agent",
+      status: "running",
+      startedAt: "2026-10-30T00:00:00.000Z",
+      costUsd: 0,
+    });
+    await go(interrupted, {}, undefined, true);
+    // The PR's review and a Fix CI round on a finished run.
+    ended.push(await orchestrate({ ...fixed, state: "running" }, fakeRunner({}).runner).o.reviewPr());
+    const ci = orchestrate({ ...fixed, state: "running" }, fakeRunner({}).runner).o;
+    ended.push(await ci.fixCi({ check: "test (ubuntu)", log: "x" }));
+
+    const keys = new Set(ended.flatMap(refsOf));
+    for (const key of [
+      "run.outcome.everyGatePassed",
+      "run.outcome.stillFailing",
+      "run.outcome.stepStopped",
+      "run.outcome.alreadyFailing",
+      "run.outcome.budgetBeforeStep",
+      "run.outcome.setupFailed",
+      "run.outcome.error",
+      "run.outcome.ciFixed",
+      "run.note.allPassed",
+      "run.note.failed",
+      "run.note.failedSomeBefore",
+      "run.note.mustFix",
+      "run.note.stopped",
+      "run.note.interrupted",
+      "run.note.reviewUnreadable",
+      "run.label.taskBranch",
+      "run.label.baseline",
+      "run.label.fix",
+      "run.label.round",
+      "run.label.prReview",
+      "run.label.fixCi",
+      "run.label.gatesAfterCiFix",
+    ]) {
+      assert.ok(keys.has(key), key);
+    }
+  });
+
+  it("keeps the record in English while the app shows it in Indonesian", async () => {
+    await setLanguage("id");
+    try {
+      const red = [gate("test", 1, 0)];
+      const failed = await orchestrate(task("S"), fakeRunner({ gateResults: [red, red, red] }).runner).o.run();
+      assert.equal(failed.run?.outcome, "test still failing after 2 fix rounds.");
+      assert.equal(shown(failed.run?.outcomeRef), "test masih gagal setelah 2 putaran perbaikan.");
+      const steps = failed.run?.steps ?? [];
+      assert.deepEqual(
+        steps.map((s) => (s.labelRef ? resultText(s.labelRef) : s.label)),
+        [
+          "Gate sebelum task",
+          "Implement",
+          "Gates",
+          "Perbaiki: test yang gagal",
+          "Gates, putaran 2",
+          "Perbaiki: test yang gagal",
+          "Gates, putaran 3",
+        ],
+      );
+      assert.equal(steps[2]?.note, "Failed: test.");
+      assert.equal(shown(steps[2]?.noteRef), "Gagal: test.");
+
+      const runner = fakeRunner({ outcomes: { "start:implement": { ok: false, subtype: "error_max_turns" } } }).runner;
+      const stopped = await orchestrate(task("S"), runner).o.run();
+      assert.equal(stopped.run?.outcome, "Implement stopped: it used all its turns.");
+      assert.equal(shown(stopped.run?.outcomeRef), "Implement berhenti: semua gilirannya terpakai.");
+
+      // The setup's note, quoted in the outcome, follows the language too.
+      const note = resultRef("run.setup.exited", { command: "npm ci", exitCode: "1", seconds: "2.0" });
+      const setup = async () => ({ ok: false, note: resultEnglish(note), noteRef: note });
+      const branch = await orchestrate(task("S"), fakeRunner({}).runner, false, setup).o.run();
+      assert.equal(branch.run?.outcome, "Setting up the task branch failed: `npm ci` exited 1 in 2.0 s");
+      assert.equal(
+        shown(branch.run?.outcomeRef),
+        "Setup branch task gagal: `npm ci` keluar dengan exit code 1 dalam 2.0 dtk",
+      );
+    } finally {
+      await setLanguage("en");
+    }
+  });
+
+  it("keeps an outcome recorded before refs as written, and quotes it as written", async () => {
+    const first = await orchestrate(task("S"), fakeRunner({}).runner).o.run();
+    if (!first.run) throw new Error("no run");
+    const { outcomeRef: _ref, ...older } = first.run;
+    const before: Task = { ...first, state: "running", run: older };
+
+    const reviewed = await orchestrate(before, fakeRunner({}).runner).o.reviewPr();
+    assert.equal(reviewed.run?.outcome, "Every gate passed after the last change.");
+    assert.ok(reviewed.run && !("outcomeRef" in reviewed.run), "no ref is made up for it");
+
+    const failing = fakeRunner({
+      onStart: (step) => {
+        if (step.id === "pr-review") throw new Error("boom");
+      },
+    });
+    const broke = await orchestrate(before, failing.runner).o.reviewPr();
+    assert.equal(
+      broke.run?.outcome,
+      "Every gate passed after the last change. The PR review stopped on an error: boom",
+    );
+    await setLanguage("id");
+    try {
+      assert.equal(
+        shown(broke.run?.outcomeRef),
+        "Every gate passed after the last change. Tinjauan PR berhenti karena error: boom",
+      );
+    } finally {
+      await setLanguage("en");
+    }
   });
 });

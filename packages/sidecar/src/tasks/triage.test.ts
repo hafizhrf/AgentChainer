@@ -1,13 +1,21 @@
 import assert from "node:assert/strict";
 import { after, describe, it } from "node:test";
-import type { TaskContract, Tier, WorkspaceProfile } from "@agentchainer/protocol";
+import {
+  resultEnglish,
+  resultText,
+  setLanguage,
+  type TaskContract,
+  type Tier,
+  type TriageSignal,
+  type WorkspaceProfile,
+} from "@agentchainer/protocol";
 import benchmark from "../../test/triage-benchmark.json" with { type: "json" };
 import { detectWorkspace } from "../detect/detect.ts";
 import { copyFixture, removeFixtureCopies } from "../detect/fixture-copy.ts";
 import type { AgentSdkModule } from "../sdk-loader.ts";
 import { listFiles } from "../workspace.ts";
 import { availableGates, normalizeContract } from "./contract.ts";
-import { classify, maxTier, signals, staticPrefix, triageRecord } from "./triage.ts";
+import { classify, classifyPrompt, maxTier, signals, staticPrefix, triageRecord } from "./triage.ts";
 
 const profile = (packages: { path: string; test?: boolean }[]): WorkspaceProfile => ({
   stacks: ["node"],
@@ -200,5 +208,78 @@ describe("triage benchmark (no model calls)", () => {
       const why = r.signals.map((s) => `${s.signal}=${s.floor}: ${s.detail}`).join("; ");
       assert.ok(ORDER[r.floor] <= ORDER[t.suggested as Tier], `${t.id}: floor ${r.floor} > ${t.suggested} (${why})`);
     }
+  });
+});
+
+describe("triage results in the app's language (X-13)", () => {
+  /** Every signal at once, and the one for a contract without areas. */
+  const all = () => [
+    ...signals({
+      request: "Rename the login helper everywhere",
+      contract: contract({ affectedAreas: ["src/a.ts", "docs/new.md"] }),
+      profile: profile([{ path: ".", test: false }]),
+      files: FILES,
+      truncated: true,
+    }).signals,
+    ...run("x", {}).signals,
+  ];
+  const by = (found: TriageSignal[], name: string) => found.filter((s) => s.signal === name).map((s) => s.detail);
+
+  it("stores each signal's detail with a ref that renders the same English", () => {
+    const found = all();
+    assert.deepEqual(
+      found.map((s) => s.signal),
+      ["risk-keywords", "breadth", "scope", "new-areas", "repo-size", "tests", "scope"],
+    );
+    for (const s of found) {
+      assert.ok(s.detailRef, s.signal);
+      assert.equal(resultEnglish(s.detailRef), s.detail);
+    }
+    assert.deepEqual(by(found, "scope"), [
+      "2 areas in 2 top-level parts (src, docs), 1 existing file.",
+      "No affected areas listed.",
+    ]);
+    assert.deepEqual(by(found, "breadth"), ["Says “everywhere”."]);
+    assert.deepEqual(by(found, "repo-size"), ["More than 7 files."]);
+  });
+
+  it("shows details and the model's errors in Indonesian, while the record and the prompt stay English", async () => {
+    await setLanguage("id");
+    try {
+      const found = all();
+      const shown = (name: string) =>
+        found.filter((s) => s.signal === name).map((s) => s.detailRef && resultText(s.detailRef));
+      assert.deepEqual(by(found, "tests"), ["No test command detected."]);
+      assert.deepEqual(shown("scope"), [
+        "2 area di 2 bagian tingkat atas (src, docs), 1 file yang sudah ada.",
+        "Tidak ada area terdampak yang dicantumkan.",
+      ]);
+      assert.deepEqual(shown("risk-keywords"), ["Menyebut login."]);
+      assert.deepEqual(shown("repo-size"), ["Lebih dari 7 file."]);
+      assert.match(classifyPrompt("x", contract(), found), /- scope: 2 areas in 2 top-level parts/);
+
+      const sdk = { query: () => (async function* () {})() } as unknown as AgentSdkModule;
+      const empty = await classify(sdk, "claude", "/", "p");
+      assert.equal(empty.error, "The classification ended without a result.");
+      const t = triageRecord({ signals: found, floor: "L" }, empty);
+      assert.equal(t.modelError, "The classification ended without a result.");
+      assert.ok(t.modelErrorRef);
+      assert.equal(resultText(t.modelErrorRef), "Klasifikasi berakhir tanpa hasil.");
+    } finally {
+      await setLanguage("en");
+    }
+  });
+
+  it("keeps an error's own message as it is, without a ref", async () => {
+    const sdk = {
+      query: () =>
+        (async function* () {
+          yield* [];
+          throw new Error("spawn failed");
+        })(),
+    } as unknown as AgentSdkModule;
+    const failed = await classify(sdk, "claude", "/", "p");
+    assert.deepEqual([failed.error, failed.errorRef], ["spawn failed", undefined]);
+    assert.equal(triageRecord({ signals: [], floor: "S" }, failed).modelErrorRef, undefined);
   });
 });

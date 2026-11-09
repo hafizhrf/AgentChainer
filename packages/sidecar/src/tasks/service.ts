@@ -5,8 +5,11 @@ import path from "node:path";
 import {
   MAX_CI_FIXES,
   type MergeGate,
+  type MessageRef,
   type PermissionMode,
+  type ResultKey,
   RpcErrorCode,
+  resultEnglish,
   resultRef,
   resultText,
   type Task,
@@ -82,7 +85,7 @@ import {
   removeWorktree,
   worktreePath,
 } from "./worktree.ts";
-import { setupNote, XlOrchestrator } from "./xl.ts";
+import { type SetupRun, XlOrchestrator } from "./xl.ts";
 import { gitWorld, setupWorktree } from "./xl-world.ts";
 
 /**
@@ -267,7 +270,9 @@ export function approveTask(
   if (tier !== task.triage.proposed && !why) {
     throw invalid(t("tasks.service.tierReason", { tier, proposed: task.triage.proposed }));
   }
-  const { override: _previous, ...proposal } = task.triage;
+  const { override: previous, ...proposal } = task.triage;
+  // A reason the sidecar gave (a split's sub-task, approved as drafted) keeps its ref while its text is the same.
+  const reasonRef = previous?.reason === why ? previous.reasonRef : undefined;
   const at = now.toISOString();
   const next: Task = {
     ...task,
@@ -277,7 +282,7 @@ export function approveTask(
       ...proposal,
       chosen: tier,
       budgetUsd,
-      ...(tier !== proposal.proposed ? { override: { reason: why } } : {}),
+      ...(tier !== proposal.proposed ? { override: { reason: why, ...(reasonRef ? { reasonRef } : {}) } } : {}),
     },
     updatedAt: at,
   };
@@ -584,30 +589,50 @@ function orchestratorFor(
   return orchestrator;
 }
 
+/** How a worktree's install command went, for the "Task branch" step's note: the same text as xl.ts's `setupNote`. */
+function setupRef(s: SetupRun): MessageRef {
+  const seconds = (s.durationMs / 1000).toFixed(1);
+  return s.timedOut
+    ? resultRef("run.setup.timedOut", { command: s.command, seconds })
+    : resultRef("run.setup.exited", { command: s.command, exitCode: String(s.exitCode), seconds });
+}
+
 /**
  * The task's branch, ready to work in: the project's install command in its new worktree (M5-01). The note says which
  * branch, and that the workspace's uncommitted changes aren't on it.
  */
-async function readyBranch(root: string, task: Task, signal: AbortSignal): Promise<{ ok: boolean; note: string }> {
+export async function readyBranch(
+  root: string,
+  task: Task,
+  signal: AbortSignal,
+): Promise<{ ok: boolean; note: string; noteRef?: MessageRef }> {
   const wt = task.worktree;
   // A multi-folder task's other worktrees are set up too, each with its own folder's install command (M8-01).
   const others = folderDirs(task).filter((f) => f.folder.worktree && !f.folder.worktree.removed);
   if (!wt && !others.length) return { ok: true, note: "" };
   let ok = true;
-  const notes: string[] = [];
+  // Branch names are as they are; the rest is shown in the app's language.
+  const notes: (string | MessageRef)[] = [];
   if (wt) {
     const run = await setupWorktree(codeRootIn(root, wt.path), signal);
     ok = !run || (run.exitCode === 0 && !run.timedOut);
-    notes.push(wt.branch, ...(run ? [setupNote(run)] : []));
-    if (hasTrackedChanges(root)) notes.push("your uncommitted changes in the workspace aren't on this branch");
+    notes.push(wt.branch, ...(run ? [setupRef(run)] : []));
+    if (hasTrackedChanges(root)) notes.push(resultRef("run.branch.uncommitted"));
   }
   for (const o of others) {
     const run = await setupWorktree(o.dir, signal);
     if (run && (run.exitCode !== 0 || run.timedOut)) ok = false;
-    notes.push(`${o.name}: ${o.folder.worktree?.branch}${run ? `, ${setupNote(run)}` : ""}`);
-    if (hasTrackedChanges(o.folder.path)) notes.push(`your uncommitted changes in ${o.name} aren't on its branch`);
+    const branch = o.folder.worktree?.branch ?? "";
+    notes.push(
+      run
+        ? resultRef("run.branch.folderSetup", { folder: o.name, branch, setup: setupRef(run) })
+        : `${o.name}: ${branch}`,
+    );
+    if (hasTrackedChanges(o.folder.path)) notes.push(resultRef("run.branch.folderUncommitted", { folder: o.name }));
   }
-  return { ok, note: notes.join("; ") };
+  // "a; b; c" as a; (b; c), so it renders in one language.
+  const note = notes.reduceRight((rest, first) => resultRef("run.branch.notes", { first, rest }));
+  return typeof note === "string" ? { ok, note } : { ok, note: resultEnglish(note), noteRef: note };
 }
 
 /**
@@ -816,13 +841,15 @@ export async function splitTask(root: string, id: string, claude: Claude, model?
         files,
         truncated: listing.truncated,
       });
+      const rationale = result("triage.split.rationale");
       const proposal = triageRecord(
         found,
-        { model: { tier: sub.tier, rationale: "Proposed by the split.", confidence: "medium" } },
+        { model: { tier: sub.tier, rationale: rationale.text, rationaleRef: rationale.ref, confidence: "medium" } },
         now,
       );
       // A sub-task runs as S, M or L; the XL budget is per sub-task.
       const chosen = proposal.proposed === "XL" ? "L" : proposal.proposed;
+      const reason = result("triage.split.overrideReason");
       const child: Task = {
         ...created,
         title: sub.title,
@@ -831,7 +858,7 @@ export async function splitTask(root: string, id: string, claude: Claude, model?
           ...proposal,
           chosen,
           budgetUsd: budgetUsd === null ? DEFAULT_BUDGET_USD[chosen] : Math.min(DEFAULT_BUDGET_USD[chosen], budgetUsd),
-          ...(chosen !== proposal.proposed ? { override: { reason: "Sub-tasks run as S, M or L." } } : {}),
+          ...(chosen !== proposal.proposed ? { override: { reason: reason.text, reasonRef: reason.ref } } : {}),
         },
         parent: { id, index },
         dependsOn: sub.dependsOn.map((j) => ids[j]).filter((d): d is string => d !== undefined),
@@ -924,7 +951,7 @@ export function continueTask(root: string, id: string, host: SessionHost, notify
   if (!["failed", "unverified", "cancelled", "interrupted"].includes(task.state)) {
     throw invalid(t("tasks.service.continueWhich"));
   }
-  const { endedAt: _ended, outcome: _outcome, ...run } = task.run;
+  const { endedAt: _ended, outcome: _outcome, outcomeRef: _outcomeRef, ...run } = task.run;
   const running: Task = { ...task, state: "running", run, updatedAt: new Date().toISOString() };
   saveTask(root, running);
   notify(running);
@@ -1438,7 +1465,7 @@ export async function fixCiTask(
   void track(root, id, round, notify).then(async (ended) => {
     let state: "done" | "failed" | "cancelled" =
       ended.state === "done" ? "done" : ended.state === "cancelled" ? "cancelled" : "failed";
-    let outcome: string | null = null;
+    let outcome: { text: string; ref: MessageRef } | null = null;
     const latest = loadTask(root, id);
     if (state === "done" && latest.worktree) {
       try {
@@ -1446,13 +1473,15 @@ export async function fixCiTask(
         await pushBranch(root, latest.worktree.branch, ghCredentialConfig(root) ?? []);
       } catch (err) {
         state = "failed";
-        outcome = `The fix passed the gates, but pushing it failed: ${err instanceof Error ? err.message : String(err)}`;
+        outcome = result("run.outcome.pushFailed", { error: err instanceof Error ? err.message : String(err) });
       }
     }
     const head = latest.worktree ? git(["rev-parse", latest.worktree.branch], root).stdout.trim() : "";
     const next: Task = {
       ...latest,
-      ...(outcome && latest.run ? { state: "failed" as const, run: { ...latest.run, outcome } } : {}),
+      ...(outcome && latest.run
+        ? { state: "failed" as const, run: { ...latest.run, outcome: outcome.text, outcomeRef: outcome.ref } }
+        : {}),
       ...(latest.pr
         ? {
             pr: {
@@ -1501,62 +1530,63 @@ export async function mergeGates(root: string, id: string, gh: Gh | null) {
   const state = await prState(run, root, pr.number);
   const head = state.headSha;
   const gates: MergeGate[] = [];
+  // Worked out on each call and never stored: shown in the app's language as they are (X-13 part 2b).
+  const say = (key: ResultKey, params?: Record<string, string | number>) => resultText(resultRef(key, params));
 
+  const local = say("run.mergeGates.localLabel");
+  const outcome = task.run?.outcomeRef ? resultText(task.run.outcomeRef) : task.run?.outcome;
   gates.push(
     task.state === "done"
-      ? { id: "local", label: "Local gates", state: "pass", detail: task.run?.outcome ?? "The run ended Done." }
+      ? { id: "local", label: local, state: "pass", detail: outcome ?? say("run.mergeGates.runDone") }
       : task.state === "accepted"
         ? {
             id: "local",
-            label: "Local gates",
+            label: local,
             state: "pass",
-            detail: `Accepted with risk: ${task.run?.acceptance?.reason ?? ""}`,
+            detail: say("run.mergeGates.accepted", { reason: task.run?.acceptance?.reason ?? "" }),
           }
-        : { id: "local", label: "Local gates", state: "fail", detail: `The run is ${task.state}.` },
+        : { id: "local", label: local, state: "fail", detail: say("run.mergeGates.runState", { state: task.state }) },
   );
 
   const rv = pr.review;
+  const review = say("run.mergeGates.reviewLabel");
   gates.push(
     !rv
-      ? {
-          id: "review",
-          label: "Review of the PR",
-          state: "missing",
-          detail: "No independent review covers this PR yet.",
-        }
+      ? { id: "review", label: review, state: "missing", detail: say("run.mergeGates.noReview") }
       : rv.headSha !== head
-        ? {
-            id: "review",
-            label: "Review of the PR",
-            state: "missing",
-            detail: "The PR changed since its review. Review it again.",
-          }
+        ? { id: "review", label: review, state: "missing", detail: say("run.mergeGates.reviewStale") }
         : rv.verdict === "unreadable"
-          ? { id: "review", label: "Review of the PR", state: "fail", detail: "The review couldn't be read." }
+          ? { id: "review", label: review, state: "fail", detail: say("run.mergeGates.reviewUnreadable") }
           : rv.mustFix
             ? {
                 id: "review",
-                label: "Review of the PR",
+                label: review,
                 state: "fail",
-                detail: `${rv.mustFix} must-fix finding${rv.mustFix === 1 ? "" : "s"}.`,
+                detail: say("run.mergeGates.mustFix", { count: rv.mustFix }),
               }
             : {
                 id: "review",
-                label: "Review of the PR",
+                label: review,
                 state: "pass",
-                detail: `No must-fix findings (${rv.verdict}; ${rv.source === "run" ? "the run's review" : "reviewed on the PR"}).`,
+                detail:
+                  rv.source === "run"
+                    ? say("run.mergeGates.noMustFixRun", { verdict: rv.verdict })
+                    : say("run.mergeGates.noMustFixPr", { verdict: rv.verdict }),
               },
   );
 
+  const secretsLabel = say("run.mergeGates.secretsLabel");
+  const semgrepLabel = say("run.mergeGates.semgrepLabel");
+  const trivyLabel = say("run.mergeGates.trivyLabel");
   const wt = task.worktree;
   const code = wt && !wt.removed && existsSync(wt.path) ? codeRootIn(root, wt.path) : null;
   const atHead = code !== null && git(["rev-parse", "HEAD"], code).stdout.trim() === head;
   if (!code || !atHead) {
-    const why = !code ? "The task's worktree was cleaned up." : "The task's worktree isn't at the PR's head.";
+    const why = !code ? say("run.mergeGates.worktreeRemoved") : say("run.mergeGates.worktreeNotAtHead");
     for (const [gid, label] of [
-      ["secrets", "Secrets (gitleaks)"],
-      ["semgrep", "semgrep"],
-      ["trivy", "trivy"],
+      ["secrets", secretsLabel],
+      ["semgrep", semgrepLabel],
+      ["trivy", trivyLabel],
     ] as const) {
       gates.push({ id: gid, label, state: "not-run", detail: why });
     }
@@ -1570,30 +1600,30 @@ export async function mergeGates(root: string, id: string, gh: Gh | null) {
     );
     gates.push(
       !secrets.ran
-        ? { id: "secrets", label: "Secrets (gitleaks)", state: "not-run", detail: secrets.why }
+        ? { id: "secrets", label: secretsLabel, state: "not-run", detail: secrets.why }
         : secrets.flagged.length
           ? {
               id: "secrets",
-              label: "Secrets (gitleaks)",
+              label: secretsLabel,
               state: "fail",
-              detail: `Possible secrets in ${secrets.flagged.join(", ")}.`,
+              detail: say("run.mergeGates.secretsFound", { files: secrets.flagged.join(", ") }),
             }
           : {
               id: "secrets",
-              label: "Secrets (gitleaks)",
+              label: secretsLabel,
               state: "pass",
-              detail: `Nothing found in ${secrets.scanned} changed file${secrets.scanned === 1 ? "" : "s"}.`,
+              detail: say("run.mergeGates.secretsNone", { count: secrets.scanned }),
             },
     );
     const [semgrep, trivy] = await Promise.all([semgrepScan(code, files), trivyScan(code)]);
-    for (const [gid, label, result] of [
-      ["semgrep", "semgrep", semgrep],
-      ["trivy", "trivy", trivy],
+    for (const [gid, label, scan] of [
+      ["semgrep", semgrepLabel, semgrep],
+      ["trivy", trivyLabel, trivy],
     ] as const) {
       gates.push(
-        !result.ran
-          ? { id: gid, label, state: "not-run", detail: result.why }
-          : { id: gid, label, state: result.findings ? "fail" : "pass", detail: result.detail },
+        !scan.ran
+          ? { id: gid, label, state: "not-run", detail: scan.why }
+          : { id: gid, label, state: scan.findings ? "fail" : "pass", detail: scan.detail },
       );
     }
   }
@@ -1601,23 +1631,25 @@ export async function mergeGates(root: string, id: string, gh: Gh | null) {
   const checks = await prChecks(run, root, pr.number);
   const failed = checks.filter((c) => c.bucket === "fail" || c.bucket === "cancel");
   const pending = checks.filter((c) => c.bucket === "pending");
+  const ci = say("run.mergeGates.ciLabel");
+  const names = (list: typeof checks) => list.map((c) => c.name).join(", ");
   gates.push(
     !checks.length
-      ? { id: "ci", label: "CI", state: "not-run", detail: "No CI checks on this PR." }
+      ? { id: "ci", label: ci, state: "not-run", detail: say("run.mergeGates.noChecks") }
       : failed.length
-        ? { id: "ci", label: "CI", state: "fail", detail: `Failing: ${failed.map((c) => c.name).join(", ")}.` }
+        ? { id: "ci", label: ci, state: "fail", detail: say("run.mergeGates.checksFailing", { checks: names(failed) }) }
         : pending.length
           ? {
               id: "ci",
-              label: "CI",
+              label: ci,
               state: "pending",
-              detail: `Still running: ${pending.map((c) => c.name).join(", ")}.`,
+              detail: say("run.mergeGates.checksPending", { checks: names(pending) }),
             }
           : {
               id: "ci",
-              label: "CI",
+              label: ci,
               state: "pass",
-              detail: `${checks.length} check${checks.length === 1 ? "" : "s"} passed.`,
+              detail: say("run.mergeGates.checksPassed", { count: checks.length }),
             },
   );
   return { headSha: head, draft: state.draft, gates, ...(await mergeMethods(run, root)) };

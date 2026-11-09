@@ -2255,6 +2255,11 @@ first.
         - **Live:** one S task with `AGENTCHAINER_LANGUAGE=id` (haiku, ≈$0.01).
           - `task.json` keeps "Implement" and "Gates", shown as "Implementasi" and "Gate".
           - `evidence.md` keeps the English.
+        - **Evidence:** CI run [42579393280](https://github.com/hafizhrf/AgentChainer/actions/runs/42579393280)
+          (#138), on Ubuntu and on Windows: X-06, X-12, the pseudo-locale and Bahasa Indonesia all pass.
+          - The first run stopped at the eval-report check (M7-03), since translations changed the workflows' hashes.
+            That check now leaves a workflow's `i18n` block out, and the committed report still covers the steps.
+          - Release downloads from GitHub that answered HTTP 504 were re-run.
       - **Small leftovers** are tracked in X-15.
 - [ ] **X-15** X-13's small leftovers.
       - Deploy smoke details and plugin warnings are stored in the language of the moment. `evidence.md` copies them,

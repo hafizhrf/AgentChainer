@@ -157,6 +157,14 @@ CI-checked rules beyond the schema: a release-asset item has exactly one `downlo
 release asset; an MCP server that runs a downloaded binary uses `local` scope; npm steps run the pinned version; any
 `${VAR}` in steps is one of the item's `secrets`.
 
+**Translations (X-13):** an item's prose also comes in Bahasa Indonesia, in the same YAML, in an `i18n.id` block:
+`name`, `summary`, `why`, `permissions` (the same number, in the same order), `notes` when the item has notes, and
+`hints` by tool for `requires`.
+- `build-catalog.ts` refuses a shipped item without one, or with more or fewer permissions than the English.
+- The app shows the app's language and the English counts: a translation never changes what the item is allowed to
+  do.
+- Review notes stay as their reviewers wrote them.
+
 Marketplace plugins can't be pinned by the CLI (spike S6). Their `source` records the version that was reviewed
 (`reviewedVersion`) and the marketplace commit it was read at (`reviewedRef`).
 
@@ -168,6 +176,8 @@ Marketplace plugins can't be pinned by the CLI (spike S6). Their `source` record
 - [ ] `permissions` and `risk` accurately describe what the item can do.
 - [ ] Install and uninstall were tested on macOS, Windows and Ubuntu, and uninstall leaves no residue.
 - [ ] `why` is written for a non-expert.
+- [ ] The `i18n` translations say the same as the English, permissions above all: nothing softened, left out or
+      added. A maintainer who reads both languages checks them in the PR; the English counts.
 - [ ] For updates: the upstream diff between the old and new ref is summarized in the PR.
 
 ## 5. Profiles
@@ -187,7 +197,10 @@ Profiles group items. The detector picks profiles; the user can add or remove it
 | `web-testing` (opt-in) | On request | `playwright-mcp` (pinned; the `playwright` plugin runs `@latest`) |
 | `security` (opt-in) | Before release, or on request | `cloudflare-security-audit`, `semgrep` (CLI), `trivy` (CLI) **(later: needs the hashing installer)** |
 
-Profiles live in `catalog/profiles/<id>.yaml` with `suggest: {always | stacks | remoteHost | optIn}`.
+Profiles live in `catalog/profiles/<id>.yaml` with `suggest: {always | stacks | remoteHost | optIn}`, and their
+`name` and `description` in Bahasa Indonesia under `i18n.id`. A workflow in `catalog/workflows/` has its
+`description` and every step's label there too (`i18n.id.labels` by step id); a project's own workflow may leave it
+out.
 
 ## 6. Seed items
 

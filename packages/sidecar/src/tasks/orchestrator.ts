@@ -3,6 +3,7 @@ import {
   type GateKind,
   type GateRun,
   type GuardBlock,
+  literalRef,
   type MessageRef,
   resultRef,
   type StepRun,
@@ -438,16 +439,33 @@ export class Orchestrator {
    * Runs one agent step's turn in its own timeline entry: its answer, or null when it stopped or couldn't start. A
    * step the sidecar names itself (the PR's review) brings its label's ref, and its outcome when the budget is gone.
    */
+  /**
+   * A step's label from its workflow, with the workflow's own translation (X-13 part 2c); none when the workflow has
+   * no translation for it (a project's file, a task's own flow). `lower` for a label inside a sentence.
+   */
+  private labelOf(step: { id: string; label: string }, lower = false): MessageRef | undefined {
+    const translated = this.workflow.i18n?.id.labels[step.id];
+    if (!translated) return undefined;
+    return lower
+      ? literalRef({ en: step.label.toLowerCase(), id: translated.toLowerCase() })
+      : literalRef({ en: step.label, id: translated });
+  }
+
   private async turnOf(
     step: AgentStep,
     opts: { group?: string; labelRef?: MessageRef; noBudget?: Said } = {},
   ): Promise<{ id: string; out: AgentOutcome } | null> {
-    const { group, labelRef } = opts;
+    const { group } = opts;
+    const labelRef = opts.labelRef ?? this.labelOf(step);
     // A write step's session also takes its fix rounds, and the SDK caps a session as a whole: it gets what's left of
     // the task's budget. Read steps are fresh sessions with caps of their own.
     const budget = this.budget(step.access === "write" ? Number.POSITIVE_INFINITY : step.limits.maxBudgetUsd);
     if (!budget) {
-      const outcome = opts.noBudget ?? result("run.outcome.budgetBeforeStep", { step: step.label.toLowerCase() });
+      const outcome =
+        opts.noBudget ??
+        result("run.outcome.budgetBeforeStep", {
+          step: this.labelOf(step, true) ?? step.label.toLowerCase(),
+        });
       this.commit(() => outcomeOf(outcome));
       return null;
     }
@@ -745,10 +763,13 @@ export class Orchestrator {
     for (;;) {
       const round = Math.max(-1, ...this.rec.gates.map((g) => g.round)) + 1;
       // The first round is the workflow's own label; later ones say which round.
-      const label = round === 0 ? null : result("run.label.round", { step: step.label, round: round + 1 });
+      const own = this.labelOf(step);
+      const label = round === 0 ? null : result("run.label.round", { step: own ?? step.label, round: round + 1 });
       const id = this.begin({
         step: step.id,
-        ...(label ? { label: label.text, labelRef: label.ref } : { label: step.label }),
+        ...(label
+          ? { label: label.text, labelRef: label.ref }
+          : { label: step.label, ...(own ? { labelRef: own } : {}) }),
         kind: "gates",
       });
       const { runs, notRun } = await this.runner.gates(step.gates, round);

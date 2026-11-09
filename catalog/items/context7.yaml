@@ -38,3 +38,19 @@ notes: >-
   Hosted MCP only: the service can change without a new pin. At f8c5e7a the plugin no longer reads
   CONTEXT7_API_KEY (removed upstream in #6333), although its README still says so. The marketplace tags this entry
   community-managed; it's listed here as verified-vendor (author: Upstash).
+i18n:
+  id:
+    name: "Dokumentasi Context7 (Upstash)"
+    summary: "Dokumentasi library terkini sesuai versi, dari layanan Context7 yang di-host Upstash."
+    why: >-
+      Claude mencari dokumentasi terkini dari library yang Anda pakai alih-alih mengandalkan ingatannya, sehingga
+      terhindar dari API yang sudah usang.
+    permissions:
+      - >-
+        Mengirim nama library dan pertanyaan Anda (ditulis oleh Claude, mungkin berisi detail proyek) ke layanan yang
+        di-host Upstash (mcp.context7.com)
+      - "Mungkin meminta Anda login ke Context7"
+    notes: >-
+      Hanya MCP yang di-host: layanannya bisa berubah tanpa pin baru. Di f8c5e7a plugin ini tidak lagi membaca
+      CONTEXT7_API_KEY (dihapus di upstream di #6333), meskipun README-nya masih menyebutnya. Marketplace menandai entri
+      ini sebagai dikelola komunitas; di sini ia dicantumkan sebagai verified-vendor (pembuat: Upstash).

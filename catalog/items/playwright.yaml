@@ -35,3 +35,24 @@ reviews: []
 notes: >-
   Not approved (docs/catalog-reviews/2026-10-30.md): the plugin runs `npx @playwright/mcp@latest`, a floating tag,
   which ADR-0005 rules out. Use playwright-mcp, the same server pinned to a reviewed version.
+i18n:
+  id:
+    name: "Browser Playwright (Microsoft)"
+    summary: >-
+      Memungkinkan Claude mengendalikan browser sungguhan: membuka halaman, mengklik, mengisi formulir, dan mengambil
+      tangkapan layar.
+    why: >-
+      Claude dapat memeriksa web UI dari ujung ke ujung, seperti yang dilakukan tester, bukan hanya membaca kodenya.
+    permissions:
+      - "Menjalankan Google Chrome yang terpasang, yang dikendalikan Claude; ia dapat membuka URL apa pun"
+      - >-
+        Menjalankan npx @playwright/mcp@latest setiap kali dimulai: versi mana pun yang terbaru saat itu, bukan versi
+        yang sudah ditinjau
+      - "Memiliki tool yang menjalankan JavaScript apa pun di komputer Anda (browser_run_code_unsafe)"
+      - "Menyimpan cookie dan login browser antar-session"
+    notes: >-
+      Tidak disetujui (docs/catalog-reviews/2026-10-30.md): plugin ini menjalankan `npx @playwright/mcp@latest`, tag
+      yang berubah-ubah, yang dilarang ADR-0005. Gunakan playwright-mcp, server yang sama yang di-pin ke versi yang
+      sudah ditinjau.
+    hints:
+      npx: "Pasang Node.js (npx sudah termasuk di dalamnya)"

@@ -43,3 +43,26 @@ reviews:
 notes: >-
   /commit-push-pr needs the GitHub CLI (gh), installed and signed in. The plugin doesn't scan for secrets; the
   gitleaks hook covers that.
+i18n:
+  id:
+    name: "Commit Commands"
+    summary: "Perintah untuk commit, push, dan membuka pull request."
+    why: >-
+      Mengubah rutinitas git yang biasa menjadi satu perintah: Claude menulis pesan commit, melakukan push, dan dapat
+      membuka pull request.
+    permissions:
+      - "Menambahkan perintah /commit, /commit-push-pr, dan /clean_gone"
+      - >-
+        /commit melakukan stage dan commit atas perubahan Anda; perintah git yang dibutuhkannya berjalan tanpa
+        bertanya
+      - >-
+        /commit-push-pr juga melakukan push branch ke origin dan membuka pull request GitHub dengan login gh Anda,
+        tanpa bertanya
+      - >-
+        /clean_gone menghapus branch lokal yang branch remote-nya sudah tidak ada (git branch -D) dan menghapus paksa
+        worktree-nya, yang dapat membuang pekerjaan yang belum di-push atau belum di-commit
+    notes: >-
+      /commit-push-pr membutuhkan GitHub CLI (gh), terpasang dan sudah login. Plugin ini tidak memindai secret; hook
+      gitleaks yang menanganinya.
+    hints:
+      git: "Pasang Git (https://git-scm.com)"

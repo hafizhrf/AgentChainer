@@ -36,3 +36,12 @@ reviews:
       Read the marketplace entry, README and LICENSE at f8c5e7a (1.0.0, the whole folder): Apache-2.0; a config-only
       LSP plugin that starts pyright-langserver --stdio from PATH; no hooks, MCP servers, scripts or telemetry.
       docs/catalog-reviews/2026-10-30.md
+i18n:
+  id:
+    name: "Language server Python (Pyright)"
+    summary: "Memberi Claude pemeriksaan tipe dan kecerdasan kode Python lewat Pyright."
+    why: "Claude melihat error tipe dan definisi di kode Python seperti yang dilakukan editor."
+    permissions:
+      - "Menjalankan pyright-langserver di proyek"
+    hints:
+      pyright-langserver: "npm install -g pyright (atau pipx install pyright)"

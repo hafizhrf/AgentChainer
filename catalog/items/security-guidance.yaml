@@ -41,3 +41,33 @@ notes: >-
   runtime, which ADR-0005 rules out, and its model reviews spend outside the session's visible cost. It's no longer
   in the baseline profile. If you use it anyway: ENABLE_CODE_SECURITY_REVIEW=0 turns off the model reviews and the
   SDK install; SECURITY_GUIDANCE_DISABLE=1 turns the plugin off.
+i18n:
+  id:
+    name: "Security Guidance"
+    summary: "Menandai pola yang tidak aman di edit Claude dan meninjau diff untuk kerentanan."
+    why: >-
+      Menangkap injection, XSS, SSRF, secret yang ditulis langsung di kode, dan kesalahan serupa saat Claude menulis
+      kode, bukan setelah dirilis.
+    permissions:
+      - >-
+        Memeriksa setiap file yang diedit Claude untuk pola kode berisiko dan memperingatkan Claude (lokal, tanpa
+        jaringan)
+      - >-
+        Setelah setiap giliran, mengirim kode yang berubah ke Claude Opus untuk review keamanan yang tidak tampil di
+        biaya session Anda (memakai paket Claude atau API key Anda)
+      - >-
+        Setelah git commit atau push, peninjau di latar belakang membaca file proyek yang terkait dan mengirimkannya
+        ke model
+      - "Dapat membangunkan Claude setelah ia selesai agar ia memperbaiki temuannya"
+      - >-
+        Pada pemakaian pertama, memasang claude-agent-sdk terbaru dari PyPI (beberapa ratus MB, tidak di-pin) ke
+        ~/.claude/security
+      - "Menyimpan log dan state di ~/.claude/security, yang tidak dihapus saat uninstall"
+      - "Melaporkan jumlah pemakaian ke Anthropic lewat metrik hook Claude Code"
+    notes: >-
+      Tidak disetujui di f8c5e7a (docs/catalog-reviews/2026-10-30.md): hook-nya memasang claude-agent-sdk yang tidak
+      di-pin lewat pip saat runtime, yang dilarang ADR-0005, dan review modelnya memakai biaya di luar biaya session
+      yang terlihat. Ia tidak lagi ada di profil baseline. Jika Anda tetap memakainya: ENABLE_CODE_SECURITY_REVIEW=0
+      mematikan review model dan instalasi SDK; SECURITY_GUIDANCE_DISABLE=1 mematikan plugin ini.
+    hints:
+      python3: "Python 3.10 atau lebih baru (Python 3.9 bawaan macOS hanya menjalankan peringatan pola)"

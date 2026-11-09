@@ -85,7 +85,21 @@
             "maxBudgetUsd": 1.5
           }
         }
-      ]
+      ],
+      "i18n": {
+        "id": {
+          "description": "Perencanaan arsitektur, keamanan, dan test secara paralel, implementasi, jalankan gate (dengan putaran perbaikan), lalu tinjauan independen.",
+          "labels": {
+            "plan": "Rencana",
+            "architecture": "Arsitektur",
+            "security": "Tinjauan keamanan",
+            "tests": "Rencana test",
+            "implement": "Implementasi",
+            "gates": "Gate",
+            "review": "Tinjauan independen"
+          }
+        }
+      }
     },
     "M": {
       "id": "tier-m",
@@ -144,7 +158,18 @@
             "maxBudgetUsd": 1
           }
         }
-      ]
+      ],
+      "i18n": {
+        "id": {
+          "description": "Rencana, implementasi, jalankan gate (dengan putaran perbaikan), lalu tinjauan independen dalam konteks baru.",
+          "labels": {
+            "plan": "Rencana",
+            "implement": "Implementasi",
+            "gates": "Gate",
+            "review": "Tinjauan independen"
+          }
+        }
+      }
     },
     "S": {
       "id": "tier-s",
@@ -173,7 +198,16 @@
             "maxBudgetUsd": 0.5
           }
         }
-      ]
+      ],
+      "i18n": {
+        "id": {
+          "description": "Satu agent mengimplementasikan kontrak, lalu gate proyek dijalankan, dengan hingga dua putaran perbaikan.",
+          "labels": {
+            "implement": "Implementasi",
+            "gates": "Gate"
+          }
+        }
+      }
     }
   },
   "xl": {
@@ -195,6 +229,14 @@
     "maxParallel": 2,
     "integration": {
       "gates": ["format", "lint", "typecheck", "test", "build", "smoke"]
+    },
+    "i18n": {
+      "id": {
+        "description": "Pecah menjadi sub-task dengan kontraknya masing-masing, jalankan masing-masing di worktree sendiri dengan workflow tier-nya, gabungkan ke branch task, lalu jalankan gate integrasi.",
+        "labels": {
+          "split": "Pemecahan"
+        }
+      }
     }
   },
   "roles": {

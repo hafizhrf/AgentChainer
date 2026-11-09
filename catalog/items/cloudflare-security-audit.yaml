@@ -43,3 +43,27 @@ notes: >-
   network calls or install steps, validators use only the file system. Its MIT notice lives at the repo root and is
   copied into the skill folder as LICENSE, pinned by its own sha256 (M2-29). On Windows the validators reject all
   input, so a full audit can't finish there; guidance mode works.
+i18n:
+  id:
+    name: "Audit Keamanan (Cloudflare)"
+    summary: "Audit keamanan enam fase yang menghasilkan temuan yang dapat dibaca mesin."
+    why: >-
+      Claude meninjau kode Anda seperti auditor keamanan dan hanya melaporkan masalah yang bisa dibuktikannya,
+      masing-masing dengan langkah untuk memeriksanya, bukan saran umum. Audit penuh itu teliti, lambat, dan memakai
+      banyak panggilan model, jadi jalankan saat dibutuhkan (misalnya sebelum rilis), bukan pada setiap perubahan.
+    permissions:
+      - >-
+        Dalam audit penuh, menjalankan banyak subagent (4 untuk memetakan kode, lalu pemburu, peninjau, dan
+        verifikator), yang memakai banyak kuota model
+      - "Menulis laporannya di luar proyek, secara default di ~/security-audit-skill/<repo>/run-<N>"
+      - >-
+        Menjalankan build dan test proyek hanya di dalam sandbox OS tanpa jaringan; tanpa sandbox, ia hanya membaca
+        kode
+      - "Menjalankan node untuk memeriksa file laporannya sendiri (validatornya hanya memakai sistem file)"
+    notes: >-
+      Belum disetujui (docs/catalog-reviews/2026-10-30.md). Ke-20 file di c1c8a8c sudah dibaca (hash tree cocok): tidak
+      ada panggilan jaringan atau langkah instalasi, dan validatornya hanya memakai sistem file. Pemberitahuan MIT-nya
+      ada di root repo dan disalin ke folder skill sebagai LICENSE, di-pin dengan sha256-nya sendiri (M2-29). Di Windows
+      validatornya menolak semua input, jadi audit penuh tidak bisa selesai di sana; mode panduan tetap berjalan.
+    hints:
+      node: "Pasang Node.js 18 atau lebih baru"

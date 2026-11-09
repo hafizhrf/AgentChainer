@@ -7,3 +7,7 @@ items:
   - code-review
   - commit-commands
   - gitleaks
+i18n:
+  id:
+    name: "Dasar"
+    description: "Setiap workspace: bantuan review, commit, dan pemindaian secret yang berguna di proyek apa pun."

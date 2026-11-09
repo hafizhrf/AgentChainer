@@ -36,3 +36,14 @@ reviews:
       Read the marketplace entry, README and LICENSE at f8c5e7a (1.0.0, the whole folder): Apache-2.0; a config-only
       LSP plugin that starts rust-analyzer from PATH; no hooks, MCP servers, scripts or telemetry. The server runs
       cargo build scripts and proc macros, as any Rust editor does. docs/catalog-reviews/2026-10-30.md
+i18n:
+  id:
+    name: "Language server Rust (rust-analyzer)"
+    summary: "Memberi Claude kecerdasan kode Rust lewat rust-analyzer."
+    why: "Claude melihat error tipe dan borrow serta definisi Rust saat mengedit."
+    permissions:
+      - >-
+        Menjalankan rust-analyzer di proyek; ia menjalankan cargo, yang dapat mem-build dan menjalankan build script
+        dan macro proyek serta mengunduh crate
+    hints:
+      rust-analyzer: "rustup component add rust-analyzer"

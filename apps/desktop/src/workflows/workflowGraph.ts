@@ -1,3 +1,4 @@
+import { currentLanguage } from "@agentchainer/protocol";
 import { t } from "../i18n/index.ts";
 import type { Path } from "./workflowDoc.ts";
 
@@ -58,6 +59,14 @@ function agentDetail(s: Obj): string {
   return parts.join(" · ");
 }
 
+/** A step's label in the app's language when the workflow's YAML translates it (X-13 part 2c); none otherwise. */
+export function translatedLabel(data: Obj, id: unknown): string | undefined {
+  const language = currentLanguage();
+  if (language === "en" || typeof id !== "string") return undefined;
+  const label = obj(obj(obj(data.i18n)[language]).labels)[id];
+  return typeof label === "string" ? label : undefined;
+}
+
 /** The nodes and edges of `data` (a parsed workflow); whatever doesn't parse yet is drawn as far as it goes. */
 export function workflowGraph(data: Obj | null): { nodes: WorkflowNode[]; edges: WorkflowEdge[] } {
   const nodes: WorkflowNode[] = [];
@@ -86,7 +95,14 @@ export function workflowGraph(data: Obj | null): { nodes: WorkflowNode[]; edges:
   if (data.split !== undefined) {
     // XL: the split, the sub-tasks with their own tiers' workflows, then the integration gates.
     const split = obj(data.split);
-    box(["split"], "split", str(split.label, t("workflows.graph.split")), agentDetail(split), 0, 0);
+    box(
+      ["split"],
+      "split",
+      translatedLabel(data, "split") ?? str(split.label, t("workflows.graph.split")),
+      agentDetail(split),
+      0,
+      0,
+    );
     box(
       ["maxParallel"],
       "subtasks",
@@ -124,7 +140,7 @@ export function workflowGraph(data: Obj | null): { nodes: WorkflowNode[]; edges:
         id: keyOf(path),
         path,
         kind: "group",
-        label: str(s.label, t("workflows.graph.parallel")),
+        label: translatedLabel(data, s.id) ?? str(s.label, t("workflows.graph.parallel")),
         detail: t("workflows.graph.groupDetail", { n: members.length }),
         x: left - GROUP_PAD,
         y,
@@ -135,7 +151,7 @@ export function workflowGraph(data: Obj | null): { nodes: WorkflowNode[]; edges:
         const node = box(
           [...path, "parallel", j],
           "member",
-          str(m.label, str(m.id)),
+          translatedLabel(data, m.id) ?? str(m.label, str(m.id)),
           agentDetail(m),
           left + j * (STEP_W + GAP_X),
           y + GROUP_HEAD,
@@ -153,7 +169,7 @@ export function workflowGraph(data: Obj | null): { nodes: WorkflowNode[]; edges:
     const node = box(
       path,
       gates ? "gates" : "agent",
-      str(s.label, str(s.id, t("workflows.graph.step", { n: i + 1 }))),
+      translatedLabel(data, s.id) ?? str(s.label, str(s.id, t("workflows.graph.step", { n: i + 1 }))),
       gates ? list(s.gates).map(String).join(", ") : agentDetail(s),
       0,
       y,

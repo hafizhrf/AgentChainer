@@ -5,3 +5,7 @@ suggest:
   stacks: [node]
 items:
   - typescript-lsp
+i18n:
+  id:
+    name: "TypeScript / JavaScript"
+    description: "Kecerdasan kode untuk proyek Node."

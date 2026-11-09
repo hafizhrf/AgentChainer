@@ -5,3 +5,7 @@ suggest:
   stacks: [python]
 items:
   - pyright-lsp
+i18n:
+  id:
+    name: "Python"
+    description: "Kecerdasan kode untuk proyek Python."

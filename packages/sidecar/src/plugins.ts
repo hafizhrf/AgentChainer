@@ -9,6 +9,7 @@ import {
   setPluginVersion,
 } from "./bootstrap/apply.ts";
 import { type Catalog, type Item, REQUIRED_REVIEWS } from "./catalog/schema.ts";
+import { itemText } from "./catalog/text.ts";
 import { compareVersions } from "./catalog/updates.ts";
 import { t } from "./i18n/index.ts";
 import type { CliResult, PluginCli } from "./installer.ts";
@@ -49,8 +50,9 @@ export function reviewOf(item: Item): NonNullable<MarketPlugin["review"]> {
       : {}),
     license: item.license,
     risk: item.risk,
-    permissions: item.permissions,
-    summary: item.summary,
+    // In the app's language (X-13); the review records stay as their reviewers wrote them.
+    permissions: itemText(item).permissions,
+    summary: itemText(item).summary,
     ...(item.homepage ? { homepage: item.homepage } : {}),
   };
 }

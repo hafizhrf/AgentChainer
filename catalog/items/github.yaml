@@ -41,3 +41,19 @@ notes: >-
   The token is read from the environment by the CLI; AgentChainer never stores it (ADR-0002). Use a fine-grained
   token limited to the repositories you need. The plugin uses GitHub's full default tool set (read and write). If
   the variable isn't set, the server fails to connect.
+i18n:
+  id:
+    name: "GitHub (MCP resmi)"
+    summary: "MCP server milik GitHub sendiri: issue, pull request, pencarian kode, dan bagian lain dari API GitHub."
+    why: >-
+      Claude dapat membaca dan memperbarui issue dan pull request secara langsung, jadi task bisa dimulai dari sebuah
+      issue dan berakhir menjadi PR.
+    permissions:
+      - >-
+        Bertindak di GitHub atas nama Anda dengan personal access token Anda: membaca dan, jika token mengizinkan,
+        membuat atau mengubah file, branch, repositori, issue, dan pull request (termasuk merge)
+      - "Mengirim token Anda dan setiap permintaan ke MCP server GitHub yang di-host (api.githubcopilot.com)"
+    notes: >-
+      Token dibaca dari environment oleh CLI; AgentChainer tidak pernah menyimpannya (ADR-0002). Gunakan token
+      fine-grained yang dibatasi ke repositori yang Anda butuhkan. Plugin ini memakai set tool default GitHub yang
+      lengkap (baca dan tulis). Jika variabelnya tidak di-set, server gagal terhubung.

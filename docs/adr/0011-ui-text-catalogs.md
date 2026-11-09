@@ -133,6 +133,27 @@ stay English. So a result is stored twice:
   - raw text quoted in a result (git's output, an error's message);
   - what Claude writes.
 
+### Addendum (2026-11-09): the catalog's and workflows' prose (X-13 part 2c)
+
+**Where translations live:** next to their English, in the same YAML, in an `i18n.id` block. That covers:
+- an item's name, summary, why, permissions, notes and hints;
+- a profile's name and description;
+- a workflow's description and step labels.
+
+A change to the English shows its translation in the same diff.
+
+**How they're checked:**
+- `build-catalog.ts` refuses a shipped item, profile or workflow whose translation is missing a field or has another
+  number of permissions.
+- A project's own workflow may have none.
+- A maintainer who reads both languages reviews a translation in its PR (CATALOG §4, owner decision). Translations
+  don't add review entries, and the English counts.
+
+**How they reach the screen:**
+- **Live responses** (the setup plan, plugin reviews, the workflow list) pick the app's language in the sidecar.
+- **A step label taken from a workflow** is stored as English plus a "literal" ref that carries both texts, since
+  they come from the YAML rather than a catalog. The canvas reads the YAML's block directly.
+
 ## Alternatives considered
 
 | Option | Pros | Cons | Why not chosen |

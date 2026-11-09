@@ -2327,6 +2327,7 @@ export {
 } from "./i18n.ts";
 export { hasSecret, redactForLog, redactSecrets, redactValue } from "./redact.ts";
 export {
+  literalRef,
   RESULTS,
   RESULTS_INDONESIAN,
   type ResultKey,

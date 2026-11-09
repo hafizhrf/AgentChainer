@@ -2,6 +2,7 @@ import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import type { BootstrapPlan, Finding, PlanAction, WorkspaceProfile } from "@agentchainer/protocol";
 import { type Catalog, type Item, type Profile, REQUIRED_REVIEWS } from "../catalog/schema.ts";
+import { itemText, profileText } from "../catalog/text.ts";
 import { type MessageKey, t } from "../i18n/index.ts";
 import shippedLibrary from "../tasks/library.json" with { type: "json" };
 import { LibrarySchema, renderRoleFile } from "../tasks/library.ts";
@@ -127,12 +128,7 @@ export function buildPlan(
 
   return {
     catalogVersion: catalog.version,
-    profiles: catalog.profiles.map((p) => ({
-      id: p.id,
-      name: p.name,
-      description: p.description,
-      suggested: suggested(p),
-    })),
+    profiles: catalog.profiles.map((p) => ({ id: p.id, ...profileText(p), suggested: suggested(p) })),
     actions,
   };
 }
@@ -251,6 +247,7 @@ function itemAction(root: string, item: Item, p: Profile, suggestedProfile: bool
   const asset = src.type === "release-asset" && key ? src.assets[key] : undefined;
   const pluginId = src.type === "marketplace" ? `${src.plugin}@${src.marketplace}` : null;
   const missing = item.requires.filter((r) => !env.hasTool(r.tool));
+  const text = itemText(item);
   const reviews = item.reviews.length;
   const needed = REQUIRED_REVIEWS[item.tier];
   let state: PlanAction["state"] = suggestedProfile ? "recommended" : "optional";
@@ -268,7 +265,7 @@ function itemAction(root: string, item: Item, p: Profile, suggestedProfile: bool
     reason = t("bootstrap.plan.notReviewed", { reviews: needed - reviews });
   } else if (missing.length) {
     state = "unavailable";
-    reason = missing.map((r) => t("bootstrap.plan.needsTool", { tool: r.tool, hint: r.hint })).join(" ");
+    reason = missing.map((r) => t("bootstrap.plan.needsTool", { tool: r.tool, hint: text.hint(r.tool) })).join(" ");
   } else if (changes.unavailable) {
     state = "unavailable";
     reason = changes.unavailable;
@@ -277,7 +274,7 @@ function itemAction(root: string, item: Item, p: Profile, suggestedProfile: bool
   const permissions =
     src.type === "release-asset" && asset
       ? [
-          ...item.permissions,
+          ...text.permissions,
           t("bootstrap.plan.downloads", {
             binary: binaryName(item) ?? item.name,
             version: src.version,
@@ -286,7 +283,7 @@ function itemAction(root: string, item: Item, p: Profile, suggestedProfile: bool
             sha256: asset.sha256.slice(0, 12),
           }),
         ]
-      : item.permissions;
+      : text.permissions;
   const source =
     src.type === "marketplace"
       ? src.reviewedVersion
@@ -304,8 +301,8 @@ function itemAction(root: string, item: Item, p: Profile, suggestedProfile: bool
   return {
     id: `item:${item.id}`,
     kind: "catalog",
-    title: item.name,
-    why: item.why,
+    title: text.name,
+    why: text.why,
     risk: item.risk,
     scope: changes.scope,
     tier: item.tier,
@@ -314,7 +311,7 @@ function itemAction(root: string, item: Item, p: Profile, suggestedProfile: bool
     profile: p.id,
     permissions,
     secrets: item.secrets,
-    ...(item.notes ? { notes: item.notes } : {}),
+    ...(text.notes ? { notes: text.notes } : {}),
     preview: changes.files.length
       ? { type: "files", files: changes.files.map(({ path: p, before, after }) => ({ path: p, before, after })) }
       : changes.commands.length

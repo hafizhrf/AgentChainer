@@ -39,3 +39,19 @@ reviews:
       Read plugin.json, commands/code-review.md, README and LICENSE at f8c5e7a (1.0.1): Apache-2.0; one command, no
       hooks, MCP servers, scripts or telemetry. Pre-approves read-only gh calls and gh pr comment; posts only with
       --comment; spawns review agents including Opus. docs/catalog-reviews/2026-10-30.md
+i18n:
+  id:
+    name: "Code Review"
+    summary: "Meninjau pull request dengan beberapa agent khusus dan hanya menyimpan temuan yang meyakinkan."
+    why: >-
+      Sebelum Anda merge, beberapa agent review memeriksa pull request GitHub untuk bug yang jelas dan pelanggaran
+      aturan CLAUDE.md Anda. Setiap temuan diperiksa ulang, jadi hanya masalah yang benar-benar mereka yakini yang
+      dilaporkan.
+    permissions:
+      - "Menambahkan perintah /code-review"
+      - >-
+        Saat Anda menjalankannya: membaca pull request GitHub dengan gh dan menjalankan 7 agent review atau lebih
+        (Haiku, Sonnet, dan Opus) yang dihitung dari paket Claude Anda
+      - "Dengan --comment: memposting review ke pull request dengan login gh Anda, tanpa bertanya setiap kali"
+    hints:
+      gh: "Pasang GitHub CLI (https://cli.github.com) dan jalankan gh auth login di terminal Anda sendiri"

@@ -5,3 +5,7 @@ suggest:
   optIn: true
 items:
   - cloudflare-security-audit
+i18n:
+  id:
+    name: "Keamanan"
+    description: "Audit keamanan mendalam, sesuai permintaan (sebelum rilis)."

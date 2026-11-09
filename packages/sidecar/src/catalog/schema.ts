@@ -95,6 +95,22 @@ const StepSchema = z.union([
 ]);
 export type Step = z.infer<typeof StepSchema>;
 
+/**
+ * An item's prose in another language (X-13): the same fields, permissions in the same order. The English is the text
+ * that counts; a translation is reviewed in its PR by a maintainer who reads both (CATALOG §4).
+ */
+const ItemTextSchema = z
+  .object({
+    name: z.string().min(1),
+    summary: z.string().min(1),
+    why: z.string().min(1),
+    permissions: z.array(z.string().min(1)),
+    notes: z.string().min(1).optional(),
+    /** `requires[].hint`, by tool. */
+    hints: z.record(z.string(), z.string().min(1)).optional(),
+  })
+  .strict();
+
 export const ItemSchema = z
   .object({
     id: z.string().regex(/^[a-z0-9][a-z0-9-]*$/),
@@ -125,6 +141,8 @@ export const ItemSchema = z
       .array(z.object({ by: z.string(), date: z.iso.date(), ref: z.string(), notes: z.string().optional() }))
       .default([]),
     notes: z.string().optional(),
+    /** Translations of the prose above, by language: `id` (Bahasa Indonesia). */
+    i18n: z.object({ id: ItemTextSchema }).strict().optional(),
   })
   .strict();
 export type Item = z.infer<typeof ItemSchema>;
@@ -142,6 +160,11 @@ export const ProfileSchema = z
       z.object({ optIn: z.literal(true) }).strict(),
     ]),
     items: z.array(z.string()).min(1),
+    /** Translations of `name` and `description`, by language (X-13). */
+    i18n: z
+      .object({ id: z.object({ name: z.string().min(1), description: z.string().min(1) }).strict() })
+      .strict()
+      .optional(),
   })
   .strict();
 export type Profile = z.infer<typeof ProfileSchema>;
@@ -170,11 +193,30 @@ export function catalogProblems(catalog: Catalog): string[] {
     if (item.kind === "plugin" && item.source.type !== "marketplace") {
       problems.push(`${item.id}: plugins install through a marketplace`);
     }
-    problems.push(...stepProblems(item));
+    problems.push(...stepProblems(item), ...translationProblems(item));
   }
   for (const profile of catalog.profiles) {
     for (const ref of profile.items) if (!ids.has(ref)) problems.push(`profile ${profile.id}: unknown item ${ref}`);
+    if (!profile.i18n) problems.push(`profile ${profile.id}: needs its Bahasa Indonesia (i18n.id)`);
   }
+  return problems;
+}
+
+/** A shipped item translates every piece of its prose, no more and no less (X-13). */
+function translationProblems(item: Item): string[] {
+  const id = item.i18n?.id;
+  if (!id) return [`${item.id}: needs its Bahasa Indonesia (i18n.id)`];
+  const problems: string[] = [];
+  if (id.permissions.length !== item.permissions.length) {
+    problems.push(
+      `${item.id}: i18n.id.permissions has ${id.permissions.length}, the English ${item.permissions.length}`,
+    );
+  }
+  if (Boolean(id.notes) !== Boolean(item.notes)) problems.push(`${item.id}: i18n.id.notes must match notes`);
+  const tools = item.requires.map((r) => r.tool).sort();
+  const hinted = Object.keys(id.hints ?? {}).sort();
+  if (tools.join() !== hinted.join())
+    problems.push(`${item.id}: i18n.id.hints must cover requires: ${tools.join(", ")}`);
   return problems;
 }
 

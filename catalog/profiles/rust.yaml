@@ -5,3 +5,7 @@ suggest:
   stacks: [rust]
 items:
   - rust-analyzer-lsp
+i18n:
+  id:
+    name: "Rust"
+    description: "Kecerdasan kode untuk proyek Rust."

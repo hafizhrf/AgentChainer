@@ -66,7 +66,18 @@
           "ref": "v1.7.12",
           "notes": "All 5 sha256 pins equal GitHub's digests and the upstream checksums file; SLSA provenance verified (gh attestation verify, darwin-x64) to release.yaml at v1.7.12 (914e7df). MIT. No network code in the binary. docs/catalog-reviews/2026-10-30.md"
         }
-      ]
+      ],
+      "i18n": {
+        "id": {
+          "name": "actionlint (pemeriksa GitHub Actions)",
+          "summary": "Pemeriksa statis untuk file workflow GitHub Actions.",
+          "why": "Menangkap kesalahan di workflow CI (ekspresi yang salah, input yang tidak dikenal, error shell) sebelum gagal di GitHub.",
+          "permissions": [
+            "Membaca file workflow yang diberikan kepadanya; tidak melakukan panggilan jaringan",
+            "Menjalankan shellcheck dan pyflakes pada skrip run: jika keduanya ada di PATH Anda"
+          ]
+        }
+      }
     },
     {
       "id": "cloudflare-security-audit",
@@ -126,7 +137,24 @@
         ]
       },
       "reviews": [],
-      "notes": "Not approved yet (docs/catalog-reviews/2026-10-30.md). All 20 files at c1c8a8c were read (tree hash matches): no network calls or install steps, validators use only the file system. Its MIT notice lives at the repo root and is copied into the skill folder as LICENSE, pinned by its own sha256 (M2-29). On Windows the validators reject all input, so a full audit can't finish there; guidance mode works."
+      "notes": "Not approved yet (docs/catalog-reviews/2026-10-30.md). All 20 files at c1c8a8c were read (tree hash matches): no network calls or install steps, validators use only the file system. Its MIT notice lives at the repo root and is copied into the skill folder as LICENSE, pinned by its own sha256 (M2-29). On Windows the validators reject all input, so a full audit can't finish there; guidance mode works.",
+      "i18n": {
+        "id": {
+          "name": "Audit Keamanan (Cloudflare)",
+          "summary": "Audit keamanan enam fase yang menghasilkan temuan yang dapat dibaca mesin.",
+          "why": "Claude meninjau kode Anda seperti auditor keamanan dan hanya melaporkan masalah yang bisa dibuktikannya, masing-masing dengan langkah untuk memeriksanya, bukan saran umum. Audit penuh itu teliti, lambat, dan memakai banyak panggilan model, jadi jalankan saat dibutuhkan (misalnya sebelum rilis), bukan pada setiap perubahan.",
+          "permissions": [
+            "Dalam audit penuh, menjalankan banyak subagent (4 untuk memetakan kode, lalu pemburu, peninjau, dan verifikator), yang memakai banyak kuota model",
+            "Menulis laporannya di luar proyek, secara default di ~/security-audit-skill/<repo>/run-<N>",
+            "Menjalankan build dan test proyek hanya di dalam sandbox OS tanpa jaringan; tanpa sandbox, ia hanya membaca kode",
+            "Menjalankan node untuk memeriksa file laporannya sendiri (validatornya hanya memakai sistem file)"
+          ],
+          "notes": "Belum disetujui (docs/catalog-reviews/2026-10-30.md). Ke-20 file di c1c8a8c sudah dibaca (hash tree cocok): tidak ada panggilan jaringan atau langkah instalasi, dan validatornya hanya memakai sistem file. Pemberitahuan MIT-nya ada di root repo dan disalin ke folder skill sebagai LICENSE, di-pin dengan sha256-nya sendiri (M2-29). Di Windows validatornya menolak semua input, jadi audit penuh tidak bisa selesai di sana; mode panduan tetap berjalan.",
+          "hints": {
+            "node": "Pasang Node.js 18 atau lebih baru"
+          }
+        }
+      }
     },
     {
       "id": "code-review",
@@ -200,7 +228,22 @@
           "ref": "f8c5e7a1dcb71b10cb74586224b5401f3de5db28",
           "notes": "Read plugin.json, commands/code-review.md, README and LICENSE at f8c5e7a (1.0.1): Apache-2.0; one command, no hooks, MCP servers, scripts or telemetry. Pre-approves read-only gh calls and gh pr comment; posts only with --comment; spawns review agents including Opus. docs/catalog-reviews/2026-10-30.md"
         }
-      ]
+      ],
+      "i18n": {
+        "id": {
+          "name": "Code Review",
+          "summary": "Meninjau pull request dengan beberapa agent khusus dan hanya menyimpan temuan yang meyakinkan.",
+          "why": "Sebelum Anda merge, beberapa agent review memeriksa pull request GitHub untuk bug yang jelas dan pelanggaran aturan CLAUDE.md Anda. Setiap temuan diperiksa ulang, jadi hanya masalah yang benar-benar mereka yakini yang dilaporkan.",
+          "permissions": [
+            "Menambahkan perintah /code-review",
+            "Saat Anda menjalankannya: membaca pull request GitHub dengan gh dan menjalankan 7 agent review atau lebih (Haiku, Sonnet, dan Opus) yang dihitung dari paket Claude Anda",
+            "Dengan --comment: memposting review ke pull request dengan login gh Anda, tanpa bertanya setiap kali"
+          ],
+          "hints": {
+            "gh": "Pasang GitHub CLI (https://cli.github.com) dan jalankan gh auth login di terminal Anda sendiri"
+          }
+        }
+      }
     },
     {
       "id": "codebase-memory-mcp",
@@ -286,7 +329,22 @@
         ]
       },
       "reviews": [],
-      "notes": "AgentChainer never runs the project's install script: it edits the global config of every coding agent it finds and adds hooks, agents and skills. Only the binary is used, registered for this workspace. Re-pinned to 0.12.1, which has the security fixes 0.11.0 lacked (docs/catalog-reviews/2026-10-30.md); the draft review is in docs/catalog-reviews/2026-10-31-codebase-memory-mcp-0.12.1.md. As a community item it needs two signed reviews before it's offered. Its web UI is on by default and AgentChainer leaves that setting alone, because it is shared by every agent on the account. Every cbm process on the machine must run the same version, so another installed version conflicts."
+      "notes": "AgentChainer never runs the project's install script: it edits the global config of every coding agent it finds and adds hooks, agents and skills. Only the binary is used, registered for this workspace. Re-pinned to 0.12.1, which has the security fixes 0.11.0 lacked (docs/catalog-reviews/2026-10-30.md); the draft review is in docs/catalog-reviews/2026-10-31-codebase-memory-mcp-0.12.1.md. As a community item it needs two signed reviews before it's offered. Its web UI is on by default and AgentChainer leaves that setting alone, because it is shared by every agent on the account. Every cbm process on the machine must run the same version, so another installed version conflicts.",
+      "i18n": {
+        "id": {
+          "name": "Memori codebase (MCP graf kode)",
+          "summary": "Graf pengetahuan lokal dari codebase yang ditanyai Claude alih-alih membaca file satu per satu.",
+          "why": "Claude menjawab \"siapa yang memanggil ini?\" atau \"apa yang rusak jika saya mengubahnya?\" dari indeks kode, yang lebih cepat dan memakai jauh lebih sedikit token daripada mencari file demi file.",
+          "permissions": [
+            "Mengindeks kode ke database lokal di ~/.cache/codebase-memory-mcp, yang dipakai bersama oleh setiap proyek dan agent di akun ini",
+            "Menjalankan proses latar belakang per akun yang memantau proyek git dari session yang terbuka dan mengindeksnya ulang; ia berkoordinasi lewat folder di /tmp (macOS, Linux) atau %LOCALAPPDATA% (Windows), dan indeks yang diminta untuk dibangun tetap berjalan setelah permintaannya selesai",
+            "Menyajikan web UI (CBM Lens) di 127.0.0.1:9749 secara default, tanpa login: program apa pun di mesin ini dapat membaca graf, menjelajahi folder, memulai indeks, atau mengubah pengaturannya di sana. `codebase-memory-mcp --ui=false` mematikannya untuk setiap agent di akun ini",
+            "Claude dapat memintanya mengindeks folder mana pun di mesin ini, menghapus indeks, atau menyimpan catatan desain di indeks",
+            "Menjalankan git; binary-nya tidak membuat permintaan jaringan dan tidak mengumpulkan telemetri. Asisten di dalam browser milik web UI mengunduh model dari Hugging Face hanya saat Anda mengklik Download (diperiksa di source 0.12.1)"
+          ],
+          "notes": "AgentChainer tidak pernah menjalankan skrip instalasi proyek ini: skrip itu mengedit konfigurasi global setiap agent coding yang ditemukannya dan menambahkan hook, agent, dan skill. Hanya binary-nya yang dipakai, didaftarkan untuk workspace ini. Di-pin ulang ke 0.12.1, yang berisi perbaikan keamanan yang tidak ada di 0.11.0 (docs/catalog-reviews/2026-10-30.md); draf review-nya ada di docs/catalog-reviews/2026-10-31-codebase-memory-mcp-0.12.1.md. Sebagai item community, ia butuh dua review bertanda tangan sebelum ditawarkan. Web UI-nya aktif secara default dan AgentChainer tidak mengubah pengaturan itu, karena dipakai bersama oleh setiap agent di akun ini. Setiap proses cbm di mesin harus menjalankan versi yang sama, jadi versi lain yang terpasang akan bentrok."
+        }
+      }
     },
     {
       "id": "commit-commands",
@@ -362,7 +420,24 @@
           "notes": "Read the 3 commands, plugin.json, README and LICENSE at f8c5e7a (1.0.1): Apache-2.0; no hooks, MCP servers or telemetry. Pre-approves git add/commit/push and gh pr create; /clean_gone uses branch -D and worktree remove --force. docs/catalog-reviews/2026-10-30.md"
         }
       ],
-      "notes": "/commit-push-pr needs the GitHub CLI (gh), installed and signed in. The plugin doesn't scan for secrets; the gitleaks hook covers that."
+      "notes": "/commit-push-pr needs the GitHub CLI (gh), installed and signed in. The plugin doesn't scan for secrets; the gitleaks hook covers that.",
+      "i18n": {
+        "id": {
+          "name": "Commit Commands",
+          "summary": "Perintah untuk commit, push, dan membuka pull request.",
+          "why": "Mengubah rutinitas git yang biasa menjadi satu perintah: Claude menulis pesan commit, melakukan push, dan dapat membuka pull request.",
+          "permissions": [
+            "Menambahkan perintah /commit, /commit-push-pr, dan /clean_gone",
+            "/commit melakukan stage dan commit atas perubahan Anda; perintah git yang dibutuhkannya berjalan tanpa bertanya",
+            "/commit-push-pr juga melakukan push branch ke origin dan membuka pull request GitHub dengan login gh Anda, tanpa bertanya",
+            "/clean_gone menghapus branch lokal yang branch remote-nya sudah tidak ada (git branch -D) dan menghapus paksa worktree-nya, yang dapat membuang pekerjaan yang belum di-push atau belum di-commit"
+          ],
+          "notes": "/commit-push-pr membutuhkan GitHub CLI (gh), terpasang dan sudah login. Plugin ini tidak memindai secret; hook gitleaks yang menanganinya.",
+          "hints": {
+            "git": "Pasang Git (https://git-scm.com)"
+          }
+        }
+      }
     },
     {
       "id": "context7",
@@ -431,7 +506,19 @@
           "notes": "Read all 3 plugin files at f8c5e7a: an HTTP MCP server at mcp.context7.com; nothing runs locally; no environment variables or secrets are read; any sign-in goes through Claude Code's MCP OAuth. docs/catalog-reviews/2026-10-30.md"
         }
       ],
-      "notes": "Hosted MCP only: the service can change without a new pin. At f8c5e7a the plugin no longer reads CONTEXT7_API_KEY (removed upstream in #6333), although its README still says so. The marketplace tags this entry community-managed; it's listed here as verified-vendor (author: Upstash)."
+      "notes": "Hosted MCP only: the service can change without a new pin. At f8c5e7a the plugin no longer reads CONTEXT7_API_KEY (removed upstream in #6333), although its README still says so. The marketplace tags this entry community-managed; it's listed here as verified-vendor (author: Upstash).",
+      "i18n": {
+        "id": {
+          "name": "Dokumentasi Context7 (Upstash)",
+          "summary": "Dokumentasi library terkini sesuai versi, dari layanan Context7 yang di-host Upstash.",
+          "why": "Claude mencari dokumentasi terkini dari library yang Anda pakai alih-alih mengandalkan ingatannya, sehingga terhindar dari API yang sudah usang.",
+          "permissions": [
+            "Mengirim nama library dan pertanyaan Anda (ditulis oleh Claude, mungkin berisi detail proyek) ke layanan yang di-host Upstash (mcp.context7.com)",
+            "Mungkin meminta Anda login ke Context7"
+          ],
+          "notes": "Hanya MCP yang di-host: layanannya bisa berubah tanpa pin baru. Di f8c5e7a plugin ini tidak lagi membaca CONTEXT7_API_KEY (dihapus di upstream di #6333), meskipun README-nya masih menyebutnya. Marketplace menandai entri ini sebagai dikelola komunitas; di sini ia dicantumkan sebagai verified-vendor (pembuat: Upstash)."
+        }
+      }
     },
     {
       "id": "github",
@@ -502,7 +589,19 @@
           "notes": "Read both plugin files at f8c5e7a: a remote MCP server at api.githubcopilot.com with Authorization: Bearer ${GITHUB_PERSONAL_ACCESS_TOKEN}; nothing runs locally; the server's default tool sets include write and merge tools. docs/catalog-reviews/2026-10-30.md"
         }
       ],
-      "notes": "The token is read from the environment by the CLI; AgentChainer never stores it (ADR-0002). Use a fine-grained token limited to the repositories you need. The plugin uses GitHub's full default tool set (read and write). If the variable isn't set, the server fails to connect."
+      "notes": "The token is read from the environment by the CLI; AgentChainer never stores it (ADR-0002). Use a fine-grained token limited to the repositories you need. The plugin uses GitHub's full default tool set (read and write). If the variable isn't set, the server fails to connect.",
+      "i18n": {
+        "id": {
+          "name": "GitHub (MCP resmi)",
+          "summary": "MCP server milik GitHub sendiri: issue, pull request, pencarian kode, dan bagian lain dari API GitHub.",
+          "why": "Claude dapat membaca dan memperbarui issue dan pull request secara langsung, jadi task bisa dimulai dari sebuah issue dan berakhir menjadi PR.",
+          "permissions": [
+            "Bertindak di GitHub atas nama Anda dengan personal access token Anda: membaca dan, jika token mengizinkan, membuat atau mengubah file, branch, repositori, issue, dan pull request (termasuk merge)",
+            "Mengirim token Anda dan setiap permintaan ke MCP server GitHub yang di-host (api.githubcopilot.com)"
+          ],
+          "notes": "Token dibaca dari environment oleh CLI; AgentChainer tidak pernah menyimpannya (ADR-0002). Gunakan token fine-grained yang dibatasi ke repositori yang Anda butuhkan. Plugin ini memakai set tool default GitHub yang lengkap (baca dan tulis). Jika variabelnya tidak di-set, server gagal terhubung."
+        }
+      }
     },
     {
       "id": "gitleaks",
@@ -590,7 +689,19 @@
           "notes": "All 5 sha256 pins equal GitHub's digests and the upstream checksums file; no signatures or attestations (the maintainer builds the binaries), so the pin is the protection. MIT. Runs only git diff --staged; no network calls. docs/catalog-reviews/2026-10-30.md"
         }
       ],
-      "notes": "Teammates without gitleaks (or AgentChainer) aren't blocked: the committed hook prints a hint and lets the commit through."
+      "notes": "Teammates without gitleaks (or AgentChainer) aren't blocked: the committed hook prints a hint and lets the commit through.",
+      "i18n": {
+        "id": {
+          "name": "Pemindaian secret sebelum setiap commit (gitleaks)",
+          "summary": "Memindai perubahan yang di-stage untuk API key, token, dan password sebelum setiap commit, di mesin Anda.",
+          "why": "Agent menulis dan meng-commit banyak kode dengan cepat. Key yang tertempel di file konfigurasi tertangkap sebelum masuk ke repositori, karena menghapusnya nanti berarti menulis ulang riwayat dan mengganti key tersebut.",
+          "permissions": [
+            "Membaca perubahan yang di-stage dari setiap commit, secara lokal; tidak ada yang dikirim ke mana pun",
+            "Menghentikan commit yang berisi secret. Tandai false positive dengan komentar gitleaks:allow atau .gitleaksignore; lewati pemeriksaan sekali dengan git commit --no-verify"
+          ],
+          "notes": "Rekan tim tanpa gitleaks (atau AgentChainer) tidak terhalang: hook yang di-commit menampilkan petunjuk dan membiarkan commit lewat."
+        }
+      }
     },
     {
       "id": "gopls-lsp",
@@ -662,7 +773,20 @@
           "ref": "f8c5e7a1dcb71b10cb74586224b5401f3de5db28",
           "notes": "Read the marketplace entry, README and LICENSE at f8c5e7a (1.0.0, the whole folder): Apache-2.0; a config-only LSP plugin that starts gopls from PATH; no hooks, MCP servers, scripts or telemetry. gopls may download the modules go.mod lists. docs/catalog-reviews/2026-10-30.md"
         }
-      ]
+      ],
+      "i18n": {
+        "id": {
+          "name": "Language server Go (gopls)",
+          "summary": "Memberi Claude kecerdasan kode dan refactoring Go lewat gopls.",
+          "why": "Claude dapat menjelajahi package Go dan melihat error compiler saat mengedit.",
+          "permissions": [
+            "Menjalankan gopls di proyek"
+          ],
+          "hints": {
+            "gopls": "go install golang.org/x/tools/gopls@latest, lalu tambahkan $(go env GOPATH)/bin ke PATH Anda"
+          }
+        }
+      }
     },
     {
       "id": "playwright-mcp",
@@ -723,7 +847,21 @@
           "notes": "The 0.0.83 tarball's sha512 matches the pin and the registry, published with npm provenance. Read package.json, cli.js, index.js, README and LICENSE (Apache-2.0); dependencies are exact Playwright versions with no install scripts; no telemetry. Uses the system Chrome; browser_run_code_unsafe is on by default. docs/catalog-reviews/2026-10-30.md"
         }
       ],
-      "notes": "Pinned to an exact version, unlike the playwright plugin, which runs @playwright/mcp@latest. Claude Code asks before using servers from a project's .mcp.json. Needs Google Chrome (or run npx @playwright/mcp@0.0.83 install-browser chrome) and a display."
+      "notes": "Pinned to an exact version, unlike the playwright plugin, which runs @playwright/mcp@latest. Claude Code asks before using servers from a project's .mcp.json. Needs Google Chrome (or run npx @playwright/mcp@0.0.83 install-browser chrome) and a display.",
+      "i18n": {
+        "id": {
+          "name": "Browser Playwright (MCP, di-pin)",
+          "summary": "MCP server Playwright dari Microsoft: Claude mengendalikan browser sungguhan untuk memeriksa web UI.",
+          "why": "Claude dapat membuka aplikasi Anda di browser, mengklik di dalamnya, dan membaca isi halaman, sehingga perubahan UI diperiksa seperti cara seseorang memeriksanya.",
+          "permissions": [
+            "Menjalankan Google Chrome yang terpasang dan mengunjungi halaman yang dipilih Claude",
+            "Menjalankan npx, yang mengunduh @playwright/mcp versi yang di-pin dan dua paket Playwright dari npm pada pemakaian pertama",
+            "Memiliki tool yang menjalankan JavaScript apa pun di komputer Anda (browser_run_code_unsafe); Claude Code bertanya sebelum setiap pemakaian kecuali Anda mengizinkannya",
+            "Memulai setiap session dengan profil browser baru (--isolated): tidak ada cookie atau login yang disimpan"
+          ],
+          "notes": "Di-pin ke versi yang pasti, tidak seperti plugin playwright yang menjalankan @playwright/mcp@latest. Claude Code bertanya sebelum memakai server dari .mcp.json milik proyek. Membutuhkan Google Chrome (atau jalankan npx @playwright/mcp@0.0.83 install-browser chrome) dan layar."
+        }
+      }
     },
     {
       "id": "playwright",
@@ -792,7 +930,24 @@
         ]
       },
       "reviews": [],
-      "notes": "Not approved (docs/catalog-reviews/2026-10-30.md): the plugin runs `npx @playwright/mcp@latest`, a floating tag, which ADR-0005 rules out. Use playwright-mcp, the same server pinned to a reviewed version."
+      "notes": "Not approved (docs/catalog-reviews/2026-10-30.md): the plugin runs `npx @playwright/mcp@latest`, a floating tag, which ADR-0005 rules out. Use playwright-mcp, the same server pinned to a reviewed version.",
+      "i18n": {
+        "id": {
+          "name": "Browser Playwright (Microsoft)",
+          "summary": "Memungkinkan Claude mengendalikan browser sungguhan: membuka halaman, mengklik, mengisi formulir, dan mengambil tangkapan layar.",
+          "why": "Claude dapat memeriksa web UI dari ujung ke ujung, seperti yang dilakukan tester, bukan hanya membaca kodenya.",
+          "permissions": [
+            "Menjalankan Google Chrome yang terpasang, yang dikendalikan Claude; ia dapat membuka URL apa pun",
+            "Menjalankan npx @playwright/mcp@latest setiap kali dimulai: versi mana pun yang terbaru saat itu, bukan versi yang sudah ditinjau",
+            "Memiliki tool yang menjalankan JavaScript apa pun di komputer Anda (browser_run_code_unsafe)",
+            "Menyimpan cookie dan login browser antar-session"
+          ],
+          "notes": "Tidak disetujui (docs/catalog-reviews/2026-10-30.md): plugin ini menjalankan `npx @playwright/mcp@latest`, tag yang berubah-ubah, yang dilarang ADR-0005. Gunakan playwright-mcp, server yang sama yang di-pin ke versi yang sudah ditinjau.",
+          "hints": {
+            "npx": "Pasang Node.js (npx sudah termasuk di dalamnya)"
+          }
+        }
+      }
     },
     {
       "id": "pyright-lsp",
@@ -864,7 +1019,20 @@
           "ref": "f8c5e7a1dcb71b10cb74586224b5401f3de5db28",
           "notes": "Read the marketplace entry, README and LICENSE at f8c5e7a (1.0.0, the whole folder): Apache-2.0; a config-only LSP plugin that starts pyright-langserver --stdio from PATH; no hooks, MCP servers, scripts or telemetry. docs/catalog-reviews/2026-10-30.md"
         }
-      ]
+      ],
+      "i18n": {
+        "id": {
+          "name": "Language server Python (Pyright)",
+          "summary": "Memberi Claude pemeriksaan tipe dan kecerdasan kode Python lewat Pyright.",
+          "why": "Claude melihat error tipe dan definisi di kode Python seperti yang dilakukan editor.",
+          "permissions": [
+            "Menjalankan pyright-langserver di proyek"
+          ],
+          "hints": {
+            "pyright-langserver": "npm install -g pyright (atau pipx install pyright)"
+          }
+        }
+      }
     },
     {
       "id": "rust-analyzer-lsp",
@@ -936,7 +1104,20 @@
           "ref": "f8c5e7a1dcb71b10cb74586224b5401f3de5db28",
           "notes": "Read the marketplace entry, README and LICENSE at f8c5e7a (1.0.0, the whole folder): Apache-2.0; a config-only LSP plugin that starts rust-analyzer from PATH; no hooks, MCP servers, scripts or telemetry. The server runs cargo build scripts and proc macros, as any Rust editor does. docs/catalog-reviews/2026-10-30.md"
         }
-      ]
+      ],
+      "i18n": {
+        "id": {
+          "name": "Language server Rust (rust-analyzer)",
+          "summary": "Memberi Claude kecerdasan kode Rust lewat rust-analyzer.",
+          "why": "Claude melihat error tipe dan borrow serta definisi Rust saat mengedit.",
+          "permissions": [
+            "Menjalankan rust-analyzer di proyek; ia menjalankan cargo, yang dapat mem-build dan menjalankan build script dan macro proyek serta mengunduh crate"
+          ],
+          "hints": {
+            "rust-analyzer": "rustup component add rust-analyzer"
+          }
+        }
+      }
     },
     {
       "id": "security-guidance",
@@ -1008,7 +1189,27 @@
         ]
       },
       "reviews": [],
-      "notes": "Not approved at f8c5e7a (docs/catalog-reviews/2026-10-30.md): its hooks pip-install an unpinned claude-agent-sdk at runtime, which ADR-0005 rules out, and its model reviews spend outside the session's visible cost. It's no longer in the baseline profile. If you use it anyway: ENABLE_CODE_SECURITY_REVIEW=0 turns off the model reviews and the SDK install; SECURITY_GUIDANCE_DISABLE=1 turns the plugin off."
+      "notes": "Not approved at f8c5e7a (docs/catalog-reviews/2026-10-30.md): its hooks pip-install an unpinned claude-agent-sdk at runtime, which ADR-0005 rules out, and its model reviews spend outside the session's visible cost. It's no longer in the baseline profile. If you use it anyway: ENABLE_CODE_SECURITY_REVIEW=0 turns off the model reviews and the SDK install; SECURITY_GUIDANCE_DISABLE=1 turns the plugin off.",
+      "i18n": {
+        "id": {
+          "name": "Security Guidance",
+          "summary": "Menandai pola yang tidak aman di edit Claude dan meninjau diff untuk kerentanan.",
+          "why": "Menangkap injection, XSS, SSRF, secret yang ditulis langsung di kode, dan kesalahan serupa saat Claude menulis kode, bukan setelah dirilis.",
+          "permissions": [
+            "Memeriksa setiap file yang diedit Claude untuk pola kode berisiko dan memperingatkan Claude (lokal, tanpa jaringan)",
+            "Setelah setiap giliran, mengirim kode yang berubah ke Claude Opus untuk review keamanan yang tidak tampil di biaya session Anda (memakai paket Claude atau API key Anda)",
+            "Setelah git commit atau push, peninjau di latar belakang membaca file proyek yang terkait dan mengirimkannya ke model",
+            "Dapat membangunkan Claude setelah ia selesai agar ia memperbaiki temuannya",
+            "Pada pemakaian pertama, memasang claude-agent-sdk terbaru dari PyPI (beberapa ratus MB, tidak di-pin) ke ~/.claude/security",
+            "Menyimpan log dan state di ~/.claude/security, yang tidak dihapus saat uninstall",
+            "Melaporkan jumlah pemakaian ke Anthropic lewat metrik hook Claude Code"
+          ],
+          "notes": "Tidak disetujui di f8c5e7a (docs/catalog-reviews/2026-10-30.md): hook-nya memasang claude-agent-sdk yang tidak di-pin lewat pip saat runtime, yang dilarang ADR-0005, dan review modelnya memakai biaya di luar biaya session yang terlihat. Ia tidak lagi ada di profil baseline. Jika Anda tetap memakainya: ENABLE_CODE_SECURITY_REVIEW=0 mematikan review model dan instalasi SDK; SECURITY_GUIDANCE_DISABLE=1 mematikan plugin ini.",
+          "hints": {
+            "python3": "Python 3.10 atau lebih baru (Python 3.9 bawaan macOS hanya menjalankan peringatan pola)"
+          }
+        }
+      }
     },
     {
       "id": "typescript-lsp",
@@ -1080,7 +1281,20 @@
           "ref": "f8c5e7a1dcb71b10cb74586224b5401f3de5db28",
           "notes": "Read the marketplace entry, README and LICENSE at f8c5e7a (1.0.0, the whole folder): Apache-2.0; a config-only LSP plugin that starts typescript-language-server --stdio from PATH; no hooks, MCP servers, scripts or telemetry. docs/catalog-reviews/2026-10-30.md"
         }
-      ]
+      ],
+      "i18n": {
+        "id": {
+          "name": "Language server TypeScript",
+          "summary": "Memberi Claude kecerdasan kode TypeScript/JavaScript lewat typescript-language-server.",
+          "why": "Claude dapat melompat ke definisi dan melihat error tipe seperti yang dilakukan editor, alih-alih menebak dari pencarian teks.",
+          "permissions": [
+            "Menjalankan typescript-language-server di proyek"
+          ],
+          "hints": {
+            "typescript-language-server": "npm install -g typescript-language-server typescript"
+          }
+        }
+      }
     }
   ],
   "profiles": [
@@ -1095,7 +1309,13 @@
         "code-review",
         "commit-commands",
         "gitleaks"
-      ]
+      ],
+      "i18n": {
+        "id": {
+          "name": "Dasar",
+          "description": "Setiap workspace: bantuan review, commit, dan pemindaian secret yang berguna di proyek apa pun."
+        }
+      }
     },
     {
       "id": "github",
@@ -1106,7 +1326,13 @@
       },
       "items": [
         "github"
-      ]
+      ],
+      "i18n": {
+        "id": {
+          "name": "GitHub",
+          "description": "Untuk repositori yang di-host di GitHub."
+        }
+      }
     },
     {
       "id": "go",
@@ -1119,7 +1345,13 @@
       },
       "items": [
         "gopls-lsp"
-      ]
+      ],
+      "i18n": {
+        "id": {
+          "name": "Go",
+          "description": "Kecerdasan kode untuk proyek Go."
+        }
+      }
     },
     {
       "id": "knowledge",
@@ -1131,7 +1363,13 @@
       "items": [
         "context7",
         "codebase-memory-mcp"
-      ]
+      ],
+      "i18n": {
+        "id": {
+          "name": "Pengetahuan",
+          "description": "Dokumentasi library terkini dan graf kode, sesuai permintaan."
+        }
+      }
     },
     {
       "id": "python",
@@ -1144,7 +1382,13 @@
       },
       "items": [
         "pyright-lsp"
-      ]
+      ],
+      "i18n": {
+        "id": {
+          "name": "Python",
+          "description": "Kecerdasan kode untuk proyek Python."
+        }
+      }
     },
     {
       "id": "rust",
@@ -1157,7 +1401,13 @@
       },
       "items": [
         "rust-analyzer-lsp"
-      ]
+      ],
+      "i18n": {
+        "id": {
+          "name": "Rust",
+          "description": "Kecerdasan kode untuk proyek Rust."
+        }
+      }
     },
     {
       "id": "security",
@@ -1168,7 +1418,13 @@
       },
       "items": [
         "cloudflare-security-audit"
-      ]
+      ],
+      "i18n": {
+        "id": {
+          "name": "Keamanan",
+          "description": "Audit keamanan mendalam, sesuai permintaan (sebelum rilis)."
+        }
+      }
     },
     {
       "id": "ts-node",
@@ -1181,7 +1437,13 @@
       },
       "items": [
         "typescript-lsp"
-      ]
+      ],
+      "i18n": {
+        "id": {
+          "name": "TypeScript / JavaScript",
+          "description": "Kecerdasan kode untuk proyek Node."
+        }
+      }
     },
     {
       "id": "web-testing",
@@ -1192,7 +1454,13 @@
       },
       "items": [
         "playwright-mcp"
-      ]
+      ],
+      "i18n": {
+        "id": {
+          "name": "Pengujian web",
+          "description": "Otomatisasi browser untuk web UI, sesuai permintaan."
+        }
+      }
     }
   ]
 }

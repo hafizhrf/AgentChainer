@@ -47,3 +47,16 @@ steps:
     output: review
     fix: { step: implement, maxRounds: 1, maxBudgetUsd: 1.5 }
     limits: { maxTurns: 40, maxBudgetUsd: 1.5 }
+i18n:
+  id:
+    description: >-
+      Perencanaan arsitektur, keamanan, dan test secara paralel, implementasi, jalankan gate (dengan putaran perbaikan),
+      lalu tinjauan independen.
+    labels:
+      plan: "Rencana"
+      architecture: "Arsitektur"
+      security: "Tinjauan keamanan"
+      tests: "Rencana test"
+      implement: "Implementasi"
+      gates: "Gate"
+      review: "Tinjauan independen"

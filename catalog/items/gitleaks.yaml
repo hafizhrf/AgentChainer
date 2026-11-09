@@ -57,3 +57,18 @@ reviews:
 notes: >-
   Teammates without gitleaks (or AgentChainer) aren't blocked: the committed hook prints a hint and lets the commit
   through.
+i18n:
+  id:
+    name: "Pemindaian secret sebelum setiap commit (gitleaks)"
+    summary: "Memindai perubahan yang di-stage untuk API key, token, dan password sebelum setiap commit, di mesin Anda."
+    why: >-
+      Agent menulis dan meng-commit banyak kode dengan cepat. Key yang tertempel di file konfigurasi tertangkap sebelum
+      masuk ke repositori, karena menghapusnya nanti berarti menulis ulang riwayat dan mengganti key tersebut.
+    permissions:
+      - "Membaca perubahan yang di-stage dari setiap commit, secara lokal; tidak ada yang dikirim ke mana pun"
+      - >-
+        Menghentikan commit yang berisi secret. Tandai false positive dengan komentar gitleaks:allow atau
+        .gitleaksignore; lewati pemeriksaan sekali dengan git commit --no-verify
+    notes: >-
+      Rekan tim tanpa gitleaks (atau AgentChainer) tidak terhalang: hook yang di-commit menampilkan petunjuk dan
+      membiarkan commit lewat.

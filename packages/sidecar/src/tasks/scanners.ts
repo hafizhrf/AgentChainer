@@ -1,7 +1,9 @@
 import { existsSync } from "node:fs";
 import path from "node:path";
+import { type MessageRef, resultRef } from "@agentchainer/protocol";
 import { findTool, toolsDir } from "../bootstrap/tools.ts";
 import { runAsync } from "../run-async.ts";
+import { result } from "./result.ts";
 
 /**
  * semgrep and trivy as merge gates (M5-04, docs/design/git-workflow.md §7), only when the user has them installed, and
@@ -9,7 +11,19 @@ import { runAsync } from "../run-async.ts";
  * later follows ADR-0005.
  */
 
-export type ScanResult = { ran: true; findings: number; detail: string } | { ran: false; why: string };
+/** `detail` and `why` in English, and their refs for the app's language (X-13 part 2b). */
+export type ScanResult =
+  | { ran: true; findings: number; detail: string; detailRef: MessageRef }
+  | { ran: false; why: string; whyRef: MessageRef };
+
+type Text = ReturnType<typeof result>;
+const found = (findings: number, detail: Text): ScanResult => ({
+  ran: true,
+  findings,
+  detail: detail.text,
+  detailRef: detail.ref,
+});
+const notRun = (why: Text): ScanResult => ({ ran: false, why: why.text, whyRef: why.ref });
 
 /** The repository's own semgrep rules; registry rules (`--config auto`, `p/...`) would need the network. */
 const SEMGREP_CONFIGS = [".semgrep.yml", ".semgrep.yaml", ".semgrep"];
@@ -25,6 +39,10 @@ const run: Run = (bin, args, cwd) => runAsync(bin, args, { cwd, timeoutMs: 300_0
 
 const firstLine = (text: string) => text.trim().split("\n")[0]?.slice(0, 200) ?? "";
 
+/** What a scanner that failed said, or its exit code when it said nothing. */
+const failure = (r: { status: number | null; stdout: string; stderr: string }) =>
+  firstLine(r.stderr || r.stdout) || resultRef("evidence.gate.exit", { code: String(r.status) });
+
 /** semgrep over the changed files, with the repository's own config. Exit 1 with `--error` means findings. */
 export async function semgrepScan(
   code: string,
@@ -32,29 +50,30 @@ export async function semgrepScan(
   bin = findTool("semgrep", toolsDir()),
   exec: Run = run,
 ): Promise<ScanResult> {
-  if (!bin) return { ran: false, why: "semgrep isn't installed" };
+  if (!bin) return notRun(result("evidence.scan.notInstalled", { tool: "semgrep" }));
   const config = SEMGREP_CONFIGS.find((c) => existsSync(path.join(code, c)));
-  if (!config)
-    return { ran: false, why: "the repository has no semgrep config (.semgrep.yml); registry rules need the network" };
-  if (!files.length) return { ran: true, findings: 0, detail: "No changed files to scan." };
+  if (!config) return notRun(result("evidence.scan.semgrepNoConfig"));
+  if (!files.length) return found(0, result("evidence.scan.noFiles"));
   const r = await exec(
     bin,
     ["scan", "--metrics=off", "--disable-version-check", "--config", config, "--json", "--error", "--quiet", ...files],
     code,
   );
-  if (r.status !== 0 && r.status !== 1)
-    return { ran: false, why: `semgrep failed: ${firstLine(r.stderr || r.stdout) || `exit ${r.status}`}` };
+  if (r.status !== 0 && r.status !== 1) {
+    return notRun(result("evidence.scan.failed", { tool: "semgrep", error: failure(r) }));
+  }
   let findings = 0;
   try {
     findings = (JSON.parse(r.stdout) as { results?: unknown[] }).results?.length ?? 0;
   } catch {
-    return { ran: false, why: "semgrep's output couldn't be read" };
+    return notRun(result("evidence.scan.unreadable", { tool: "semgrep" }));
   }
-  return {
-    ran: true,
+  return found(
     findings,
-    detail: findings ? `${findings} finding${findings === 1 ? "" : "s"} (${config}).` : `Nothing found (${config}).`,
-  };
+    findings
+      ? result("evidence.scan.foundIn", { count: findings, config })
+      : result("evidence.scan.cleanIn", { config }),
+  );
 }
 
 /**
@@ -66,7 +85,7 @@ export async function trivyScan(
   bin = findTool("trivy", toolsDir()),
   exec: Run = run,
 ): Promise<ScanResult> {
-  if (!bin) return { ran: false, why: "trivy isn't installed" };
+  if (!bin) return notRun(result("evidence.scan.notInstalled", { tool: "trivy" }));
   const r = await exec(
     bin,
     [
@@ -87,7 +106,7 @@ export async function trivyScan(
     code,
   );
   if (r.status !== 0 && r.status !== 3) {
-    return { ran: false, why: `trivy didn't run offline: ${firstLine(r.stderr || r.stdout) || `exit ${r.status}`}` };
+    return notRun(result("evidence.scan.trivyOffline", { error: failure(r) }));
   }
   let findings = 0;
   try {
@@ -98,11 +117,7 @@ export async function trivyScan(
       findings += (x.Vulnerabilities?.length ?? 0) + (x.Secrets?.length ?? 0) + (x.Misconfigurations?.length ?? 0);
     }
   } catch {
-    return { ran: false, why: "trivy's output couldn't be read" };
+    return notRun(result("evidence.scan.unreadable", { tool: "trivy" }));
   }
-  return {
-    ran: true,
-    findings,
-    detail: findings ? `${findings} finding${findings === 1 ? "" : "s"}.` : "Nothing found.",
-  };
+  return found(findings, findings ? result("evidence.scan.found", { count: findings }) : result("evidence.scan.clean"));
 }

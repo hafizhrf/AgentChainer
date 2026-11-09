@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { after, describe, it } from "node:test";
 import { fileURLToPath } from "node:url";
-import { RpcErrorCode } from "@agentchainer/protocol";
+import { RpcErrorCode, setLanguage } from "@agentchainer/protocol";
 import { copyFixture, removeFixtureCopies } from "../detect/fixture-copy.ts";
 import type { Gh, GhResult } from "../github.ts";
 import type { AgentSdkModule } from "../sdk-loader.ts";
@@ -32,6 +32,7 @@ import {
   messageRun,
   newTask,
   overlapsOf,
+  prBody,
   proposeFlow,
   prPreview,
   prStatus,
@@ -224,6 +225,38 @@ describe("task flow", () => {
     const again = taskEvidence(root, created.id).markdown;
     assert.match(again, /Second\./);
     assert.doesNotMatch(again, /First\./);
+  });
+
+  it("shows the report in the app's language, while evidence.md and the PR body stay English (X-13)", async () => {
+    const root = copyFixture("sample-app");
+    const created = newTask(root, "Fix total()");
+    const workflow = LibrarySchema.parse(shipped).workflows.S;
+    if (!workflow) throw new Error("no S workflow");
+    const run = newRun(workflow, { permissionMode: "default", base: null, untrackedAtStart: [] }, new Date());
+    saveTask(root, {
+      ...created,
+      state: "failed",
+      updatedAt: "2026-10-30T01:00:00.000Z",
+      run: { ...run, outcome: "X." },
+    });
+    const { markdown: english, path } = taskEvidence(root, created.id);
+    await setLanguage("id");
+    try {
+      const shown = taskEvidence(root, created.id).markdown;
+      assert.match(shown, /^# Bukti task: Fix total\(\)\n/);
+      assert.match(shown, /- \*\*Hasil:\*\* \*\*Gagal\.\*\* X\./);
+      assert.equal(readFileSync(path, "utf8"), english);
+      const body = prBody(root, loadTask(root, created.id));
+      assert.match(body, /## Evidence\n\n- \*\*Request:\*\* Fix total\(\)/);
+      assert.doesNotMatch(body, /Permintaan|Hasil/);
+      // A report written before its prose had refs is shown as it was written.
+      const json = join(root, ".agentchainer", "tasks", created.id, "evidence.json");
+      const { refs: _, ...old } = JSON.parse(readFileSync(json, "utf8"));
+      writeFileSync(json, JSON.stringify(old));
+      assert.equal(taskEvidence(root, created.id).markdown, english);
+    } finally {
+      await setLanguage("en");
+    }
   });
 
   it("splits an approved XL task into draft sub-tasks with their own triage, shown only on its page", async () => {

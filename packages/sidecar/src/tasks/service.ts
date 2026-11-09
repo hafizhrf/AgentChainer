@@ -7,6 +7,8 @@ import {
   type MergeGate,
   type PermissionMode,
   RpcErrorCode,
+  resultRef,
+  resultText,
   type Task,
   type TaskContract,
   type TaskFolder,
@@ -45,6 +47,7 @@ import {
   buildEvidence,
   type Evidence,
   type FileChange,
+  notScanned,
   renderEvidence,
   type SecretsScan,
   sectionLines,
@@ -61,6 +64,7 @@ import {
   type WorkflowRef,
   workflowRef,
 } from "./project-workflows.ts";
+import { result } from "./result.ts";
 import { runEvidenceFile, withPastRun } from "./run-history.ts";
 import { changedPaths, fileStats, type SessionHost, sessionRunner, startBase, untracked } from "./runner.ts";
 import { semgrepScan, trivyScan } from "./scanners.ts";
@@ -1166,7 +1170,7 @@ export function prBody(root: string, task: Task): string {
         "",
       ]
     : [];
-  const evidence = taskEvidence(root, task.id).markdown.replace(/^# .*\n+/, "");
+  const evidence = storedEvidence(root, task.id).markdown.replace(/^# .*\n+/, "");
   // The task's PRs in its other folders' repositories (M8-01), and the branches that have none.
   const linked = (task.folders ?? []).flatMap((f) => (f.pr ? [`- \`${f.name}\`: ${f.pr.url}`] : []));
   // Before Create PR (the preview), a changed folder has no PR yet: it gets one, linked here, when this one is opened.
@@ -1740,7 +1744,7 @@ export function acceptRisk(root: string, id: string, reason: string, now = new D
  */
 export async function scanSecretsAsync(root: string, files: FileChange[]): Promise<SecretsScan> {
   const gitleaks = findTool("gitleaks", toolsDir());
-  if (!gitleaks) return { ran: false, why: "gitleaks isn't installed" };
+  if (!gitleaks) return gitleaksMissing();
   const targets = files.filter((f) => f.status !== "deleted");
   const flagged: string[] = [];
   for (const f of targets) {
@@ -1750,20 +1754,28 @@ export async function scanSecretsAsync(root: string, files: FileChange[]): Promi
       { cwd: root, timeoutMs: 60_000 },
     );
     if (r.status === 3) flagged.push(f.path);
-    else if (r.status !== 0) {
-      return {
-        ran: false,
-        why: `gitleaks failed: ${(r.stderr || r.stdout).trim().slice(0, 200) || `exit ${r.status}`}`,
-      };
-    }
+    else if (r.status !== 0) return gitleaksFailed(r);
   }
   return { ran: true, scanned: targets.length, flagged };
 }
 
+const gitleaksMissing = () => notScanned(result("evidence.scan.notInstalled", { tool: "gitleaks" }));
+
+/** gitleaks exiting other than 0 or 3: what it said, or its exit code. */
+const gitleaksFailed = (r: { status: number | null; stdout: string | null; stderr: string | null }) =>
+  notScanned(
+    result("evidence.scan.failed", {
+      tool: "gitleaks",
+      error:
+        (r.stderr || r.stdout || "").trim().slice(0, 200) ||
+        resultRef("evidence.gate.exit", { code: String(r.status) }),
+    }),
+  );
+
 /** gitleaks over the changed files, when it's installed (the catalog's copy, or one on PATH). */
 export function scanSecrets(root: string, files: FileChange[]): SecretsScan {
   const gitleaks = findTool("gitleaks", toolsDir());
-  if (!gitleaks) return { ran: false, why: "gitleaks isn't installed" };
+  if (!gitleaks) return gitleaksMissing();
   const targets = files.filter((f) => f.status !== "deleted");
   const flagged: string[] = [];
   for (const f of targets) {
@@ -1778,11 +1790,7 @@ export function scanSecrets(root: string, files: FileChange[]): SecretsScan {
       },
     );
     if (r.status === 3) flagged.push(f.path);
-    else if (r.status !== 0)
-      return {
-        ran: false,
-        why: `gitleaks failed: ${(r.stderr || r.stdout || "").trim().slice(0, 200) || `exit ${r.status}`}`,
-      };
+    else if (r.status !== 0) return gitleaksFailed(r);
   }
   return { ran: true, scanned: targets.length, flagged };
 }
@@ -1822,10 +1830,12 @@ export function writeEvidence(root: string, task: Task, now = new Date()): { mar
   } catch {
     review = null;
   }
+  const xl = children.length ? subtaskSummaries(root, children) : null;
   const evidence = buildEvidence({
-    task: children.length ? withSubtaskRecords(task, children) : task,
+    task,
     files,
-    summary: children.length ? subtaskSummaries(root, children) : readTaskFile(root, task.id, "summary.md"),
+    summary: xl ? xl.summary : readTaskFile(root, task.id, "summary.md"),
+    ...(xl ? { notes: xl.notes, records: subtaskRecords(children) } : {}),
     review,
     secrets: scanSecretsAcross(code, stats, task),
     deploys: listDeploys(root, task.id),
@@ -1836,10 +1846,12 @@ export function writeEvidence(root: string, task: Task, now = new Date()): { mar
       state: c.state,
       costUsd: c.run?.costUsd ?? 0,
       outcome: c.run?.outcome ?? null,
+      ...(c.run?.outcomeRef ? { outcomeRef: c.run.outcomeRef } : {}),
       report: path.join(AC_DIR, "tasks", c.id, "evidence.md"),
     })),
     now,
   });
+  // In English, like the PR it goes into (X-13): the task page renders `evidence.json` in the app's language.
   const markdown = renderEvidence(evidence);
   writeTaskFile(root, task.id, "evidence.json", `${JSON.stringify(evidence, null, 2)}\n`);
   writeTaskFile(root, task.id, "evidence.md", markdown);
@@ -1848,45 +1860,66 @@ export function writeEvidence(root: string, task: Task, now = new Date()): { mar
   return { markdown, path: path.join(root, AC_DIR, "tasks", task.id, "evidence.md") };
 }
 
+/** A text an XL task's report marks with its sub-task ("Sub-task 2: …"). */
+const ofSubtask = (c: Task, text: string) =>
+  result("evidence.subtask.labeled", { n: (c.parent?.index ?? 0) + 1, text });
+
 /** An XL task's report lists the approvals and guard blocks of its sub-tasks' steps, each marked with its sub-task. */
-function withSubtaskRecords(task: Task, children: Task[]): Task {
-  if (!task.run) return task;
-  const mark = (c: Task) => `Sub-task ${(c.parent?.index ?? 0) + 1}`;
+function subtaskRecords(children: Task[]) {
   return {
-    ...task,
-    run: {
-      ...task.run,
-      approvals: children.flatMap((c) =>
-        (c.run?.approvals ?? []).map((a) => ({ ...a, label: `${mark(c)}: ${a.label}` })),
-      ),
-      guardBlocks: children.flatMap((c) => c.run?.guardBlocks ?? []),
-    },
+    approvals: children.flatMap((c) =>
+      (c.run?.approvals ?? []).map((a) => {
+        const label = ofSubtask(c, a.label);
+        return { ...a, label: label.text, labelRef: label.ref };
+      }),
+    ),
+    guardBlocks: children.flatMap((c) => c.run?.guardBlocks ?? []),
   };
 }
 
-/** What an XL task's files are for, and its implementers' notes, from its sub-tasks' latest summaries. */
-function subtaskSummaries(root: string, children: Task[]): string {
+/**
+ * What an XL task's files are for (the `## Changes` its sub-tasks' latest summaries have), and its implementers'
+ * notes, each marked with its sub-task.
+ */
+function subtaskSummaries(root: string, children: Task[]) {
   const changes: string[] = [];
-  const notes: string[] = [];
+  const notes: ReturnType<typeof result>[] = [];
   for (const c of children) {
     const text = readTaskFile(root, c.id, "summary.md");
     changes.push(...sectionLines(text, "Changes"));
-    notes.push(...sectionLines(text, "Notes").map((n) => `Sub-task ${(c.parent?.index ?? 0) + 1}: ${n}`));
+    notes.push(...sectionLines(text, "Notes").map((n) => ofSubtask(c, n)));
   }
-  return ["## Changes", ...changes.map((l) => `- ${l}`), "", "## Notes", ...notes.map((l) => `- ${l}`)].join("\n");
+  return { summary: ["## Changes", ...changes.map((l) => `- ${l}`)].join("\n"), notes };
 }
 
-/**
- * The stored report while nothing in the task changed after it was written; otherwise (a newer run, an interrupted
- * one, a run from before reports existed) it's built again from the records.
- */
 /** The task's evidence report as data, written again first when it's out of date (M8-06). */
 export function evidenceOf(root: string, id: string): Evidence {
-  taskEvidence(root, id);
+  storedEvidence(root, id);
   return JSON.parse(readTaskFile(root, id, "evidence.json") ?? "null") as Evidence;
 }
 
+/**
+ * The report for the task page (`task.evidence`), in the app's language (X-13 part 2b): rendered from `evidence.json`
+ * with the results catalog. A report from before its prose had refs, or without its `evidence.json`, is shown as it
+ * was written, in English.
+ */
 export function taskEvidence(root: string, id: string): { markdown: string; path: string } {
+  const stored = storedEvidence(root, id);
+  let evidence: Evidence | null = null;
+  try {
+    evidence = JSON.parse(readTaskFile(root, id, "evidence.json") ?? "null") as Evidence | null;
+  } catch {
+    // Unreadable: the stored report.
+  }
+  return evidence?.refs ? { ...stored, markdown: renderEvidence(evidence, resultText) } : stored;
+}
+
+/**
+ * `evidence.md`, in English like the PR it goes into: the stored report while nothing in the task changed after it was
+ * written; otherwise (a newer run, an interrupted one, a run from before reports existed) it's built again from the
+ * records.
+ */
+function storedEvidence(root: string, id: string): { markdown: string; path: string } {
   const task = present(loadTask(root, id));
   if (!task.run || task.state === "running") throw invalid(t("tasks.service.reportAtEnd"));
   const stored = readTaskFile(root, id, "evidence.md");

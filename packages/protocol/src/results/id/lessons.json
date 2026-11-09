@@ -1,1 +1,14 @@
-{}
+{
+  "lessons.signal.gateFixed": "`{{command}}` gagal, lalu lulus setelah diperbaiki:\n{{output}}",
+  "lessons.signal.formatted": "Formatter menulis ulang {{n}} file: {{files}}",
+  "lessons.signal.review": "{{severity}}: {{text}}",
+  "lessons.signal.reviewIn": "{{severity}} di {{file}}: {{text}}",
+  "lessons.signal.guardBlocked": "{{tool}} `{{target}}` diblokir: {{reason}}",
+  "lessons.signal.denied": "Anda menolak {{tool}} `{{target}}`",
+  "lessons.note.noSignals": "Tidak ada yang mengarah ke pelajaran dalam run ini: tidak ada gate yang perlu diperbaiki, tidak ada temuan tinjauan, tidak ada aksi yang diblokir atau ditolak.",
+  "lessons.note.stopped": "Pembuatan saran berhenti: {{reason}}.",
+  "lessons.note.invalidAnswer": "Saran yang diterima bukan jawaban yang valid.",
+  "lessons.note.allKnown": "Tidak ada pelajaran baru: yang ditunjukkan run ini sudah ada di CLAUDE.md, atau sudah diabaikan.",
+  "lessons.note.taskOnly": "Run ini tidak menghasilkan pelajaran untuk task lain: yang ditunjukkannya hanya tentang task ini.",
+  "lessons.history.title_other": "Tambahkan {{count}} pelajaran ke {{path}}"
+}

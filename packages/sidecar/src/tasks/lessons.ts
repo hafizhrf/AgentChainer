@@ -1,13 +1,24 @@
 import { randomUUID } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import path from "node:path";
-import { hasSecret, type Lesson, type LessonSource } from "@agentchainer/protocol";
+import {
+  hasSecret,
+  type Lesson,
+  type LessonSource,
+  type MessageRef,
+  MessageRefSchema,
+  type ResultKey,
+  resultEnglish,
+  resultRef,
+  resultText,
+} from "@agentchainer/protocol";
 import { z } from "zod";
 import { AC_DIR, ensureIgnored } from "../ac-dir.ts";
 import { applyFileEdits } from "../bootstrap/apply.ts";
 import { t } from "../i18n/index.ts";
 import type { AgentSdkModule } from "../sdk-loader.ts";
 import type { Evidence } from "./evidence.ts";
+import { result } from "./result.ts";
 
 /**
  * Lessons from outcomes (M8-06, docs/design/lessons.md): what a finished task's records say Claude should know next
@@ -15,7 +26,11 @@ import type { Evidence } from "./evidence.ts";
  * small haiku call words them as rules, and anything CLAUDE.md already says, or that the person dismissed, is dropped.
  */
 
-export type Signal = { source: LessonSource; ref: string; text: string };
+/**
+ * `text` is English: Claude reads it, and the evidence and CLAUDE.md quote it. `textRef` shows the app's own signals in
+ * its language (X-13 part 2b); the implementer's notes are its own words and have none.
+ */
+export type Signal = { source: LessonSource; ref: string; text: string; textRef?: MessageRef };
 
 const MAX_SIGNALS = 30;
 const MAX_TEXT = 300;
@@ -23,6 +38,26 @@ const MAX_LESSONS = 5;
 const clip = (s: string, n = MAX_TEXT) => (s.length > n ? `${s.slice(0, n)}…` : s);
 const tailOf = (s: string) => s.trim().split("\n").slice(-6).join("\n");
 const keyOf = (kind: string, pkg: string) => (pkg === "." ? kind : `${kind} (${pkg})`);
+
+/**
+ * A signal's text, clipped, and its ref. A clipped text keeps a ref when the cut falls in the value that ends the
+ * message (`last`), clipped there instead, so both say the same; otherwise it shows in English, as written.
+ */
+function said(
+  key: ResultKey,
+  params: Record<string, string | number>,
+  last: string,
+): { text: string; textRef?: MessageRef } {
+  const full = result(key, params);
+  const text = clip(full.text);
+  if (text === full.text) return { text, textRef: full.ref };
+  const value = String(params[last]);
+  const ref = resultRef(key, {
+    ...params,
+    [last]: clip(value, Math.max(0, value.length - (full.text.length - MAX_TEXT))),
+  });
+  return resultEnglish(ref) === text ? { text, textRef: ref } : { text };
+}
 
 /** What the run's records point at, by kind: no model needed. */
 export function lessonSignals(e: Evidence): Signal[] {
@@ -42,17 +77,16 @@ export function lessonSignals(e: Evidence): Signal[] {
       out.push({
         source: "gate",
         ref: `gate:${key}`,
-        text: clip(`\`${bad.command}\` failed, then passed after a fix:\n${tailOf(bad.tail)}`),
+        ...said("lessons.signal.gateFixed", { command: bad.command, output: tailOf(bad.tail) }, "output"),
       });
     }
     const rewrote = sorted.find((g) => g.kind === "format" && g.changed?.length);
     if (rewrote) {
+      const changed = rewrote.changed ?? [];
       out.push({
         source: "format",
         ref: `format:${key}`,
-        text: clip(
-          `The formatter rewrote ${rewrote.changed?.length} file(s): ${rewrote.changed?.slice(0, 5).join(", ")}`,
-        ),
+        ...said("lessons.signal.formatted", { n: changed.length, files: changed.slice(0, 5).join(", ") }, "files"),
       });
     }
   }
@@ -61,14 +95,16 @@ export function lessonSignals(e: Evidence): Signal[] {
     out.push({
       source: "review",
       ref: `review:${i + 1}`,
-      text: clip(`${f.severity}${f.file ? ` in ${f.file}` : ""}: ${f.text}`),
+      ...(f.file
+        ? said("lessons.signal.reviewIn", { severity: f.severity, file: f.file, text: f.text }, "text")
+        : said("lessons.signal.review", { severity: f.severity, text: f.text }, "text")),
     });
   }
   for (const [i, b] of e.security.guardBlocks.entries()) {
     out.push({
       source: "guard",
       ref: `guard:${i + 1}`,
-      text: clip(`${b.tool} \`${b.target}\` was blocked: ${b.reason}`),
+      ...said("lessons.signal.guardBlocked", { tool: b.tool, target: b.target, reason: b.reason }, "reason"),
     });
   }
   for (const [i, a] of e.security.approvals.entries()) {
@@ -76,7 +112,7 @@ export function lessonSignals(e: Evidence): Signal[] {
     out.push({
       source: "approval",
       ref: `approval:${i + 1}`,
-      text: clip(`The person denied ${a.tool} \`${a.target}\``),
+      ...said("lessons.signal.denied", { tool: a.tool, target: a.target }, "target"),
     });
   }
   for (const [i, n] of e.risks.fromImplementer.entries()) {
@@ -132,7 +168,9 @@ const LessonsFileSchema = z.object({
       id: z.string(),
       text: z.string(),
       why: z.string(),
-      sources: z.array(z.object({ source: z.string(), ref: z.string(), text: z.string() })),
+      sources: z.array(
+        z.object({ source: z.string(), ref: z.string(), text: z.string(), textRef: MessageRefSchema.optional() }),
+      ),
     }),
   ),
 });
@@ -232,9 +270,11 @@ export function applyLessons(root: string, taskId: string, ids: string[], from: 
   // Ignored before the run is recorded: dismissing the rest afterwards then doesn't change a file the run backed up,
   // which would stop it from rolling back cleanly.
   ensureIgnored(root, "lessons.json");
+  // History keeps a run's title in the language it was written in, as it does for the other runs.
+  const title = resultText(resultRef("lessons.history.title", { count: ids.length, path: file }));
   const runId = applyFileEdits(
     root,
-    { id: `lessons:${taskId}`, title: `Add ${ids.length} lesson${ids.length === 1 ? "" : "s"} to ${file}` },
+    { id: `lessons:${taskId}`, title },
     [{ path: file, content: after }],
     catalogVersion,
   );
@@ -316,11 +356,7 @@ export async function suggestLessons(
   const signals = lessonSignals(evidence);
   if (!signals.length) {
     writeJson(suggestionsFile(root, taskId), { lessons: [] });
-    return {
-      lessons: [],
-      costUsd: 0,
-      note: "Nothing in this run points at a lesson: no gate needed a fix, no review finding, no block or denial.",
-    };
+    return { lessons: [], costUsd: 0, note: resultText(resultRef("lessons.note.noSignals")) };
   }
   const claudeMd = readClaudeMd(root);
   const dismissed = dismissedLessons(root);
@@ -352,12 +388,12 @@ export async function suggestLessons(
       if (m.type !== "result") continue;
       costUsd += m.total_cost_usd;
       if (m.subtype !== "success") {
-        note = `The suggestion stopped: ${m.subtype}.`;
+        note = resultText(resultRef("lessons.note.stopped", { reason: m.subtype }));
         break;
       }
       const parsed = AnswerSchema.safeParse(m.structured_output);
       if (parsed.success) answer = parsed.data;
-      else note = "The suggestion wasn't a valid answer.";
+      else note = resultText(resultRef("lessons.note.invalidAnswer"));
       break;
     }
   } catch (err) {
@@ -381,11 +417,7 @@ export async function suggestLessons(
     ...(note
       ? { note }
       : !lessons.length
-        ? {
-            note: offered
-              ? "No new lesson: what the run shows is already in CLAUDE.md, or was dismissed."
-              : "Nothing in this run makes a lesson for other tasks: what it shows is about this task only.",
-          }
+        ? { note: resultText(resultRef(offered ? "lessons.note.allKnown" : "lessons.note.taskOnly")) }
         : {}),
   };
 }

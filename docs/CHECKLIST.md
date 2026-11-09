@@ -2196,11 +2196,40 @@ first.
           - X-12: 8/8;
           - the pseudo-locale: 5/5;
           - Bahasa Indonesia: 5/5, including the plan action titled by the sidecar.
+      - **Part 2b, task results (2026-11-09):** results are stored as English plus a `MessageRef`, and shown in the
+        app's language. Pull requests, `evidence.md` and Claude keep the English.
+        - **Translated:** run outcomes, step notes and the labels the sidecar writes, XL outcomes (nested in one
+          language down to a sub-task's own outcome), triage signal details and model errors, lesson sources,
+          merge gates (live), and the evidence report (rendered twice from `evidence.json`).
+        - **Catalogs:** about 380 results keys in `packages/protocol/src/results/`, in English and Indonesian.
+        - **No logic on words:** XL's "Interrupted" check reads the note's ref, and falls back to the text for older
+          records.
+        - **How it was done:** the core first, then three agents in worktrees (run and triage; XL and lessons;
+          evidence). Then the integration:
+          - one setup sentence for both orchestrators;
+          - the scanners' reasons in merge gates;
+          - one Indonesian phrase for exit codes;
+          - the review outcome's English "pr" fixed.
+        - **Tests:** 740 unit tests. They check:
+          - each ref renders to exactly the stored English;
+          - the same runs render in Indonesian;
+          - `evidence.md` is byte-identical to before (12 fixtures and a golden string);
+          - records without refs still load;
+          - results parity;
+          - the literal scan's `LATER` list is gone.
+        - **Live:** one S task on `sample-app` with `AGENTCHAINER_LANGUAGE=id` (haiku, ≈$0.015).
+          - `task.json`'s outcome is "Every gate passed after the last change." and renders "Semua gate lulus setelah
+            perubahan terakhir."
+          - The sidecar's labels and notes render in Indonesian. The workflow's own labels ("Implement", "Gates") stay
+            as written (2c).
+          - `evidence.md`'s headings are English, while `task.evidence` returns Indonesian sections.
       - **Part 2, still open:**
-        - **2b, task results:** run outcomes, step and merge-gate labels, triage details, lessons. They go into PRs
-          and evidence, so they need an English copy and a translated one. Also the deploy smoke details and
-          plugin warnings that evidence copies, and `generate-workflow`'s retry reason.
-        - **2c:** the catalog YAML's prose.
+        - **2c:** the catalog YAML's prose, including workflow step labels.
+        - **Small leftovers:**
+          - deploy smoke details and plugin warnings are stored in the language of the moment, and evidence copies
+            them;
+          - `generate-workflow`'s retry reason to Claude follows the app's language;
+          - an English XL outcome that quotes a child's outcome ending with a full stop shows "..".
         - Also: weekday names in `schedules.ts` stay `en-US`, and enum values shown as words (risk, scope, state)
           arrive as received.
         - Then a second language, with its Language setting.

@@ -114,6 +114,25 @@ checks a typed error (`AlreadyRunning`).
 - task results (run outcomes, step and merge-gate labels, the evidence report), which also go into pull requests;
 - the catalog's YAML prose.
 
+### Addendum (2026-11-09): task results (X-13 part 2b)
+
+A task's results are stored, and the same text goes into pull requests, `evidence.md`, prompts and CLAUDE.md, which
+stay English. So a result is stored twice:
+- **the English text**, the canonical field that every artifact and test uses;
+- **a `MessageRef`** (`{ key, params }`, where params may be refs) into the results catalog in the protocol package,
+  which the app renders in its language.
+
+**Details:**
+- **One template:** the sidecar's `result()` builds both, so they can't drift.
+- **Old records:** they have no refs and show as written.
+- **Live, never stored:** merge gates and the lessons' notes render directly in the app's language.
+- **The evidence report:** `evidence.json` keeps refs for its prose. `renderEvidence` takes a renderer: English for
+  `evidence.md` and the PR body, the app's language for `task.evidence`.
+- **Still English:**
+  - labels from a workflow's YAML (part 2c, with the catalog's prose);
+  - raw text quoted in a result (git's output, an error's message);
+  - what Claude writes.
+
 ## Alternatives considered
 
 | Option | Pros | Cons | Why not chosen |

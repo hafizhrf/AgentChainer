@@ -1,5 +1,5 @@
 {
-  "catalogVersion": "2026.10.30",
+  "catalogVersion": "2026.11.9",
   "profiles": [
     {
       "id": "baseline",
@@ -254,7 +254,7 @@
       "scope": "project",
       "tier": "official",
       "license": "Apache-2.0",
-      "source": "typescript-lsp@claude-plugins-official, reviewed v1.0.0 at f8c5e7a",
+      "source": "typescript-lsp@claude-plugins-official, reviewed v1.0.0 at 0412be7",
       "profile": "ts-node",
       "permissions": [
         "Starts typescript-language-server in the project"
@@ -274,8 +274,9 @@
           ]
         ]
       },
-      "state": "recommended",
-      "selected": true
+      "state": "unavailable",
+      "selected": false,
+      "reason": "Not reviewed yet: needs 1 more maintainer review(s) against docs/CATALOG.md §4."
     },
     {
       "id": "gen:generate-claude-md",

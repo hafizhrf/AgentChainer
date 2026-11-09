@@ -13,7 +13,7 @@ source:
   repo: anthropics/claude-plugins-official
   plugin: rust-analyzer-lsp
   reviewedVersion: "1.0.0"
-  reviewedRef: "f8c5e7a1dcb71b10cb74586224b5401f3de5db28"
+  reviewedRef: "0412be76f50ab4f4f8abff3753efa9269fbbca5b"
 platforms: [darwin, linux, win32]
 requires:
   - tool: rust-analyzer
@@ -28,14 +28,7 @@ install:
 uninstall:
   steps:
     - run: [claude, plugin, uninstall, "rust-analyzer-lsp@claude-plugins-official", --scope, project, --json]
-reviews:
-  - by: hafizhrf
-    date: "2026-10-30"
-    ref: "f8c5e7a1dcb71b10cb74586224b5401f3de5db28"
-    notes: >-
-      Read the marketplace entry, README and LICENSE at f8c5e7a (1.0.0, the whole folder): Apache-2.0; a config-only
-      LSP plugin that starts rust-analyzer from PATH; no hooks, MCP servers, scripts or telemetry. The server runs
-      cargo build scripts and proc macros, as any Rust editor does. docs/catalog-reviews/2026-10-30.md
+reviews: []
 i18n:
   id:
     name: "Language server Rust (rust-analyzer)"

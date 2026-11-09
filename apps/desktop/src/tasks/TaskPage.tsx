@@ -40,6 +40,7 @@ import { type Confirm, Modal } from "../Dialog.tsx";
 import { approxUsd, dateTime, seconds as secondsText } from "../i18n/format.ts";
 import { t } from "../i18n/index.ts";
 import { Rich } from "../i18n/Rich.tsx";
+import { localized } from "../i18n/shown.ts";
 import { Markdown } from "../Markdown.tsx";
 import { MODE_NAMES, modelChoices, modeOptions } from "../options.ts";
 import type { PermissionAnswer } from "../PermissionDialog.tsx";
@@ -272,7 +273,7 @@ export function TaskPage({
     setTask((current) => newer(current, t, "reply"));
     setEdited(t.contract);
     setTier(t.triage?.chosen ?? "S");
-    setReason(t.triage?.override?.reason ?? "");
+    setReason(localized(t.triage?.override?.reason, t.triage?.override?.reasonRef) ?? "");
     setBudget(t.triage ? (t.triage.budgetUsd === null ? NO_BUDGET : String(t.triage.budgetUsd)) : "");
   }
 
@@ -709,7 +710,7 @@ export function TaskPage({
             busy={false}
             placeholder={
               runningStep && (runningStep.kind === "agent" || runningStep.kind === "fix")
-                ? t("tasks.page.messageStep", { step: runningStep.label })
+                ? t("tasks.page.messageStep", { step: localized(runningStep.label, runningStep.labelRef) })
                 : t("tasks.page.stepTakesNoMessages")
             }
             hint={t("tasks.page.messageStepHint")}
@@ -1326,7 +1327,7 @@ function TriageCard({
                   </span>
                 )}
               </div>
-              <span>{s.detail}</span>
+              <span>{localized(s.detail, s.detailRef)}</span>
             </li>
           ))}
           <li>
@@ -1336,11 +1337,13 @@ function TriageCard({
             </div>
             {triage.model ? (
               <span>
-                {triage.model.rationale}{" "}
+                {localized(triage.model.rationale, triage.model.rationaleRef)}{" "}
                 <span className="muted">{t("tasks.triage.confidence", { confidence: triage.model.confidence })}</span>
               </span>
             ) : (
-              <span className="muted">{t("tasks.triage.unavailable", { error: triage.modelError ?? "" })}</span>
+              <span className="muted">
+                {t("tasks.triage.unavailable", { error: localized(triage.modelError, triage.modelErrorRef) ?? "" })}
+              </span>
             )}
           </li>
         </ul>
@@ -1467,7 +1470,10 @@ function ContractView({ task, contract, triage }: { task: Task; contract: TaskCo
               {triage.override && (
                 <span className="muted">
                   {" "}
-                  {t("tasks.contractView.overridden", { tier: triage.proposed, reason: triage.override.reason })}
+                  {t("tasks.contractView.overridden", {
+                    tier: triage.proposed,
+                    reason: localized(triage.override.reason, triage.override.reasonRef),
+                  })}
                 </span>
               )}
             </dd>
@@ -1619,14 +1625,14 @@ function RunView({
             >
               <ChevronRight size={14} className="task-step-chevron" aria-hidden />
               <StepIcon status={entry.status} />
-              <span className="task-step-label">{entry.label}</span>
+              <span className="task-step-label">{localized(entry.label, entry.labelRef)}</span>
               {entry.role && <span className="chip step-role">{entry.role}</span>}
               {entry.group && (
                 <span className="badge" title={t("tasks.run.parallelHint", { group: entry.group })}>
                   {t("tasks.run.parallel")}
                 </span>
               )}
-              <span className="grow muted task-step-note">{entry.note}</span>
+              <span className="grow muted task-step-note">{localized(entry.note, entry.noteRef)}</span>
               <span className="muted">{duration(entry.startedAt, entry.endedAt)}</span>
               {(entry.kind === "agent" || entry.kind === "fix" || entry.kind === "subtask") && (
                 <span className="muted">{usd(entry.costUsd)}</span>
@@ -1638,13 +1644,17 @@ function RunView({
                   <GateList runs={gates} before={entry.kind === "gates" ? before : undefined} />
                 ) : entry.kind === "subtask" && entry.taskId ? (
                   <div className="task-step-empty task-step-actions">
-                    <span className="muted grow">{entry.note ?? t("tasks.run.subtaskNote")}</span>
+                    <span className="muted grow">
+                      {localized(entry.note, entry.noteRef) ?? t("tasks.run.subtaskNote")}
+                    </span>
                     <button type="button" className="secondary small" onClick={() => onOpenTask(entry.taskId ?? "")}>
                       {t("tasks.run.openSubtask")}
                     </button>
                   </div>
                 ) : entry.kind === "setup" || entry.kind === "merge" ? (
-                  <p className="muted task-step-empty">{entry.note ?? t("tasks.run.working")}</p>
+                  <p className="muted task-step-empty">
+                    {localized(entry.note, entry.noteRef) ?? t("tasks.run.working")}
+                  </p>
                 ) : sessionItems?.length ? (
                   <TranscriptView cwd={cwd} items={sessionItems} />
                 ) : (
@@ -1657,7 +1667,7 @@ function RunView({
           </section>
         );
       })}
-      {run.outcome && <p className={`callout tone-${tone} run-outcome`}>{run.outcome}</p>}
+      {run.outcome && <p className={`callout tone-${tone} run-outcome`}>{localized(run.outcome, run.outcomeRef)}</p>}
       {run.acceptance && (
         <p className="callout">
           <strong>{t("tasks.run.riskAccepted")}</strong> {dateTime(run.acceptance.at)}: {run.acceptance.reason}

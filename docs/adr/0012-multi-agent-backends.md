@@ -68,6 +68,13 @@ Team supervisors and the app's own model calls.
      - **Read steps** also get `deny: write_file(*)`.
 4. **Cost is an estimate.** Tokens × a pinned price table, labeled as an estimate wherever it shows. A step's cap and
    the task's budget count it like Claude's spend.
+   - As built (M9-07): the table is `packages/sidecar/src/backends/prices.ts`, each price with its source and the
+     date it applies from. It's the API price, the same kind of number the Agent SDK reports for a Claude
+     subscription, so the three agents add up.
+   - A model with no price shows its tokens and an unknown cost, and counts $0 toward the budget. The evidence says
+     so.
+   - Codex reports tokens during a turn, so its turn stops once the estimate passes the step's cap. agy reports them
+     only at the end of a turn, so its spend is checked between steps.
 5. **Any role on any agent the user has** (owner, 2026-11-10: "gak selalu gitu, bisa diadjust… jadi fleksibel"). No
    pairing is built in.
    - **Examples:**

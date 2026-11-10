@@ -1,11 +1,13 @@
 import {
   type ApprovalRecord,
+  type CostKind,
   type GateKind,
   type GateRun,
   type GuardBlock,
   literalRef,
   type MessageRef,
   resultRef,
+  type StepAgent,
   type StepRun,
   type Task,
   type TaskContract,
@@ -31,7 +33,22 @@ export type AgentOutcome = {
   text: string;
   structured?: unknown;
   costUsd: number;
+  /** Which agent ran the step and with what model; how its cost was counted, and its tokens (M9-07). */
+  agent?: StepAgent;
+  model?: string;
+  costKind?: CostKind;
+  tokens?: { input: number; output: number };
 };
+
+/** The agent fields of a step's timeline entry, from its outcome (M9-07). */
+function ranBy(out: AgentOutcome): Partial<StepRun> {
+  return {
+    ...(out.agent ? { agent: out.agent } : {}),
+    ...(out.model ? { model: out.model } : {}),
+    ...(out.costKind ? { costKind: out.costKind } : {}),
+    ...(out.tokens ? { tokens: out.tokens } : {}),
+  };
+}
 
 /** A step's tag without the workspace, which the runner adds. */
 export type StepTag = Omit<TaskTag, "cwd">;
@@ -490,20 +507,20 @@ export class Orchestrator {
         )
       : await this.runner.start(step, this.prompt(step), budget, tag);
     if (this.cancelled) {
-      this.finish(id, { status: "cancelled", sessionId: out.sessionId }, out.costUsd);
+      this.finish(id, { status: "cancelled", sessionId: out.sessionId, ...ranBy(out) }, out.costUsd);
       return null;
     }
     if (!out.ok) {
       const why = stopped(out.subtype);
       this.finish(
         id,
-        { status: "failed", sessionId: out.sessionId, ...noteOf(result("run.note.stopped", { why })) },
+        { status: "failed", sessionId: out.sessionId, ...ranBy(out), ...noteOf(result("run.note.stopped", { why })) },
         out.costUsd,
       );
       this.commit(() => outcomeOf(result("run.outcome.stepStopped", { step: labelRef ?? step.label, why })));
       return null;
     }
-    this.finish(id, { status: "done", sessionId: out.sessionId }, out.costUsd);
+    this.finish(id, { status: "done", sessionId: out.sessionId, ...ranBy(out) }, out.costUsd);
     // The implementer's latest summary: what each file's change is for, in the evidence.
     if (step.access === "write") this.files.write("summary.md", out.text);
     return { id, out };
@@ -590,19 +607,19 @@ export class Orchestrator {
       ].join("\n\n");
       const out = await this.runner.start(step, prompt, budget, this.tag(id, step.label, step.role));
       if (this.cancelled) {
-        this.finish(id, { status: "cancelled", sessionId: out.sessionId }, out.costUsd);
+        this.finish(id, { status: "cancelled", sessionId: out.sessionId, ...ranBy(out) }, out.costUsd);
         return this.end("cancelled", result("run.outcome.stoppedByUserWorktree"));
       }
       if (!out.ok) {
         const why = stopped(out.subtype);
         this.finish(
           id,
-          { status: "failed", sessionId: out.sessionId, ...noteOf(result("run.note.stopped", { why })) },
+          { status: "failed", sessionId: out.sessionId, ...ranBy(out), ...noteOf(result("run.note.stopped", { why })) },
           out.costUsd,
         );
         return this.end("failed", result("run.outcome.ciFixStopped", { why }));
       }
-      this.finish(id, { status: "done", sessionId: out.sessionId }, out.costUsd);
+      this.finish(id, { status: "done", sessionId: out.sessionId, ...ranBy(out) }, out.costUsd);
       this.files.write("summary.md", out.text);
       const gates = this.workflow.steps.find(isGates);
       if (!gates) return this.end("done", result("run.outcome.ciFixedNoGates", { check: ci.check }));
@@ -743,13 +760,13 @@ export class Orchestrator {
       const note = this.cancelled ? {} : noteOf(result("run.note.stopped", { why }));
       this.finish(
         id,
-        { status: this.cancelled ? "cancelled" : "failed", sessionId: out.sessionId, ...note },
+        { status: this.cancelled ? "cancelled" : "failed", sessionId: out.sessionId, ...ranBy(out), ...note },
         out.costUsd,
       );
       if (!this.cancelled) this.commit(() => outcomeOf(result("run.outcome.fixStopped", { what, why })));
       return false;
     }
-    this.finish(id, { status: "done", sessionId: out.sessionId }, out.costUsd);
+    this.finish(id, { status: "done", sessionId: out.sessionId, ...ranBy(out) }, out.costUsd);
     this.files.write("summary.md", out.text);
     return true;
   }

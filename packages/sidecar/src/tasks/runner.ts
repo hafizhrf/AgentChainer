@@ -283,7 +283,7 @@ export function sessionRunner(
     return session;
   };
 
-  const turn = async (session: StepSession, prompt: string, write = false): Promise<AgentOutcome> => {
+  const turn = async (step: AgentStep, session: StepSession, prompt: string, write = false): Promise<AgentOutcome> => {
     const entry = { session, write };
     inTurn.push(entry);
     try {
@@ -295,9 +295,20 @@ export function sessionRunner(
         text: r.text,
         ...(r.structured !== undefined ? { structured: r.structured } : {}),
         costUsd: r.costUsd,
+        agent: agentFor(step, run.agents),
+        ...(r.model ? { model: r.model } : {}),
+        ...(r.costKind ? { costKind: r.costKind } : {}),
+        ...(r.tokens ? { tokens: r.tokens } : {}),
       };
     } catch {
-      return { sessionId: session.id, ok: false, subtype: "ended", text: "", costUsd: 0 };
+      return {
+        sessionId: session.id,
+        ok: false,
+        subtype: "ended",
+        text: "",
+        costUsd: 0,
+        agent: agentFor(step, run.agents),
+      };
     } finally {
       inTurn.splice(inTurn.indexOf(entry), 1);
     }
@@ -309,7 +320,7 @@ export function sessionRunner(
       tags.set(session, { ...tag, cwd: root });
       session.tag = { ...tag, cwd: root };
       if (step.access === "write") live.set(step.id, session);
-      const out = await turn(session, prompt, step.access === "write");
+      const out = await turn(step, session, prompt, step.access === "write");
       if (step.access === "read") void session.close();
       return out;
     },
@@ -322,7 +333,7 @@ export function sessionRunner(
       }
       tags.set(session, { ...tag, cwd: root });
       session.tag = { ...tag, cwd: root };
-      return turn(session, prompt, true);
+      return turn(step, session, prompt, true);
     },
     async gates(kinds, round) {
       // Each folder runs its own commands (M8-01); a gate counts as run when any folder has it.

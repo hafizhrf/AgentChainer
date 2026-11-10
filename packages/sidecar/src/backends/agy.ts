@@ -3,13 +3,14 @@ import { randomUUID } from "node:crypto";
 import { homedir } from "node:os";
 import path from "node:path";
 import { createInterface } from "node:readline";
-import type { AgentEvent, FleetItem, TaskTag } from "@agentchainer/protocol";
+import type { AgentEvent, CostKind, FleetItem, TaskTag } from "@agentchainer/protocol";
 import type { Cli } from "../deploy/cli.ts";
 import { checkToolCall, GUARD_PREFIX, SECRET_DIRS } from "../guard.ts";
 import { t } from "../i18n/index.ts";
 import { log } from "../rpc.ts";
 import type { SessionCallbacks, TurnResult } from "../session.ts";
 import { type AgyEvent, type AgyUsage, eventsOf, parseLine, usageOfResult, writesOf } from "./agy-events.ts";
+import { estimateUsd } from "./prices.ts";
 import type { LiveSession, StepBackend, StepOptions } from "./types.ts";
 
 /**
@@ -94,6 +95,8 @@ class AgySession implements LiveSession {
   private child: ChildProcessWithoutNullStreams | null = null;
   private turns = 0;
   private total: AgyUsage = { inputTokens: 0, outputTokens: 0, thinkingTokens: 0, cacheReadTokens: 0 };
+  /** The model agy reported at its last turn's start. */
+  model = "";
   private status: FleetItem["status"] = "idle";
   private readonly startedAt = new Date().toISOString();
   private since = this.startedAt;
@@ -138,8 +141,9 @@ class AgySession implements LiveSession {
         this.named(e.conversationId);
         if (first) this.touch("working");
       }
+      const init = e as { model?: unknown };
+      if (e.kind === "init" && typeof init.model === "string") this.model = init.model;
       if (e.kind === "init" && first) {
-        const init = e as { model?: unknown };
         this.emit({
           type: "session.started",
           sessionId: this.id,
@@ -206,6 +210,7 @@ class AgySession implements LiveSession {
       | (AgyEvent & { status?: string; response?: string })
       | undefined;
     const usage = usageOfResult(result);
+    const before = this.costOf(this.total);
     this.total = {
       inputTokens: this.total.inputTokens + usage.inputTokens,
       outputTokens: this.total.outputTokens + usage.outputTokens,
@@ -237,7 +242,7 @@ class AgySession implements LiveSession {
       type: "turn.completed",
       subtype: ok ? "success" : "error_during_execution",
       isError: !ok,
-      totalCostUsd: 0,
+      totalCostUsd: this.costOf(this.total) ?? 0,
       durationMs: Math.round(Number(result?.duration_seconds ?? 0) * 1000),
       numTurns: this.turns,
       usage: {
@@ -254,8 +259,27 @@ class AgySession implements LiveSession {
       isError: !ok,
       text: ok ? text : "",
       ...(structured !== undefined ? { structured } : {}),
-      costUsd: 0,
+      costUsd: Math.max(0, (this.costOf(this.total) ?? 0) - (before ?? 0)),
+      ...(this.model ? { model: this.model } : {}),
+      costKind: this.costKind,
+      tokens: { input: usage.inputTokens, output: usage.outputTokens + usage.thinkingTokens },
     };
+  }
+
+  /**
+   * `usage` at the model's API price (M9-07), or null for a model with no price. agy's input count includes its cache
+   * reads, as Gemini's API counts them (verify).
+   */
+  private costOf(usage: AgyUsage): number | null {
+    return estimateUsd(this.model, {
+      input: usage.inputTokens,
+      cached: usage.cacheReadTokens,
+      output: usage.outputTokens + usage.thinkingTokens,
+    });
+  }
+
+  private get costKind(): CostKind {
+    return estimateUsd(this.model, { input: 0, cached: 0, output: 0 }) === null ? "unknown" : "estimate";
   }
 
   /** A headless run takes no messages mid-turn. */
@@ -280,7 +304,10 @@ class AgySession implements LiveSession {
       cwd: this.options.cwd,
       status: this.status,
       waiting: 0,
-      costUsd: 0,
+      costUsd: this.costOf(this.total) ?? 0,
+      agent: "agy",
+      ...(this.model ? { model: this.model } : {}),
+      costKind: this.costKind,
       startedAt: this.startedAt,
       since: this.since,
       ...(this.tag ? { task: this.tag } : {}),

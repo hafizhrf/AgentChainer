@@ -8,6 +8,7 @@ import {
   type ResultKey,
   resultEnglish,
   resultRef,
+  type StepRun,
   type Task,
   type TaskRun,
 } from "@agentchainer/protocol";
@@ -129,7 +130,17 @@ export type Evidence = {
     manual: string[];
   };
   cost: {
-    steps: { label: string; labelRef?: MessageRef; durationMs: number | null; costUsd: number }[];
+    steps: {
+      label: string;
+      labelRef?: MessageRef;
+      durationMs: number | null;
+      costUsd: number;
+      /** Who ran an agent step (M9-07). */
+      agent?: StepRun["agent"];
+      model?: string;
+      costKind?: StepRun["costKind"];
+      tokens?: StepRun["tokens"];
+    }[];
     runUsd: number;
     totalUsd: number;
   };
@@ -336,6 +347,10 @@ export function buildEvidence({
         ...(s.labelRef ? { labelRef: s.labelRef } : {}),
         durationMs: s.endedAt ? Date.parse(s.endedAt) - Date.parse(s.startedAt) : null,
         costUsd: s.costUsd,
+        ...(s.agent ? { agent: s.agent } : {}),
+        ...(s.model ? { model: s.model } : {}),
+        ...(s.costKind ? { costKind: s.costKind } : {}),
+        ...(s.tokens ? { tokens: s.tokens } : {}),
       })),
       runUsd: run?.costUsd ?? 0,
       totalUsd: task.costUsd,
@@ -408,6 +423,9 @@ export const named = (words: Partial<Record<string, ResultKey>>, value: string):
 };
 
 const cell = (s: string) => s.replace(/\|/g, "\\|").replace(/\n/g, " ");
+/** The agents' product names, which stay as they are in every language. */
+const AGENT_NAMES = { claude: "Claude", codex: "Codex", agy: "Antigravity CLI" } as const;
+
 const usd = (n: number) => `≈$${n.toFixed(n < 0.1 ? 4 : 2)}`;
 
 /**
@@ -639,11 +657,20 @@ export function renderEvidence(e: Evidence, render: (ref: MessageRef) => string 
       );
     }
   }
-  add("", r("evidence.report.cost"), "", r("evidence.report.costTable"), "|---|---|---|");
+  add("", r("evidence.report.cost"), "", r("evidence.report.costTable"), "|---|---|---|---|");
   for (const s of e.cost.steps) {
-    add(`| ${cell(shown(s.label, s.labelRef))} | ${seconds(s.durationMs)} | ${usd(s.costUsd)} |`);
+    const ran = s.agent ? [AGENT_NAMES[s.agent], s.model].filter(Boolean).join(" · ") : "–";
+    const tokens = s.tokens ? (s.tokens.input + s.tokens.output).toLocaleString("en-US") : "";
+    const cost =
+      s.costKind === "unknown"
+        ? r("evidence.report.costUnknown", { tokens })
+        : s.costKind === "estimate" && tokens
+          ? r("evidence.report.costTokens", { cost: usd(s.costUsd), tokens })
+          : usd(s.costUsd);
+    add(`| ${cell(shown(s.label, s.labelRef))} | ${cell(ran)} | ${seconds(s.durationMs)} | ${cost} |`);
   }
   add("", r("evidence.report.costTotal", { run: usd(e.cost.runUsd), total: usd(e.cost.totalUsd) }), "");
+  if (e.cost.steps.some((s) => s.costKind)) add(r("evidence.report.costEstimated"), "");
   add(r("evidence.report.generated", { at: e.generatedAt }), "");
   return out.join("\n");
 }

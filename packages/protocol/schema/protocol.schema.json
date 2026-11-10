@@ -163,6 +163,24 @@
                 },
                 "parentId": {
                   "type": "string"
+                },
+                "agent": {
+                  "type": "string",
+                  "enum": [
+                    "claude",
+                    "codex",
+                    "agy"
+                  ]
+                },
+                "model": {
+                  "type": "string"
+                },
+                "costKind": {
+                  "type": "string",
+                  "enum": [
+                    "estimate",
+                    "unknown"
+                  ]
                 }
               },
               "required": [
@@ -6191,6 +6209,40 @@
                         "costUsd": {
                           "type": "number"
                         },
+                        "agent": {
+                          "type": "string",
+                          "enum": [
+                            "claude",
+                            "codex",
+                            "agy"
+                          ]
+                        },
+                        "model": {
+                          "type": "string"
+                        },
+                        "costKind": {
+                          "type": "string",
+                          "enum": [
+                            "estimate",
+                            "unknown"
+                          ]
+                        },
+                        "tokens": {
+                          "type": "object",
+                          "properties": {
+                            "input": {
+                              "type": "number"
+                            },
+                            "output": {
+                              "type": "number"
+                            }
+                          },
+                          "required": [
+                            "input",
+                            "output"
+                          ],
+                          "additionalProperties": false
+                        },
                         "note": {
                           "type": "string"
                         },
@@ -7528,6 +7580,40 @@
                         },
                         "costUsd": {
                           "type": "number"
+                        },
+                        "agent": {
+                          "type": "string",
+                          "enum": [
+                            "claude",
+                            "codex",
+                            "agy"
+                          ]
+                        },
+                        "model": {
+                          "type": "string"
+                        },
+                        "costKind": {
+                          "type": "string",
+                          "enum": [
+                            "estimate",
+                            "unknown"
+                          ]
+                        },
+                        "tokens": {
+                          "type": "object",
+                          "properties": {
+                            "input": {
+                              "type": "number"
+                            },
+                            "output": {
+                              "type": "number"
+                            }
+                          },
+                          "required": [
+                            "input",
+                            "output"
+                          ],
+                          "additionalProperties": false
                         },
                         "note": {
                           "type": "string"
@@ -8872,6 +8958,40 @@
                         },
                         "costUsd": {
                           "type": "number"
+                        },
+                        "agent": {
+                          "type": "string",
+                          "enum": [
+                            "claude",
+                            "codex",
+                            "agy"
+                          ]
+                        },
+                        "model": {
+                          "type": "string"
+                        },
+                        "costKind": {
+                          "type": "string",
+                          "enum": [
+                            "estimate",
+                            "unknown"
+                          ]
+                        },
+                        "tokens": {
+                          "type": "object",
+                          "properties": {
+                            "input": {
+                              "type": "number"
+                            },
+                            "output": {
+                              "type": "number"
+                            }
+                          },
+                          "required": [
+                            "input",
+                            "output"
+                          ],
+                          "additionalProperties": false
                         },
                         "note": {
                           "type": "string"
@@ -10319,6 +10439,40 @@
                         },
                         "costUsd": {
                           "type": "number"
+                        },
+                        "agent": {
+                          "type": "string",
+                          "enum": [
+                            "claude",
+                            "codex",
+                            "agy"
+                          ]
+                        },
+                        "model": {
+                          "type": "string"
+                        },
+                        "costKind": {
+                          "type": "string",
+                          "enum": [
+                            "estimate",
+                            "unknown"
+                          ]
+                        },
+                        "tokens": {
+                          "type": "object",
+                          "properties": {
+                            "input": {
+                              "type": "number"
+                            },
+                            "output": {
+                              "type": "number"
+                            }
+                          },
+                          "required": [
+                            "input",
+                            "output"
+                          ],
+                          "additionalProperties": false
                         },
                         "note": {
                           "type": "string"
@@ -11793,6 +11947,40 @@
                         "costUsd": {
                           "type": "number"
                         },
+                        "agent": {
+                          "type": "string",
+                          "enum": [
+                            "claude",
+                            "codex",
+                            "agy"
+                          ]
+                        },
+                        "model": {
+                          "type": "string"
+                        },
+                        "costKind": {
+                          "type": "string",
+                          "enum": [
+                            "estimate",
+                            "unknown"
+                          ]
+                        },
+                        "tokens": {
+                          "type": "object",
+                          "properties": {
+                            "input": {
+                              "type": "number"
+                            },
+                            "output": {
+                              "type": "number"
+                            }
+                          },
+                          "required": [
+                            "input",
+                            "output"
+                          ],
+                          "additionalProperties": false
+                        },
                         "note": {
                           "type": "string"
                         },
@@ -13127,6 +13315,40 @@
                         },
                         "costUsd": {
                           "type": "number"
+                        },
+                        "agent": {
+                          "type": "string",
+                          "enum": [
+                            "claude",
+                            "codex",
+                            "agy"
+                          ]
+                        },
+                        "model": {
+                          "type": "string"
+                        },
+                        "costKind": {
+                          "type": "string",
+                          "enum": [
+                            "estimate",
+                            "unknown"
+                          ]
+                        },
+                        "tokens": {
+                          "type": "object",
+                          "properties": {
+                            "input": {
+                              "type": "number"
+                            },
+                            "output": {
+                              "type": "number"
+                            }
+                          },
+                          "required": [
+                            "input",
+                            "output"
+                          ],
+                          "additionalProperties": false
                         },
                         "note": {
                           "type": "string"
@@ -14505,6 +14727,40 @@
                         "costUsd": {
                           "type": "number"
                         },
+                        "agent": {
+                          "type": "string",
+                          "enum": [
+                            "claude",
+                            "codex",
+                            "agy"
+                          ]
+                        },
+                        "model": {
+                          "type": "string"
+                        },
+                        "costKind": {
+                          "type": "string",
+                          "enum": [
+                            "estimate",
+                            "unknown"
+                          ]
+                        },
+                        "tokens": {
+                          "type": "object",
+                          "properties": {
+                            "input": {
+                              "type": "number"
+                            },
+                            "output": {
+                              "type": "number"
+                            }
+                          },
+                          "required": [
+                            "input",
+                            "output"
+                          ],
+                          "additionalProperties": false
+                        },
                         "note": {
                           "type": "string"
                         },
@@ -15843,6 +16099,40 @@
                         "costUsd": {
                           "type": "number"
                         },
+                        "agent": {
+                          "type": "string",
+                          "enum": [
+                            "claude",
+                            "codex",
+                            "agy"
+                          ]
+                        },
+                        "model": {
+                          "type": "string"
+                        },
+                        "costKind": {
+                          "type": "string",
+                          "enum": [
+                            "estimate",
+                            "unknown"
+                          ]
+                        },
+                        "tokens": {
+                          "type": "object",
+                          "properties": {
+                            "input": {
+                              "type": "number"
+                            },
+                            "output": {
+                              "type": "number"
+                            }
+                          },
+                          "required": [
+                            "input",
+                            "output"
+                          ],
+                          "additionalProperties": false
+                        },
                         "note": {
                           "type": "string"
                         },
@@ -17177,6 +17467,40 @@
                         },
                         "costUsd": {
                           "type": "number"
+                        },
+                        "agent": {
+                          "type": "string",
+                          "enum": [
+                            "claude",
+                            "codex",
+                            "agy"
+                          ]
+                        },
+                        "model": {
+                          "type": "string"
+                        },
+                        "costKind": {
+                          "type": "string",
+                          "enum": [
+                            "estimate",
+                            "unknown"
+                          ]
+                        },
+                        "tokens": {
+                          "type": "object",
+                          "properties": {
+                            "input": {
+                              "type": "number"
+                            },
+                            "output": {
+                              "type": "number"
+                            }
+                          },
+                          "required": [
+                            "input",
+                            "output"
+                          ],
+                          "additionalProperties": false
                         },
                         "note": {
                           "type": "string"
@@ -18607,6 +18931,40 @@
                         "costUsd": {
                           "type": "number"
                         },
+                        "agent": {
+                          "type": "string",
+                          "enum": [
+                            "claude",
+                            "codex",
+                            "agy"
+                          ]
+                        },
+                        "model": {
+                          "type": "string"
+                        },
+                        "costKind": {
+                          "type": "string",
+                          "enum": [
+                            "estimate",
+                            "unknown"
+                          ]
+                        },
+                        "tokens": {
+                          "type": "object",
+                          "properties": {
+                            "input": {
+                              "type": "number"
+                            },
+                            "output": {
+                              "type": "number"
+                            }
+                          },
+                          "required": [
+                            "input",
+                            "output"
+                          ],
+                          "additionalProperties": false
+                        },
                         "note": {
                           "type": "string"
                         },
@@ -19947,6 +20305,40 @@
                         },
                         "costUsd": {
                           "type": "number"
+                        },
+                        "agent": {
+                          "type": "string",
+                          "enum": [
+                            "claude",
+                            "codex",
+                            "agy"
+                          ]
+                        },
+                        "model": {
+                          "type": "string"
+                        },
+                        "costKind": {
+                          "type": "string",
+                          "enum": [
+                            "estimate",
+                            "unknown"
+                          ]
+                        },
+                        "tokens": {
+                          "type": "object",
+                          "properties": {
+                            "input": {
+                              "type": "number"
+                            },
+                            "output": {
+                              "type": "number"
+                            }
+                          },
+                          "required": [
+                            "input",
+                            "output"
+                          ],
+                          "additionalProperties": false
                         },
                         "note": {
                           "type": "string"
@@ -21685,6 +22077,40 @@
                         "costUsd": {
                           "type": "number"
                         },
+                        "agent": {
+                          "type": "string",
+                          "enum": [
+                            "claude",
+                            "codex",
+                            "agy"
+                          ]
+                        },
+                        "model": {
+                          "type": "string"
+                        },
+                        "costKind": {
+                          "type": "string",
+                          "enum": [
+                            "estimate",
+                            "unknown"
+                          ]
+                        },
+                        "tokens": {
+                          "type": "object",
+                          "properties": {
+                            "input": {
+                              "type": "number"
+                            },
+                            "output": {
+                              "type": "number"
+                            }
+                          },
+                          "required": [
+                            "input",
+                            "output"
+                          ],
+                          "additionalProperties": false
+                        },
                         "note": {
                           "type": "string"
                         },
@@ -23020,6 +23446,40 @@
                         "costUsd": {
                           "type": "number"
                         },
+                        "agent": {
+                          "type": "string",
+                          "enum": [
+                            "claude",
+                            "codex",
+                            "agy"
+                          ]
+                        },
+                        "model": {
+                          "type": "string"
+                        },
+                        "costKind": {
+                          "type": "string",
+                          "enum": [
+                            "estimate",
+                            "unknown"
+                          ]
+                        },
+                        "tokens": {
+                          "type": "object",
+                          "properties": {
+                            "input": {
+                              "type": "number"
+                            },
+                            "output": {
+                              "type": "number"
+                            }
+                          },
+                          "required": [
+                            "input",
+                            "output"
+                          ],
+                          "additionalProperties": false
+                        },
                         "note": {
                           "type": "string"
                         },
@@ -24354,6 +24814,40 @@
                         },
                         "costUsd": {
                           "type": "number"
+                        },
+                        "agent": {
+                          "type": "string",
+                          "enum": [
+                            "claude",
+                            "codex",
+                            "agy"
+                          ]
+                        },
+                        "model": {
+                          "type": "string"
+                        },
+                        "costKind": {
+                          "type": "string",
+                          "enum": [
+                            "estimate",
+                            "unknown"
+                          ]
+                        },
+                        "tokens": {
+                          "type": "object",
+                          "properties": {
+                            "input": {
+                              "type": "number"
+                            },
+                            "output": {
+                              "type": "number"
+                            }
+                          },
+                          "required": [
+                            "input",
+                            "output"
+                          ],
+                          "additionalProperties": false
                         },
                         "note": {
                           "type": "string"
@@ -25902,6 +26396,40 @@
                         "costUsd": {
                           "type": "number"
                         },
+                        "agent": {
+                          "type": "string",
+                          "enum": [
+                            "claude",
+                            "codex",
+                            "agy"
+                          ]
+                        },
+                        "model": {
+                          "type": "string"
+                        },
+                        "costKind": {
+                          "type": "string",
+                          "enum": [
+                            "estimate",
+                            "unknown"
+                          ]
+                        },
+                        "tokens": {
+                          "type": "object",
+                          "properties": {
+                            "input": {
+                              "type": "number"
+                            },
+                            "output": {
+                              "type": "number"
+                            }
+                          },
+                          "required": [
+                            "input",
+                            "output"
+                          ],
+                          "additionalProperties": false
+                        },
                         "note": {
                           "type": "string"
                         },
@@ -27361,6 +27889,40 @@
                         "costUsd": {
                           "type": "number"
                         },
+                        "agent": {
+                          "type": "string",
+                          "enum": [
+                            "claude",
+                            "codex",
+                            "agy"
+                          ]
+                        },
+                        "model": {
+                          "type": "string"
+                        },
+                        "costKind": {
+                          "type": "string",
+                          "enum": [
+                            "estimate",
+                            "unknown"
+                          ]
+                        },
+                        "tokens": {
+                          "type": "object",
+                          "properties": {
+                            "input": {
+                              "type": "number"
+                            },
+                            "output": {
+                              "type": "number"
+                            }
+                          },
+                          "required": [
+                            "input",
+                            "output"
+                          ],
+                          "additionalProperties": false
+                        },
                         "note": {
                           "type": "string"
                         },
@@ -28798,6 +29360,40 @@
                         "costUsd": {
                           "type": "number"
                         },
+                        "agent": {
+                          "type": "string",
+                          "enum": [
+                            "claude",
+                            "codex",
+                            "agy"
+                          ]
+                        },
+                        "model": {
+                          "type": "string"
+                        },
+                        "costKind": {
+                          "type": "string",
+                          "enum": [
+                            "estimate",
+                            "unknown"
+                          ]
+                        },
+                        "tokens": {
+                          "type": "object",
+                          "properties": {
+                            "input": {
+                              "type": "number"
+                            },
+                            "output": {
+                              "type": "number"
+                            }
+                          },
+                          "required": [
+                            "input",
+                            "output"
+                          ],
+                          "additionalProperties": false
+                        },
                         "note": {
                           "type": "string"
                         },
@@ -30151,6 +30747,40 @@
                         },
                         "costUsd": {
                           "type": "number"
+                        },
+                        "agent": {
+                          "type": "string",
+                          "enum": [
+                            "claude",
+                            "codex",
+                            "agy"
+                          ]
+                        },
+                        "model": {
+                          "type": "string"
+                        },
+                        "costKind": {
+                          "type": "string",
+                          "enum": [
+                            "estimate",
+                            "unknown"
+                          ]
+                        },
+                        "tokens": {
+                          "type": "object",
+                          "properties": {
+                            "input": {
+                              "type": "number"
+                            },
+                            "output": {
+                              "type": "number"
+                            }
+                          },
+                          "required": [
+                            "input",
+                            "output"
+                          ],
+                          "additionalProperties": false
                         },
                         "note": {
                           "type": "string"
@@ -33628,6 +34258,40 @@
                         "costUsd": {
                           "type": "number"
                         },
+                        "agent": {
+                          "type": "string",
+                          "enum": [
+                            "claude",
+                            "codex",
+                            "agy"
+                          ]
+                        },
+                        "model": {
+                          "type": "string"
+                        },
+                        "costKind": {
+                          "type": "string",
+                          "enum": [
+                            "estimate",
+                            "unknown"
+                          ]
+                        },
+                        "tokens": {
+                          "type": "object",
+                          "properties": {
+                            "input": {
+                              "type": "number"
+                            },
+                            "output": {
+                              "type": "number"
+                            }
+                          },
+                          "required": [
+                            "input",
+                            "output"
+                          ],
+                          "additionalProperties": false
+                        },
                         "note": {
                           "type": "string"
                         },
@@ -35856,6 +36520,40 @@
                           "costUsd": {
                             "type": "number"
                           },
+                          "agent": {
+                            "type": "string",
+                            "enum": [
+                              "claude",
+                              "codex",
+                              "agy"
+                            ]
+                          },
+                          "model": {
+                            "type": "string"
+                          },
+                          "costKind": {
+                            "type": "string",
+                            "enum": [
+                              "estimate",
+                              "unknown"
+                            ]
+                          },
+                          "tokens": {
+                            "type": "object",
+                            "properties": {
+                              "input": {
+                                "type": "number"
+                              },
+                              "output": {
+                                "type": "number"
+                              }
+                            },
+                            "required": [
+                              "input",
+                              "output"
+                            ],
+                            "additionalProperties": false
+                          },
                           "note": {
                             "type": "string"
                           },
@@ -36720,6 +37418,24 @@
             },
             "parentId": {
               "type": "string"
+            },
+            "agent": {
+              "type": "string",
+              "enum": [
+                "claude",
+                "codex",
+                "agy"
+              ]
+            },
+            "model": {
+              "type": "string"
+            },
+            "costKind": {
+              "type": "string",
+              "enum": [
+                "estimate",
+                "unknown"
+              ]
             }
           },
           "required": [

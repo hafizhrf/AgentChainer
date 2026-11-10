@@ -2180,6 +2180,20 @@ with the OpenAI Codex CLI and Google's Antigravity CLI (`agy`), in both directio
     included), with Codex implementing and $0.0007 of Claude spend; the gate runs re-checked by hand matched.
 
 - [ ] **M9-07** The thread, Flow, Fleet and evidence show which agent and model ran each step.
+  - **Cost** (owner, 2026-11-10: "just follow claude one"): Codex and agy steps are estimated from their tokens at
+    the model's API price, and count toward the budget like Claude's spend (ADR-0012 §4).
+  Progress (2026-11-10), part 1, the sidecar:
+  - **Prices:** `backends/prices.ts`, with a source per model and dated changes (Gemini 3.8 Flash doubles on
+    2027-01-01). OpenAI's pricing page refused automated reads, so its prices are from release notes and trackers,
+    marked (verify).
+  - **Steps:** `StepRun` records `agent`, `model`, `tokens` and `costKind` (`estimate` or `unknown`). Fleet rows carry
+    the agent, the model and the estimate.
+  - **Budget:** a Codex turn stops (`error_max_budget_usd`) once its estimate passes the step's cap.
+  - **Evidence:** the cost table gets an Agent column ("Codex · gpt-6-luna"), tokens beside an estimate, "unknown"
+    for a model with no price, and a line saying how estimates are made.
+  - **Tests:** `prices.test.ts` (4), the Codex fake (an estimate, an unknown model, the budget stop), the agy fake
+    (an estimate per turn), the evidence table.
+  - **Left (part 2, the UI):** the agent and model in the thread, Flow, Fleet and the task page.
 - [ ] **M9-08** (later) Team workers on Codex or agy. The supervisor stays Claude.
 - [ ] **M9-09** (later) A chat on Codex or agy.
 

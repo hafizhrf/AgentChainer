@@ -6,6 +6,7 @@ import { after, describe, it } from "node:test";
 import type { AgentEvent } from "@agentchainer/protocol";
 import { GUARD_PREFIX } from "../guard.ts";
 import { agyBackend, runSettings, turnArgs } from "./agy.ts";
+import { estimateUsd } from "./prices.ts";
 import type { LiveSession } from "./types.ts";
 
 // A stand-in `agy -p`: prints the stream spike S8 recorded, writing the file named in FAKE_WRITE, and appends the
@@ -17,7 +18,7 @@ appendFileSync(process.env.FAKE_ARGS, JSON.stringify(args) + "\n");
 const at = args.indexOf("--conversation");
 const conv = at >= 0 ? args[at + 1] : "conv-1";
 const out = (o) => process.stdout.write(JSON.stringify(o) + "\n");
-out({ event: "init", conversation_id: conv, init: { model: "gemini-fake", permission_mode: "request-review" } });
+out({ event: "init", conversation_id: conv, init: { model: process.env.FAKE_MODEL || "gemini-fake", permission_mode: "request-review" } });
 const p = { Path: process.env.FAKE_WRITE };
 out({ event: "step_update", step_update: { conversation_id: conv, step_index: 1, state: "ACTIVE", step_type: "tool", tool_info: { name: "write_file", parameters: p } } });
 out({ event: "step_update", step_update: { conversation_id: conv, step_index: 1, state: "DONE", step_type: "tool", tool_info: { name: "write_file", parameters: p } } });
@@ -66,6 +67,22 @@ async function run(write: string, opts: { readOnly?: boolean; turns?: number } =
 }
 
 describe("the Antigravity CLI step backend (M9-05)", () => {
+  it("estimates each turn's cost from its tokens at the model's price (M9-07)", async () => {
+    process.env.FAKE_MODEL = "gemini-3.8-flash-low";
+    try {
+      const { results, session } = await run(path.join(dir, "priced.txt"), { turns: 2 });
+      const each = estimateUsd("gemini-3.8-flash-low", { input: 100, cached: 40, output: 10 }) ?? 0;
+      assert.ok(each > 0);
+      for (const r of results) {
+        assert.equal(r.costKind, "estimate");
+        assert.ok(Math.abs(r.costUsd - each) < 1e-12);
+      }
+      assert.ok(Math.abs(session.fleetItem.costUsd - 2 * each) < 1e-12);
+    } finally {
+      delete process.env.FAKE_MODEL;
+    }
+  });
+
   it("edits files with no commands, through per-run settings, and goes by agy's conversation id", async () => {
     const { session, results, events, argv, ids, statuses } = await run(path.join(dir, "hello.txt"), { turns: 2 });
     // The fleet only hears of the conversation's id: no row is left behind under the temporary one.
@@ -79,6 +96,15 @@ describe("the Antigravity CLI step backend (M9-05)", () => {
     );
     assert.equal(session.id, "conv-1");
     assert.deepEqual(ids, ["conv-1"], "registered again under the conversation's id");
+    // A model with no price: tokens, and a cost that's unknown (M9-07).
+    assert.deepEqual(
+      results.map((r) => [r.model, r.costKind, r.tokens?.input, r.tokens?.output]),
+      [
+        ["gemini-fake", "unknown", 100, 10],
+        ["gemini-fake", "unknown", 100, 10],
+      ],
+    );
+    assert.equal(session.fleetItem.agent, "agy");
     const [first, second] = argv;
     assert.ok(first && second);
     // The first turn carries the role's prompt and the no-commands rule; the second resumes the conversation.

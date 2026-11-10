@@ -5,6 +5,7 @@ import { createInterface } from "node:readline";
 import type {
   AgentEvent,
   AlwaysScope,
+  CostKind,
   Effort,
   FleetItem,
   Image,
@@ -101,6 +102,12 @@ export type TurnResult = {
   structured?: unknown;
   /** What this turn cost, an estimate. */
   costUsd: number;
+  /** The model that ran the turn, as the agent names it (M9-07). */
+  model?: string;
+  /** How `costUsd` was counted, for agents that report tokens: see `CostKind` (M9-07). */
+  costKind?: CostKind;
+  /** The turn's tokens, for agents that report tokens and not dollars. */
+  tokens?: { input: number; output: number };
 };
 
 /**
@@ -176,6 +183,8 @@ export class Session {
   private readonly waiters: { resolve: (r: TurnResult) => void; reject: (e: Error) => void }[] = [];
   /** The session's running cost, to give each turn its own. */
   private totalCostUsd = 0;
+  /** The model the CLI reported at its last init. */
+  private modelName: string | undefined;
   /** The CLI process, so that closing can wait for it to exit (and let go of the session's folder). */
   private proc: ChildProcess | null = null;
   private closing: Promise<void> | null = null;
@@ -518,6 +527,7 @@ export class Session {
         if (RECORD_PATH) appendFileSync(RECORD_PATH, `${JSON.stringify(message)}\n`);
         // Every turn starts with init (spike S2). One that no user message opened is the CLI going on after background
         // work (M4-07). The CLI runs turns one at a time, so the next result is that turn's.
+        if (message.type === "system" && message.subtype === "init") this.modelName = message.model;
         if (message.type === "system" && message.subtype === "init" && !this.busy) {
           this.autoTurns++;
           this.callbacks.emit({ type: "turn.started", reason: "background" });
@@ -543,6 +553,7 @@ export class Session {
             text: ok ? message.result : "",
             ...(ok && message.structured_output !== undefined ? { structured: message.structured_output } : {}),
             costUsd,
+            ...(this.modelName ? { model: this.modelName } : {}),
           };
           this.waiters.shift()?.resolve(ended);
         }

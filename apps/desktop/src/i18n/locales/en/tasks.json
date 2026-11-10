@@ -474,5 +474,8 @@
   "tasks.defaults.budgetFor": "Budget for tier {{tier}}",
   "tasks.defaults.noBudget": "no budget",
   "tasks.defaults.budgetsHelpApp": "Empty keeps the built-in budget. XL's applies to each sub-task.",
-  "tasks.defaults.budgetsHelpWorkspace": "Empty follows the app's default, shown greyed out. XL's applies to each sub-task."
+  "tasks.defaults.budgetsHelpWorkspace": "Empty follows the app's default, shown greyed out. XL's applies to each sub-task.",
+  "tasks.defaults.agentsGroup": "Who runs each step",
+  "tasks.defaults.runGroup": "Model and permissions",
+  "tasks.defaults.tierLabel": "Tier {{tier}}"
 }

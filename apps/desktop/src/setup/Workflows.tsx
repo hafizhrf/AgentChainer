@@ -87,25 +87,35 @@ export function Workflows({
         </div>
         {error && <p className="warn">{error}</p>}
         {!list && !error && <p className="muted">{t("setup.workflows.reading")}</p>}
-        <ul className="deploy-targets">
+        <ul className="tier-list">
           {list?.workflows.map((w) => (
-            <li key={w.tier}>
-              <strong>{w.tier}</strong>
-              <span className={`chip${w.source === "project" ? " on" : ""}`}>
-                {w.source === "project" ? t("setup.workflows.sourceProject") : t("setup.workflows.sourceApp")}
+            <li key={w.tier} className="tier-row">
+              <span className={`tier-badge${w.source === "project" ? " project" : ""}`} aria-hidden>
+                {w.tier}
               </span>
-              <span className="grow muted deploy-detail" title={w.description}>
-                {w.description}
-              </span>
-              {w.source === "project" ? (
-                <code className="muted" title={`sha256 ${w.hash}`}>
-                  {w.file} · {w.hash}
-                </code>
-              ) : (
-                <span className="muted">{t("setup.workflows.idVersion", { id: w.id, version: w.version })}</span>
-              )}
+              <div className="tier-text">
+                <span className="tier-description" title={w.description}>
+                  <span className="sr-only">{w.tier}: </span>
+                  {w.description}
+                </span>
+                <span className="muted tier-meta">
+                  {w.source === "project" ? (
+                    <>
+                      {t("setup.workflows.sourceProject")} ·{" "}
+                      <code title={`sha256 ${w.hash}`}>
+                        {w.file} · {w.hash}
+                      </code>
+                    </>
+                  ) : (
+                    <>
+                      {t("setup.workflows.sourceApp")} ·{" "}
+                      {t("setup.workflows.idVersion", { id: w.id, version: w.version })}
+                    </>
+                  )}
+                </span>
+              </div>
               <button type="button" className="ghost small" onClick={() => setEditing(w.tier)}>
-                <Pencil size={13} />
+                <Pencil size={13} aria-hidden />
                 {t("setup.workflows.edit")}
               </button>
             </li>

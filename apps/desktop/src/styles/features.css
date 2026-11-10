@@ -135,3 +135,231 @@ fieldset.folder-switcher {
   margin: 0;
   border: 0;
 }
+
+/* Usage (CP-01): totals, the daily chart and the tables, in the main area like the fleet view. */
+.usage {
+  position: absolute;
+  inset: 0;
+  overflow-y: auto;
+  padding: var(--space-5) var(--space-6);
+}
+
+.usage > * {
+  max-width: 1080px;
+  margin-right: auto;
+  margin-left: auto;
+}
+
+.usage-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-bottom: var(--space-2);
+}
+
+.usage-header > h1 {
+  margin: 0;
+  font-size: var(--text-xl);
+}
+
+.usage-note {
+  margin-top: 0;
+  margin-bottom: var(--space-3);
+  font-size: var(--text-sm);
+}
+
+.usage-note.error {
+  color: var(--err);
+}
+
+.usage-tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
+}
+
+.usage-tile {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  margin: 0;
+}
+
+.usage-tile > strong {
+  font-size: var(--text-xl);
+  font-variant-numeric: tabular-nums;
+}
+
+.usage .card {
+  margin-bottom: var(--space-4);
+}
+
+.usage-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-4);
+  margin: 0 0 var(--space-2);
+  padding: 0;
+  list-style: none;
+  font-size: var(--text-sm);
+}
+
+.usage-legend li {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.usage-swatch {
+  display: inline-block;
+  flex: none;
+  width: 10px;
+  height: 10px;
+  margin-right: var(--space-1);
+  border-radius: 2px;
+  vertical-align: baseline;
+}
+
+.series-opus {
+  background: var(--series-opus);
+  fill: var(--series-opus);
+}
+
+.series-sonnet {
+  background: var(--series-sonnet);
+  fill: var(--series-sonnet);
+}
+
+.series-haiku {
+  background: var(--series-haiku);
+  fill: var(--series-haiku);
+}
+
+.series-fable {
+  background: var(--series-fable);
+  fill: var(--series-fable);
+}
+
+.series-codex {
+  background: var(--series-codex);
+  fill: var(--series-codex);
+}
+
+.series-agy {
+  background: var(--series-agy);
+  fill: var(--series-agy);
+}
+
+.series-other {
+  background: var(--series-other);
+  fill: var(--series-other);
+}
+
+.usage-chart {
+  position: relative;
+}
+
+.usage-chart svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+/* Stacked segments keep a 2px gap of surface between them. */
+.usage-seg {
+  stroke: var(--surface);
+  stroke-width: 2px;
+}
+
+.usage-grid {
+  stroke: var(--border);
+  stroke-width: 1px;
+}
+
+.usage-baseline {
+  stroke: var(--border-strong);
+  stroke-width: 1px;
+}
+
+.usage-axis {
+  fill: var(--muted);
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+}
+
+.usage-hit {
+  fill: transparent;
+}
+
+.usage-hit:hover {
+  fill: var(--surface-3);
+  fill-opacity: 0.4;
+}
+
+.usage-tooltip {
+  position: absolute;
+  top: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 150px;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+  transform: translateX(-50%);
+}
+
+.usage-tooltip-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.usage-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--text-sm);
+}
+
+.usage-table th {
+  color: var(--muted);
+  font-weight: 500;
+  text-align: left;
+}
+
+.usage-table th,
+.usage-table td {
+  padding: var(--space-1) var(--space-2);
+  border-bottom: 1px solid var(--border);
+  vertical-align: top;
+}
+
+.usage-table .num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.usage-title {
+  display: block;
+  max-width: 560px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.usage-sub {
+  display: block;
+  font-size: var(--text-xs);
+}
+
+.usage-more {
+  margin: var(--space-2) 0 0;
+  font-size: var(--text-sm);
+}

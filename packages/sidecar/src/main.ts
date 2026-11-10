@@ -1,4 +1,4 @@
-import { existsSync } from "node:fs";
+import { existsSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { asLanguage, folderProblems, PROTOCOL_VERSION, RpcErrorCode, type Task } from "@agentchainer/protocol";
@@ -122,6 +122,7 @@ import {
 } from "./tasks/service.ts";
 import { loadTask } from "./tasks/store.ts";
 import { sessionWorkers, Team, teamTools, type WorkerBase } from "./team.ts";
+import { allTasks, type UsageSources, usageFile, usageReport } from "./usage/report.ts";
 import { fileDiff, gitInit, listFiles, revert } from "./workspace.ts";
 
 /** The other agents' CLIs, as last probed (M9-06). */
@@ -307,6 +308,22 @@ function rejectIfOpen(sessionId: string): void {
 }
 
 /** Loads the SDK; the packaged app downloads and verifies it on first use (a few seconds). */
+/** Where the usage page reads from (CP-01): the SDK's stored sessions, never the CLI's files (ADR-0004). */
+async function usageSources(): Promise<UsageSources> {
+  const { sdk } = await prepareSdk();
+  return {
+    sessions: () => sdk.listSessions({}),
+    messages: async (s) => {
+      const dir = s.cwd ? { dir: s.cwd } : {};
+      const main = await sdk.getSessionMessages(s.sessionId, dir);
+      const ids = await sdk.listSubagents(s.sessionId, dir).catch(() => [] as string[]);
+      const subs = await Promise.all(ids.map((id) => sdk.getSubagentMessages(s.sessionId, id, dir).catch(() => [])));
+      return [...main, ...subs.flat()];
+    },
+    tasks: (root) => (existsSync(root) ? allTasks(root) : []),
+  };
+}
+
 function prepareSdk() {
   return loadSdk().catch((err: unknown) => {
     throw new RpcFailure(RpcErrorCode.sdkUnavailable, err instanceof Error ? err.message : String(err));
@@ -1102,6 +1119,22 @@ serve(
         throw new RpcFailure(RpcErrorCode.invalidParams, err instanceof Error ? err.message : String(err));
       }
       return { ok: true as const };
+    },
+
+    "usage.report": async ({ sinceDays, workspaces }) => usageReport(await usageSources(), { sinceDays, workspaces }),
+
+    "usage.export": async ({ sinceDays, workspaces, path: file, format }) => {
+      if (!file.toLowerCase().endsWith(`.${format}`)) {
+        throw new RpcFailure(RpcErrorCode.invalidParams, t("rpc.usage.exportExtension", { format }));
+      }
+      const report = await usageReport(await usageSources(), {
+        sinceDays,
+        workspaces,
+        topSessions: Number.POSITIVE_INFINITY,
+      });
+      const { text, rows } = usageFile(report, format);
+      writeFileSync(file, text);
+      return { ok: true as const, rows };
     },
 
     "metrics.summary": ({ cwd, since, tier }) => {

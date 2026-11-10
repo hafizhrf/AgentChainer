@@ -113,5 +113,6 @@
   "app.palette.checkUpdates": "Periksa pembaruan…",
   "app.palette.exportDiagnostics": "Ekspor diagnostik…",
   "app.palette.gettingStarted": "Panduan memulai",
-  "app.palette.reportIssue": "Laporkan masalah"
+  "app.palette.reportIssue": "Laporkan masalah",
+  "app.palette.usage": "Penggunaan: biaya dan token di semua sesi"
 }

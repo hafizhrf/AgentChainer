@@ -42,6 +42,8 @@ work on a task (preview):
 
 **Sessions** are the Claude CLI's own session files. AgentChainer lists and resumes them through the Agent SDK and
 doesn't keep a copy ([ADR-0004](adr/0004-session-data.md)).
+The **Usage** page reads each stored session's model and token counts the same way, to add up an estimated cost on
+your computer. It keeps no copy, and sends nothing. **Export** writes a `.csv` or `.json` file only where you choose.
 
 To remove everything, uninstall the app and delete the three folders above, plus `.agentchainer/` in any project you
 set up.

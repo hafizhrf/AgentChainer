@@ -114,5 +114,6 @@
   "app.palette.checkUpdates": "Check for updates…",
   "app.palette.exportDiagnostics": "Export diagnostics…",
   "app.palette.gettingStarted": "Getting started guide",
-  "app.palette.reportIssue": "Report an issue"
+  "app.palette.reportIssue": "Report an issue",
+  "app.palette.usage": "Usage: cost and tokens across sessions"
 }

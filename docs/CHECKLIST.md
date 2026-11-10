@@ -2249,6 +2249,23 @@ Owner request, 2026-11-10: features that community tools for coding agents have 
 **P1**
 - [ ] **CP-01** A usage dashboard across sessions: cost and tokens by model, project and period, with charts and
       export. Today: per-turn history, `/usage`, Metrics. — opcode ([repo](https://github.com/winfunc/opcode)).
+  - **Plan (2026-11-10):**
+    - **Data:** every stored Claude session through the SDK's session history (`listSessions` across projects, then
+      each session's and subagent's messages; ADR-0004). It covers chats run outside the app and task steps too.
+      Codex and agy steps come from the known workspaces' task records.
+    - **Cost:** history has tokens and models but no dollars, so tokens are priced at Claude's API prices (a pinned
+      table from the pricing page), like Codex and agy (M9-07).
+    - **Time:** history has no time per message, so a session counts on the day it was last active.
+    - **Page:** a sidebar entry beside Fleet. A period picker, totals, a daily chart stacked by agent family (fixed
+      colors), tables by model, project and the costliest sessions, and CSV/JSON export.
+  Progress (2026-11-10): built.
+  - **Sidecar:** `usage/claude-prices.ts` (cache reads at their per-model multiplier, 5-minute and one-hour writes,
+    Haiku 5.5's long-prompt price); `usage/report.ts` (a response counted once by its id, a session parsed once per
+    app run unless it changed); `usage.report` and `usage.export` (CSV cells defused against formulas).
+  - **UI:** `usage/UsagePage.tsx`. The chart's six family colors passed the palette check in both themes; three
+    light ones are under 3:1 against the card, so the tables carry every number.
+  - **Tests:** `usage.test.ts` in the sidecar (8) and the UI (2).
+  - **Real data, no model calls:** 249 sessions in the last 30 days were read in 3.2 s (0.2 s once cached), all priced.
 - [ ] **CP-02** An MCP server manager: add any server, import from Claude Desktop, test the connection. Today: catalog
       items only. — opcode; Vibe Kanban ([MCP settings](https://vibekanban.com/docs/settings/mcp-servers)).
 - [ ] **CP-03** A CLAUDE.md editor with a live preview, and a scan across projects. — opcode.

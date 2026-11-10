@@ -37,7 +37,7 @@ import { type PermissionAnswer, PermissionDialog } from "./PermissionDialog.tsx"
 import { PANEL_TAB_LABEL, PANEL_TABS, type PanelTab, parseHidden, serializeHidden, toggleHidden } from "./panelTabs.ts";
 import { SessionView } from "./SessionView.tsx";
 import { SettingsDialog } from "./SettingsDialog.tsx";
-import { FLEET, Sidebar } from "./Sidebar.tsx";
+import { FLEET, Sidebar, USAGE } from "./Sidebar.tsx";
 import { notify as notifyOs, scheduledRunEnded } from "./schedules.ts";
 import { quitApp, readSelftestConfig, runSelftest, type SelftestConfig } from "./selftest.ts";
 import {
@@ -74,6 +74,7 @@ import { applyEvent, closeAssistant, type Item, nextId, setMessageId } from "./t
 import { UpdateDialog } from "./UpdateDialog.tsx";
 import { IconButton } from "./ui/IconButton.tsx";
 import { layoutStorage, usePersistentFlag, usePersistentValue } from "./ui/layoutStorage.ts";
+import { UsagePage } from "./usage/UsagePage.tsx";
 import { type MenuCommand, menuShortcut, useMenuCommands } from "./useMenuCommands.ts";
 import { WorkspaceDialog, WorkspacesCard } from "./WorkspaceDialog.tsx";
 
@@ -1160,6 +1161,7 @@ export function App() {
       shortcut: menuShortcut("new-session"),
     });
     add(session, "fleet", t("app.palette.fleet"), () => show(FLEET));
+    add(session, "usage", t("app.palette.usage"), () => show(USAGE));
     if (settings?.tasksPreview === true)
       add(session, "new-task", t("app.palette.newTask"), newTask, { shortcut: menuShortcut("new-task") });
     add(session, "open-folder", t("app.palette.openFolder"), () => void openFolder(), {
@@ -1369,6 +1371,16 @@ export function App() {
                     }
                     schedules={Object.values(schedules)}
                     onSchedule={(action, s) => void scheduleAction(action, s)}
+                  />
+                )}
+                {active === USAGE && !setup && (
+                  <UsagePage
+                    workspaces={[
+                      ...new Set([
+                        ...(settings?.recentWorkspaces ?? []),
+                        ...(settings?.workspaces ?? []).flatMap((w) => [w.primary, ...w.folders]),
+                      ]),
+                    ]}
                   />
                 )}
                 {active === null && !setup && (

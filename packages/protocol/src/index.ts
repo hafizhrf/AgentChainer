@@ -977,6 +977,78 @@ export const MetricsTaskSchema = z.object({
 export type MetricsTask = z.infer<typeof MetricsTaskSchema>;
 
 /** A workspace's task metrics (M7-01, docs/design/evals.md §4), computed locally; a rate is null with nothing to count. */
+/**
+ * The usage page's series (CP-01): fixed agent families, so a color keeps its meaning whatever a period shows.
+ * Claude's by model line; Codex and agy by agent; anything else is `other`.
+ */
+export const USAGE_FAMILIES = ["opus", "sonnet", "haiku", "fable", "codex", "agy", "other"] as const;
+export const UsageFamilySchema = z.enum(USAGE_FAMILIES);
+export type UsageFamily = z.infer<typeof UsageFamilySchema>;
+
+const UsageTokensSchema = {
+  costUsd: z.number(),
+  /** All tokens: input, output, cache reads and cache writes. */
+  tokens: z.number(),
+};
+
+/**
+ * What agents spent across sessions (CP-01): every stored Claude session (from the SDK's history, ADR-0004) and the
+ * Codex and agy steps of the given workspaces' tasks. Costs are estimates at API prices; a model with no price
+ * counts its tokens in `unpricedTokens` and $0. A session counts on the day it was last active.
+ */
+export const UsageReportSchema = z.object({
+  generatedAt: z.string(),
+  /** Null: all time. */
+  sinceDays: z.number().nullable(),
+  totals: z.object({
+    ...UsageTokensSchema,
+    input: z.number(),
+    output: z.number(),
+    cacheRead: z.number(),
+    cacheWrite: z.number(),
+    unpricedTokens: z.number(),
+    sessions: z.number(),
+  }),
+  byModel: z.array(
+    z.object({
+      model: z.string(),
+      family: UsageFamilySchema,
+      ...UsageTokensSchema,
+      input: z.number(),
+      output: z.number(),
+      cacheRead: z.number(),
+      cacheWrite: z.number(),
+      unpricedTokens: z.number(),
+      sessions: z.number(),
+    }),
+  ),
+  /** By folder the session ran in (a task's worktree is its own). */
+  byProject: z.array(z.object({ project: z.string(), ...UsageTokensSchema, sessions: z.number() })),
+  /** Each day with spend, oldest first: the estimate by family. */
+  byDay: z.array(z.object({ day: z.string(), costUsd: z.partialRecord(UsageFamilySchema, z.number()) })),
+  /** The costliest sessions and task steps, costliest first. */
+  sessions: z.array(
+    z.object({
+      id: z.string(),
+      project: z.string(),
+      title: z.string(),
+      day: z.string(),
+      source: z.enum(["claude", "codex", "agy"]),
+      models: z.array(z.string()),
+      ...UsageTokensSchema,
+      unpricedTokens: z.number(),
+    }),
+  ),
+});
+export type UsageReport = z.infer<typeof UsageReportSchema>;
+
+const UsageParams = z.object({
+  /** 7, 30 or 90 days back from now; null for all time. */
+  sinceDays: z.number().int().positive().max(3650).nullable(),
+  /** Workspaces whose task records add their Codex and agy steps. */
+  workspaces: z.array(z.string()).max(200),
+});
+
 export const MetricsSummarySchema = z.object({
   tasks: z.number().int(),
   runs: z.number().int(),
@@ -2228,6 +2300,12 @@ export const methodSchemas = {
     result: z.object({ ok: z.literal(true) }),
   },
   /** The workspace's task metrics (M7-01), from its own task records; `since` and `tier` narrow them. */
+  "usage.report": { params: UsageParams, result: UsageReportSchema },
+  /** Writes the report to a file the person chose: every session as CSV rows, or the whole report as JSON. */
+  "usage.export": {
+    params: UsageParams.extend({ path: z.string().min(1), format: z.enum(["csv", "json"]) }),
+    result: z.object({ ok: z.literal(true), rows: z.number() }),
+  },
   "metrics.summary": {
     params: WorkspaceRef.extend({ since: z.string().optional(), tier: z.enum(TIERS).optional() }),
     result: MetricsSummarySchema,

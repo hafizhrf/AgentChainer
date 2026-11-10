@@ -56,18 +56,22 @@ fn settings_get(app: AppHandle) -> Settings {
 /// Saves and returns the normalized settings.
 #[tauri::command]
 fn settings_set(app: AppHandle, settings: Settings) -> Result<Settings, String> {
-    // The CLI path is run as the user's `claude` (X-02): a new one must be an existing file at an absolute path. One
-    // saved earlier stays even if it's gone since, so other settings can still be saved.
-    let wanted = settings
-        .claude_path
-        .as_deref()
-        .map(str::trim)
-        .filter(|p| !p.is_empty());
-    if let Some(path) = wanted
-        && settings::load(&app).claude_path.as_deref() != Some(path)
-        && let Some(problem) = settings::claude_path_problem(path)
-    {
-        return Err(problem);
+    // A CLI path is run as the user's own CLI (X-02): a new one must be an existing file at an absolute path. One saved
+    // earlier stays even if it's gone since, so other settings can still be saved. Codex and agy run task steps (M9).
+    let saved = settings::load(&app);
+    let paths = [
+        ("Claude CLI", &settings.claude_path, &saved.claude_path),
+        ("Codex CLI", &settings.codex_path, &saved.codex_path),
+        ("Antigravity CLI", &settings.agy_path, &saved.agy_path),
+    ];
+    for (cli, wanted, before) in paths {
+        let wanted = wanted.as_deref().map(str::trim).filter(|p| !p.is_empty());
+        if let Some(path) = wanted
+            && before.as_deref() != Some(path)
+            && let Some(problem) = settings::cli_path_problem(cli, path)
+        {
+            return Err(problem);
+        }
     }
     settings::save(&app, settings)
 }

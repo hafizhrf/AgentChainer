@@ -172,6 +172,13 @@ fn run_once(
     if let Some(path) = saved.claude_path {
         cmd.env("AGENTCHAINER_CLAUDE_PATH", path);
     }
+    // The other agents' CLIs for task steps (M9), when the person set where they are.
+    if let Some(path) = saved.codex_path {
+        cmd.env("AGENTCHAINER_CODEX_PATH", path);
+    }
+    if let Some(path) = saved.agy_path {
+        cmd.env("AGENTCHAINER_AGY_PATH", path);
+    }
     // The UI's language (X-13), for the sidecar's own messages; a change restarts the app, and so the sidecar.
     if let Some(language) = saved.language {
         cmd.env("AGENTCHAINER_LANGUAGE", language);

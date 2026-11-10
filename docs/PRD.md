@@ -192,7 +192,9 @@ Open: whether project settings and CLAUDE.md load from the added folders **(veri
 ## 7. Non-goals (v0.x)
 
 - Building our own code editor. Monaco is used for diffs and quick edits; "Open in editor" covers the rest.
-- Non-Claude models or providers other than those the Claude CLI supports.
+- Non-Claude models or providers other than those the Claude CLI supports, **except** other agents' own CLIs (OpenAI
+  Codex, Google's Antigravity CLI) as backends for task steps, run with the user's own installs and logins
+  ([ADR-0012](adr/0012-multi-agent-backends.md), M9). Chats stay on Claude.
 - Implementing login, or storing credentials or API keys ([ADR-0002](adr/0002-auth-and-branding.md)).
 - Cloud accounts, sync, a team server, or a hosted service.
 - Mobile apps.

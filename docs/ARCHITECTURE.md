@@ -55,7 +55,8 @@ env vars the user set (`ANTHROPIC_API_KEY`, `CLAUDE_CODE_USE_BEDROCK`, …).
    inherit `~/.zshrc` or `~/.bashrc`. At startup, run `$SHELL -ilc 'env -0'` with a timeout and merge the result into the
    sidecar's env, as VS Code does. On failure, fall back to the process env and show a warning.
 2. **Find the binary** (`findClaude()` in `claude.ts`), in order:
-   - the "Claude CLI path" setting (passed to the sidecar as `AGENTCHAINER_CLAUDE_PATH`);
+   - the "Claude CLI path" setting (passed to the sidecar as `AGENTCHAINER_CLAUDE_PATH`), and the Codex and
+     Antigravity CLI paths (`AGENTCHAINER_CODEX_PATH`, `AGENTCHAINER_AGY_PATH`, M9-06);
    - `PATH` from the resolved env;
    - known locations: `~/.local/bin/claude`, `/opt/homebrew/bin/claude`, `/usr/local/bin/claude`,
      `%USERPROFILE%\.local\bin\claude.exe`, `%APPDATA%\npm`.

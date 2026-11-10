@@ -2163,7 +2163,15 @@ with the OpenAI Codex CLI and Google's Antigravity CLI (`agy`), in both directio
   - **Checked in the app:** Review set to agy saved `{"review":"agy"}`, and the file was git-ignored. In tier M's
     editor, the review step's Agent set to Codex showed `@codex` on the node and `agent: codex` in the YAML (not
     saved).
-  - **Left (part 2b):** readiness rows and CLI paths in Settings; the eval variant.
+  Progress, part 2b:
+  - **Readiness:** once Claude is ready, the setup line adds each other CLI that's installed: " · Codex 0.157.0 ·
+    agy 1.5.4", or "(not signed in)". They're never required.
+  - **Settings:** a **Codex CLI path** and an **Antigravity CLI path**, checked like the Claude one (absolute, an
+    existing file) and passed to the sidecar as `AGENTCHAINER_CODEX_PATH` / `AGENTCHAINER_AGY_PATH`. Changing any
+    of the three restarts the sidecar.
+  - **Checked in the app:** the line read "… · Codex 0.157.0 · agy 1.5.4"; `codex` alone was refused ("The Codex CLI
+    path must be absolute"); agy's real path saved, the sidecar restarted and still found agy. Settings restored.
+  - **Left:** the eval variant.
 
 - [ ] **M9-07** The thread, Flow, Fleet and evidence show which agent and model ran each step.
 - [ ] **M9-08** (later) Team workers on Codex or agy. The supervisor stays Claude.

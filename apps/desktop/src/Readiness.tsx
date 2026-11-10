@@ -1,8 +1,10 @@
 import type { EnvCheck } from "@agentchainer/protocol";
 import { invoke } from "@tauri-apps/api/core";
 import { CircleCheck, CircleX, RefreshCw, SquareTerminal } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { t } from "./i18n/index.ts";
+import { request } from "./sidecar.ts";
+import type { AgentClis } from "./tasks/AgentPickers.tsx";
 
 /**
  * Onboarding readiness and tutorial (spike S5, checklist M1-04/M1-05). The app never signs in for the user: it shows
@@ -17,6 +19,11 @@ export function Readiness({
   checking: boolean;
   onRecheck: () => void;
 }) {
+  // The other agents' CLIs for task steps (M9-06): shown beside Claude when they're installed, never required.
+  const [clis, setClis] = useState<AgentClis | null>(null);
+  useEffect(() => {
+    if (env?.ready) void request("agents.available", {}).then(setClis, () => setClis(null));
+  }, [env?.ready]);
   if (!env)
     return (
       <section className="card readiness compact" aria-label={t("home.readiness.label")}>
@@ -93,6 +100,7 @@ export function Readiness({
               auth: authLabel(env),
               git: shortVersion(env.git.version?.replace(/^git version /, "") ?? null),
             })}
+            {otherClis(clis)}
           </span>
         </span>
         {recheck}
@@ -152,6 +160,21 @@ function CommandLine({ command }: { command: string }) {
       </button>
     </div>
   );
+}
+
+/** " · Codex 0.157.0 · agy 1.5.4": the other agents' CLIs that are installed, or that one isn't signed in. */
+function otherClis(clis: AgentClis | null): string {
+  if (!clis) return "";
+  const line = (name: string, c: AgentClis["codex"]) =>
+    !c.installed
+      ? []
+      : [
+          c.signedIn
+            ? t("home.readiness.agentReady", { name, version: (c.version ?? "").replace(/^[^\d]*/, "") })
+            : t("home.readiness.agentSignedOut", { name }),
+        ];
+  const parts = [...line("Codex", clis.codex), ...line("agy", clis.agy)];
+  return parts.length ? ` · ${parts.join(" · ")}` : "";
 }
 
 /** "2.1.3" for "2.1.3 (Claude Code)" or "2.50.1 (Apple Git-155)". */

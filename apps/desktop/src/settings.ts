@@ -4,6 +4,9 @@ import { invoke } from "@tauri-apps/api/core";
 /** Mirrors `settings.rs` (M1-07). No secrets: auth stays in the user's own Claude CLI (ADR-0002). */
 export type Settings = {
   claudePath: string | null;
+  /** Where the Codex and Antigravity CLIs are, for task steps on them (M9); null finds them automatically. */
+  codexPath: string | null;
+  agyPath: string | null;
   defaultModel: string | null;
   defaultMode: string | null;
   /** "Open in editor" target: system, vscode, cursor, zed, idea (M1-28). */

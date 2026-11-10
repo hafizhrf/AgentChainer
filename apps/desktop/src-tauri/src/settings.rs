@@ -37,6 +37,10 @@ pub struct SessionFolders {
 pub struct Settings {
     /// Overrides `claude` discovery; passed to the sidecar as `AGENTCHAINER_CLAUDE_PATH`.
     pub claude_path: Option<String>,
+    /// Overrides `codex` discovery for task steps on Codex (M9); passed as `AGENTCHAINER_CODEX_PATH`.
+    pub codex_path: Option<String>,
+    /// Overrides `agy` discovery for task steps on the Antigravity CLI (M9); passed as `AGENTCHAINER_AGY_PATH`.
+    pub agy_path: Option<String>,
     /// Model alias for new sessions (`haiku`, `sonnet`, `opus`), or `None` for the CLI's default.
     pub default_model: Option<String>,
     /// Permission mode for new sessions.
@@ -70,6 +74,8 @@ impl Settings {
     pub fn normalized(mut self) -> Self {
         let clean = |v: Option<String>| v.map(|s| s.trim().to_string()).filter(|s| !s.is_empty());
         self.claude_path = clean(self.claude_path);
+        self.codex_path = clean(self.codex_path);
+        self.agy_path = clean(self.agy_path);
         self.default_model = clean(self.default_model);
         self.default_mode = clean(self.default_mode);
         self.editor = clean(self.editor);
@@ -181,18 +187,19 @@ pub fn load(app: &AppHandle) -> Settings {
 }
 
 /// Writes atomically (temp file + rename), so a crash never leaves a half-written file.
-/// Why `path` can't be the Claude CLI, or `None`: it must be an absolute path to an existing file (X-02).
-pub fn claude_path_problem(path: &str) -> Option<String> {
+/// Why `path` can't be the `cli` (the Claude, Codex or Antigravity CLI), or `None`: it must be an absolute path to an
+/// existing file (X-02), since the app runs it as the user's own CLI.
+pub fn cli_path_problem(cli: &str, path: &str) -> Option<String> {
     let p = std::path::Path::new(path);
     if !p.is_absolute() {
         Some(crate::i18n::tr(
-            "native.claudePathAbsolute",
-            &[("path", path)],
+            "native.cliPathAbsolute",
+            &[("cli", cli), ("path", path)],
         ))
     } else if !p.is_file() {
         Some(crate::i18n::tr(
-            "native.claudePathMissing",
-            &[("path", path)],
+            "native.cliPathMissing",
+            &[("cli", cli), ("path", path)],
         ))
     } else {
         None
@@ -244,6 +251,8 @@ mod tests {
     fn normalizes_blank_values_and_recent_workspaces() {
         let s = Settings {
             claude_path: Some("  ".into()),
+            codex_path: Some(" /usr/local/bin/codex ".into()),
+            agy_path: Some("".into()),
             default_model: Some(" haiku ".into()),
             default_mode: None,
             editor: Some(" vscode ".into()),
@@ -263,6 +272,8 @@ mod tests {
         }
         .normalized();
         assert_eq!(s.claude_path, None);
+        assert_eq!(s.codex_path.as_deref(), Some("/usr/local/bin/codex"));
+        assert_eq!(s.agy_path, None);
         assert_eq!(s.default_model.as_deref(), Some("haiku"));
         assert_eq!(s.editor.as_deref(), Some("vscode"));
         assert_eq!(s.budget_usd, None, "a non-positive budget means no cap");
@@ -355,14 +366,20 @@ mod tests {
 
     #[test]
     fn a_claude_path_must_be_an_existing_file_at_an_absolute_path() {
-        assert!(claude_path_problem("claude").is_some_and(|p| p.contains("absolute")));
+        assert!(cli_path_problem("Claude CLI", "claude").is_some_and(|p| p.contains("absolute")));
         let dir = std::env::temp_dir();
-        assert!(claude_path_problem(&dir.to_string_lossy()).is_some_and(|p| p.contains("No file")));
+        assert!(
+            cli_path_problem("Claude CLI", &dir.to_string_lossy())
+                .is_some_and(|p| p.contains("No file"))
+        );
         let missing = dir.join("ac-no-such-claude");
-        assert!(claude_path_problem(&missing.to_string_lossy()).is_some());
+        assert!(cli_path_problem("Claude CLI", &missing.to_string_lossy()).is_some());
         let file = dir.join(format!("ac-claude-{}", std::process::id()));
         std::fs::write(&file, "").expect("temp file");
-        assert_eq!(claude_path_problem(&file.to_string_lossy()), None);
+        assert_eq!(
+            cli_path_problem("Claude CLI", &file.to_string_lossy()),
+            None
+        );
         let _ = std::fs::remove_file(&file);
     }
 

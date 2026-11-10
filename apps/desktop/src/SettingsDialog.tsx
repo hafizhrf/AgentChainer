@@ -229,6 +229,22 @@ export function SettingsDialog({
                 spellCheck={false}
               />
             </Field>
+            <Field label={t("home.settings.codexPath")} help={t("home.settings.agentPathHelp")}>
+              <input
+                value={draft.codexPath ?? ""}
+                onChange={(e) => setDraft({ ...draft, codexPath: e.target.value || null })}
+                placeholder={t("home.settings.codexPathPlaceholder")}
+                spellCheck={false}
+              />
+            </Field>
+            <Field label={t("home.settings.agyPath")} help={t("home.settings.agentPathHelp")}>
+              <input
+                value={draft.agyPath ?? ""}
+                onChange={(e) => setDraft({ ...draft, agyPath: e.target.value || null })}
+                placeholder={t("home.settings.agyPathPlaceholder")}
+                spellCheck={false}
+              />
+            </Field>
           </section>
 
           <section className="settings-section">

@@ -4,6 +4,8 @@ import { foldersFor, type Settings, withSessionFolders } from "./settings.ts";
 
 const base: Settings = {
   claudePath: null,
+  codexPath: null,
+  agyPath: null,
   defaultModel: null,
   defaultMode: null,
   editor: null,

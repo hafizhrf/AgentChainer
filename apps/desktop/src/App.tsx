@@ -449,9 +449,12 @@ export function App() {
 
   async function onSaveSettings(next: Settings) {
     const saved = await saveSettings(next);
-    const claudePathChanged = saved.claudePath !== settings?.claudePath;
+    const claudePathChanged =
+      saved.claudePath !== settings?.claudePath ||
+      saved.codexPath !== settings?.codexPath ||
+      saved.agyPath !== settings?.agyPath;
     applySettings(saved);
-    // The CLI path reaches the sidecar as an env var at spawn, so a change needs a restart (ready → re-check).
+    // The CLI paths reach the sidecar as env vars at spawn, so a change needs a restart (ready → re-check).
     if (claudePathChanged) {
       alive.current = false;
       await invoke("sidecar_restart");

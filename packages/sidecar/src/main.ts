@@ -63,7 +63,7 @@ import {
 } from "./installer.ts";
 import { liveResume } from "./live-resume.ts";
 import { normalize } from "./normalize.ts";
-import { listRules, removeRule } from "./permissions.ts";
+import { addRule, listRules, removeRule } from "./permissions.ts";
 import { cliError, installListed, listPluginsFor, parseDetails, uninstallListed, updateListed } from "./plugins.ts";
 import { CHAT_TOOLS, loadProfile, type ProfileOptions, profileOptions, profileSummaries } from "./profiles.ts";
 import { log, notify, RpcFailure, serve } from "./rpc.ts";
@@ -614,7 +614,17 @@ serve(
       return retention(sdk, cwd);
     },
 
-    "permissions.list": ({ cwd }) => ({ workspace: listRules(cwd, "workspace"), team: listRules(cwd, "team") }),
+    "permissions.list": ({ cwd }) => ({
+      workspace: listRules(cwd, "workspace"),
+      team: listRules(cwd, "team"),
+      user: listRules(cwd, "user"),
+    }),
+
+    "permissions.add": ({ cwd, behavior, rule, scope }) => {
+      if (scope !== "user") requireFolder(cwd);
+      addRule(cwd, behavior, rule, scope);
+      return { ok: true };
+    },
 
     "agents.list": ({ cwd }) => {
       requireFolder(cwd);

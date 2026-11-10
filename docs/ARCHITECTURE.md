@@ -109,7 +109,7 @@ Planned surface (v0.1):
 | request | `session.list` / `session.history` / `session.rename` / `session.tag` / `session.delete` / `session.fork` | SDK session APIs on stored sessions `{cwd, sessionId}`; `session.history` includes the subagents' transcripts and the stored times (M4-08) |
 | request | `session.retention` | `cleanupPeriodDays` only, from the user's effective settings |
 | request | `permission.respond` | Answer a pending permission request `{allow, always?, updatedInput?, message?, mode?}` |
-| request | `permissions.list` / `permissions.remove` | The `permissions` lists of `.claude/settings.local.json`; nothing else in that file leaves the sidecar |
+| request | `permissions.list` / `permissions.add` / `permissions.remove` | The `permissions` lists of `.claude/settings.local.json`, `.claude/settings.json` and the user's own `~/.claude/settings.json` (UX-19, ADR-0013); nothing else in those files leaves the sidecar |
 | request | `workspace.files` | Files under the workspace (tracked + untracked, minus ignored) with git status and branch |
 | request | `workspace.diff` | HEAD vs working tree for one file, with its `-U0` hunks |
 | request | `workspace.revert` | Revert a file to HEAD (new files are deleted) or one hunk (`git apply -R`), worktree only |

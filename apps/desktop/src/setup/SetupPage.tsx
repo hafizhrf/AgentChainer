@@ -228,7 +228,7 @@ export function SetupPage({
           {view === "plugins" && (
             <Plugins cwd={cwd} confirm={confirm} onChanged={() => void bootstrap.load()} onUpdates={setPluginUpdates} />
           )}
-          {view === "permissions" && <Permissions cwd={cwd} confirm={confirm} />}
+          {view === "permissions" && <Permissions cwd={cwd} confirm={confirm} workspaces={workspaces} />}
           {view === "workflows" && <Workflows cwd={cwd} confirm={confirm} workspaces={workspaces} />}
           {view === "deploy" && <Deploys cwd={cwd} />}
           {view === "metrics" && <Metrics cwd={cwd} />}

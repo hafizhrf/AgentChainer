@@ -1,4 +1,5 @@
-import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
+import { existsSync, lstatSync, mkdirSync, readFileSync, realpathSync, renameSync, writeFileSync } from "node:fs";
+import { homedir } from "node:os";
 import path from "node:path";
 import type { AlwaysScope, RuleScope } from "@agentchainer/protocol";
 import type { PermissionRuleValue, PermissionUpdate } from "@anthropic-ai/claude-agent-sdk";
@@ -16,8 +17,11 @@ type Rules = Record<Behavior, string[]>;
 
 export const localSettingsPath = (cwd: string) => path.join(cwd, ".claude", "settings.local.json");
 export const teamSettingsPath = (cwd: string) => path.join(cwd, ".claude", "settings.json");
+/** The CLI's user settings, which every project reads (ADR-0013): `CLAUDE_CONFIG_DIR`, else `~/.claude`. */
+export const userSettingsPath = (env: NodeJS.ProcessEnv = process.env) =>
+  path.join(env.CLAUDE_CONFIG_DIR || path.join(homedir(), ".claude"), "settings.json");
 const settingsPath = (cwd: string, scope: RuleScope) =>
-  scope === "team" ? teamSettingsPath(cwd) : localSettingsPath(cwd);
+  scope === "user" ? userSettingsPath() : scope === "team" ? teamSettingsPath(cwd) : localSettingsPath(cwd);
 
 const DESTINATION = { session: "session", workspace: "localSettings", team: "projectSettings" } as const;
 
@@ -76,8 +80,39 @@ export function removeRule(cwd: string, behavior: Behavior, rule: string, scope:
   const file = settingsPath(cwd, scope);
   if (!perms || !list.includes(rule)) throw new Error(t("rpc.permissions.noRule", { behavior, rule, file }));
   perms[behavior] = list.filter((r) => r !== rule);
-  mkdirSync(path.dirname(file), { recursive: true });
-  const tmp = `${file}.${process.pid}.tmp`;
+  writeSettings(file, settings);
+}
+
+/**
+ * Adds one rule, once (UX-19); everything else in the file stays as it was. A rule in another list stays there too:
+ * Claude Code applies deny first, then ask, then allow.
+ */
+export function addRule(cwd: string, behavior: Behavior, rule: string, scope: RuleScope): void {
+  const settings = readSettings(cwd, scope);
+  const current = settings.permissions;
+  const perms = (current && typeof current === "object" && !Array.isArray(current) ? current : {}) as Record<
+    string,
+    unknown
+  >;
+  const list = strings(perms[behavior]);
+  if (list.includes(rule)) return;
+  perms[behavior] = [...list, rule];
+  settings.permissions = perms;
+  writeSettings(settingsPath(cwd, scope), settings);
+}
+
+/**
+ * Writes a settings file atomically. The user settings file may be a link (dotfiles kept elsewhere): it's written
+ * where it points, so the link stays a link. A workspace's own `.claude` files aren't written through links (T-03).
+ */
+function writeSettings(file: string, settings: Record<string, unknown>): void {
+  let target = file;
+  if (existsSync(file) && lstatSync(file).isSymbolicLink()) {
+    if (file !== userSettingsPath()) throw new Error(t("rpc.permissions.linked", { file }));
+    target = realpathSync(file);
+  }
+  mkdirSync(path.dirname(target), { recursive: true });
+  const tmp = `${target}.${process.pid}.tmp`;
   writeFileSync(tmp, `${JSON.stringify(settings, null, 2)}\n`);
-  renameSync(tmp, file);
+  renameSync(tmp, target);
 }

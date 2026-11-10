@@ -26,7 +26,7 @@ import {
 
 type Listing = Methods["plugins.list"]["result"];
 type Details = Methods["plugins.details"]["result"];
-type Scope = "project" | "local";
+type Scope = "project" | "local" | "user";
 type Tab = "marketplace" | "installed";
 
 /**
@@ -110,7 +110,12 @@ export function Plugins({
     const scope = i.scope as Scope;
     const ok = await confirm({
       title: t("setup.plugins.uninstallTitle", { id: i.id }),
-      body: scope === "local" ? t("setup.plugins.uninstallBodyLocal") : t("setup.plugins.uninstallBodyShared"),
+      body:
+        scope === "local"
+          ? t("setup.plugins.uninstallBodyLocal")
+          : scope === "user"
+            ? t("setup.plugins.uninstallBodyUser")
+            : t("setup.plugins.uninstallBodyShared"),
       confirmLabel: t("setup.plugins.uninstall"),
       danger: true,
     });
@@ -752,6 +757,19 @@ function InstallDialog({
                   <Rich
                     k="setup.plugins.projectScopeNote"
                     params={{ file: ".claude/settings.json" }}
+                    tags={{ code: (s) => <code>{s}</code> }}
+                  />
+                </span>
+              </span>
+            </label>
+            <label className="check">
+              <input type="radio" name="scope" checked={scope === "user"} onChange={() => setScope("user")} />
+              <span>
+                {t("setup.plugins.allProjects")}{" "}
+                <span className="muted">
+                  <Rich
+                    k="setup.plugins.userScopeNote"
+                    params={{ file: "~/.claude/settings.json" }}
                     tags={{ code: (s) => <code>{s}</code> }}
                   />
                 </span>

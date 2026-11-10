@@ -21,7 +21,7 @@ import type { CliResult, PluginCli } from "./installer.ts";
  * `claude plugin configure` in a terminal (ADR-0002).
  */
 
-type Scope = "project" | "local";
+type Scope = "project" | "local" | "user";
 type Listing = Omit<MethodResult<"plugins.list">, "installed">;
 
 const asObject = (v: unknown): Record<string, unknown> | null =>

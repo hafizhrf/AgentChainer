@@ -56,10 +56,23 @@ export type PermissionMode = z.infer<typeof PermissionModeSchema>;
  */
 export const AlwaysScopeSchema = z.enum(["session", "workspace", "team"]);
 export type AlwaysScope = z.infer<typeof AlwaysScopeSchema>;
-/** The two rule files a workspace has; session rules aren't stored. */
-export const RuleScopeSchema = z.enum(["workspace", "team"]);
+/**
+ * Where a rule is kept; session rules aren't stored. A workspace has two files (just you, the team); `user` is the
+ * CLI's own user settings (`~/.claude/settings.json`), which every project reads (UX-19, ADR-0013).
+ */
+export const RuleScopeSchema = z.enum(["workspace", "team", "user"]);
 export type RuleScope = z.infer<typeof RuleScopeSchema>;
 const RulesSchema = z.object({ allow: z.array(z.string()), ask: z.array(z.string()), deny: z.array(z.string()) });
+/**
+ * A permission rule as Claude Code writes it: `Tool` or `Tool(content)`, e.g. `Bash(npm test:*)`, `Edit(src/**)`,
+ * `mcp__github__get_issue`. Kept short and on one line.
+ */
+export const PermissionRuleTextSchema = z
+  .string()
+  .max(300)
+  .regex(/^[A-Za-z][\w-]*(?:\([^\n()]*(?:\([^\n()]*\)[^\n()]*)*\))?$/);
+/** Where a plugin is installed: this workspace for you (`local`), for the team (`project`), or every project (`user`). */
+export const PluginInstallScopeSchema = z.enum(["local", "project", "user"]);
 
 /** An agent's name, which is also its file name in `.claude/agents/` (M4-06). */
 export const AgentNameSchema = z
@@ -1756,7 +1769,7 @@ export const methodSchemas = {
    */
   "permissions.list": {
     params: z.object({ cwd: z.string().min(1) }),
-    result: z.object({ workspace: RulesSchema, team: RulesSchema }),
+    result: z.object({ workspace: RulesSchema, team: RulesSchema, user: RulesSchema }),
   },
   /** The project's and the user's subagent definitions (M4-06). */
   "agents.list": {
@@ -1808,6 +1821,16 @@ export const methodSchemas = {
   },
   /** Starting points for a new agent (M8-04): the shipped task roles and a few starters. */
   "agents.templates": { params: Empty, result: z.object({ templates: z.array(AgentTemplateSchema) }) },
+  /** Adds a rule to one of the files; it's kept once. `user` writes the CLI's user settings (ADR-0013). */
+  "permissions.add": {
+    params: z.object({
+      cwd: z.string().min(1),
+      behavior: z.enum(["allow", "ask", "deny"]),
+      rule: PermissionRuleTextSchema,
+      scope: RuleScopeSchema,
+    }),
+    result: Ok,
+  },
   "permissions.remove": {
     params: z.object({
       cwd: z.string().min(1),
@@ -1961,7 +1984,7 @@ export const methodSchemas = {
   "plugins.install": {
     params: WorkspaceRef.extend({
       id: z.string().regex(/^[\w.-]+@[\w.-]+$/),
-      scope: z.enum(["project", "local"]),
+      scope: PluginInstallScopeSchema,
       acceptCommand: z
         .string()
         .regex(/^[0-9a-f]{64}$/)
@@ -1972,7 +1995,7 @@ export const methodSchemas = {
   "plugins.update": {
     params: WorkspaceRef.extend({
       id: z.string().regex(/^[\w.-]+@[\w.-]+$/),
-      scope: z.enum(["project", "local"]),
+      scope: PluginInstallScopeSchema,
       acceptCommand: z
         .string()
         .regex(/^[0-9a-f]{64}$/)
@@ -1981,14 +2004,14 @@ export const methodSchemas = {
     result: PluginChangeSchema,
   },
   "plugins.uninstall": {
-    params: WorkspaceRef.extend({ id: z.string().regex(/^[\w.-]+@[\w.-]+$/), scope: z.enum(["project", "local"]) }),
+    params: WorkspaceRef.extend({ id: z.string().regex(/^[\w.-]+@[\w.-]+$/), scope: PluginInstallScopeSchema }),
     result: Ok,
   },
   /** Turns an installed plugin off or on for this workspace, without uninstalling it. */
   "plugins.setEnabled": {
     params: WorkspaceRef.extend({
       id: z.string().regex(/^[\w.-]+@[\w.-]+$/),
-      scope: z.enum(["project", "local"]),
+      scope: PluginInstallScopeSchema,
       enabled: z.boolean(),
     }),
     result: Ok,

@@ -19,6 +19,7 @@
   "rpc.team.needsBudget": "Chat Team memerlukan batas anggaran untuk dirinya dan para worker-nya.",
   "rpc.permission.noPending": "Tidak ada permintaan izin {{requestId}} yang menunggu",
   "rpc.permissions.notAnObject": "{{file}} bukan objek JSON.",
+  "rpc.permissions.linked": "{{file}} adalah link; AgentChainer tidak menulis pengaturan workspace melalui link.",
   "rpc.permissions.noRule": "Tidak ada aturan {{behavior}} {{rule}} di {{file}}.",
   "rpc.permissions.accessTo": "Akses ke {{path}}",
   "rpc.task.alreadyRunning": "Task ini sudah berjalan.",

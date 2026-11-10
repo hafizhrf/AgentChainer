@@ -39,15 +39,38 @@ describe("historyEvents", () => {
     ]);
   });
 
-  it("skips text the user didn't type, like slash-command wrappers", () => {
+  it("skips text the user didn't type, like command output and reminders", () => {
     const events = historyEvents([
-      msg("user", "u1", "<command-name>/clear</command-name>"),
+      msg("user", "u1", "<local-command-stdout>ok</local-command-stdout>\n<system-reminder>x</system-reminder>"),
       msg("user", "u2", [
         { type: "text", text: "<local-command-stdout>ok</local-command-stdout>" },
         { type: "text", text: "real prompt" },
       ]),
     ]);
     assert.deepEqual(events, [{ type: "user.message", messageId: "u2", text: "real prompt" }]);
+  });
+
+  it("replays a slash command as the person typed it, not as the CLI's tags (M1-37)", () => {
+    const compact =
+      "<command-name>/compact</command-name>\n            <command-message>compact</command-message>\n            <command-args></command-args>";
+    const review = [
+      {
+        type: "text",
+        text: "<command-name>/review</command-name><command-message>review</command-message><command-args>src/cart.js</command-args>",
+      },
+    ];
+    assert.deepEqual(
+      historyEvents([
+        msg("user", "u1", compact),
+        msg("user", "u2", review),
+        msg("user", "u3", "<command-name>/clear</command-name>"),
+      ]),
+      [
+        { type: "user.message", messageId: "u1", text: "/compact" },
+        { type: "user.message", messageId: "u2", text: "/review src/cart.js" },
+        { type: "user.message", messageId: "u3", text: "/clear" },
+      ],
+    );
   });
 
   it("counts pasted images on user messages", () => {

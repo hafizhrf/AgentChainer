@@ -494,9 +494,16 @@
 
     The settings were restored and the scratch session deleted afterwards.
 
-- [ ] **M1-37** Bug: a resumed chat shows a `/compact` turn as raw `<command-name>` / `<command-message>` /
+- [x] **M1-37** Bug: a resumed chat shows a `/compact` turn as raw `<command-name>` / `<command-message>` /
   `<command-args>` tags in a user bubble. Found 2026-11-10 while checking UX-20, in a session resumed after a reload.
   History replay should show it as the command (like a typed `/compact`), not as text.
+  Done (2026-11-11):
+  - **Cause:** replay hid the CLI's wrapper text only when it was a single tagged element. A slash command is stored
+    as three (`<command-name>`, `<command-message>`, `<command-args>`), so it fell through as text.
+  - **Fix:** `stored-sessions.ts` replays a stored slash command as typed (`/compact`, `/review src/cart.js`). Other
+    wrappers (command output, reminders) stay hidden, one tag or several.
+  - **Tests:** `stored-sessions.test.ts`.
+  - **Checked on the real session:** its history now replays "what is this?" then "/compact".
 ### Exit criteria
 
 All of these run on macOS, Windows and Ubuntu against a sample repo in `fixtures/`:

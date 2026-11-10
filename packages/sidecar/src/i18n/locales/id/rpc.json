@@ -31,5 +31,8 @@
   "rpc.sdk.extractFailed": "Ekstraksi Claude Agent SDK gagal: {{detail}}",
   "rpc.session.codexNoPlan": "Chat Codex tidak punya mode rencana: pilih Aman, Standar atau Otonom.",
   "rpc.session.claudeOnly": "Hanya chat Claude yang bisa melakukannya.",
-  "rpc.session.codexMissing": "Codex belum terpasang atau tidak merespons. Pasang, atau atur path-nya di Pengaturan."
+  "rpc.session.codexMissing": "Codex belum terpasang atau tidak merespons. Pasang, atau atur path-nya di Pengaturan.",
+  "rpc.session.agyMissing": "Antigravity CLI belum terpasang atau tidak merespons. Pasang, atau atur path-nya di Pengaturan.",
+  "rpc.session.agyModes": "Chat agy mengedit file (Standar) atau hanya membaca (Rencana): agy tidak pernah bertanya dulu, jadi Aman dan Otonom tidak tersedia.",
+  "rpc.session.agyGone": "Chat agy ini tidak bisa dilanjutkan: aplikasi sudah dimulai ulang sejak itu, dan agy tidak menyimpan daftar chat yang bisa dibaca aplikasi."
 }

@@ -31,5 +31,8 @@
   "rpc.sdk.extractFailed": "Extracting the Claude Agent SDK failed: {{detail}}",
   "rpc.session.codexNoPlan": "A Codex chat has no plan mode: choose Safe, Standard or Autonomous.",
   "rpc.session.claudeOnly": "Only a Claude chat can do that.",
-  "rpc.session.codexMissing": "Codex isn't installed, or doesn't answer. Install it, or set its path in Settings."
+  "rpc.session.codexMissing": "Codex isn't installed, or doesn't answer. Install it, or set its path in Settings.",
+  "rpc.session.agyMissing": "The Antigravity CLI isn't installed, or doesn't answer. Install it, or set its path in Settings.",
+  "rpc.session.agyModes": "An agy chat edits files (Standard) or only reads (Plan): it never asks first, so Safe and Autonomous aren't offered.",
+  "rpc.session.agyGone": "This agy chat can't be continued: the app has restarted since, and agy keeps no list of its chats the app can read."
 }

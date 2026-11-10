@@ -116,5 +116,6 @@
   "tasks.agy.turnFailed": "The Antigravity CLI's turn failed (exit {{code}}).",
   "tasks.runner.agyMissing": "This step runs on the Antigravity CLI, but no `agy` was found. Install it, or run the step on Claude.",
   "tasks.service.agentMissing": "This task runs a step on {{agent}}, which isn't installed. Install it, or choose another agent for that step.",
-  "tasks.codex.defaultModel": "Codex's default"
+  "tasks.codex.defaultModel": "Codex's default",
+  "tasks.agy.defaultModel": "agy's default here"
 }

@@ -1375,7 +1375,7 @@ for the desktop shell, start screen and session view to be cleaned up (UX-02, UX
   - **New session dialog** (New, Ctrl+N, the palette, the welcome page and the folder page): the folder (recent ones,
     a named workspace, Browse…, Type a path…), model, permission profile with its explanation, and the agent profile.
     It says why Start can't run yet; Enter starts.
-  - **Composer:** a chip says which agent the chat runs on. Codex chats came with M9-09 part 1; agy is next.
+  - **Composer:** a chip says which agent the chat runs on. Codex and agy chats came with M9-09.
   Progress (2026-11-10): built.
   - **Code:** `HomeView.tsx` (welcome and folder page, `shortPath`), `NewSessionDialog.tsx`, App wiring, the
     composer chip, and new home styles replacing the old ones.
@@ -2317,8 +2317,8 @@ with the OpenAI Codex CLI and Google's Antigravity CLI (`agy`), in both directio
     owner's settings restored.
   - **Known gap:** a Codex turn the person stops records $0, so its tokens before the stop aren't counted.
 - [ ] **M9-08** (later) Team workers on Codex or agy. The supervisor stays Claude.
-- [ ] **M9-09** A chat on Codex or agy.
-  - [x] **Part 1, Codex** (PR pending):
+- [x] **M9-09** A chat on Codex or agy.
+  - [x] **Part 1, Codex** (#165):
     - **Starting one:** New session has an Agent picker (shown when Codex is installed; Codex is greyed out while
       signed out). On Codex the model is Codex's default until changed in the chat, plan mode isn't offered, and
       agent profiles are hidden.
@@ -2335,7 +2335,25 @@ with the OpenAI Codex CLI and Google's Antigravity CLI (`agy`), in both directio
     - **Checked in the app (Windows, 2026-11-11):** a new Codex chat (gpt-6-luna, "OK"), resumed from Previous
       sessions with its history, re-attached after a reload, then a second turn. About $0.004 in all. The owner's
       settings were restored.
-  - [ ] **Part 2, agy.**
+  - [x] **Part 2, agy** (PR pending):
+    - **Starting one:** agy joins the Agent picker when it's installed (greyed out while signed out). Its help says
+      what it can't do: it edits files but runs no commands, never asks, takes no message mid-turn, and can't be
+      reopened after the app restarts.
+    - **Modes:** only Standard (edits) and Plan (only reads, every write denied). agy never asks, so Safe and
+      Autonomous aren't offered; elsewhere they're fitted to the nearest (`fitMode`).
+    - **The chat:** each message runs one `agy -p` turn that continues the conversation (`--conversation`). A
+      message sent while a turn runs waits for the next one. The model list is `agy models`; the model applies from
+      the next turn. No effort picker: agy's models carry it in their names.
+    - **Its id:** the tab keeps an id of the app's, since agy names a conversation only once its first turn starts.
+      A closed tab resumes while the app runs. A reloaded tab gets its transcript back from the live session, under
+      its first message as title.
+    - **Tests:** a chat on the agy fake (held opening events, a queued message, mode and model switches, resume by
+      the tab's id, a refused mode and an unknown id), `listModels`, `agentModes` / `fitMode`.
+    - **Checked in the app (Windows, 2026-11-11):** a new agy chat answered "OK" on gemini-3.8-flash-high; after
+      switching to Flash (Low) and Plan it answered "OK2" (the ledger shows flash-low); after a reload the tab came
+      back with both turns, its title and Standard. About $0.031 in all. The owner's settings were restored.
+    - **Known gap:** the status bar keeps the model the chat opened with after a switch; the turn runs on the new
+      one.
 
 ### Exit criteria
 

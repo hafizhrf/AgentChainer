@@ -1,16 +1,10 @@
-import {
-  type AgentDefinition,
-  agentProblems,
-  PERMISSION_MODES,
-  type PermissionMode,
-  type StepAgent,
-} from "@agentchainer/protocol";
+import { type AgentDefinition, agentProblems, type PermissionMode, type StepAgent } from "@agentchainer/protocol";
 import { Folder, FolderOpen, Play } from "lucide-react";
 import { type FormEvent, useEffect, useState } from "react";
 import { Modal } from "./Dialog.tsx";
 import { pickFolder } from "./HomeView.tsx";
 import { t } from "./i18n/index.ts";
-import { MODE_HELP, modelChoices, modeOptions } from "./options.ts";
+import { agentModes, fitMode, MODE_HELP, modelChoices, modeOptions } from "./options.ts";
 import type { WorkspaceDef } from "./settings.ts";
 import { shortPath } from "./shortPath.ts";
 import { request } from "./sidecar.ts";
@@ -78,10 +72,12 @@ export function NewSessionDialog({
     if (open) void request("agents.available", {}).then(setClis, () => setClis(null));
   }, [open]);
   const onCodex = agent === "codex";
-  // A Codex chat has no plan mode: Safe stands in for it.
+  const onAgy = agent === "agy";
+  // Each agent's own modes: Safe stands in for Codex's plan, Standard for agy's missing ones.
   useEffect(() => {
-    if (onCodex && mode === "plan") onModeChange("default");
-  }, [onCodex, mode, onModeChange]);
+    const fit = fitMode(agent, mode);
+    if (fit !== mode) onModeChange(fit);
+  }, [agent, mode, onModeChange]);
   const workspace = cwd.trim();
   const profiles = useProfiles(open && ready ? workspace : "");
   // A profile the new folder doesn't have is dropped, so Start never names a missing one.
@@ -192,33 +188,53 @@ export function NewSessionDialog({
           </p>
         )}
         {isHome && <p className="warn">{t("home.workspace.homeWarning")}</p>}
-        {clis?.codex.installed && (
-          <Field label={t("home.newSession.agent")} help={onCodex ? t("home.newSession.codexHelp") : undefined}>
+        {(clis?.codex.installed || clis?.agy.installed) && (
+          <Field
+            label={t("home.newSession.agent")}
+            help={onCodex ? t("home.newSession.codexHelp") : onAgy ? t("home.newSession.agyHelp") : undefined}
+          >
             <Select
               label={t("home.newSession.agent")}
               value={agent}
               onChange={(v) => onAgentChange(v as StepAgent)}
               options={[
                 { value: "claude", label: t("tasks.agents.claude") },
-                {
-                  value: "codex",
-                  label: clis.codex.signedIn
-                    ? t("tasks.agents.codex")
-                    : t("tasks.agents.notSignedIn", { agent: t("tasks.agents.codex") }),
-                  disabled: !clis.codex.signedIn,
-                },
+                ...(clis.codex.installed
+                  ? [
+                      {
+                        value: "codex",
+                        label: clis.codex.signedIn
+                          ? t("tasks.agents.codex")
+                          : t("tasks.agents.notSignedIn", { agent: t("tasks.agents.codex") }),
+                        disabled: !clis.codex.signedIn,
+                      },
+                    ]
+                  : []),
+                ...(clis.agy.installed
+                  ? [
+                      {
+                        value: "agy",
+                        label: clis.agy.signedIn
+                          ? t("tasks.agents.agy")
+                          : t("tasks.agents.notSignedIn", { agent: t("tasks.agents.agy") }),
+                        disabled: !clis.agy.signedIn,
+                      },
+                    ]
+                  : []),
               ]}
             />
           </Field>
         )}
         <div className="field-row">
           <Field label={t("home.view.model")}>
-            {onCodex ? (
+            {onCodex || onAgy ? (
               <Select
                 label={t("home.view.model")}
                 value=""
                 onChange={() => undefined}
-                options={[{ value: "", label: t("home.newSession.codexModel") }]}
+                options={[
+                  { value: "", label: onAgy ? t("home.newSession.agyModel") : t("home.newSession.codexModel") },
+                ]}
                 disabled
               />
             ) : (
@@ -235,15 +251,13 @@ export function NewSessionDialog({
               label={t("home.view.permissionProfile")}
               value={mode}
               onChange={(m) => onModeChange(asMode(m))}
-              options={modeOptions(
-                onCodex ? PERMISSION_MODES.filter((m) => m !== "plan") : PERMISSION_MODES,
-                canAutonomous,
-              )}
+              options={modeOptions(agentModes(agent), canAutonomous)}
             />
           </Field>
         </div>
-        <p className="field-help">{MODE_HELP[mode]}</p>
-        {!onCodex && profiles && profiles.length > 0 && (
+        {/* agy never asks, so the Claude wording of a mode doesn't fit: its own help above says what each does. */}
+        {!onAgy && <p className="field-help">{MODE_HELP[mode]}</p>}
+        {agent === "claude" && profiles && profiles.length > 0 && (
           <Field label={t("home.view.agentProfile")} help={t("home.view.agentProfileHelp")}>
             <Select
               label={t("home.view.agentProfile")}

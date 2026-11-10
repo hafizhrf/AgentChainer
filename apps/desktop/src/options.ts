@@ -1,7 +1,30 @@
-import { EFFORTS, type Effort, type ModelOption, type PERMISSION_MODES } from "@agentchainer/protocol";
+import {
+  EFFORTS,
+  type Effort,
+  type ModelOption,
+  PERMISSION_MODES,
+  type PermissionMode,
+  type StepAgent,
+} from "@agentchainer/protocol";
 import { type MessageKey, t } from "./i18n/index.ts";
 
 /** Choices shared by the start screen, the composer and Settings. */
+
+/**
+ * The permission modes a chat on each agent has (M9-09). Codex can't be asked to only plan. agy never asks, so it
+ * edits (Standard) or, with Plan, only reads.
+ */
+export function agentModes(agent: StepAgent | undefined): readonly PermissionMode[] {
+  if (agent === "codex") return PERMISSION_MODES.filter((m) => m !== "plan");
+  if (agent === "agy") return ["acceptEdits", "plan"];
+  return PERMISSION_MODES;
+}
+
+/** `mode` when the agent has it, else the nearest it has: Safe for Codex's plan, Standard for agy. */
+export function fitMode(agent: StepAgent | undefined, mode: PermissionMode): PermissionMode {
+  if (agentModes(agent).includes(mode)) return mode;
+  return agent === "agy" ? "acceptEdits" : "default";
+}
 
 /** Until a chat has started once: the CLI's aliases, which always point at its latest models. */
 const fallbackModels = (): ModelOption[] => [

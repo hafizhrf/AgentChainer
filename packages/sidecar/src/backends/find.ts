@@ -45,16 +45,17 @@ export function agyHost(
   if (!bin) return null;
   try {
     const version = execFileSync(bin, ["--version"], { encoding: "utf8", timeout: 15_000, windowsHide: true }).trim();
-    let listed: Promise<string | null> | undefined;
-    const defaultModel = () => {
-      listed ??= new Promise<string | null>((resolve) =>
+    let listed: Promise<{ id: string; name: string }[]> | undefined;
+    const models = () => {
+      listed ??= new Promise((resolve) =>
         execFile(bin, ["models"], { encoding: "utf8", timeout: 30_000, windowsHide: true }, (err, out) =>
-          resolve(err ? null : firstModel(out)),
+          resolve(err ? [] : listModels(out)),
         ),
       );
       return listed;
     };
-    return { cli: { bin, prefix: [] }, version, defaultModel, ...registry };
+    const defaultModel = async () => (await models())[0]?.id ?? null;
+    return { cli: { bin, prefix: [] }, version, defaultModel, models, ...registry };
   } catch {
     return null;
   }
@@ -87,11 +88,17 @@ export async function agentClis(
   };
 }
 
-/** The first model id `agy models` prints: lines of "<id>\t<name>", after a "Fetching…" line. */
-export function firstModel(out: string): string | null {
+/** The models `agy models` prints: lines of "<id>\t<name>", after a "Fetching…" line. */
+export function listModels(out: string): { id: string; name: string }[] {
+  const models: { id: string; name: string }[] = [];
   for (const line of out.split(/\r?\n/)) {
     const [id, name] = line.split("\t");
-    if (id && name !== undefined && /^[\w.-]+$/.test(id.trim())) return id.trim();
+    if (id && name !== undefined && /^[\w.-]+$/.test(id.trim())) models.push({ id: id.trim(), name: name.trim() });
   }
-  return null;
+  return models;
+}
+
+/** The first of them, which a step that names no model runs (M9-07). */
+export function firstModel(out: string): string | null {
+  return listModels(out)[0]?.id ?? null;
 }

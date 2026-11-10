@@ -1,4 +1,4 @@
-import { type Effort, type Image, PERMISSION_MODES, type PermissionMode } from "@agentchainer/protocol";
+import type { Effort, Image, PermissionMode } from "@agentchainer/protocol";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { open } from "@tauri-apps/plugin-dialog";
 import { ArrowUp, Bot, ListPlus, Paperclip, Pencil, Play, SendHorizontal, Square, Users, X } from "lucide-react";
@@ -16,7 +16,7 @@ import {
 import { fuzzyFilter, tokenAt } from "./fuzzy.ts";
 import { t } from "./i18n/index.ts";
 import { ModeHelp } from "./ModeHelp.tsx";
-import { EFFORT_OPTIONS, MODE_HELP, MODE_NAMES, modelChoices, modeOptions } from "./options.ts";
+import { agentModes, EFFORT_OPTIONS, MODE_HELP, MODE_NAMES, modelChoices, modeOptions } from "./options.ts";
 import { asMode, isFresh, type Tab } from "./tabs.ts";
 import { agentLabel } from "./tasks/stepAgent.ts";
 import { teamSpend, usdShort } from "./team.ts";
@@ -517,11 +517,8 @@ export function Composer({
               compact
               label={t("session.composer.modeLabel")}
               value={tab.mode}
-              // A Codex chat has no plan mode (M9-09).
-              options={modeOptions(
-                tab.agent === "codex" ? PERMISSION_MODES.filter((m) => m !== "plan") : PERMISSION_MODES,
-                canAutonomous,
-              )}
+              // Each agent's own modes (M9-09).
+              options={modeOptions(agentModes(tab.agent), canAutonomous)}
               onChange={(m) => onModeChange(asMode(m))}
               disabled={tab.ended}
             />
@@ -534,14 +531,17 @@ export function Composer({
               onChange={onModelChange}
               disabled={tab.ended}
             />
-            <Select
-              compact
-              label={t("session.composer.effortLabel")}
-              value={tab.effort ?? ""}
-              options={EFFORT_OPTIONS}
-              onChange={(e) => onEffortChange((e || null) as Effort | null)}
-              disabled={tab.ended}
-            />
+            {/* agy's models carry their effort in their names (M9-09). */}
+            {tab.agent !== "agy" && (
+              <Select
+                compact
+                label={t("session.composer.effortLabel")}
+                value={tab.effort ?? ""}
+                options={EFFORT_OPTIONS}
+                onChange={(e) => onEffortChange((e || null) as Effort | null)}
+                disabled={tab.ended}
+              />
+            )}
             <button
               type="button"
               className="ghost icon"

@@ -6,6 +6,7 @@ const base: Settings = {
   claudePath: null,
   codexPath: null,
   agyPath: null,
+  taskDefaults: {},
   defaultModel: null,
   defaultMode: null,
   editor: null,

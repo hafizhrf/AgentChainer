@@ -1,4 +1,4 @@
-import { folderKey } from "@agentchainer/protocol";
+import { folderKey, type TaskDefaults } from "@agentchainer/protocol";
 import { invoke } from "@tauri-apps/api/core";
 
 /** Mirrors `settings.rs` (M1-07). No secrets: auth stays in the user's own Claude CLI (ADR-0002). */
@@ -30,6 +30,8 @@ export type Settings = {
   workspaces: WorkspaceDef[];
   /** Multi-folder sessions' other folders (M8-07), most recent first. */
   sessionFolders: { sessionId: string; folders: string[] }[];
+  /** How tasks run unless a task or its workspace chooses: the app-wide level. */
+  taskDefaults: TaskDefaults;
 };
 
 /** A named set of folders (M8-01): sessions run in `primary` and also reach `folders`. Mirrors `settings.rs`. */

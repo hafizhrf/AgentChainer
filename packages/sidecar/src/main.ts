@@ -6,7 +6,13 @@ import type { SDKMessage } from "@anthropic-ai/claude-agent-sdk";
 import pkg from "../package.json" with { type: "json" };
 import { agentTemplates } from "./agent-templates.ts";
 import { deleteAgent, listAgents, saveAgent } from "./agents.ts";
-import { readDefaults, writeDefaults } from "./backends/defaults.ts";
+import {
+  defaultsView,
+  readDefaults,
+  setAppDefaults,
+  writeDefaults,
+  writeWorkspaceDefaults,
+} from "./backends/defaults.ts";
 import { agentClis, agyHost, codexHost } from "./backends/find.ts";
 import type { LiveSession } from "./backends/types.ts";
 import { applyActions, type Cli, listRuns, rollback } from "./bootstrap/apply.ts";
@@ -375,6 +381,22 @@ serve(
     "workspace.agents": ({ cwd }) => {
       requireFolder(cwd);
       return readDefaults(cwd);
+    },
+
+    "app.setDefaults": ({ defaults }) => {
+      setAppDefaults(defaults);
+      return { ok: true as const };
+    },
+
+    "workspace.defaults": ({ cwd }) => {
+      requireFolder(cwd);
+      return defaultsView(cwd);
+    },
+
+    "workspace.setDefaults": ({ cwd, defaults }) => {
+      requireFolder(cwd);
+      writeWorkspaceDefaults(cwd, defaults);
+      return defaultsView(cwd);
     },
 
     "workspace.setAgents": ({ cwd, agents }) => {

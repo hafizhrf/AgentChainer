@@ -340,8 +340,6 @@
   "setup.permissions.empty": "Belum ada aturan yang disimpan.",
   "setup.workflows.intro": "Langkah-langkah yang dijalankan sebuah task, per tier. Sebuah proyek dapat mengganti workflow suatu tier dengan <code>{{file}}</code> miliknya sendiri, yang dibagikan lewat git; file itu diperiksa sama seperti milik aplikasi, dan setiap run menyimpan salinan workflow yang dipakainya saat mulai.",
   "setup.workflows.tiers": "Tier",
-  "setup.workflows.agentsTitle": "Agent bawaan",
-  "setup.workflows.agentsHelp": "Agent yang menjalankan tiap jenis langkah bila task tidak memilih. Langkah yang diberi agent sendiri oleh workflow tetap memakainya. Disimpan di komputer ini saja (.agentchainer/agents.json, di luar git).",
   "setup.workflows.checkAgain": "Periksa lagi",
   "setup.workflows.reading": "Membaca workflow…",
   "setup.workflows.sourceProject": "proyek",
@@ -379,5 +377,14 @@
   "setup.overview.eachHasFix": "Masing-masing memiliki perbaikan di rencana setup.",
   "setup.overview.nothingNeeded": "Tidak ada pemeriksaan kesiapan yang perlu diperhatikan.",
   "setup.overview.statusCount": "{{n}} {{status}}",
-  "setup.overview.fix": "Perbaiki"
+  "setup.overview.fix": "Perbaiki",
+
+  "setup.workflows.defaultsTitle": "Default task",
+  "setup.workflows.defaultsHelp": "Cara task di workspace ini berjalan kecuali task memilih lain. Tiap kolom mengikuti default aplikasi (Pengaturan) sampai kamu mengaturnya di sini. Disimpan saat berubah, di luar git.",
+  "setup.workflows.useApp": "Pakai default aplikasi",
+  "setup.workflows.applyAll": "Terapkan ke semua workspace",
+  "setup.workflows.applyAllTitle": "Terapkan ke semua workspace?",
+  "setup.workflows.applyAllBody": "Default task milik workspace ini menggantikan milik {{count}} workspace lain yang dikenal aplikasi (yang terbaru dan yang diberi nama). Kolom yang di sini mengikuti default aplikasi juga akan mengikutinya di sana.",
+  "setup.workflows.applied": "Diterapkan ke {{count}} workspace.",
+  "setup.workflows.appliedSome": "Diterapkan ke {{count}} workspace; tidak bisa menulis ke {{failed}}."
 }

@@ -460,5 +460,19 @@
   "tasks.agents.claude": "Claude",
   "tasks.agents.codex": "Codex",
   "tasks.agents.agy": "Antigravity CLI (agy)",
-  "tasks.agents.notSignedIn": "{{agent}} (not signed in)"
+  "tasks.agents.notSignedIn": "{{agent}} (not signed in)",
+
+  "tasks.defaults.appDefault": "App default ({{value}})",
+  "tasks.defaults.builtIn": "Built-in ({{value}})",
+  "tasks.defaults.model": "Model",
+  "tasks.defaults.modelHelp": "For each step that doesn't name its own model.",
+  "tasks.defaults.chatModel": "the chat's model",
+  "tasks.defaults.mode": "Permission profile",
+  "tasks.defaults.modeHelp": "What a write step may do without asking.",
+  "tasks.defaults.chatMode": "the chat's profile",
+  "tasks.defaults.budgets": "Budget per tier (USD)",
+  "tasks.defaults.budgetFor": "Budget for tier {{tier}}",
+  "tasks.defaults.noBudget": "no budget",
+  "tasks.defaults.budgetsHelpApp": "Empty keeps the built-in budget. XL's applies to each sub-task.",
+  "tasks.defaults.budgetsHelpWorkspace": "Empty follows the app's default, shown greyed out. XL's applies to each sub-task."
 }

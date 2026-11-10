@@ -1,6 +1,7 @@
 //! App settings (checklist M1-07), as `settings.json` in the app config dir. They hold no secrets; auth stays in
 //! the user's own CLI (ADR-0002). Session history and cost history move to SQLite later (M1-21, M1-33).
 
+use std::collections::BTreeMap;
 use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
@@ -30,6 +31,57 @@ pub struct WorkspaceDef {
 pub struct SessionFolders {
     pub session_id: String,
     pub folders: Vec<String>,
+}
+
+/// How tasks run unless a task or its workspace chooses (owner request, 2026-11-10): the agent per role (`plan`,
+/// `implement`, `review` → `claude`, `codex`, `agy`), the model, the permission profile and the budget per tier
+/// (`S`…`XL`; `null` is "no budget"). The sidecar gets them through `app.setDefaults`.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", default)]
+pub struct TaskDefaults {
+    #[serde(skip_serializing_if = "BTreeMap::is_empty")]
+    pub agents: BTreeMap<String, String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub model: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub permission_mode: Option<String>,
+    #[serde(skip_serializing_if = "BTreeMap::is_empty")]
+    pub budget_usd: BTreeMap<String, Option<f64>>,
+}
+
+impl TaskDefaults {
+    /// Keeps only the values the sidecar's schema accepts, so a hand-edited file can't make it refuse them all.
+    fn normalized(self) -> Self {
+        let agents = self
+            .agents
+            .into_iter()
+            .filter(|(role, agent)| {
+                matches!(role.as_str(), "plan" | "implement" | "review")
+                    && matches!(agent.as_str(), "claude" | "codex" | "agy")
+            })
+            .collect();
+        let model = self
+            .model
+            .map(|m| m.trim().to_string())
+            .filter(|m| !m.is_empty() && m.len() <= 100);
+        let permission_mode = self
+            .permission_mode
+            .filter(|m| matches!(m.as_str(), "default" | "acceptEdits" | "auto"));
+        let budget_usd = self
+            .budget_usd
+            .into_iter()
+            .filter(|(tier, budget)| {
+                matches!(tier.as_str(), "S" | "M" | "L" | "XL")
+                    && budget.is_none_or(|b| b.is_finite() && (0.0..=1_000_000.0).contains(&b))
+            })
+            .collect();
+        TaskDefaults {
+            agents,
+            model,
+            permission_mode,
+            budget_usd,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
@@ -67,6 +119,8 @@ pub struct Settings {
     pub workspaces: Vec<WorkspaceDef>,
     /// Multi-folder sessions' other folders (M8-07), most recent first.
     pub session_folders: Vec<SessionFolders>,
+    /// How tasks run unless a task or its workspace chooses.
+    pub task_defaults: TaskDefaults,
 }
 
 impl Settings {
@@ -83,6 +137,7 @@ impl Settings {
         self.theme = clean(self.theme).filter(|t| t == "light" || t == "dark");
         self.language = clean(self.language).filter(|l| l == "id");
         self.budget_usd = self.budget_usd.filter(|b| b.is_finite() && *b > 0.0);
+        self.task_defaults = std::mem::take(&mut self.task_defaults).normalized();
         let mut seen: Vec<String> = Vec::new();
         for dir in self.recent_workspaces {
             let dir = dir.trim().to_string();
@@ -248,6 +303,40 @@ mod tests {
     use super::*;
 
     #[test]
+    fn keeps_only_task_defaults_the_sidecar_accepts() {
+        let s = Settings {
+            task_defaults: TaskDefaults {
+                agents: BTreeMap::from([
+                    ("implement".into(), "codex".into()),
+                    ("review".into(), "gpt".into()),
+                    ("deploy".into(), "agy".into()),
+                ]),
+                model: Some("  ".into()),
+                permission_mode: Some("plan".into()),
+                budget_usd: BTreeMap::from([
+                    ("S".into(), Some(2.0)),
+                    ("M".into(), None),
+                    ("L".into(), Some(-1.0)),
+                    ("XXL".into(), Some(5.0)),
+                ]),
+            },
+            ..Settings::default()
+        }
+        .normalized();
+        let d = s.task_defaults;
+        assert_eq!(
+            d.agents,
+            BTreeMap::from([("implement".into(), "codex".into())])
+        );
+        assert_eq!(d.model, None);
+        assert_eq!(d.permission_mode, None, "plan mode doesn't run a task");
+        assert_eq!(
+            d.budget_usd,
+            BTreeMap::from([("S".into(), Some(2.0)), ("M".into(), None)])
+        );
+    }
+
+    #[test]
     fn normalizes_blank_values_and_recent_workspaces() {
         let s = Settings {
             claude_path: Some("  ".into()),
@@ -269,6 +358,7 @@ mod tests {
                 .collect(),
             workspaces: Vec::new(),
             session_folders: Vec::new(),
+            task_defaults: TaskDefaults::default(),
         }
         .normalized();
         assert_eq!(s.claude_path, None);

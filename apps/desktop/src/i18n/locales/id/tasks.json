@@ -458,5 +458,19 @@
   "tasks.agents.claude": "Claude",
   "tasks.agents.codex": "Codex",
   "tasks.agents.agy": "Antigravity CLI (agy)",
-  "tasks.agents.notSignedIn": "{{agent}} (belum masuk)"
+  "tasks.agents.notSignedIn": "{{agent}} (belum masuk)",
+
+  "tasks.defaults.appDefault": "Default aplikasi ({{value}})",
+  "tasks.defaults.builtIn": "Bawaan ({{value}})",
+  "tasks.defaults.model": "Model",
+  "tasks.defaults.modelHelp": "Untuk setiap langkah yang tidak menyebut modelnya sendiri.",
+  "tasks.defaults.chatModel": "model chat",
+  "tasks.defaults.mode": "Profil izin",
+  "tasks.defaults.modeHelp": "Apa yang boleh dilakukan langkah tulis tanpa bertanya.",
+  "tasks.defaults.chatMode": "profil chat",
+  "tasks.defaults.budgets": "Budget per tier (USD)",
+  "tasks.defaults.budgetFor": "Budget untuk tier {{tier}}",
+  "tasks.defaults.noBudget": "tanpa budget",
+  "tasks.defaults.budgetsHelpApp": "Kosong memakai budget bawaan. Budget XL berlaku untuk tiap sub-task.",
+  "tasks.defaults.budgetsHelpWorkspace": "Kosong mengikuti default aplikasi, yang tampil samar. Budget XL berlaku untuk tiap sub-task."
 }

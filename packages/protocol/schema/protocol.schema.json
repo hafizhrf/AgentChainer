@@ -32806,6 +32806,673 @@
         "additionalProperties": false
       }
     },
+    "app.setDefaults": {
+      "params": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "defaults": {
+            "type": "object",
+            "properties": {
+              "agents": {
+                "type": "object",
+                "properties": {
+                  "plan": {
+                    "type": "string",
+                    "enum": [
+                      "claude",
+                      "codex",
+                      "agy"
+                    ]
+                  },
+                  "implement": {
+                    "type": "string",
+                    "enum": [
+                      "claude",
+                      "codex",
+                      "agy"
+                    ]
+                  },
+                  "review": {
+                    "type": "string",
+                    "enum": [
+                      "claude",
+                      "codex",
+                      "agy"
+                    ]
+                  }
+                },
+                "additionalProperties": false
+              },
+              "model": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 100
+              },
+              "permissionMode": {
+                "type": "string",
+                "enum": [
+                  "default",
+                  "acceptEdits",
+                  "auto"
+                ]
+              },
+              "budgetUsd": {
+                "type": "object",
+                "propertyNames": {
+                  "type": "string",
+                  "enum": [
+                    "S",
+                    "M",
+                    "L",
+                    "XL"
+                  ]
+                },
+                "additionalProperties": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 1000000
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "defaults"
+        ],
+        "additionalProperties": false
+      },
+      "result": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "const": true
+          }
+        },
+        "required": [
+          "ok"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "workspace.defaults": {
+      "params": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "cwd": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "cwd"
+        ],
+        "additionalProperties": false
+      },
+      "result": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "app": {
+            "type": "object",
+            "properties": {
+              "agents": {
+                "type": "object",
+                "properties": {
+                  "plan": {
+                    "type": "string",
+                    "enum": [
+                      "claude",
+                      "codex",
+                      "agy"
+                    ]
+                  },
+                  "implement": {
+                    "type": "string",
+                    "enum": [
+                      "claude",
+                      "codex",
+                      "agy"
+                    ]
+                  },
+                  "review": {
+                    "type": "string",
+                    "enum": [
+                      "claude",
+                      "codex",
+                      "agy"
+                    ]
+                  }
+                },
+                "additionalProperties": false
+              },
+              "model": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 100
+              },
+              "permissionMode": {
+                "type": "string",
+                "enum": [
+                  "default",
+                  "acceptEdits",
+                  "auto"
+                ]
+              },
+              "budgetUsd": {
+                "type": "object",
+                "propertyNames": {
+                  "type": "string",
+                  "enum": [
+                    "S",
+                    "M",
+                    "L",
+                    "XL"
+                  ]
+                },
+                "additionalProperties": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 1000000
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              }
+            },
+            "additionalProperties": false
+          },
+          "workspace": {
+            "type": "object",
+            "properties": {
+              "agents": {
+                "type": "object",
+                "properties": {
+                  "plan": {
+                    "type": "string",
+                    "enum": [
+                      "claude",
+                      "codex",
+                      "agy"
+                    ]
+                  },
+                  "implement": {
+                    "type": "string",
+                    "enum": [
+                      "claude",
+                      "codex",
+                      "agy"
+                    ]
+                  },
+                  "review": {
+                    "type": "string",
+                    "enum": [
+                      "claude",
+                      "codex",
+                      "agy"
+                    ]
+                  }
+                },
+                "additionalProperties": false
+              },
+              "model": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 100
+              },
+              "permissionMode": {
+                "type": "string",
+                "enum": [
+                  "default",
+                  "acceptEdits",
+                  "auto"
+                ]
+              },
+              "budgetUsd": {
+                "type": "object",
+                "propertyNames": {
+                  "type": "string",
+                  "enum": [
+                    "S",
+                    "M",
+                    "L",
+                    "XL"
+                  ]
+                },
+                "additionalProperties": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 1000000
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              }
+            },
+            "additionalProperties": false
+          },
+          "effective": {
+            "type": "object",
+            "properties": {
+              "agents": {
+                "type": "object",
+                "properties": {
+                  "plan": {
+                    "type": "string",
+                    "enum": [
+                      "claude",
+                      "codex",
+                      "agy"
+                    ]
+                  },
+                  "implement": {
+                    "type": "string",
+                    "enum": [
+                      "claude",
+                      "codex",
+                      "agy"
+                    ]
+                  },
+                  "review": {
+                    "type": "string",
+                    "enum": [
+                      "claude",
+                      "codex",
+                      "agy"
+                    ]
+                  }
+                },
+                "additionalProperties": false
+              },
+              "model": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 100
+              },
+              "permissionMode": {
+                "type": "string",
+                "enum": [
+                  "default",
+                  "acceptEdits",
+                  "auto"
+                ]
+              },
+              "budgetUsd": {
+                "type": "object",
+                "propertyNames": {
+                  "type": "string",
+                  "enum": [
+                    "S",
+                    "M",
+                    "L",
+                    "XL"
+                  ]
+                },
+                "additionalProperties": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 1000000
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "app",
+          "workspace",
+          "effective"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "workspace.setDefaults": {
+      "params": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "cwd": {
+            "type": "string",
+            "minLength": 1
+          },
+          "defaults": {
+            "type": "object",
+            "properties": {
+              "agents": {
+                "type": "object",
+                "properties": {
+                  "plan": {
+                    "type": "string",
+                    "enum": [
+                      "claude",
+                      "codex",
+                      "agy"
+                    ]
+                  },
+                  "implement": {
+                    "type": "string",
+                    "enum": [
+                      "claude",
+                      "codex",
+                      "agy"
+                    ]
+                  },
+                  "review": {
+                    "type": "string",
+                    "enum": [
+                      "claude",
+                      "codex",
+                      "agy"
+                    ]
+                  }
+                },
+                "additionalProperties": false
+              },
+              "model": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 100
+              },
+              "permissionMode": {
+                "type": "string",
+                "enum": [
+                  "default",
+                  "acceptEdits",
+                  "auto"
+                ]
+              },
+              "budgetUsd": {
+                "type": "object",
+                "propertyNames": {
+                  "type": "string",
+                  "enum": [
+                    "S",
+                    "M",
+                    "L",
+                    "XL"
+                  ]
+                },
+                "additionalProperties": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 1000000
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "cwd",
+          "defaults"
+        ],
+        "additionalProperties": false
+      },
+      "result": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "app": {
+            "type": "object",
+            "properties": {
+              "agents": {
+                "type": "object",
+                "properties": {
+                  "plan": {
+                    "type": "string",
+                    "enum": [
+                      "claude",
+                      "codex",
+                      "agy"
+                    ]
+                  },
+                  "implement": {
+                    "type": "string",
+                    "enum": [
+                      "claude",
+                      "codex",
+                      "agy"
+                    ]
+                  },
+                  "review": {
+                    "type": "string",
+                    "enum": [
+                      "claude",
+                      "codex",
+                      "agy"
+                    ]
+                  }
+                },
+                "additionalProperties": false
+              },
+              "model": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 100
+              },
+              "permissionMode": {
+                "type": "string",
+                "enum": [
+                  "default",
+                  "acceptEdits",
+                  "auto"
+                ]
+              },
+              "budgetUsd": {
+                "type": "object",
+                "propertyNames": {
+                  "type": "string",
+                  "enum": [
+                    "S",
+                    "M",
+                    "L",
+                    "XL"
+                  ]
+                },
+                "additionalProperties": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 1000000
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              }
+            },
+            "additionalProperties": false
+          },
+          "workspace": {
+            "type": "object",
+            "properties": {
+              "agents": {
+                "type": "object",
+                "properties": {
+                  "plan": {
+                    "type": "string",
+                    "enum": [
+                      "claude",
+                      "codex",
+                      "agy"
+                    ]
+                  },
+                  "implement": {
+                    "type": "string",
+                    "enum": [
+                      "claude",
+                      "codex",
+                      "agy"
+                    ]
+                  },
+                  "review": {
+                    "type": "string",
+                    "enum": [
+                      "claude",
+                      "codex",
+                      "agy"
+                    ]
+                  }
+                },
+                "additionalProperties": false
+              },
+              "model": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 100
+              },
+              "permissionMode": {
+                "type": "string",
+                "enum": [
+                  "default",
+                  "acceptEdits",
+                  "auto"
+                ]
+              },
+              "budgetUsd": {
+                "type": "object",
+                "propertyNames": {
+                  "type": "string",
+                  "enum": [
+                    "S",
+                    "M",
+                    "L",
+                    "XL"
+                  ]
+                },
+                "additionalProperties": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 1000000
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              }
+            },
+            "additionalProperties": false
+          },
+          "effective": {
+            "type": "object",
+            "properties": {
+              "agents": {
+                "type": "object",
+                "properties": {
+                  "plan": {
+                    "type": "string",
+                    "enum": [
+                      "claude",
+                      "codex",
+                      "agy"
+                    ]
+                  },
+                  "implement": {
+                    "type": "string",
+                    "enum": [
+                      "claude",
+                      "codex",
+                      "agy"
+                    ]
+                  },
+                  "review": {
+                    "type": "string",
+                    "enum": [
+                      "claude",
+                      "codex",
+                      "agy"
+                    ]
+                  }
+                },
+                "additionalProperties": false
+              },
+              "model": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 100
+              },
+              "permissionMode": {
+                "type": "string",
+                "enum": [
+                  "default",
+                  "acceptEdits",
+                  "auto"
+                ]
+              },
+              "budgetUsd": {
+                "type": "object",
+                "propertyNames": {
+                  "type": "string",
+                  "enum": [
+                    "S",
+                    "M",
+                    "L",
+                    "XL"
+                  ]
+                },
+                "additionalProperties": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 1000000
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "app",
+          "workspace",
+          "effective"
+        ],
+        "additionalProperties": false
+      }
+    },
     "workflow.list": {
       "params": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",

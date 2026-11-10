@@ -9,6 +9,7 @@ import {
   type StepRun,
   type Task,
   type TaskContract,
+  type TaskDefaults,
   type Tier,
   type Triage,
 } from "@agentchainer/protocol";
@@ -194,12 +195,23 @@ export function TaskPage({
   const [agents, setAgents] = useState<AgentRoles>({});
   /** The other agents' CLIs on this computer, for the pickers; null until they've been checked. */
   const [clis, setClis] = useState<AgentClis | null>(null);
+  const [runMode, setRunMode] = useState<Exclude<PermissionMode, "plan">>(mode === "plan" ? "default" : mode);
+  /** The budget per tier this workspace's tasks start from (its own, then the app's); a tier left out is built-in. */
+  const [tierBudgets, setTierBudgets] = useState<TaskDefaults["budgetUsd"]>({});
   useEffect(() => {
     void request("agents.available", {}).then(setClis, () => setClis(null));
-    // The pickers start from the workspace's defaults (M9-06); a role picked here overrides its default.
-    void request("workspace.agents", { cwd }).then(setAgents, () => undefined);
+    // The task starts from the workspace's defaults, then the app's (M9-06, Settings → Task defaults): agents per
+    // role, model, profile and budgets. Anything picked here overrides them.
+    void request("workspace.defaults", { cwd }).then(
+      ({ effective }) => {
+        setAgents(effective.agents ?? {});
+        if (effective.model) setModelAlias(effective.model);
+        if (effective.permissionMode) setRunMode(effective.permissionMode);
+        setTierBudgets(effective.budgetUsd ?? {});
+      },
+      () => undefined,
+    );
   }, [cwd]);
-  const [runMode, setRunMode] = useState<Exclude<PermissionMode, "plan">>(mode === "plan" ? "default" : mode);
   const [stepItems, setStepItems] = useState<StepItems>({});
   /**
    * Each running step's session, from its events: a step records its session only when its turn ends, so this is
@@ -600,11 +612,11 @@ export function TaskPage({
                     setBudget((b) =>
                       b === NO_BUDGET && next !== "XL"
                         ? b
-                        : String(
-                            next === triage.chosen && triage.budgetUsd !== null
-                              ? triage.budgetUsd
-                              : DEFAULT_BUDGET_USD[next],
-                          ),
+                        : next === triage.chosen && triage.budgetUsd !== null
+                          ? String(triage.budgetUsd)
+                          : ((d) => (d === null ? NO_BUDGET : String(d)))(
+                              tierBudgets?.[next] === undefined ? DEFAULT_BUDGET_USD[next] : tierBudgets[next],
+                            ),
                     );
                   }}
                   reason={reason}

@@ -1341,7 +1341,19 @@ for the desktop shell, start screen and session view to be cleaned up (UX-02, UX
     - with the app default Implement on Codex and S at $2, ux12-ws's card showed "App default (Codex)" and "$2";
     - $0.50 for S saved to `defaults.json` (git-ignored), and "Use the app's defaults" emptied it;
     - the owner's settings were restored.
-  - **Left (part 2):** permission rules and plugins for all projects (ADR-0013).
+  Progress, part 2 (permissions and plugins, [ADR-0013](adr/0013-user-level-claude-settings.md)):
+  - **Permission rules:**
+    - Workspace settings → Permissions gets **All projects**: the rules in the user's own Claude settings
+      (`~/.claude/settings.json`, or `CLAUDE_CONFIG_DIR`), which every project and terminal session reads.
+    - **Add a rule** (new `permissions.add`): the rule in the CLI's syntax (checked), allow, ask or deny, and where:
+      just me, the team, all projects, or **every workspace** (copied into each known workspace's just-me file).
+    - Only the `permissions` lists change. A user settings file that's a link is written where it points, and a
+      workspace's own rule files still aren't written through links.
+  - **Plugins:** a third install scope, **All projects**, through the CLI's own `--scope user`. Its History run keeps
+    no workspace file, and Roll back uninstalls it through the CLI.
+  - **Tests:** `permissions.test.ts` (3 new: adding once with other keys kept, the user scope through a link that
+    stays a link, a workspace link refused).
+  - **Docs:** ADR-0013; THREAT_MODEL T-20, ARCHITECTURE, PRIVACY.
 - [ ] **UX-20** Starting like an IDE: a welcome page and a New session dialog. Owner feedback, 2026-11-10, with
   screenshots of the start screen: "rapihin tampilan ini biar lebih proper, sama bagian start session biar gak
   bingungin, ada popup atau apa gitu uxnya biar kaya proper IDE". Also: "di sini harusnya bisa liat, chat agent lagi

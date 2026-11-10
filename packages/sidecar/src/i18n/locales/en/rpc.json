@@ -19,6 +19,7 @@
   "rpc.team.needsBudget": "A Team chat needs a budget cap for it and its workers.",
   "rpc.permission.noPending": "No pending permission request {{requestId}}",
   "rpc.permissions.notAnObject": "{{file}} is not a JSON object.",
+  "rpc.permissions.linked": "{{file}} is a link; AgentChainer doesn't write a workspace's settings through a link.",
   "rpc.permissions.noRule": "No {{behavior}} rule {{rule}} in {{file}}.",
   "rpc.permissions.accessTo": "Access to {{path}}",
   "rpc.task.alreadyRunning": "The task is already running.",

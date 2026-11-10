@@ -1008,11 +1008,41 @@
               "deny"
             ],
             "additionalProperties": false
+          },
+          "user": {
+            "type": "object",
+            "properties": {
+              "allow": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "ask": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "deny": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            },
+            "required": [
+              "allow",
+              "ask",
+              "deny"
+            ],
+            "additionalProperties": false
           }
         },
         "required": [
           "workspace",
-          "team"
+          "team",
+          "user"
         ],
         "additionalProperties": false
       }
@@ -2047,6 +2077,60 @@
         "additionalProperties": false
       }
     },
+    "permissions.add": {
+      "params": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "cwd": {
+            "type": "string",
+            "minLength": 1
+          },
+          "behavior": {
+            "type": "string",
+            "enum": [
+              "allow",
+              "ask",
+              "deny"
+            ]
+          },
+          "rule": {
+            "type": "string",
+            "maxLength": 300,
+            "pattern": "^[A-Za-z][\\w-]*(?:\\([^\\n()]*(?:\\([^\\n()]*\\)[^\\n()]*)*\\))?$"
+          },
+          "scope": {
+            "type": "string",
+            "enum": [
+              "workspace",
+              "team",
+              "user"
+            ]
+          }
+        },
+        "required": [
+          "cwd",
+          "behavior",
+          "rule",
+          "scope"
+        ],
+        "additionalProperties": false
+      },
+      "result": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "const": true
+          }
+        },
+        "required": [
+          "ok"
+        ],
+        "additionalProperties": false
+      }
+    },
     "permissions.remove": {
       "params": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -2072,7 +2156,8 @@
             "type": "string",
             "enum": [
               "workspace",
-              "team"
+              "team",
+              "user"
             ]
           }
         },
@@ -4881,8 +4966,9 @@
           "scope": {
             "type": "string",
             "enum": [
+              "local",
               "project",
-              "local"
+              "user"
             ]
           },
           "acceptCommand": {
@@ -4966,8 +5052,9 @@
           "scope": {
             "type": "string",
             "enum": [
+              "local",
               "project",
-              "local"
+              "user"
             ]
           },
           "acceptCommand": {
@@ -5051,8 +5138,9 @@
           "scope": {
             "type": "string",
             "enum": [
+              "local",
               "project",
-              "local"
+              "user"
             ]
           }
         },
@@ -5094,8 +5182,9 @@
           "scope": {
             "type": "string",
             "enum": [
+              "local",
               "project",
-              "local"
+              "user"
             ]
           },
           "enabled": {

@@ -43,6 +43,9 @@ work on a task (preview):
 
 **Sessions** are the Claude CLI's own session files. AgentChainer lists and resumes them through the Agent SDK and
 doesn't keep a copy ([ADR-0004](adr/0004-session-data.md)).
+The **Permissions** page can add rules for all projects to your own Claude settings (`~/.claude/settings.json`), only
+when you choose that, and only in its `permissions` lists ([ADR-0013](adr/0013-user-level-claude-settings.md)).
+
 The **Usage** page reads each stored session's model and token counts the same way, to add up an estimated cost on
 your computer. It keeps no copy, and sends nothing. When Codex is installed, the page also asks your own `codex`
 for your account's daily tokens and plan limits (`account/usage/read`, `account/rateLimits/read`); Codex answers from

@@ -408,7 +408,7 @@ const settingsFor = (scope: "project" | "local") =>
  */
 export async function recordPluginInstall(
   root: string,
-  action: { id: string; title: string; scope: "project" | "local" },
+  action: { id: string; title: string; scope: "project" | "local" | "user" },
   install: () => Promise<{ pluginId: string; lock: LockItem; warnings: string[] } | null>,
   catalogVersion: string,
   now = new Date(),
@@ -431,7 +431,9 @@ export async function recordPluginInstall(
     rmSync(runDir, { recursive: true, force: true });
     removeIfEmpty(root);
   };
-  tracker.watch(rec.files, settingsFor(action.scope));
+  // A user-scope install (every project, UX-19) changes the CLI's user settings, not this workspace's files: the run
+  // keeps no file to restore, and Roll back uninstalls it through the CLI.
+  if (action.scope !== "user") tracker.watch(rec.files, settingsFor(action.scope));
   let done: Awaited<ReturnType<typeof install>>;
   try {
     done = await install();

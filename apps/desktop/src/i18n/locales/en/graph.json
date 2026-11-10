@@ -4,7 +4,6 @@
   "graph.status.done": "Done",
   "graph.status.stopped": "Stopped",
   "graph.status.failed": "Failed",
-
   "graph.agentDrawer.label": "Subagent: {{description}}",
   "graph.agentDrawer.status": "Status",
   "graph.agentDrawer.waiting": "Waiting for your approval",
@@ -23,7 +22,6 @@
   "graph.agentDrawer.activity": "Activity",
   "graph.agentDrawer.nothingYet": "Nothing yet.",
   "graph.agentDrawer.result": "Result",
-
   "graph.backgroundTasks.label": "Background tasks",
   "graph.backgroundTasks.count_one": "{{count}} task in the background",
   "graph.backgroundTasks.count_other": "{{count}} tasks in the background",
@@ -32,7 +30,6 @@
   "graph.backgroundTasks.monitor": "Monitor",
   "graph.backgroundTasks.stopping": "Stopping…",
   "graph.backgroundTasks.stop": "Stop",
-
   "graph.sessionGraph.label": "Agent graph. Arrow keys move between agents, Enter opens one, Esc closes it.",
   "graph.sessionGraph.empty": "No subagents in this session yet.",
   "graph.sessionGraph.foldTools": "Fold tools",
@@ -51,7 +48,6 @@
   "graph.sessionGraph.toolCalls_other": "{{count}} tool calls",
   "graph.sessionGraph.failed": "{{count}} failed",
   "graph.sessionGraph.moreTools": "+{{count}} more",
-
   "graph.sessionTimeline.earlier": "Earlier turn",
   "graph.sessionTimeline.later": "Later turn",
   "graph.sessionTimeline.turn": "Turn {{n}} of {{total}}",
@@ -64,13 +60,10 @@
   "graph.sessionTimeline.waited": "waited {{time}} for approval",
   "graph.sessionTimeline.paused": "paused {{time}}",
   "graph.sessionTimeline.rowTitle": "{{label}}: {{facts}}",
-
   "graph.timeline.mainAgent": "Main agent",
-
   "graph.bench.loading": "Loading the graph…",
   "graph.bench.measuring": "Measuring pan and zoom with 200 nodes…",
   "graph.bench.result": "{{nodes}} nodes · pan p95 {{panP95}} ms ({{panFps}} fps) · zoom p95 {{zoomP95}} ms ({{zoomFps}} fps)",
-
   "graph.fleet.title": "Fleet",
   "graph.fleet.counts": "{{waiting}} waiting for you · {{working}} working · {{total}} in all",
   "graph.fleet.clearEnded": "Clear {{n}} ended",
@@ -104,7 +97,6 @@
   "graph.fleet.statusWorking": "Working",
   "graph.fleet.statusIdle": "Idle",
   "graph.fleet.statusEnded": "Ended",
-
   "graph.team.assign": "Assign worker",
   "graph.team.handoff": "Hand off to worker",
   "graph.team.sendMessage": "Message worker",
@@ -113,7 +105,6 @@
   "graph.team.closeWorker": "Close worker",
   "graph.team.stopped": "Team stopped at its {{cap}} cap",
   "graph.team.spend": "Team · {{spent}} of {{cap}}",
-
   "graph.schedules.done": "done",
   "graph.schedules.failed": "failed",
   "graph.schedules.unverified": "ended unverified",
@@ -141,7 +132,7 @@
   "graph.usage.exportCsv": "CSV",
   "graph.usage.exportJson": "JSON",
   "graph.usage.refresh": "Refresh",
-  "graph.usage.note": "Estimated from each response's tokens at the model's API price, across every stored Claude session and your workspaces' Codex and agy task steps. A session counts on the day it was last active.",
+  "graph.usage.note": "Estimated from tokens at each model's API price: every stored Claude session, and the Codex and agy runs AgentChainer launched. A session counts on the day it was last active.",
   "graph.usage.exported": "Saved {{count}} rows to {{path}}",
   "graph.usage.failed": "Couldn't read the usage: {{error}}",
   "graph.usage.loading": "Reading your sessions…",
@@ -167,5 +158,18 @@
   "graph.usage.session": "Session",
   "graph.usage.day": "Last active",
   "graph.usage.tokensDetail": "{{input}} in · {{output}} out",
-  "graph.usage.sessionsDetail": "In {{projects}} folders"
+  "graph.usage.sessionsDetail": "In {{projects}} folders",
+  "graph.usage.codexTitle": "Codex account",
+  "graph.usage.codexPlan": "{{plan}} plan",
+  "graph.usage.codexLifetime": "{{tokens}} tokens all time",
+  "graph.usage.codexNote": "From Codex itself: your whole ChatGPT account on every device and app, sessions outside AgentChainer included. Tokens only, so it isn't in the totals above.",
+  "graph.usage.codexLimit": "{{window}} limit: {{used}}% used",
+  "graph.usage.codexResets": "Resets {{at}}",
+  "graph.usage.codexDaily": "Tokens per active day",
+  "graph.usage.codexNeedsChatgpt": "Codex shows account usage only for a ChatGPT login; with an API key, its runs from AgentChainer are still counted above.",
+  "graph.usage.codexFailed": "Couldn't read the usage from Codex just now; its runs from AgentChainer are still counted above.",
+  "graph.usage.windowDays": "{{count}}-day",
+  "graph.usage.windowHours": "{{count}}-hour",
+  "graph.usage.windowMinutes": "{{count}}-minute",
+  "graph.usage.date": "Day"
 }

@@ -338,3 +338,56 @@ fieldset.folder-switcher {
   margin: 0;
   font-size: var(--text-sm);
 }
+
+.usage-quota {
+  display: grid;
+  grid-template-columns: minmax(0, max-content) minmax(120px, 1fr) max-content;
+  align-items: center;
+  gap: var(--space-3);
+  font-size: var(--text-sm);
+}
+
+.usage-quota-bar {
+  height: 8px;
+  overflow: hidden;
+  border-radius: var(--radius-full);
+  background: var(--surface-3);
+}
+
+.usage-quota-fill {
+  display: block;
+  height: 100%;
+  border-radius: var(--radius-full);
+  background: var(--series-codex);
+}
+
+.usage-quota-bar.warn > .usage-quota-fill {
+  background: var(--warn);
+}
+
+.usage-codex-days td {
+  white-space: nowrap;
+}
+
+.usage-daybar {
+  display: inline-block;
+  width: 160px;
+  height: 8px;
+  margin-right: var(--space-2);
+  overflow: hidden;
+  border-radius: 2px;
+  background: var(--surface-3);
+  vertical-align: middle;
+}
+
+.usage-daybar-fill {
+  display: block;
+  height: 100%;
+  background: var(--series-codex);
+}
+
+.usage-daynum {
+  display: inline-block;
+  min-width: 52px;
+  text-align: right;
+}

@@ -17,6 +17,9 @@ export const CODEX_CONTRACT = {
     "turn/start",
     "turn/steer",
     "turn/interrupt",
+    // The usage page (CP-01): the account's daily tokens and the plan's quota.
+    "account/usage/read",
+    "account/rateLimits/read",
   ],
   /** In `ClientNotification.json`. */
   clientNotifications: ["initialized"],
@@ -65,6 +68,19 @@ export const CODEX_CONTRACT = {
     FileChangeRequestApprovalParams: ["itemId"],
     FileChangeRequestApprovalResponse: ["decision", "accept", "decline"],
     McpServerElicitationRequestResponse: ["action", "decline", "content"],
+    GetAccountTokenUsageResponse: ["summary", "dailyUsageBuckets", "lifetimeTokens", "startDate", "tokens"],
+    GetAccountRateLimitsResponse: [
+      "rateLimits",
+      "rateLimitsByLimitId",
+      "limitId",
+      "limitName",
+      "planType",
+      "primary",
+      "secondary",
+      "usedPercent",
+      "windowDurationMins",
+      "resetsAt",
+    ],
   } as Record<string, string[]>,
 } as const;
 

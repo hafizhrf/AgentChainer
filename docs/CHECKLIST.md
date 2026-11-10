@@ -2266,6 +2266,20 @@ Owner request, 2026-11-10: features that community tools for coding agents have 
     light ones are under 3:1 against the card, so the tables carry every number.
   - **Tests:** `usage.test.ts` in the sidecar (8) and the UI (2).
   - **Real data, no model calls:** 249 sessions in the last 30 days were read in 3.2 s (0.2 s once cached), all priced.
+  - **Layout fix** (owner, 2026-11-10: the page looked broken): its `.usage` / `.usage-table` classes collided with the
+    composer's `/usage` popup. The page now has its own root and reuses Metrics' tiles and tables. The chart is
+    drawn at the card's width. Checked in light, dark and at 900 px.
+  Progress, part 2 (Codex and agy):
+  - **Codex's own account usage** (`account/usage/read`, `account/rateLimits/read` on a short-lived app-server, no
+    model calls): the daily tokens of the whole ChatGPT account and the plan's limit windows, in a card of their own
+    and out of the totals. An API-key login is told why it's empty. Both methods are pinned in `contracts.ts`.
+  - **The app's own Codex and agy runs:** each turn is appended to `usage/agent-runs.jsonl` in the app's data folder
+    (`AGENTCHAINER_USAGE_DIR`, set in dev too), in any folder. Task records only fill in runs from before the record
+    existed.
+  - **Tests:** `usage.test.ts` (12): the record, merging runs by day and session, and parsing Codex's answers with
+    account ids dropped.
+  - **Live:** the card showed the owner's free plan, 4% of a 30-day limit and 14 active days. A tier-S task on agy
+    was recorded with its model, tokens and ≈$0.088 estimate.
 - [ ] **CP-02** An MCP server manager: add any server, import from Claude Desktop, test the connection. Today: catalog
       items only. — opcode; Vibe Kanban ([MCP settings](https://vibekanban.com/docs/settings/mcp-servers)).
 - [ ] **CP-03** A CLAUDE.md editor with a live preview, and a scan across projects. — opcode.

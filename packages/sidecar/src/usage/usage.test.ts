@@ -1,7 +1,12 @@
 import assert from "node:assert/strict";
+import { appendFileSync, mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import path from "node:path";
 import { beforeEach, describe, it } from "node:test";
 import type { Task } from "@agentchainer/protocol";
 import { claudeCostUsd, claudePriceOf } from "./claude-prices.ts";
+import { parseAccount } from "./codex-account.ts";
+import { type AgentRun, readRuns, recordRun } from "./ledger.ts";
 import { clearUsageCache, familyOf, type StoredSession, tallySession, usageFile, usageReport } from "./report.ts";
 
 const close = (a: number, b: number) => Math.abs(a - b) < 1e-9;
@@ -121,6 +126,7 @@ describe("the usage report (CP-01)", () => {
     sessions: async () => sessions,
     messages: async (s: StoredSession) => messages[s.sessionId] ?? [],
     tasks: (root: string) => (root === "/w/shop" ? [task] : []),
+    runs: () => [] as AgentRun[],
   };
 
   it("sums the period's sessions and the tasks' Codex steps by model, project and day", async () => {
@@ -185,5 +191,175 @@ describe("the usage report (CP-01)", () => {
     assert.equal(head, "day,source,project,title,models,tokens,unpriced_tokens,est_cost_usd,id");
     assert.match(row ?? "", /^2026-11-10,claude,\/w,"'=SUM\(A1\), ""quoted""",claude-opus-5-5,1100,0,/);
     assert.deepEqual(JSON.parse(usageFile(withRow, "json").text).totals.sessions, 1);
+  });
+});
+
+describe("the app's record of Codex and agy runs (CP-01)", () => {
+  it("appends a line per turn, skips a broken one, and records nothing without a folder", () => {
+    const dir = mkdtempSync(path.join(tmpdir(), "ac-usage-"));
+    try {
+      const env = { AGENTCHAINER_USAGE_DIR: path.join(dir, "usage") };
+      const run = { agent: "codex" as const, model: "gpt-6-luna", input: 1000, output: 50, cwd: "/w", sessionId: "t1" };
+      recordRun({ ...run, costUsd: 0.0001, costKind: "estimate" }, env);
+      appendFileSync(path.join(dir, "usage", "agent-runs.jsonl"), '{"at":"cut short\n');
+      recordRun({ ...run, agent: "agy", model: "agy", costUsd: 0, sessionId: "c1" }, env);
+      const runs = readRuns(env);
+      assert.deepEqual(
+        runs.map((r) => [r.agent, r.sessionId, r.costKind]),
+        [
+          ["codex", "t1", "estimate"],
+          ["agy", "c1", "unknown"],
+        ],
+      );
+      recordRun({ ...run, costUsd: 0 }, {});
+      assert.deepEqual(readRuns({}), []);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("counts recorded runs on their own days, as one session row, and doesn't count a task step twice", async () => {
+    clearUsageCache();
+    const now = new Date("2026-11-10T12:00:00");
+    const runs: AgentRun[] = [
+      {
+        at: "2026-11-09T10:00:00",
+        agent: "codex",
+        model: "gpt-6-luna",
+        input: 1000,
+        output: 10,
+        costUsd: 0.001,
+        costKind: "estimate",
+        cwd: "/tmp/fixture",
+        sessionId: "thread-1",
+        title: "Count quantity · Implement",
+      },
+      {
+        at: "2026-11-10T10:00:00",
+        agent: "codex",
+        model: "gpt-6-luna",
+        input: 2000,
+        output: 20,
+        costUsd: 0.002,
+        costKind: "estimate",
+        cwd: "/tmp/fixture",
+        sessionId: "thread-1",
+        title: "Count quantity · Implement",
+      },
+      {
+        at: "2026-11-10T11:00:00",
+        agent: "agy",
+        model: "agy",
+        input: 500,
+        output: 5,
+        costUsd: 0,
+        costKind: "unknown",
+        cwd: "/w/shop",
+        sessionId: "conv-1",
+      },
+    ];
+    const step = {
+      id: "implement",
+      step: "implement",
+      label: "Implement",
+      kind: "agent",
+      status: "done",
+      agent: "codex",
+      model: "gpt-6-luna",
+      costKind: "estimate",
+      tokens: { input: 3000, output: 30 },
+      costUsd: 0.003,
+      sessionId: "thread-1",
+      startedAt: "2026-11-10T09:00:00.000Z",
+    };
+    const r = await usageReport(
+      {
+        sessions: async () => [],
+        messages: async () => [],
+        tasks: () => [
+          {
+            id: "2026-11-10-bbbbbbbb",
+            title: "Count quantity",
+            request: "x",
+            run: { steps: [step] },
+          } as unknown as Task,
+        ],
+        runs: () => runs,
+      },
+      { sinceDays: 7, workspaces: ["/w/shop"], now },
+    );
+    assert.equal(r.totals.sessions, 2, "thread-1 once, conv-1; the task's step is the recorded thread");
+    assert.ok(close(r.totals.costUsd, 0.003));
+    assert.equal(r.totals.unpricedTokens, 505);
+    assert.deepEqual(
+      r.byDay.map((d) => [d.day, Number((d.costUsd.codex ?? 0).toFixed(3))]),
+      [
+        ["2026-11-09", 0.001],
+        ["2026-11-10", 0.002],
+      ],
+    );
+    const thread = r.sessions.find((s) => s.id === "thread-1");
+    assert.deepEqual([thread?.day, thread?.tokens, thread?.source], ["2026-11-10", 3030, "codex"]);
+  });
+});
+
+describe("Codex's account usage (CP-01)", () => {
+  it("keeps daily tokens, the lifetime total and each quota window, and drops account details", () => {
+    const usage = parseAccount(
+      {
+        id: 2,
+        result: {
+          summary: { lifetimeTokens: 550_356_042, peakDailyTokens: 155_199_772 },
+          dailyUsageBuckets: [
+            { startDate: "2026-10-29", tokens: 47_060_094 },
+            { startDate: "2026-10-30", tokens: 21_344_658 },
+          ],
+          threadUsage: null,
+        },
+      },
+      {
+        id: 3,
+        result: {
+          accountId: "acct-secret",
+          rateLimits: {
+            limitId: "codex",
+            primary: { usedPercent: 4, windowDurationMins: 43_200, resetsAt: 1_796_485_138 },
+          },
+          rateLimitsByLimitId: {
+            codex: {
+              limitId: "codex",
+              planType: "free",
+              primary: { usedPercent: 4, windowDurationMins: 43_200, resetsAt: 1_796_485_138 },
+              secondary: null,
+            },
+          },
+        },
+      },
+    );
+    assert.equal(usage.available, true);
+    assert.equal(usage.plan, "free");
+    assert.equal(usage.lifetimeTokens, 550_356_042);
+    assert.deepEqual(
+      usage.daily?.map((d) => d.day),
+      ["2026-10-29", "2026-10-30"],
+    );
+    assert.deepEqual(usage.limits, [
+      {
+        name: "codex",
+        which: "primary",
+        usedPercent: 4,
+        windowMins: 43_200,
+        resetsAt: new Date(1_796_485_138_000).toISOString(),
+      },
+    ]);
+    assert.doesNotMatch(JSON.stringify(usage), /acct-secret/);
+  });
+
+  it("says when the login can't read account usage", () => {
+    const usage = parseAccount(
+      { id: 2, error: { message: "chatgpt authentication required to read token usage" } },
+      { id: 3 },
+    );
+    assert.deepEqual(usage, { available: false, reason: "needsChatgpt" });
   });
 });

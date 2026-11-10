@@ -992,6 +992,33 @@ const UsageTokensSchema = {
 };
 
 /**
+ * The user's Codex account usage (CP-01), from Codex's own app-server: daily tokens across the whole ChatGPT account
+ * (every device and app, so it overlaps the app's own Codex runs) and the plan's quota windows. Tokens only: Codex
+ * gives no per-model split here, so no cost.
+ */
+export const CodexAccountUsageSchema = z.object({
+  available: z.boolean(),
+  /** Why there's nothing: Codex isn't installed, the login isn't ChatGPT (API key), or the call failed. */
+  reason: z.enum(["notInstalled", "needsChatgpt", "failed"]).optional(),
+  plan: z.string().nullable().optional(),
+  lifetimeTokens: z.number().nullable().optional(),
+  /** Days with activity, as Codex reports them. */
+  daily: z.array(z.object({ day: z.string(), tokens: z.number() })).optional(),
+  limits: z
+    .array(
+      z.object({
+        name: z.string(),
+        which: z.enum(["primary", "secondary"]),
+        usedPercent: z.number(),
+        windowMins: z.number().nullable(),
+        resetsAt: z.string().nullable(),
+      }),
+    )
+    .optional(),
+});
+export type CodexAccountUsage = z.infer<typeof CodexAccountUsageSchema>;
+
+/**
  * What agents spent across sessions (CP-01): every stored Claude session (from the SDK's history, ADR-0004) and the
  * Codex and agy steps of the given workspaces' tasks. Costs are estimates at API prices; a model with no price
  * counts its tokens in `unpricedTokens` and $0. A session counts on the day it was last active.
@@ -1026,6 +1053,8 @@ export const UsageReportSchema = z.object({
   byProject: z.array(z.object({ project: z.string(), ...UsageTokensSchema, sessions: z.number() })),
   /** Each day with spend, oldest first: the estimate by family. */
   byDay: z.array(z.object({ day: z.string(), costUsd: z.partialRecord(UsageFamilySchema, z.number()) })),
+  /** Codex's own account usage, when Codex is installed; separate from the totals, which it would count twice. */
+  codexAccount: CodexAccountUsageSchema.optional(),
   /** The costliest sessions and task steps, costliest first. */
   sessions: z.array(
     z.object({

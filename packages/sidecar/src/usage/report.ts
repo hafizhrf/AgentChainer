@@ -5,6 +5,7 @@ import { AC_DIR } from "../ac-dir.ts";
 import { estimateUsd } from "../backends/prices.ts";
 import { loadTask } from "../tasks/store.ts";
 import { type ClaudeTokens, claudeCostUsd } from "./claude-prices.ts";
+import type { AgentRun } from "./ledger.ts";
 
 /**
  * The usage page (CP-01): what agents spent across sessions, by model, project and day. ADR-0004 keeps the app off
@@ -34,6 +35,8 @@ export type UsageSources = {
   messages(session: StoredSession): Promise<{ message: unknown }[]>;
   /** The tasks recorded in a workspace, sub-tasks included. */
   tasks(root: string): Task[];
+  /** The Codex and agy turns the app recorded (ledger.ts), in any folder. */
+  runs(): AgentRun[];
 };
 
 type Tally = {
@@ -205,11 +208,41 @@ export async function usageReport(
     });
   }
 
-  // Codex and agy steps, from the task records (Claude's steps are sessions above already).
+  // Codex and agy turns the app recorded, each on its own day.
+  const recorded = new Set<string>();
+  for (const run of src.runs()) {
+    const at = Date.parse(run.at);
+    if (since !== null && at < since) continue;
+    recorded.add(run.sessionId);
+    const priced = run.costKind === "estimate";
+    count({
+      id: run.sessionId,
+      project: run.cwd,
+      title: run.title ?? `${run.agent === "codex" ? "Codex" : "agy"} · ${run.sessionId.slice(0, 8)}`,
+      day: dayOf(at),
+      source: run.agent,
+      models: new Map([
+        [
+          run.model,
+          {
+            ...empty(),
+            input: run.input,
+            output: run.output,
+            costUsd: priced ? run.costUsd : 0,
+            unpriced: priced ? 0 : run.input + run.output,
+          },
+        ],
+      ]),
+    });
+  }
+
+  // Codex and agy steps from before the app recorded runs: the task records of the known workspaces. Claude's steps
+  // are sessions above already.
   for (const root of new Set(opts.workspaces)) {
     for (const task of src.tasks(root)) {
       for (const step of task.run?.steps ?? []) {
         if (step.agent !== "codex" && step.agent !== "agy") continue;
+        if (step.sessionId && recorded.has(step.sessionId)) continue;
         const at = Date.parse(step.endedAt ?? step.startedAt);
         if (since !== null && at < since) continue;
         const model = step.model ?? step.agent;
@@ -243,6 +276,21 @@ export async function usageReport(
   }
 
   const sorted = <T extends { costUsd: number }>(xs: T[]) => xs.sort((a, b) => b.costUsd - a.costUsd);
+  // A session that ran on several days is one row: its spend added up, on its last day.
+  const merged = new Map<string, UsageReport["sessions"][number]>();
+  for (const r of rows) {
+    const m = merged.get(r.id);
+    if (!m) {
+      merged.set(r.id, { ...r, models: [...r.models] });
+      continue;
+    }
+    m.costUsd += r.costUsd;
+    m.tokens += r.tokens;
+    m.unpricedTokens += r.unpricedTokens;
+    m.models = [...new Set([...m.models, ...r.models])];
+    if (r.day > m.day) m.day = r.day;
+  }
+  const sessionRows = [...merged.values()];
   return {
     generatedAt: now.toISOString(),
     sinceDays: opts.sinceDays,
@@ -254,7 +302,7 @@ export async function usageReport(
       cacheRead: total.cacheRead,
       cacheWrite: total.cacheWrite,
       unpricedTokens: total.unpriced,
-      sessions: rows.length,
+      sessions: sessionRows.length,
     },
     byModel: sorted(
       [...byModel].map(([model, m]) => ({
@@ -281,7 +329,7 @@ export async function usageReport(
     byDay: [...byDay]
       .sort(([a], [b]) => a.localeCompare(b))
       .map(([day, fams]) => ({ day, costUsd: Object.fromEntries(fams) as Partial<Record<UsageFamily, number>> })),
-    sessions: sorted(rows).slice(0, opts.topSessions ?? 50),
+    sessions: sorted(sessionRows).slice(0, opts.topSessions ?? 50),
   };
 }
 

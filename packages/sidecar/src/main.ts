@@ -122,6 +122,8 @@ import {
 } from "./tasks/service.ts";
 import { loadTask } from "./tasks/store.ts";
 import { sessionWorkers, Team, teamTools, type WorkerBase } from "./team.ts";
+import { codexAccountUsage } from "./usage/codex-account.ts";
+import { readRuns } from "./usage/ledger.ts";
 import { allTasks, type UsageSources, usageFile, usageReport } from "./usage/report.ts";
 import { fileDiff, gitInit, listFiles, revert } from "./workspace.ts";
 
@@ -321,6 +323,7 @@ async function usageSources(): Promise<UsageSources> {
       return [...main, ...subs.flat()];
     },
     tasks: (root) => (existsSync(root) ? allTasks(root) : []),
+    runs: () => readRuns(),
   };
 }
 
@@ -1121,7 +1124,15 @@ serve(
       return { ok: true as const };
     },
 
-    "usage.report": async ({ sinceDays, workspaces }) => usageReport(await usageSources(), { sinceDays, workspaces }),
+    "usage.report": async ({ sinceDays, workspaces }) => {
+      const env = process.env.AGENTCHAINER_CODEX_PATH;
+      const codexCli = env ? { bin: env, prefix: [] } : resolveCli("codex");
+      const [report, codexAccount] = await Promise.all([
+        usageReport(await usageSources(), { sinceDays, workspaces }),
+        codexAccountUsage(codexCli),
+      ]);
+      return { ...report, codexAccount };
+    },
 
     "usage.export": async ({ sinceDays, workspaces, path: file, format }) => {
       if (!file.toLowerCase().endsWith(`.${format}`)) {

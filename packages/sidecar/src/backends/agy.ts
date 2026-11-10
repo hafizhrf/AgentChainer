@@ -9,6 +9,7 @@ import { checkToolCall, GUARD_PREFIX, SECRET_DIRS } from "../guard.ts";
 import { t } from "../i18n/index.ts";
 import { log } from "../rpc.ts";
 import type { SessionCallbacks, TurnResult } from "../session.ts";
+import { recordRun } from "../usage/ledger.ts";
 import { type AgyEvent, type AgyUsage, eventsOf, parseLine, usageOfResult, writesOf } from "./agy-events.ts";
 import { estimateUsd } from "./prices.ts";
 import type { LiveSession, StepBackend, StepOptions } from "./types.ts";
@@ -225,6 +226,21 @@ class AgySession implements LiveSession {
       | undefined;
     const usage = usageOfResult(result);
     const before = this.costOf(this.total);
+    if (usage.inputTokens + usage.outputTokens + usage.thinkingTokens > 0) {
+      const turn = { ...usage };
+      const cost = this.costOf(turn);
+      recordRun({
+        agent: "agy",
+        model: this.model || "agy",
+        input: turn.inputTokens,
+        output: turn.outputTokens + turn.thinkingTokens,
+        costUsd: cost ?? 0,
+        costKind: cost === null ? "unknown" : "estimate",
+        cwd: this.options.cwd,
+        sessionId: this.id,
+        ...(this.tag ? { title: [this.tag.title, this.tag.label].filter(Boolean).join(" · ") } : {}),
+      });
+    }
     this.total = {
       inputTokens: this.total.inputTokens + usage.inputTokens,
       outputTokens: this.total.outputTokens + usage.outputTokens,

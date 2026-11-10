@@ -8,7 +8,7 @@ describe("the M4-E2 bench scene", () => {
   it("has exactly as many graph nodes as the graph shows before folding, all laid out", () => {
     const g = agentGraph(benchItems(), { running: false });
     assert.equal(g.nodes.length, MAX_NODES);
-    assert.equal(g.nodes.filter((n) => n.kind === "agent").length, 49);
+    assert.equal(g.nodes.filter((n) => n.kind === "agent").length, 99);
     assert.equal(layoutGraph(g).size, MAX_NODES);
   });
 

@@ -77,7 +77,8 @@
    "description": "Sleep 8 seconds then echo finished"
   },
   "parentToolUseId": "toolu_019AKc9fm3GAi5nSe8xqrLpD",
-  "agentId": "a2df20d2a2c34bcd5"
+  "agentId": "a2df20d2a2c34bcd5",
+  "model": "claude-haiku-5-5"
  },
  {
   "type": "agent.progress",
@@ -108,7 +109,8 @@
   "type": "agent.text",
   "parentToolUseId": "toolu_019AKc9fm3GAi5nSe8xqrLpD",
   "agentId": "a2df20d2a2c34bcd5",
-  "text": "The command `sleep 8 && echo finished` ran and printed:\n\n```\nfinished\n```"
+  "text": "The command `sleep 8 && echo finished` ran and printed:\n\n```\nfinished\n```",
+  "model": "claude-haiku-5-5"
  },
  {
   "type": "agent.updated",

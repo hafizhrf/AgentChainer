@@ -50,7 +50,8 @@
    "subagent_type": "general-purpose"
   },
   "parentToolUseId": "toolu_01Vx9Av3x2rfamqYG9HzWgYq",
-  "agentId": "a0a2d00c4aa378606"
+  "agentId": "a0a2d00c4aa378606",
+  "model": "claude-haiku-5-5"
  },
  {
   "type": "agent.started",
@@ -83,7 +84,8 @@
    "description": "Print current date and time"
   },
   "parentToolUseId": "toolu_014J3iz2KGCUFjD2F91KsMd8",
-  "agentId": "a5f1cb099ff60f5e1"
+  "agentId": "a5f1cb099ff60f5e1",
+  "model": "claude-haiku-5-5"
  },
  {
   "type": "tool.completed",
@@ -96,7 +98,8 @@
   "type": "agent.text",
   "parentToolUseId": "toolu_014J3iz2KGCUFjD2F91KsMd8",
   "agentId": "a5f1cb099ff60f5e1",
-  "text": "The output of `date` was:\n\n```\nSat Oct 31 21:37:14 SEAST 2026\n```"
+  "text": "The output of `date` was:\n\n```\nSat Oct 31 21:37:14 SEAST 2026\n```",
+  "model": "claude-haiku-5-5"
  },
  {
   "type": "agent.updated",
@@ -127,7 +130,8 @@
   "type": "agent.text",
   "parentToolUseId": "toolu_01Vx9Av3x2rfamqYG9HzWgYq",
   "agentId": "a0a2d00c4aa378606",
-  "text": "The subagent ran `date` and returned:\n\n```\nSat Oct 31 21:37:14 SEAST 2026\n```\n\nThis matches the session's stated date of 2026-10-31."
+  "text": "The subagent ran `date` and returned:\n\n```\nSat Oct 31 21:37:14 SEAST 2026\n```\n\nThis matches the session's stated date of 2026-10-31.",
+  "model": "claude-haiku-5-5"
  },
  {
   "type": "agent.updated",

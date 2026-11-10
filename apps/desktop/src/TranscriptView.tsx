@@ -34,6 +34,7 @@ import {
   type Item,
   type ToolGroup,
   type ToolItem,
+  toolSummary,
 } from "./transcript.ts";
 import { CopyButton } from "./ui/CopyButton.tsx";
 
@@ -397,16 +398,4 @@ const TOOL_ICONS: Record<string, LucideIcon> = {
 function ToolIcon({ name }: { name: string }) {
   const Icon = TOOL_ICONS[name] ?? Wrench;
   return <Icon size={14} className="tool-icon" aria-hidden />;
-}
-
-/** The one input worth showing in a collapsed tool row; paths inside the workspace are shown relative to it. */
-function toolSummary(input: unknown, cwd: string): string {
-  if (input && typeof input === "object") {
-    const o = input as Record<string, unknown>;
-    let v = o.command ?? o.file_path ?? o.path ?? o.pattern ?? o.url ?? o.description;
-    if (typeof v === "string" && cwd && (v.startsWith(`${cwd}/`) || v.startsWith(`${cwd}\\`)))
-      v = v.slice(cwd.length + 1);
-    if (typeof v === "string") return v.length > 80 ? `${v.slice(0, 80)}…` : v;
-  }
-  return "";
 }

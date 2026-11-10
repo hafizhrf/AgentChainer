@@ -3,32 +3,52 @@ import type { AgentChild, AgentItem, Item, ToolItem } from "../transcript.ts";
 
 /**
  * The session graph's model (M4-02, docs/design/observability.md §4), derived from the transcript's agent tree: the main
- * agent as the root, one node per subagent under its parent, and only the key tool calls. Pure, so it's tested without
- * a WebView; the layout and React Flow come after.
+ * agent as the root, one node per subagent under its parent, and each agent's tool calls as one card (UX-18). Pure, so
+ * it's tested without a WebView; the layout and React Flow come after.
  */
 
-/** A tool call running at least this long gets a node of its own (design §17). */
+/** A tool call running at least this long counts as a key call (design §17). */
 export const LONG_TOOL_MS = 10_000;
 /** Above this many nodes, finished subtrees fold into their root (design §17). */
 export const MAX_NODES = 200;
+/** An open tools card lists at most this many calls, the latest; the rest are "+N more" (UX-18). */
+export const TOOL_ROWS = 8;
 
 export const MAIN_ID = "main";
 
-export type MainNode = { kind: "main"; id: typeof MAIN_ID; running: boolean; foldedTools: number };
-/** `foldedTools` are this agent's tool calls without a node; `foldedAgents` its subagents folded to keep under the cap. */
+/** `tools` counts the calls behind its card: for the main agent, the current turn's (UX-18). */
+export type MainNode = { kind: "main"; id: typeof MAIN_ID; running: boolean; tools: number };
+/** `tools` is how many tool calls it made; `foldedAgents` its subagents folded to keep under the cap. */
 export type AgentNode = {
   kind: "agent";
   id: string;
   parent: string;
   agent: AgentItem;
-  foldedTools: number;
+  tools: number;
   foldedAgents: number;
   /** One of its tool calls waits for an approval. */
   waiting: boolean;
 };
-export type ToolNode = { kind: "tool"; id: string; parent: string; tool: ToolItem; waiting: boolean };
-export type GraphNode = MainNode | AgentNode | ToolNode;
-/** A spawn, or a key tool call, from `source` to `target`. `done` once the target has ended. */
+/**
+ * An agent's tool calls as one card (UX-18), instead of a node each, so a busy agent doesn't spread the graph sideways.
+ * Shown when one of them matters (an edit, a failure, a wait, a long call) or when the person opens the card. `rows`
+ * are what an open card lists, the latest last; `counts` are by tool name, most used first.
+ */
+export type ToolsNode = {
+  kind: "tools";
+  id: string;
+  parent: string;
+  open: boolean;
+  counts: { name: string; n: number }[];
+  rows: ToolItem[];
+  /** Calls an open card leaves out. */
+  more: number;
+  errors: number;
+  waiting: number;
+  running: number;
+};
+export type GraphNode = MainNode | AgentNode | ToolsNode;
+/** A spawn, or an agent's tools card, from `source` to `target`. `done` once the target has ended. */
 export type GraphEdge = { id: string; source: string; target: string; done: boolean };
 export type AgentGraph = { nodes: GraphNode[]; edges: GraphEdge[] };
 
@@ -39,11 +59,11 @@ export type GraphOptions = {
   now?: number;
   /** Tool call ids waiting for an approval. */
   waiting?: ReadonlySet<string>;
-  /** Agent ids (or `main`) whose every tool call is shown. */
+  /** Agent ids (or `main`) whose tools card is open. */
   expanded?: ReadonlySet<string>;
 };
 
-/** A tool call worth a node: an edit, a failure, a wait for approval, or a long call. */
+/** A tool call worth showing without being asked: an edit, a failure, a wait for approval, or a long call. */
 export function isKeyTool(tool: ToolItem, o: GraphOptions): boolean {
   if (EDIT_TOOLS.has(tool.name) || tool.status === "error" || o.waiting?.has(tool.id)) return true;
   if (tool.durationMs !== undefined) return tool.durationMs >= LONG_TOOL_MS;
@@ -52,53 +72,77 @@ export function isKeyTool(tool: ToolItem, o: GraphOptions): boolean {
     : false;
 }
 
+/** The id of `parent`'s tools card. */
+export const toolsId = (parent: string) => `${parent}::tools`;
+
+/** The main agent's calls since the last message the person sent: its card is about the turn at hand (UX-18). */
+function currentTurn(items: readonly Item[]): ToolItem[] {
+  let start = 0;
+  items.forEach((item, i) => {
+    if (item.kind === "user") start = i + 1;
+  });
+  return items.slice(start).filter((i): i is ToolItem => i.kind === "tool");
+}
+
 export function agentGraph(items: readonly Item[], o: GraphOptions): AgentGraph {
   const nodes: GraphNode[] = [];
   const edges: GraphEdge[] = [];
 
-  /** Adds the tools and subagents of `parent`; returns how many tool calls were folded. */
-  const addChildren = (parent: string, children: readonly (Item | AgentChild)[]): number => {
-    let folded = 0;
-    for (const c of children) {
-      if (c.kind === "agent") {
-        addAgent(parent, c);
-      } else if (c.kind === "tool") {
-        if (o.expanded?.has(parent) || isKeyTool(c, o)) {
-          nodes.push({ kind: "tool", id: c.id, parent, tool: c, waiting: o.waiting?.has(c.id) ?? false });
-          edges.push({ id: `${parent}->${c.id}`, source: parent, target: c.id, done: c.status !== "running" });
-        } else {
-          folded++;
-        }
-      }
-    }
-    return folded;
+  /** `parent`'s tools card, when it has one to show. */
+  const addTools = (parent: string, tools: readonly ToolItem[]) => {
+    const open = o.expanded?.has(parent) ?? false;
+    if (!tools.length || (!open && !tools.some((tool) => isKeyTool(tool, o)))) return;
+    const byName = new Map<string, number>();
+    for (const tool of tools) byName.set(tool.name, (byName.get(tool.name) ?? 0) + 1);
+    const rows = open ? tools.slice(-TOOL_ROWS) : [];
+    const running = tools.filter((tool) => tool.status === "running").length;
+    const id = toolsId(parent);
+    nodes.push({
+      kind: "tools",
+      id,
+      parent,
+      open,
+      counts: [...byName].map(([name, n]) => ({ name, n })).sort((a, b) => b.n - a.n),
+      rows,
+      more: open ? tools.length - rows.length : 0,
+      errors: tools.filter((tool) => tool.status === "error").length,
+      waiting: tools.filter((tool) => o.waiting?.has(tool.id)).length,
+      running,
+    });
+    edges.push({ id: `${parent}->${id}`, source: parent, target: id, done: running === 0 });
   };
 
   const addAgent = (parent: string, agent: AgentItem) => {
-    const node: AgentNode = {
+    const tools = agent.children.filter((c): c is ToolItem => c.kind === "tool");
+    nodes.push({
       kind: "agent",
       id: agent.id,
       parent,
       agent,
-      foldedTools: 0,
+      tools: tools.length,
       foldedAgents: 0,
-      waiting: agent.children.some((c) => c.kind === "tool" && (o.waiting?.has(c.id) ?? false)),
-    };
-    nodes.push(node);
+      waiting: tools.some((c) => o.waiting?.has(c.id) ?? false),
+    });
     edges.push({ id: `${parent}->${agent.id}`, source: parent, target: agent.id, done: !isLive(agent) });
-    node.foldedTools = addChildren(agent.id, agent.children);
+    addTools(agent.id, tools);
+    addAgents(agent.id, agent.children);
   };
 
-  const main: MainNode = { kind: "main", id: MAIN_ID, running: o.running, foldedTools: 0 };
-  nodes.push(main);
-  main.foldedTools = addChildren(MAIN_ID, items);
+  const addAgents = (parent: string, children: readonly (Item | AgentChild)[]) => {
+    for (const c of children) if (c.kind === "agent") addAgent(parent, c);
+  };
+
+  const turn = currentTurn(items);
+  nodes.push({ kind: "main", id: MAIN_ID, running: o.running, tools: turn.length });
+  addTools(MAIN_ID, turn);
+  addAgents(MAIN_ID, items);
   return nodes.length > MAX_NODES ? fold({ nodes, edges }) : { nodes, edges };
 }
 
 const isLive = (a: AgentItem) => a.status === "running" || a.status === "paused";
 
 /**
- * Keeps a big graph under `MAX_NODES`: first the tool nodes of finished agents go, then finished subtrees fold into
+ * Keeps a big graph under `MAX_NODES`: first the tools cards of finished agents go, then finished subtrees fold into
  * their root, outermost first, until it fits. Live work always stays visible.
  */
 function fold(graph: AgentGraph): AgentGraph {
@@ -108,11 +152,8 @@ function fold(graph: AgentGraph): AgentGraph {
 
   for (const n of graph.nodes) {
     if (count() <= MAX_NODES) break;
-    const parent = n.kind === "tool" ? byId.get(n.parent) : undefined;
-    if (n.kind === "tool" && parent?.kind === "agent" && !isLive(parent.agent)) {
-      removed.add(n.id);
-      parent.foldedTools++;
-    }
+    const parent = n.kind === "tools" ? byId.get(n.parent) : undefined;
+    if (n.kind === "tools" && parent?.kind === "agent" && !isLive(parent.agent)) removed.add(n.id);
   }
 
   const children = new Map<string, GraphNode[]>();
@@ -131,7 +172,6 @@ function fold(graph: AgentGraph): AgentGraph {
     for (const d of below) {
       removed.add(d.id);
       if (d.kind === "agent") n.foldedAgents++;
-      else n.foldedTools++;
     }
   }
 
@@ -141,9 +181,20 @@ function fold(graph: AgentGraph): AgentGraph {
   };
 }
 
-/** The structure only: ids and parents. The layout is recomputed when this changes, not on every status update. */
+/**
+ * The structure only: ids, parents and how big each tools card is. The layout is recomputed when this changes, not on
+ * every status update.
+ */
 export function structureKey(graph: AgentGraph): string {
-  return graph.nodes.map((n) => (n.kind === "main" ? n.id : `${n.parent}>${n.id}`)).join("|");
+  return graph.nodes
+    .map((n) =>
+      n.kind === "main"
+        ? n.id
+        : n.kind === "tools"
+          ? `${n.parent}>${n.id}#${n.open ? n.rows.length : "c"}`
+          : `${n.parent}>${n.id}`,
+    )
+    .join("|");
 }
 
 /** Arrow keys over the tree: up to the parent, down to the first child, left and right among siblings. */

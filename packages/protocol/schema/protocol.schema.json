@@ -2238,6 +2238,9 @@
                     },
                     "agentId": {
                       "type": "string"
+                    },
+                    "model": {
+                      "type": "string"
                     }
                   },
                   "required": [
@@ -2487,6 +2490,9 @@
                       "type": "string"
                     },
                     "text": {
+                      "type": "string"
+                    },
+                    "model": {
                       "type": "string"
                     }
                   },
@@ -33793,6 +33799,9 @@
                 },
                 "agentId": {
                   "type": "string"
+                },
+                "model": {
+                  "type": "string"
                 }
               },
               "required": [
@@ -34042,6 +34051,9 @@
                   "type": "string"
                 },
                 "text": {
+                  "type": "string"
+                },
+                "model": {
                   "type": "string"
                 }
               },

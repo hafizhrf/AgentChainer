@@ -23,8 +23,8 @@ const edit = (id: string, file: string): ToolItem => ({
 
 /**
  * The synthetic session of exit criterion M4-E2: 200 graph nodes, the most the graph shows before it folds. The main
- * agent with 3 edits, 7 subagents with 6 nested subagents each (49 agents), and 3 edits under every agent: 1 + 3 + 49 +
- * 147 = 200. Every edit is a key tool call, so each one is a node.
+ * agent with 3 edits, 9 subagents with 10 nested subagents each (99 agents), and 3 edits under every agent. Edits are
+ * key calls, so every agent has a tools card (UX-18): 1 + 1 + 99 + 99 = 200.
  */
 export function benchItems(): Item[] {
   const agent = (id: string, children: AgentItem["children"]): AgentItem => ({
@@ -38,10 +38,10 @@ export function benchItems(): Item[] {
     toolUses: 3,
     children: [...[1, 2, 3].map((n) => edit(`${id}-edit-${n}`, `src/${id}/file-${n}.ts`)), ...children],
   });
-  const tops = Array.from({ length: 7 }, (_, i) =>
+  const tops = Array.from({ length: 9 }, (_, i) =>
     agent(
       `a${i}`,
-      Array.from({ length: 6 }, (_, j) => agent(`a${i}-${j}`, [])),
+      Array.from({ length: 10 }, (_, j) => agent(`a${i}-${j}`, [])),
     ),
   );
   return [

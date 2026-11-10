@@ -148,6 +148,25 @@ describe("replayEvents (M4-08)", () => {
     ]);
   });
 
+  it("says which model each subagent ran, from its messages (UX-18)", () => {
+    const withModel = (m: SessionMessage, model: string): SessionMessage => ({
+      ...m,
+      message: { ...(m.message as object), model },
+    });
+    const ran = outer.map((m) => (m.type === "assistant" ? withModel(m, "claude-haiku-5-5") : m));
+    const { events } = replayEvents(main, new Map([["agent-outer", ran]]));
+    const models = events.flatMap((e) =>
+      (e.type === "tool.started" || e.type === "agent.text") && e.parentToolUseId === "sp-outer" ? [e.model] : [],
+    );
+    assert.deepEqual(models, ["claude-haiku-5-5", "claude-haiku-5-5"]);
+    // The main agent's own messages carry none: its model comes with `session.started`.
+    assert.ok(
+      historyEvents(main.map((m) => withModel(m, "claude-opus-5-5"))).every(
+        (e) => e.type !== "tool.started" || e.model === undefined,
+      ),
+    );
+  });
+
   it("gives every event its message's time, and ends a subagent when its spawn call returned", () => {
     const { events, times } = replayEvents(
       main,

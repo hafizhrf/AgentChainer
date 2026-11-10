@@ -1282,7 +1282,7 @@ for the desktop shell, start screen and session view to be cleaned up (UX-02, UX
     - the S and L workflows in the editor, dark and light;
     - an interrupted M task's Flow tab, where the two loops' labels no longer overlap and the controls cover no
       step.
-- [ ] **UX-18** A clearer agent graph. Owner feedback, 2026-11-10: "rapihin tampilan graph, jadi agentnya lebih
+- [x] **UX-18** A clearer agent graph. Owner feedback, 2026-11-10: "rapihin tampilan graph, jadi agentnya lebih
       jelas pake model apa, dan kalo show tools jadi banyak banget terlalu lebar".
   - **Model:**
     - The main node shows the session's model.
@@ -1294,6 +1294,27 @@ for the desktop shell, start screen and session view to be cleaned up (UX-02, UX
     - expanded: up to 8 rows and "+N more", which opens the drawer.
     - The graph's width then depends on the number of agents only.
   - Checked in both themes on a long session; the 200-node bench (M4-E2) still passes.
+  Note: done.
+  - **Model:**
+    - Subagents' `tool.started` and `agent.text` events carry the model their messages came from, live
+      (`normalize.ts`) and replayed (`stored-sessions.ts`).
+    - The transcript keeps it on the agent; before the first message, the Agent call's `model` alias.
+    - Nodes show a chip (`modelName`: "claude-haiku-5-5" → "Haiku 5.5"); the main node shows the session's model.
+      A subagent without its own is shown dimmed, as the session's.
+    - The drawer has a Model row.
+  - **Tools:** a `tools` node per agent (`agentGraph.ts`), sized per node (`layout.ts`).
+    - Closed, it lists counts by tool; open, the latest 8 calls with their targets, then "+N more", which opens the
+      agent's drawer.
+    - It shows on its own only for edits, failures, waits and long calls.
+    - The main agent's card covers the turn at hand.
+    - 30 calls under one agent make 1 card instead of 30 nodes (test).
+  - Also: "+1 agents" now has its plural.
+  - **Bench:** the M4-E2 scene is 200 nodes again with cards (99 agents and 99 cards).
+    `scripts/graph-bench.mjs` on Windows (debug build, 1280×800): pan, zoom and close-up all at 143.9 fps, with 0%
+    dropped frames.
+  - **Checked in the app over CDP (Windows), on haiku (≈$0.01):**
+    - two parallel Explore subagents, with cards closed and open, light and dark;
+    - after a restart and a resume, the drawer and the chips showed Haiku 5.5 from the stored history.
 - [ ] **UX-E1** All M1/M2 screens use the design system, in light and dark themes.
 - [ ] **UX-E2** Usability test participants complete the M1 exit scenarios without help.
 

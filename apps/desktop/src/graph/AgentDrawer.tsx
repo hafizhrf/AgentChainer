@@ -3,6 +3,7 @@ import { Bot, Square, X } from "lucide-react";
 import { useState } from "react";
 import { approxUsd, count, seconds } from "../i18n/format.ts";
 import { t } from "../i18n/index.ts";
+import { modelName } from "../modelName.ts";
 import { AgentChildren } from "../TranscriptView.tsx";
 import { agentUsd, type Cost } from "../tabs.ts";
 import { type AgentItem, agentDuration } from "../transcript.ts";
@@ -58,6 +59,8 @@ export function AgentDrawer({
   const facts: [string, string | undefined][] = [
     [t("graph.agentDrawer.status"), waiting && live ? t("graph.agentDrawer.waiting") : statusLabel(agent.status)],
     [t("graph.agentDrawer.type"), agent.agentType],
+    // The model its messages report, else the alias its Agent call asked for (UX-18).
+    [t("graph.agentDrawer.model"), modelName(agent.model)],
     [t("graph.agentDrawer.using"), live ? agent.lastTool : undefined],
     [t("graph.agentDrawer.time"), duration !== undefined ? seconds((duration / 1000).toFixed(1)) : undefined],
     [t("graph.agentDrawer.tokens"), agent.tokens !== undefined ? count(agent.tokens) : undefined],

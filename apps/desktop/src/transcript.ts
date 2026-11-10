@@ -35,6 +35,8 @@ export type AgentItem = {
   description: string;
   agentType?: string;
   prompt?: string;
+  /** The model it runs: the one its messages report, else the Agent call's `model` alias (UX-18). */
+  model?: string;
   depth?: number;
   background?: boolean;
   status: AgentStatus;
@@ -91,6 +93,9 @@ export function closeAssistant(items: Item[]): Item[] {
 }
 
 /** Applies one event. `now` (epoch ms) is passed for live events only, to time tool calls (M1-11). */
+/** The model a subagent's message reports replaces the alias its Agent call asked for (UX-18). */
+const withModel = (a: AgentItem, model: string | undefined): AgentItem => (model ? { ...a, model } : a);
+
 export function applyEvent(items: Item[], e: AgentEvent, now?: number): Item[] {
   switch (e.type) {
     case "text.delta":
@@ -164,11 +169,15 @@ export function applyEvent(items: Item[], e: AgentEvent, now?: number): Item[] {
           children: [],
           ...(typeof input.subagent_type === "string" ? { agentType: input.subagent_type } : {}),
           ...(typeof input.prompt === "string" ? { prompt: input.prompt } : {}),
+          ...(typeof input.model === "string" ? { model: input.model } : {}),
           ...(now !== undefined ? { startedAt: now } : {}),
         };
       }
       if (e.parentToolUseId !== null && findAgent(items, byId(e.parentToolUseId))) {
-        return mapAgent(items, byId(e.parentToolUseId), (a) => ({ ...a, children: [...a.children, child] }));
+        return mapAgent(items, byId(e.parentToolUseId), (a) => ({
+          ...withModel(a, e.model),
+          children: [...a.children, child],
+        }));
       }
       return [...closeAssistant(items), child];
     }
@@ -262,7 +271,7 @@ export function applyEvent(items: Item[], e: AgentEvent, now?: number): Item[] {
     case "agent.text":
       if (!findAgent(items, byId(e.parentToolUseId))) return items;
       return mapAgent(items, byId(e.parentToolUseId), (a) => ({
-        ...a,
+        ...withModel(a, e.model),
         children: [...a.children, { kind: "text", id: nextId(), text: e.text }],
       }));
 
@@ -392,4 +401,16 @@ export function groupItems(items: Item[]): Row[] {
   }
   flush();
   return rows;
+}
+
+/** The one input worth showing in a collapsed tool row; paths inside the workspace are shown relative to it. */
+export function toolSummary(input: unknown, cwd: string): string {
+  if (input && typeof input === "object") {
+    const o = input as Record<string, unknown>;
+    let v = o.command ?? o.file_path ?? o.path ?? o.pattern ?? o.url ?? o.description;
+    if (typeof v === "string" && cwd && (v.startsWith(`${cwd}/`) || v.startsWith(`${cwd}\\`)))
+      v = v.slice(cwd.length + 1);
+    if (typeof v === "string") return v.length > 80 ? `${v.slice(0, 80)}…` : v;
+  }
+  return "";
 }

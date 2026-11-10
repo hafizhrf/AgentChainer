@@ -85,9 +85,12 @@ function messageEvents(m: SessionMessage, agent: string | null): AgentEvent[] {
       });
     }
   } else if (m.type === "assistant" && typeof blocks !== "string") {
+    // A subagent's messages say which model it ran, as they do live (UX-18).
+    const said = (m.message as { model?: unknown } | null)?.model;
+    const model = agent !== null && typeof said === "string" && said ? { model: said } : {};
     for (const b of blocks) {
       if (b.type === "text" && typeof b.text === "string" && b.text.trim()) {
-        if (agent !== null) events.push({ type: "agent.text", parentToolUseId: agent, text: b.text });
+        if (agent !== null) events.push({ type: "agent.text", parentToolUseId: agent, text: b.text, ...model });
         else if (m.parent_tool_use_id === null) events.push({ type: "text.delta", text: b.text });
       } else if (b.type === "tool_use" && typeof b.id === "string" && typeof b.name === "string") {
         events.push({
@@ -96,6 +99,7 @@ function messageEvents(m: SessionMessage, agent: string | null): AgentEvent[] {
           name: b.name,
           input: b.input,
           parentToolUseId: agent ?? m.parent_tool_use_id,
+          ...model,
         });
       }
     }

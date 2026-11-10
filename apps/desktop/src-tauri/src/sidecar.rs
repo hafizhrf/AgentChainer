@@ -273,17 +273,21 @@ fn command(app: &AppHandle) -> Result<(Command, String), String> {
         .map_err(|e| crate::i18n::tr("native.noDataDir", &[("error", &e.to_string())]))?;
     // Downloaded catalog tools (M2-15) live here in dev builds too.
     let tools_dir = data_dir.join("tools");
+    // The usage page's record of Codex and agy runs (CP-01) lives here in dev builds too.
+    let usage_dir = data_dir.join("usage");
 
     let Some(bin) = packaged else {
         let mut cmd = Command::new("node");
         cmd.arg(SIDECAR_ENTRY)
-            .env("AGENTCHAINER_TOOLS_DIR", &tools_dir);
+            .env("AGENTCHAINER_TOOLS_DIR", &tools_dir)
+            .env("AGENTCHAINER_USAGE_DIR", &usage_dir);
         return Ok((cmd, format!("node {SIDECAR_ENTRY}")));
     };
 
     let mut cmd = Command::new(&bin);
     cmd.env("AGENTCHAINER_DATA_DIR", data_dir)
         .env("AGENTCHAINER_TOOLS_DIR", &tools_dir)
+        .env("AGENTCHAINER_USAGE_DIR", &usage_dir)
         // Let the SDK download honour HTTP(S)_PROXY / NO_PROXY like other tools on the machine.
         .env("NODE_USE_ENV_PROXY", "1");
     Ok((cmd, bin.display().to_string()))

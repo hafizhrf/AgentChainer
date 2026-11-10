@@ -1,4 +1,4 @@
-import { USAGE_FAMILIES, type UsageFamily, type UsageReport } from "@agentchainer/protocol";
+import { type CodexAccountUsage, USAGE_FAMILIES, type UsageFamily, type UsageReport } from "@agentchainer/protocol";
 import { save } from "@tauri-apps/plugin-dialog";
 import { BarChart3, Download, Loader2, RefreshCw } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -169,6 +169,8 @@ function UsageBody({ report }: { report: UsageReport }) {
         <DailyChart bars={bars} families={present} />
       </section>
 
+      {report.codexAccount && <CodexAccountCard account={report.codexAccount} />}
+
       <div className="metrics-tables">
         <section className="card" aria-labelledby="usage-models">
           <h2 id="usage-models" className="usage-card-heading">
@@ -277,6 +279,101 @@ function Tile({ label, value, detail }: { label: string; value: string; detail?:
       {detail && <span className="metric-detail muted">{detail}</span>}
     </div>
   );
+}
+
+/**
+ * Codex's own numbers for the whole ChatGPT account (CP-01): its quota windows and the tokens of each active day,
+ * across every device and app. Tokens only, and kept out of the totals above, which count the app's own Codex runs.
+ */
+function CodexAccountCard({ account }: { account: CodexAccountUsage }) {
+  if (!account.available) {
+    if (account.reason === "notInstalled") return null;
+    return (
+      <section className="card" aria-labelledby="usage-codex">
+        <h2 id="usage-codex" className="usage-card-heading">
+          {t("graph.usage.codexTitle")}
+        </h2>
+        <p className="muted usage-more">
+          {account.reason === "needsChatgpt" ? t("graph.usage.codexNeedsChatgpt") : t("graph.usage.codexFailed")}
+        </p>
+      </section>
+    );
+  }
+  const daily = account.daily ?? [];
+  const max = Math.max(1, ...daily.map((d) => d.tokens));
+  return (
+    <section className="card" aria-labelledby="usage-codex">
+      <div className="card-title">
+        <h2 id="usage-codex" className="usage-card-heading">
+          {t("graph.usage.codexTitle")}
+        </h2>
+        <span className="grow" />
+        <span className="muted usage-more">
+          {[
+            account.plan ? t("graph.usage.codexPlan", { plan: account.plan }) : null,
+            account.lifetimeTokens != null
+              ? t("graph.usage.codexLifetime", { tokens: short(account.lifetimeTokens) })
+              : null,
+          ]
+            .filter(Boolean)
+            .join(" · ")}
+        </span>
+      </div>
+      <p className="muted usage-more">{t("graph.usage.codexNote")}</p>
+      {(account.limits ?? []).map((l) => (
+        <div key={`${l.name}-${l.which}`} className="usage-quota">
+          <span className="usage-quota-label">
+            {t("graph.usage.codexLimit", {
+              window: l.windowMins ? windowText(l.windowMins) : l.which,
+              used: Math.round(l.usedPercent),
+            })}
+          </span>
+          <div className={`usage-quota-bar${l.usedPercent >= 80 ? " warn" : ""}`} aria-hidden>
+            <span className="usage-quota-fill" style={{ width: `${Math.min(100, Math.max(0, l.usedPercent))}%` }} />
+          </div>
+          {l.resetsAt && (
+            <span className="muted usage-more">
+              {t("graph.usage.codexResets", { at: new Date(l.resetsAt).toLocaleDateString() })}
+            </span>
+          )}
+        </div>
+      ))}
+      {daily.length > 0 && (
+        <table className="metrics-table usage-codex-days">
+          <caption>{t("graph.usage.codexDaily")}</caption>
+          <thead>
+            <tr>
+              <th scope="col">{t("graph.usage.date")}</th>
+              <th scope="col">{t("graph.usage.tokens")}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {[...daily]
+              .reverse()
+              .slice(0, 14)
+              .map((d) => (
+                <tr key={d.day}>
+                  <th scope="row">{d.day}</th>
+                  <td title={count(d.tokens)}>
+                    <span className="usage-daybar" aria-hidden>
+                      <span className="usage-daybar-fill" style={{ width: `${(d.tokens / max) * 100}%` }} />
+                    </span>
+                    <span className="usage-daynum">{short(d.tokens)}</span>
+                  </td>
+                </tr>
+              ))}
+          </tbody>
+        </table>
+      )}
+    </section>
+  );
+}
+
+/** "30 days", "5 hours": a quota window's length. */
+function windowText(mins: number): string {
+  if (mins % 1440 === 0) return t("graph.usage.windowDays", { count: mins / 1440 });
+  if (mins % 60 === 0) return t("graph.usage.windowHours", { count: mins / 60 });
+  return t("graph.usage.windowMinutes", { count: mins });
 }
 
 const H = 200;

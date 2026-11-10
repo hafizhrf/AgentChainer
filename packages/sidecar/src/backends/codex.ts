@@ -9,6 +9,7 @@ import { checkBash, checkToolCall, GUARD_PREFIX } from "../guard.ts";
 import { t } from "../i18n/index.ts";
 import { log } from "../rpc.ts";
 import type { PermissionAnswer, SessionCallbacks, TurnResult } from "../session.ts";
+import { recordRun } from "../usage/ledger.ts";
 import {
   type CodexItem,
   type CodexUsage,
@@ -363,6 +364,19 @@ class CodexSession implements LiveSession {
     this.turns++;
     const used = this.turnUsage();
     this.spent = plus(this.spent, used);
+    if (used.inputTokens + used.outputTokens + used.reasoningOutputTokens > 0) {
+      recordRun({
+        agent: "codex",
+        model: this.model || "codex",
+        input: used.inputTokens,
+        output: used.outputTokens + used.reasoningOutputTokens,
+        costUsd: this.costOf(used) ?? 0,
+        costKind: this.costKind,
+        cwd: this.options.cwd,
+        sessionId: this.id,
+        ...(this.tag ? { title: [this.tag.title, this.tag.label].filter(Boolean).join(" · ") } : {}),
+      });
+    }
     this.turnBase = null;
     const overBudget = this.overBudget;
     this.overBudget = false;

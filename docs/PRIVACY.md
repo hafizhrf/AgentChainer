@@ -23,6 +23,7 @@ AgentChainer never signs you in, and never reads or stores your credentials ([AD
 |---|---|---|
 | Settings | `settings.json` in Settings | Default model, mode, effort and editor; spend cap; theme; the Claude CLI path, if you set one; your recent folders; the multi-folder workspaces you named, with their folders' paths. |
 | Cost history | `agentchainer.db` in Data | Per turn: session id, folder, time, cost and token counts. No prompts or replies. |
+| Codex and agy runs | `usage/agent-runs.jsonl` in Data | Per turn the app ran on Codex or the Antigravity CLI: time, agent, model, token counts, the estimated cost, folder, session id and the task step's title. No prompts or replies. The Usage page reads it. |
 | Agent SDK | `sdk/` in Data | The pinned Claude Agent SDK, downloaded and verified on first run. |
 | Tools | `tools/` in Data | Pinned tool binaries that setup installs, such as gitleaks. |
 | App log | `agentchainer.log` in Logs | App and agent-runtime messages, including errors. It doesn't log conversations, but an error message can quote a file path or command output. Each line is masked before it's written: your home folder becomes `~`, and keys, tokens, passwords and email addresses are masked. |
@@ -43,7 +44,10 @@ work on a task (preview):
 **Sessions** are the Claude CLI's own session files. AgentChainer lists and resumes them through the Agent SDK and
 doesn't keep a copy ([ADR-0004](adr/0004-session-data.md)).
 The **Usage** page reads each stored session's model and token counts the same way, to add up an estimated cost on
-your computer. It keeps no copy, and sends nothing. **Export** writes a `.csv` or `.json` file only where you choose.
+your computer. It keeps no copy, and sends nothing. When Codex is installed, the page also asks your own `codex`
+for your account's daily tokens and plan limits (`account/usage/read`, `account/rateLimits/read`); Codex answers from
+OpenAI with your login, as its own `/status` does. The app keeps only the totals and percentages, not your account
+id. **Export** writes a `.csv` or `.json` file only where you choose.
 
 To remove everything, uninstall the app and delete the three folders above, plus `.agentchainer/` in any project you
 set up.

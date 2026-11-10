@@ -4,7 +4,6 @@
   "graph.status.done": "Selesai",
   "graph.status.stopped": "Dihentikan",
   "graph.status.failed": "Gagal",
-
   "graph.agentDrawer.label": "Subagent: {{description}}",
   "graph.agentDrawer.status": "Status",
   "graph.agentDrawer.waiting": "Menunggu persetujuan Anda",
@@ -23,7 +22,6 @@
   "graph.agentDrawer.activity": "Aktivitas",
   "graph.agentDrawer.nothingYet": "Belum ada apa-apa.",
   "graph.agentDrawer.result": "Hasil",
-
   "graph.backgroundTasks.label": "Task latar belakang",
   "graph.backgroundTasks.count_other": "{{count}} task di latar belakang",
   "graph.backgroundTasks.subagent": "Subagent",
@@ -31,7 +29,6 @@
   "graph.backgroundTasks.monitor": "Monitor",
   "graph.backgroundTasks.stopping": "Menghentikan…",
   "graph.backgroundTasks.stop": "Hentikan",
-
   "graph.sessionGraph.label": "Graf agent. Tombol panah berpindah antar-agent, Enter membuka satu agent, Esc menutupnya.",
   "graph.sessionGraph.empty": "Belum ada subagent di session ini.",
   "graph.sessionGraph.foldTools": "Lipat tool",
@@ -47,7 +44,6 @@
   "graph.sessionGraph.toolCalls_other": "{{count}} panggilan tool",
   "graph.sessionGraph.failed": "{{count}} gagal",
   "graph.sessionGraph.moreTools": "+{{count}} lagi",
-
   "graph.sessionTimeline.earlier": "Giliran sebelumnya",
   "graph.sessionTimeline.later": "Giliran berikutnya",
   "graph.sessionTimeline.turn": "Giliran {{n}} dari {{total}}",
@@ -60,13 +56,10 @@
   "graph.sessionTimeline.waited": "menunggu persetujuan {{time}}",
   "graph.sessionTimeline.paused": "dijeda {{time}}",
   "graph.sessionTimeline.rowTitle": "{{label}}: {{facts}}",
-
   "graph.timeline.mainAgent": "Agent utama",
-
   "graph.bench.loading": "Memuat graf…",
   "graph.bench.measuring": "Mengukur pan dan zoom dengan 200 node…",
   "graph.bench.result": "{{nodes}} node · pan p95 {{panP95}} ms ({{panFps}} fps) · zoom p95 {{zoomP95}} ms ({{zoomFps}} fps)",
-
   "graph.fleet.title": "Fleet",
   "graph.fleet.counts": "{{waiting}} menunggu Anda · {{working}} bekerja · {{total}} total",
   "graph.fleet.clearEnded": "Hapus {{n}} yang berakhir",
@@ -100,7 +93,6 @@
   "graph.fleet.statusWorking": "Bekerja",
   "graph.fleet.statusIdle": "Menganggur",
   "graph.fleet.statusEnded": "Berakhir",
-
   "graph.team.assign": "Tugaskan worker",
   "graph.team.handoff": "Serahkan ke worker",
   "graph.team.sendMessage": "Kirim pesan ke worker",
@@ -109,7 +101,6 @@
   "graph.team.closeWorker": "Tutup worker",
   "graph.team.stopped": "Tim berhenti di batas {{cap}}",
   "graph.team.spend": "Tim · {{spent}} dari {{cap}}",
-
   "graph.schedules.done": "selesai",
   "graph.schedules.failed": "gagal",
   "graph.schedules.unverified": "berakhir belum terverifikasi",
@@ -137,7 +128,7 @@
   "graph.usage.exportCsv": "CSV",
   "graph.usage.exportJson": "JSON",
   "graph.usage.refresh": "Muat ulang",
-  "graph.usage.note": "Diperkirakan dari token setiap respons dengan harga API modelnya, dari semua sesi Claude yang tersimpan dan langkah task Codex dan agy di workspace kamu. Sebuah sesi dihitung pada hari terakhir sesi itu aktif.",
+  "graph.usage.note": "Diperkirakan dari token dengan harga API tiap model: semua sesi Claude yang tersimpan, dan run Codex serta agy yang dijalankan AgentChainer. Sebuah sesi dihitung pada hari terakhir sesi itu aktif.",
   "graph.usage.exported": "{{count}} baris disimpan ke {{path}}",
   "graph.usage.failed": "Tidak bisa membaca penggunaan: {{error}}",
   "graph.usage.loading": "Membaca sesi kamu…",
@@ -163,5 +154,18 @@
   "graph.usage.session": "Sesi",
   "graph.usage.day": "Terakhir aktif",
   "graph.usage.tokensDetail": "{{input}} masuk · {{output}} keluar",
-  "graph.usage.sessionsDetail": "Di {{projects}} folder"
+  "graph.usage.sessionsDetail": "Di {{projects}} folder",
+  "graph.usage.codexTitle": "Akun Codex",
+  "graph.usage.codexPlan": "paket {{plan}}",
+  "graph.usage.codexLifetime": "{{tokens}} token sepanjang waktu",
+  "graph.usage.codexNote": "Dari Codex sendiri: seluruh akun ChatGPT kamu di semua perangkat dan aplikasi, termasuk sesi di luar AgentChainer. Hanya token, jadi tidak masuk total di atas.",
+  "graph.usage.codexLimit": "Batas {{window}}: {{used}}% terpakai",
+  "graph.usage.codexResets": "Reset {{at}}",
+  "graph.usage.codexDaily": "Token per hari aktif",
+  "graph.usage.codexNeedsChatgpt": "Codex hanya menampilkan penggunaan akun untuk login ChatGPT; dengan API key, run dari AgentChainer tetap dihitung di atas.",
+  "graph.usage.codexFailed": "Tidak bisa membaca penggunaan dari Codex saat ini; run dari AgentChainer tetap dihitung di atas.",
+  "graph.usage.windowDays": "{{count}} hari",
+  "graph.usage.windowHours": "{{count}} jam",
+  "graph.usage.windowMinutes": "{{count}} menit",
+  "graph.usage.date": "Hari"
 }

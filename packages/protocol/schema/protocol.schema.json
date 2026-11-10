@@ -33392,6 +33392,98 @@
               "additionalProperties": false
             }
           },
+          "codexAccount": {
+            "type": "object",
+            "properties": {
+              "available": {
+                "type": "boolean"
+              },
+              "reason": {
+                "type": "string",
+                "enum": [
+                  "notInstalled",
+                  "needsChatgpt",
+                  "failed"
+                ]
+              },
+              "plan": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "lifetimeTokens": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "daily": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "day": {
+                      "type": "string"
+                    },
+                    "tokens": {
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "day",
+                    "tokens"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "limits": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string"
+                    },
+                    "which": {
+                      "type": "string",
+                      "enum": [
+                        "primary",
+                        "secondary"
+                      ]
+                    },
+                    "usedPercent": {
+                      "type": "number"
+                    },
+                    "windowMins": {
+                      "type": [
+                        "number",
+                        "null"
+                      ]
+                    },
+                    "resetsAt": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "name",
+                    "which",
+                    "usedPercent",
+                    "windowMins",
+                    "resetsAt"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "required": [
+              "available"
+            ],
+            "additionalProperties": false
+          },
           "sessions": {
             "type": "array",
             "items": {

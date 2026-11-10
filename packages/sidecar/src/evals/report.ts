@@ -17,6 +17,8 @@ export type VariantSummary = {
   name: string;
   model: string;
   workflowsFrom: string | null;
+  /** The agent per role when the variant names one (M9-06); absent when every step ran on Claude. */
+  agents?: Record<string, string>;
   /** sha256 of each workflow file the variant put in place of the app's. */
   workflows: Record<string, string>;
   runs: number;
@@ -133,6 +135,7 @@ export function summarize(v: Variant, runs: CaseRun[], caseIds: string[]): Varia
     name: v.name,
     model: v.model,
     workflowsFrom: v.workflowsFrom,
+    ...(Object.keys(v.agents).length ? { agents: v.agents } : {}),
     workflows: Object.fromEntries(Object.entries(v.workflows).map(([f, text]) => [f, sha256(text)])),
     runs: mine.length,
     passes,
@@ -200,7 +203,7 @@ export function renderMarkdown(r: EvalReport): string {
   ];
   for (const v of r.variants) {
     out.push(
-      `| ${v.name} | ${v.model} | ${v.workflowsFrom ?? "the app's"} | ${v.passes}/${v.runs} (${pct(v.passRate)}) | ` +
+      `| ${v.name} | ${v.model}${agentsOf(v)} | ${v.workflowsFrom ?? "the app's"} | ${v.passes}/${v.runs} (${pct(v.passRate)}) | ` +
         `${v.passInterval ? `${pct(v.passInterval[0])}–${pct(v.passInterval[1])}` : "—"} | ${usd(v.costPerRun)} | ` +
         `${usd(v.costPerPass)} | ${secs(v.durationP50Ms)} | ${v.fixRounds} |`,
     );
@@ -273,4 +276,10 @@ export function renderMarkdown(r: EvalReport): string {
   out.push("", "## Inputs", "", "sha256 of the first-party files a task run reads, at the app commit:", "");
   for (const [f, h] of Object.entries(r.inputs)) out.push(`- \`${f}\` ${h.slice(0, 12)}`);
   return `${out.join("\n")}\n`;
+}
+
+/** "; implement on codex, review on agy": the roles a variant moved off Claude. */
+function agentsOf(v: VariantSummary): string {
+  const moved = Object.entries(v.agents ?? {}).filter(([, a]) => a !== "claude");
+  return moved.length ? `; ${moved.map(([role, a]) => `${role} on ${a}`).join(", ")}` : "";
 }

@@ -2114,7 +2114,7 @@ with the OpenAI Codex CLI and Google's Antigravity CLI (`agy`), in both directio
       and the task passed (77 s, ≈$0.014 for Claude's steps).
   - The readiness row (`agy models`) comes with M9-06's rows for every CLI.
 
-- [ ] **M9-06** Choosing agents, flexibly (ADR-0012 §5):
+- [x] **M9-06** Choosing agents, flexibly (ADR-0012 §5). Done in #151, #152, #153 and the eval PR:
   - **Schema:** `agent: claude | codex | agy` (default `claude`) and an optional `model` per agent step.
   - **Per task:** an agent per role on the triage card, before approval.
   - **Per workspace:** default agents per role (planner, implementer, reviewer) in Workspace settings.
@@ -2171,7 +2171,13 @@ with the OpenAI Codex CLI and Google's Antigravity CLI (`agy`), in both directio
     of the three restarts the sidecar.
   - **Checked in the app:** the line read "… · Codex 0.157.0 · agy 1.5.4"; `codex` alone was refused ("The Codex CLI
     path must be absolute"); agy's real path saved, the sidecar restarted and still found agy. Settings restored.
-  - **Left:** the eval variant.
+  Progress, part 3 (the eval variant):
+  - A benchmark variant takes `agent=<claude|codex|agy>` (every role) or `plan=`, `implement=`, `review=` (one role),
+    and the report shows it in the Model column ("haiku; implement on codex").
+  - Only Claude's spend counts toward a variant's cost, since the other CLIs report tokens (docs/design/evals.md).
+  - **Tests:** parsing and `task.start` with the variant's agents (`evals.test.ts`).
+  - **Checked live:** `--variant mix:implement=codex --cases sample-with-tax -n 1` passed 1/1 (hidden checks
+    included), with Codex implementing and $0.0007 of Claude spend; the gate runs re-checked by hand matched.
 
 - [ ] **M9-07** The thread, Flow, Fleet and evidence show which agent and model ran each step.
 - [ ] **M9-08** (later) Team workers on Codex or agy. The supervisor stays Claude.

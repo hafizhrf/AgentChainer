@@ -73,6 +73,9 @@ reader; an XL task counts once, with its sub-tasks' costs inside it.
     generators, not task runs, so the task benchmark doesn't vary them. `workflows-ref=origin/main` is the usual
     baseline for a workflow change. The contract is written in the case and triaged, not drafted, so every variant
     starts from the same one.
+  - M9-06 adds `agent=<claude|codex|agy>` (every role) and `plan=`, `implement=`, `review=` (one role), so a mix of
+    agents can be compared with Claude alone, e.g. `--variant app --variant mix:implement=codex,review=agy`. The other
+    CLIs run on their own logins and report tokens, not dollars, so a mix's cost counts only Claude's spend.
   - `-n` repeats each case, because a single run is noisy. `--max-usd` caps the whole run and stops it cleanly.
     Haiku is the default unless the variant names a model.
   - Variants run on the same commit of the app, one after another, each on a fresh fixture copy.

@@ -494,6 +494,9 @@
 
     The settings were restored and the scratch session deleted afterwards.
 
+- [ ] **M1-37** Bug: a resumed chat shows a `/compact` turn as raw `<command-name>` / `<command-message>` /
+  `<command-args>` tags in a user bubble. Found 2026-11-10 while checking UX-20, in a session resumed after a reload.
+  History replay should show it as the command (like a typed `/compact`), not as text.
 ### Exit criteria
 
 All of these run on macOS, Windows and Ubuntu against a sample repo in `fixtures/`:
@@ -1339,6 +1342,31 @@ for the desktop shell, start screen and session view to be cleaned up (UX-02, UX
     - $0.50 for S saved to `defaults.json` (git-ignored), and "Use the app's defaults" emptied it;
     - the owner's settings were restored.
   - **Left (part 2):** permission rules and plugins for all projects (ADR-0013).
+- [ ] **UX-20** Starting like an IDE: a welcome page and a New session dialog. Owner feedback, 2026-11-10, with
+  screenshots of the start screen: "rapihin tampilan ini biar lebih proper, sama bagian start session biar gak
+  bingungin, ada popup atau apa gitu uxnya biar kaya proper IDE". Also: "di sini harusnya bisa liat, chat agent lagi
+  pake claude, codex atau agy" (the composer).
+  - **Welcome page** (no folder chosen):
+    - a **Start** column: New session…, Open folder…, New task…, New workspace…, with their shortcuts;
+    - a **Recent** column: folders with their parent folder shortened (`~`, the middle left out);
+    - the named workspaces below.
+    - The readiness card shows only when something is missing; the sidebar's status says Ready otherwise.
+  - **Folder page** (a folder chosen): its name and path, Workspace settings, New session and Close, then its
+    previous sessions and tasks. The options card is gone from the page.
+  - **New session dialog** (New, Ctrl+N, the palette, the welcome page and the folder page): the folder (recent ones,
+    a named workspace, Browse…, Type a path…), model, permission profile with its explanation, and the agent profile.
+    It says why Start can't run yet; Enter starts.
+  - **Composer:** a chip says which agent the chat runs on (Claude for now). It becomes a picker with M9-09 (Codex
+    and agy chats).
+  Progress (2026-11-10): built.
+  - **Code:** `HomeView.tsx` (welcome and folder page, `shortPath`), `NewSessionDialog.tsx`, App wiring, the
+    composer chip, and new home styles replacing the old ones.
+  - **Checked in the app (Windows, over CDP):** the welcome page at 1280 and 760 px, dark and light; the dialog's folder
+    list (recent folders, Kyou as a workspace, Browse, Type a path) and picking one; the folder page; the chip in the
+    composer. Settings unchanged.
+  - **Found:** the dialog's form class first collided with the sidebar's New button (`.new-session`), which turned it
+    into a tile; it's renamed. Also M1-37.
+
 - [ ] **UX-E1** All M1/M2 screens use the design system, in light and dark themes.
 - [ ] **UX-E2** Usability test participants complete the M1 exit scenarios without help.
 

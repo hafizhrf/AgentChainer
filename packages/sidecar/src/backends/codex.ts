@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto";
 import { homedir } from "node:os";
 import path from "node:path";
 import { createInterface } from "node:readline";
-import type { AgentEvent, FleetItem, PermissionMode, TaskTag } from "@agentchainer/protocol";
+import type { AgentEvent, CostKind, FleetItem, PermissionMode, TaskTag } from "@agentchainer/protocol";
 import type { Cli } from "../deploy/cli.ts";
 import { checkBash, checkToolCall, GUARD_PREFIX } from "../guard.ts";
 import { t } from "../i18n/index.ts";
@@ -18,6 +18,7 @@ import {
   itemStarted,
   usageOf,
 } from "./codex-events.ts";
+import { estimateUsd } from "./prices.ts";
 import type { LiveSession, StepBackend, StepOptions } from "./types.ts";
 
 /**
@@ -66,6 +67,20 @@ type Frame = {
 };
 type Ask = { rpcId: number | string; toolName: string; input: Record<string, unknown>; toolUseId: string };
 
+const NO_USAGE: CodexUsage = { inputTokens: 0, cachedInputTokens: 0, outputTokens: 0, reasoningOutputTokens: 0 };
+const plus = (a: CodexUsage, b: CodexUsage): CodexUsage => ({
+  inputTokens: a.inputTokens + b.inputTokens,
+  cachedInputTokens: a.cachedInputTokens + b.cachedInputTokens,
+  outputTokens: a.outputTokens + b.outputTokens,
+  reasoningOutputTokens: a.reasoningOutputTokens + b.reasoningOutputTokens,
+});
+const minus = (a: CodexUsage, b: CodexUsage): CodexUsage => ({
+  inputTokens: Math.max(0, a.inputTokens - b.inputTokens),
+  cachedInputTokens: Math.max(0, a.cachedInputTokens - b.cachedInputTokens),
+  outputTokens: Math.max(0, a.outputTokens - b.outputTokens),
+  reasoningOutputTokens: Math.max(0, a.reasoningOutputTokens - b.reasoningOutputTokens),
+});
+
 class CodexSession implements LiveSession {
   id = "";
   tag: TaskTag | undefined;
@@ -83,7 +98,17 @@ class CodexSession implements LiveSession {
   private waiter: { resolve: (r: TurnResult) => void; reject: (e: Error) => void } | null = null;
   private messages: string[] = [];
   private turnError: string | null = null;
-  private total: CodexUsage = { inputTokens: 0, cachedInputTokens: 0, outputTokens: 0, reasoningOutputTokens: 0 };
+  private total: CodexUsage = { ...NO_USAGE };
+  /**
+   * The thread's total before this turn's first request: a resumed thread's total includes its earlier turns, so a
+   * turn's tokens are the total now less this (M9-07). Null until the turn's first usage update.
+   */
+  private turnBase: CodexUsage | null = null;
+  /** What this session's turns used, for the fleet's cost. */
+  private spent: CodexUsage = { ...NO_USAGE };
+  /** The turn was stopped for passing the step's budget. */
+  private overBudget = false;
+  model = "";
   private turns = 0;
   private status: FleetItem["status"] = "idle";
   private readonly startedAt = new Date().toISOString();
@@ -135,6 +160,7 @@ class CodexSession implements LiveSession {
     const id = (r.result as { thread?: { id?: string } } | undefined)?.thread?.id;
     if (!id) throw new Error(t("tasks.codex.noThread", { error: r.error?.message ?? "no thread id" }));
     this.id = id;
+    this.model = model ?? "";
     this.emit({
       type: "session.started",
       sessionId: id,
@@ -207,7 +233,10 @@ class CodexSession implements LiveSession {
       cwd: this.options.cwd,
       status: this.status,
       waiting: this.asks.size,
-      costUsd: 0,
+      costUsd: this.costOf(plus(this.spent, this.turnUsage())) ?? 0,
+      agent: "codex",
+      ...(this.model ? { model: this.model } : {}),
+      costKind: this.costKind,
       startedAt: this.startedAt,
       since: this.since,
       ...(this.tag ? { task: this.tag } : {}),
@@ -300,7 +329,16 @@ class CodexSession implements LiveSession {
         return;
       case "thread/tokenUsage/updated": {
         const usage = usageOf(params);
-        if (usage) this.total = usage.total;
+        if (!usage) return;
+        this.total = usage.total;
+        this.turnBase ??= minus(usage.total, usage.last);
+        // Codex has no budget of its own: stop the turn once its estimate passes the step's cap.
+        const cap = this.options.maxBudgetUsd;
+        const cost = this.costOf(this.turnUsage());
+        if (cap !== undefined && cost !== null && cost > cap && !this.overBudget && this.turnId) {
+          this.overBudget = true;
+          void this.interrupt();
+        }
         return;
       }
       case "error": {
@@ -323,8 +361,20 @@ class CodexSession implements LiveSession {
   private finishTurn(status: string, error: string | null, durationMs = 0) {
     this.turnId = null;
     this.turns++;
+    const used = this.turnUsage();
+    this.spent = plus(this.spent, used);
+    this.turnBase = null;
+    const overBudget = this.overBudget;
+    this.overBudget = false;
     const ok = status === "completed";
     const text = this.messages.at(-1) ?? "";
+    const subtype = ok
+      ? "success"
+      : overBudget
+        ? "error_max_budget_usd"
+        : status === "interrupted"
+          ? "interrupted"
+          : "error_during_execution";
     let structured: unknown;
     if (ok && this.options.outputFormat && text) {
       try {
@@ -335,9 +385,9 @@ class CodexSession implements LiveSession {
     }
     this.emit({
       type: "turn.completed",
-      subtype: ok ? "success" : status === "interrupted" ? "interrupted" : "error_during_execution",
+      subtype,
       isError: !ok,
-      totalCostUsd: 0,
+      totalCostUsd: this.costOf(this.spent) ?? 0,
       durationMs,
       numTurns: this.turns,
       usage: {
@@ -352,12 +402,33 @@ class CodexSession implements LiveSession {
     const w = this.waiter;
     this.waiter = null;
     w?.resolve({
-      subtype: ok ? "success" : "error_during_execution",
+      subtype: subtype === "interrupted" ? "error_during_execution" : subtype,
       isError: !ok,
       text: ok ? text : "",
       ...(structured !== undefined ? { structured } : {}),
-      costUsd: 0,
+      costUsd: this.costOf(used) ?? 0,
+      ...(this.model ? { model: this.model } : {}),
+      costKind: this.costKind,
+      tokens: { input: used.inputTokens, output: used.outputTokens + used.reasoningOutputTokens },
     });
+  }
+
+  /** This turn's tokens so far. */
+  private turnUsage(): CodexUsage {
+    return this.turnBase ? minus(this.total, this.turnBase) : { ...NO_USAGE };
+  }
+
+  /** `usage` at the model's API price (M9-07), or null for a model with no price. */
+  private costOf(usage: CodexUsage): number | null {
+    return estimateUsd(this.model, {
+      input: usage.inputTokens,
+      cached: usage.cachedInputTokens,
+      output: usage.outputTokens + usage.reasoningOutputTokens,
+    });
+  }
+
+  private get costKind(): CostKind {
+    return this.costOf(NO_USAGE) === null ? "unknown" : "estimate";
   }
 
   /** An approval request: the guard first, then the step's profile, then the person. */

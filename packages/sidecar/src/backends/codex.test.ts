@@ -16,6 +16,7 @@ const send = (f) => process.stdout.write(JSON.stringify(f) + "\n");
 let ask = 100;
 const waiting = new Map();
 const decisions = [];
+let interrupted = null;
 const request = (method, params) =>
   new Promise((resolve) => {
     const id = ask++;
@@ -29,6 +30,10 @@ createInterface({ input: process.stdin }).on("line", async (line) => {
   if (f.method === "model/list") return send({ id: f.id, result: { data: [{ id: "gpt-fake", isDefault: true }] } });
   if (f.method === "thread/start" || f.method === "thread/resume")
     return send({ id: f.id, result: { thread: { id: f.params.threadId ?? "thread-1", model: f.params.model } } });
+  if (f.method === "turn/interrupt") {
+    send({ id: f.id, result: {} });
+    return interrupted?.();
+  }
   if (f.method === "turn/start") {
     send({ id: f.id, result: { turn: { id: "turn-1" } } });
     send({ method: "turn/started", params: { threadId: "thread-1", turn: { id: "turn-1" } } });
@@ -43,6 +48,10 @@ createInterface({ input: process.stdin }).on("line", async (line) => {
     decisions.push(b.decision);
     send({ method: "item/completed", params: { item: { ...push, status: b.decision === "accept" ? "completed" : "declined", exitCode: null, aggregatedOutput: "" } } });
     send({ method: "thread/tokenUsage/updated", params: { tokenUsage: { total: { inputTokens: 50, cachedInputTokens: 20, outputTokens: 7, reasoningOutputTokens: 3 }, last: { inputTokens: 50, cachedInputTokens: 20, outputTokens: 7, reasoningOutputTokens: 3 } } } });
+    if (process.env.FAKE_WAIT_INTERRUPT) {
+      await new Promise((resolve) => (interrupted = resolve));
+      return send({ method: "turn/completed", params: { threadId: "thread-1", turn: { id: "turn-1", status: "interrupted", error: null, durationMs: 5 } } });
+    }
     send({ method: "item/completed", params: { item: { type: "agentMessage", id: "m1", text: "decisions: " + decisions.join(",") } } });
     send({ method: "turn/completed", params: { threadId: "thread-1", turn: { id: "turn-1", status: "completed", error: null, durationMs: 5 } } });
   }
@@ -55,8 +64,16 @@ const script = path.join(dir, "fake-app-server.mjs");
 writeFileSync(script, FAKE);
 
 /** Opens a Codex step on the fake, with the person's answer to every approval it's asked. */
-async function step(opts: { permissionMode?: "default" | "acceptEdits"; allow: boolean; resume?: string }) {
+async function step(opts: {
+  permissionMode?: "default" | "acceptEdits";
+  allow: boolean;
+  resume?: string;
+  model?: string;
+  maxBudgetUsd?: number;
+}) {
   process.env.FAKE_FILE = path.join(dir, "hello.txt");
+  if (opts.maxBudgetUsd !== undefined) process.env.FAKE_WAIT_INTERRUPT = "1";
+  else delete process.env.FAKE_WAIT_INTERRUPT;
   const events: AgentEvent[] = [];
   const asked: Omit<PermissionRequest, "sessionId">[] = [];
   const answered: string[] = [];
@@ -70,7 +87,13 @@ async function step(opts: { permissionMode?: "default" | "acceptEdits"; allow: b
     unregister: (id) => registered.delete(id),
   });
   session = (await open(
-    { cwd: dir, permissionMode: opts.permissionMode ?? "default", ...(opts.resume ? { resume: opts.resume } : {}) },
+    {
+      cwd: dir,
+      permissionMode: opts.permissionMode ?? "default",
+      ...(opts.resume ? { resume: opts.resume } : {}),
+      ...(opts.model ? { model: opts.model } : {}),
+      ...(opts.maxBudgetUsd !== undefined ? { maxBudgetUsd: opts.maxBudgetUsd } : {}),
+    },
     {
       emit: (e) => events.push(e),
       askPermission: (r) => {
@@ -87,6 +110,26 @@ async function step(opts: { permissionMode?: "default" | "acceptEdits"; allow: b
 }
 
 describe("the Codex step backend (M9-04)", () => {
+  it("estimates a turn's cost from its tokens, or says it's unknown for a model with no price (M9-07)", async () => {
+    const priced = await step({ allow: true, model: "gpt-6-luna" });
+    assert.equal(priced.result.model, "gpt-6-luna");
+    assert.equal(priced.result.costKind, "estimate");
+    assert.deepEqual(priced.result.tokens, { input: 50, output: 10 });
+    // 30 uncached × $0.10, 20 cached × $0.01, 10 out × $0.50, per million.
+    assert.ok(Math.abs(priced.result.costUsd - (3 + 0.2 + 5) / 1_000_000) < 1e-12);
+    assert.equal(priced.session.fleetItem.agent, "codex");
+    const unpriced = await step({ allow: true });
+    assert.equal(unpriced.result.model, "gpt-fake");
+    assert.equal(unpriced.result.costKind, "unknown");
+    assert.equal(unpriced.result.costUsd, 0);
+  });
+
+  it("stops a turn once its estimate passes the step's budget (M9-07)", async () => {
+    const { result } = await step({ allow: true, model: "gpt-6-luna", maxBudgetUsd: 0.000001 });
+    assert.equal(result.subtype, "error_max_budget_usd");
+    assert.equal(result.isError, true);
+  });
+
   it("asks before an edit, and the guard declines a force push before anyone is asked", async () => {
     const { session, result, events, asked, answered } = await step({ allow: true });
     assert.equal(session.id, "thread-1", "the session's id is the thread's, which fix rounds resume");

@@ -7,6 +7,8 @@
 //   [--stop-after <seconds>]: stops the run that long after it starts, to check it ends `cancelled`
 //   [--accept "<reason>"]: accepts the risk when the run ends failed or not verified (M3-10)
 //   [--print-evidence]: prints the evidence report (M3-09)
+//   [--agents implement=codex,review=agy]: runs those roles' steps on the user's own Codex or Antigravity CLI (M9-06),
+//   as the triage card's pickers would; their cost is an estimate from their tokens (M9-07)
 //   --tier XL: splits the task, approves every sub-task as drafted, runs it, prints the task branch's log, then cleans
 //   the worktrees up (M3-07)
 //   [--cwd <checkout>]: runs in an existing checkout instead of a fixture copy (left in place); for M5's live checks
@@ -33,6 +35,7 @@ const { values } = parseArgs({
     "stop-after": { type: "string" },
     accept: { type: "string" },
     "print-evidence": { type: "boolean", default: false },
+    agents: { type: "string" },
     cwd: { type: "string" },
     pr: { type: "boolean", default: false },
     "fix-ci": { type: "boolean", default: false },
@@ -140,7 +143,19 @@ try {
   }
   const t0 = Date.now();
   const done = client.ended(created.id);
-  await request("task.start", { cwd, id: created.id, permissionMode: "acceptEdits", model: values.model });
+  const agents = Object.fromEntries(
+    (values.agents ?? "")
+      .split(",")
+      .filter(Boolean)
+      .map((p) => p.split("=")),
+  );
+  await request("task.start", {
+    cwd,
+    id: created.id,
+    permissionMode: "acceptEdits",
+    model: values.model,
+    ...(values.agents ? { agents } : {}),
+  });
   if (values["stop-after"]) {
     setTimeout(() => {
       console.log("  ✋ stopping");
@@ -152,7 +167,9 @@ try {
     `\n${end.state}: ${end.run?.outcome} (${((Date.now() - t0) / 1000).toFixed(0)} s, ≈$${end.costUsd.toFixed(3)})`,
   );
   for (const s of end.run?.steps ?? []) {
-    console.log(`  ${s.id.padEnd(18)} ${s.status.padEnd(9)} $${s.costUsd.toFixed(3)}  ${s.note ?? ""}`);
+    const ran = s.agent ? ` ${s.agent}${s.model ? `/${s.model}` : ""}${s.costKind ? ` (${s.costKind})` : ""}` : "";
+    const tokens = s.tokens ? ` ${s.tokens.input}+${s.tokens.output} tok` : "";
+    console.log(`  ${s.id.padEnd(18)} ${s.status.padEnd(9)} $${s.costUsd.toFixed(4)}${ran}${tokens}  ${s.note ?? ""}`);
   }
   for (const g of end.run?.baseline ?? [])
     console.log(`  baseline ${g.kind} \`${g.command}\` → ${g.exitCode} (${g.durationMs} ms)`);

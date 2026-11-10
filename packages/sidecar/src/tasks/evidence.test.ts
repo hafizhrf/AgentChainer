@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { type GateRun, resultText, setLanguage, type Task } from "@agentchainer/protocol";
+import { type GateRun, resultText, type StepRun, setLanguage, type Task } from "@agentchainer/protocol";
 import { buildEvidence, type Evidence, notScanned, purposes, renderEvidence, sectionLines } from "./evidence.ts";
 import { result } from "./result.ts";
 
@@ -213,9 +213,9 @@ const ENGLISH = [
   "",
   "## Cost and time",
   "",
-  "| Step | Time | Cost |",
-  "|---|---|---|",
-  "| Implement | 30 s | ≈$0.15 |",
+  "| Step | Agent | Time | Cost |",
+  "|---|---|---|---|",
+  "| Implement | – | 30 s | ≈$0.15 |",
   "",
   "Run ≈$0.18; with drafting and triage ≈$0.20. Estimates.",
   "",
@@ -385,6 +385,46 @@ describe("evidence", () => {
     assert.match(md, /The guard blocked nothing\./);
   });
 
+  it("names each step's agent and model, and marks estimated and unknown costs (M9-07)", () => {
+    const step = (id: string, over: Partial<StepRun>): StepRun => ({
+      id,
+      step: id,
+      label: id,
+      kind: "agent",
+      status: "done",
+      startedAt: "2026-10-30T00:00:00.000Z",
+      endedAt: "2026-10-30T00:00:10.000Z",
+      costUsd: 0,
+      ...over,
+    });
+    const md = renderEvidence(
+      evidence(
+        task({
+          steps: [
+            step("plan", { agent: "claude", model: "claude-haiku-5-5", costUsd: 0.01 }),
+            step("implement", {
+              agent: "codex",
+              model: "gpt-6-luna",
+              costKind: "estimate",
+              costUsd: 0.0012,
+              tokens: { input: 10000, output: 500 },
+            }),
+            step("review", {
+              agent: "agy",
+              model: "gpt-oss-120b-medium",
+              costKind: "unknown",
+              tokens: { input: 900, output: 100 },
+            }),
+          ],
+        }),
+      ),
+    );
+    assert.match(md, /\| plan \| Claude · claude-haiku-5-5 \| 10 s \| ≈\$0\.0100 \|/);
+    assert.match(md, /\| implement \| Codex · gpt-6-luna \| 10 s \| ≈\$0\.0012 \(10,500 tokens\) \|/);
+    assert.match(md, /\| review \| Antigravity CLI · gpt-oss-120b-medium \| 10 s \| unknown \(1,000 tokens\) \|/);
+    assert.match(md, /estimated from their tokens at the model's API price/);
+  });
+
   it("records the tier override, the accepted risk and the implementer's notes as Claude's", () => {
     const md = renderEvidence(
       evidence(task({ acceptance: { reason: "lint is set up next sprint", at: "2026-10-30T03:00:00.000Z" } })),
@@ -424,7 +464,7 @@ describe("evidence in the app's language (X-13)", () => {
       const kept = english.split("\n").filter((l) => l.trim() && shown.split("\n").includes(l));
       assert.deepEqual(
         [...new Set(kept)],
-        ["|---|---|---|---|---|", "|---|---|---|---|---|---|", "```", "test broke", "|---|---|---|"],
+        ["|---|---|---|---|---|", "|---|---|---|---|---|---|", "```", "test broke", "|---|---|---|---|"],
       );
       for (const heading of ["## Changed files", "## Gates", "## Review", "## Security notes", "## Cost and time"]) {
         assert.ok(!shown.includes(heading), heading);

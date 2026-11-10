@@ -792,6 +792,18 @@ export const TASK_STATES = [
 export type TaskState = (typeof TASK_STATES)[number];
 
 /** One entry in a run's timeline: an agent step's turn, a fix round, or a round of gates. */
+/** The agents a task's step can run on (M9, ADR-0012): the user's own Claude, Codex or Antigravity CLI. */
+export const StepAgentSchema = z.enum(["claude", "codex", "agy"]);
+export type StepAgent = z.infer<typeof StepAgentSchema>;
+/**
+ * How a step's cost was counted (M9-07): absent when the agent reported dollars (Claude); `estimate` from its tokens
+ * at the model's API price; `unknown` for a model with no price, which then counts $0 toward the budget.
+ */
+export const CostKindSchema = z.enum(["estimate", "unknown"]);
+export type CostKind = z.infer<typeof CostKindSchema>;
+/** Tokens a step used, for agents that report tokens and not dollars (M9-07). Input includes cached tokens. */
+export const StepTokensSchema = z.object({ input: z.number(), output: z.number() });
+
 export const StepRunSchema = z.object({
   /** Unique within the run, e.g. `implement`, `gates-2`, `fix-1`. */
   id: z.string(),
@@ -814,6 +826,11 @@ export const StepRunSchema = z.object({
   startedAt: z.string(),
   endedAt: z.string().optional(),
   costUsd: z.number(),
+  /** An agent step's agent and the model it ran (M9-07); absent on entries before M9. */
+  agent: StepAgentSchema.optional(),
+  model: z.string().optional(),
+  costKind: CostKindSchema.optional(),
+  tokens: StepTokensSchema.optional(),
   /** What happened, in a sentence: the failing gates, the must-fix findings, an error. */
   note: z.string().optional(),
   noteRef: MessageRefSchema.optional(),
@@ -866,9 +883,6 @@ export const GuardBlockSchema = z.object({
 });
 export type GuardBlock = z.infer<typeof GuardBlockSchema>;
 
-/** The agents a task's step can run on (M9, ADR-0012): the user's own Claude, Codex or Antigravity CLI. */
-export const StepAgentSchema = z.enum(["claude", "codex", "agy"]);
-export type StepAgent = z.infer<typeof StepAgentSchema>;
 /**
  * A task's agent per role (M9-06): a write step implements, a read step with a verdict reviews, other read steps plan.
  * A step's own `agent:` in its workflow wins; a role left out runs on Claude.
@@ -2272,6 +2286,10 @@ export const FleetItemSchema = z.object({
   task: TaskTagSchema.optional(),
   /** A Team chat's worker (M8-03): the supervisor's session id. */
   parentId: z.string().optional(),
+  /** A task step on another agent (M9-07): which one, its model, and whether `costUsd` is an estimate. */
+  agent: StepAgentSchema.optional(),
+  model: z.string().optional(),
+  costKind: CostKindSchema.optional(),
 });
 export type FleetItem = z.infer<typeof FleetItemSchema>;
 

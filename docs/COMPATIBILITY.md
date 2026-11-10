@@ -32,6 +32,18 @@ AgentChainer drives your own `claude` CLI, signed in by you ([AUTH_SETUP](guides
   through every command and flag the app uses (`packages/sidecar/src/cli-contract.ts`) and opens an issue when one
   goes missing.
 
+## Codex and the Antigravity CLI (optional)
+
+Task steps can run on your own Codex CLI or Antigravity CLI (`agy`), each signed in by you
+([ADR-0012](adr/0012-multi-agent-backends.md)). Neither is required.
+
+- Used by hand so far: Codex **0.157.0** and agy **1.5.4** (Windows 11).
+- **Codex** is checked every week by the same Drift workflow. The newest `@openai/codex` from npm is installed without
+  install scripts, and its app-server's protocol, generated as JSON Schema with no login, is checked against every
+  method, value and field the app uses (`packages/sidecar/src/backends/contracts.ts`).
+- **agy** has no package the workflow can install without running an install script, so its flags are checked by
+  hand: `node packages/sidecar/scripts/cli-contract.ts --skip-claude --agy <path to agy>`.
+
 ## Agent SDK
 
 - Pinned: **0.3.311**. The packaged app downloads exactly this version from npm on first run and checks its

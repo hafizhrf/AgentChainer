@@ -165,6 +165,9 @@ IPC table in [ARCHITECTURE](docs/ARCHITECTURE.md) §4.
     `scripts/check-compatibility.mjs` fails until they match.
   - When the app starts running a new `claude` command or flag, add it to `packages/sidecar/src/cli-contract.ts`. Its
     test fails when a call in `installer.ts` is missing from it.
+  - When the Codex or agy backend starts using a new app-server method, value or field, or a new `agy` flag, add it to
+    `packages/sidecar/src/backends/contracts.ts`. Check with
+    `node packages/sidecar/scripts/cli-contract.ts --skip-claude --codex <bin/codex.js> --agy <agy>`.
 
 ## Code style
 

@@ -66,10 +66,24 @@ Team supervisors and the app's own model calls.
      - If the spike finds no per-run settings path, agy gets read-only steps only until there is one.
 4. **Cost is an estimate.** Tokens × a pinned price table, labeled as an estimate wherever it shows. A step's cap and
    the task's budget count it like Claude's spend.
-5. **Workflows say which agent runs a step:**
-   - `agent: claude | codex | agy` (default `claude`), and an optional `model`.
-   - The split step of XL and the app's own calls stay Claude.
-   - A shipped workflow that names another agent needs a new eval report (M7-03), with an `agent=` variant.
+5. **Any role on any agent the user has** (owner, 2026-11-10: "gak selalu gitu, bisa diadjust… jadi fleksibel"). No
+   pairing is built in.
+   - **Examples:**
+     - Claude plans, Codex implements, agy reviews;
+     - with only Claude and agy: Claude plans and implements, agy reviews;
+     - or agy implements and Claude reviews.
+   - **Where it's set,** first match wins:
+     1. a step's own `agent:` in the workflow YAML;
+     2. the task's choice when it's approved: an agent per role on the triage card;
+     3. the workspace's defaults per role (planner, implementer, reviewer), in Workspace settings;
+     4. Claude.
+   - **Only agents that are installed and signed in** are offered.
+     - A workflow or default that names a missing one stops the run before it starts.
+     - The message says which agent is missing, and offers to run that step on Claude instead.
+   - **YAML:** `agent: claude | codex | agy` (default `claude`), and an optional `model`.
+   - **Stays Claude:** the split step of XL and the app's own calls.
+   - **Evals:** a shipped workflow that names another agent needs a new eval report (M7-03), with an `agent=`
+     variant.
 
 ## Alternatives considered
 

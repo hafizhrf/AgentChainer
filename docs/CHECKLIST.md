@@ -1983,6 +1983,8 @@ with the OpenAI Codex CLI and Google's Antigravity CLI (`agy`), in both directio
 
 **Owner decisions (2026-11-10):**
 - Chaining starts at workflow steps. Team workers and chats come later.
+- No fixed pairing: any role (plan, implement, review) can run on any agent the user has installed and signed in.
+  E.g. Claude plans and implements and agy reviews, or the other way round.
 - agy may write, but only through an allowlist the app writes per run.
 
 **Rules for every item:**
@@ -2039,8 +2041,13 @@ with the OpenAI Codex CLI and Google's Antigravity CLI (`agy`), in both directio
   - **Afterwards:** every reported command is checked against the guard; a breach fails the step and goes into the
     evidence.
   - Read-only only if M9-02 finds no per-run settings path.
-- [ ] **M9-06** Workflows name the agent:
+- [ ] **M9-06** Choosing agents, flexibly (ADR-0012 §5):
   - **Schema:** `agent: claude | codex | agy` (default `claude`) and an optional `model` per agent step.
+  - **Per task:** an agent per role on the triage card, before approval.
+  - **Per workspace:** default agents per role (planner, implementer, reviewer) in Workspace settings.
+  - **Precedence:** step > task > workspace > Claude.
+  - **Only available agents are offered.** A run that names a missing one stops before it starts, and offers that
+    step on Claude.
   - **Canvas:** a picker.
   - **The generator's guide** knows the new fields.
   - **Rules:** XL's split stays Claude.
@@ -2053,8 +2060,11 @@ with the OpenAI Codex CLI and Google's Antigravity CLI (`agy`), in both directio
 
 ### Exit criteria
 
-- [ ] **M9-E1** On `fixtures/sample-app`, an M task with Claude planning, Codex implementing and agy reviewing passes
-      its gates. Its evidence names each step's agent and model, with costs marked as estimates.
+- [ ] **M9-E1** On `fixtures/sample-app`, M tasks with two different mixes pass their gates:
+  - Claude plans, Codex implements, agy reviews;
+  - Claude plans and implements, agy reviews.
+
+  Each evidence report names every step's agent and model, with costs marked as estimates.
 
 ---
 

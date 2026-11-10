@@ -142,10 +142,6 @@
   background: var(--surface-2);
 }
 
-.graph-node.tool {
-  font-size: var(--text-xs);
-}
-
 .graph-node.selected {
   border-color: var(--accent);
   box-shadow: 0 0 0 2px var(--accent-soft);
@@ -212,6 +208,145 @@
 
 .graph-fold {
   font-size: var(--text-xs);
+}
+
+/* An agent's tool calls as one card (UX-18): a header, then counts when closed or one row per call when open. */
+.graph-node.tools {
+  justify-content: flex-start;
+  gap: 0;
+  padding: 0;
+  overflow: hidden;
+  border-style: dashed;
+  background: var(--surface-2);
+  font-size: var(--text-xs);
+}
+
+.graph-node.tools.waiting {
+  border-style: solid;
+}
+
+.graph-tools-head {
+  width: 100%;
+  min-height: 30px;
+  padding: 0 var(--space-3);
+  border: 0;
+  background: none;
+  color: var(--fg);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.graph-tools-head:hover {
+  background: var(--surface-3);
+}
+
+.graph-tool-counts {
+  padding: 0 var(--space-3) var(--space-1);
+  overflow: hidden;
+  color: var(--muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.graph-tool-rows {
+  margin: 0;
+  padding: 0 0 var(--space-1);
+  list-style: none;
+}
+
+.graph-tool-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  height: 22px;
+  padding: 0 var(--space-3);
+  min-width: 0;
+}
+
+.graph-tool-status {
+  display: inline-flex;
+  flex: 0 0 auto;
+  color: var(--muted);
+}
+
+.graph-tool-name {
+  flex-shrink: 0;
+  font-weight: 600;
+}
+
+.graph-tool-target {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--muted);
+  font-family: var(--font-mono);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.graph-tool-row.error .graph-tool-name,
+.graph-tool-row.error .graph-tool-status {
+  color: var(--err);
+}
+
+.graph-tool-row.done .graph-tool-status {
+  color: var(--ok);
+}
+
+.graph-tool-row.more {
+  color: var(--muted);
+}
+
+.graph-chip {
+  flex: 0 0 auto;
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-full);
+  font-size: var(--text-xs);
+  line-height: 18px;
+}
+
+.graph-chip.error {
+  background: var(--err-bg);
+  color: var(--err);
+}
+
+.graph-chip.waiting {
+  background: var(--warn-bg);
+  color: var(--warn);
+}
+
+/* The model an agent runs (UX-18); dimmer when it's the session's, inherited. */
+.graph-model {
+  flex: 0 0 auto;
+  max-width: 96px;
+  padding: 0 var(--space-2);
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-full);
+  background: var(--accent-soft);
+  color: var(--fg);
+  font-size: var(--text-xs);
+  font-weight: 500;
+  line-height: 18px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Not stretched like the title's other text. */
+.graph-node-title > span.graph-model {
+  flex: 0 0 auto;
+}
+
+.graph-model.inherited {
+  background: transparent;
+  color: var(--muted);
+}
+
+.graph-node-meta-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* ---------- Timeline ---------- */

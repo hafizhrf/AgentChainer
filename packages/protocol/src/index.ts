@@ -1288,6 +1288,8 @@ export const AgentEventSchema = z.discriminatedUnion("type", [
     input: z.unknown(),
     parentToolUseId: z.string().nullable(),
     agentId: z.string().optional(),
+    /** A subagent's call: the model its message came from, so the graph says which model each agent runs (UX-18). */
+    model: z.string().optional(),
   }),
   z.object({
     type: z.literal("tool.completed"),
@@ -1366,6 +1368,8 @@ export const AgentEventSchema = z.discriminatedUnion("type", [
     parentToolUseId: z.string(),
     agentId: z.string().optional(),
     text: z.string(),
+    /** The model the subagent's message came from (UX-18). */
+    model: z.string().optional(),
   }),
   z.object({
     type: z.literal("agent.completed"),

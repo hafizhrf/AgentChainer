@@ -3,8 +3,18 @@ import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
 import type { AgentEvent } from "@agentchainer/protocol";
 import { type AgentItem, applyEvent, type Item, type ToolItem } from "../transcript.ts";
-import { agentGraph, isKeyTool, LONG_TOOL_MS, MAIN_ID, MAX_NODES, moveFocus, structureKey } from "./agentGraph.ts";
-import { layoutGraph, NODE_SIZE } from "./layout.ts";
+import {
+  agentGraph,
+  isKeyTool,
+  LONG_TOOL_MS,
+  MAIN_ID,
+  MAX_NODES,
+  moveFocus,
+  structureKey,
+  TOOL_ROWS,
+  toolsId,
+} from "./agentGraph.ts";
+import { layoutGraph, NODE_SIZE, nodeSize } from "./layout.ts";
 
 const fixture = (name: string): Item[] =>
   (
@@ -38,7 +48,10 @@ describe("agentGraph (M4-02)", () => {
     const [outer, inner] = agents;
     assert.equal(outer?.parent, MAIN_ID);
     assert.equal(inner?.parent, outer?.id);
-    assert.equal(inner?.kind === "agent" && inner.foldedTools, 1, "the quick Bash call is a count, not a node");
+    assert.equal(inner?.kind === "agent" && inner.tools, 1);
+    // Each subagent knows the model its messages came from (UX-18).
+    assert.equal(outer?.kind === "agent" && outer.agent.model, "claude-haiku-5-5");
+    assert.ok(!g.nodes.some((n) => n.kind === "tools"), "a quick Bash call alone shows no card");
     assert.deepEqual(
       g.edges.map((e) => [e.source, e.target, e.done]),
       [
@@ -59,7 +72,7 @@ describe("agentGraph (M4-02)", () => {
     assert.ok((pos.get(MAIN_ID)?.y ?? 0) < (a?.y ?? 0), "the main agent is above");
   });
 
-  it("shows edits, failures, waits and long calls as nodes; the rest fold into a count", () => {
+  it("tells the calls that matter: edits, failures, waits and long calls", () => {
     const o = { running: true, now: 50_000, waiting: new Set(["w"]) };
     assert.equal(isKeyTool(tool("e", "Edit"), o), true);
     assert.equal(isKeyTool(tool("f", "Bash", { status: "error" }), o), true);
@@ -67,24 +80,73 @@ describe("agentGraph (M4-02)", () => {
     assert.equal(isKeyTool(tool("l", "Bash", { status: "running", startedAt: 50_000 - LONG_TOOL_MS }), o), true);
     assert.equal(isKeyTool(tool("d", "Grep", { durationMs: LONG_TOOL_MS + 1 }), o), true);
     assert.equal(isKeyTool(tool("q", "Read", { durationMs: 20 }), o), false);
+  });
 
+  it("puts an agent's tool calls on one card, shown when one matters or when opened (UX-18)", () => {
+    const o = { running: true, waiting: new Set(["w"]) };
     const items: Item[] = [
       tool("r1", "Read"),
       tool("r2", "Read"),
-      agent("A", [tool("w", "Bash", { status: "running" })], "running"),
+      agent(
+        "A",
+        [tool("a1", "Read"), tool("a2", "Edit"), tool("a3", "Read"), tool("w", "Bash", { status: "running" })],
+        "running",
+      ),
     ];
     const g = agentGraph(items, o);
     const main = g.nodes.find((n) => n.kind === "main");
-    assert.equal(main?.kind === "main" && main.foldedTools, 2);
+    assert.equal(main?.kind === "main" && main.tools, 2);
+    assert.ok(!g.nodes.some((n) => n.id === toolsId(MAIN_ID)), "two reads: no card until it's opened");
+    const card = g.nodes.find((n) => n.id === toolsId("A"));
+    assert.ok(card?.kind === "tools");
+    assert.deepEqual(card.counts, [
+      { name: "Read", n: 2 },
+      { name: "Edit", n: 1 },
+      { name: "Bash", n: 1 },
+    ]);
+    assert.deepEqual([card.open, card.waiting, card.running, card.rows.length], [false, 1, 1, 0]);
     const a = g.nodes.find((n) => n.id === "A");
     assert.equal(a?.kind === "agent" && a.waiting, true);
-    assert.ok(g.nodes.some((n) => n.id === "w"));
+    assert.ok(g.edges.some((e) => e.source === "A" && e.target === toolsId("A") && !e.done));
 
-    const expanded = agentGraph(items, { ...o, expanded: new Set([MAIN_ID]) });
-    assert.deepEqual(
-      expanded.nodes.filter((n) => n.kind === "tool").map((n) => n.id),
-      ["r1", "r2", "w"],
-    );
+    const opened = agentGraph(items, { ...o, expanded: new Set([MAIN_ID]) });
+    const mainCard = opened.nodes.find((n) => n.id === toolsId(MAIN_ID));
+    assert.deepEqual(mainCard?.kind === "tools" && mainCard.rows.map((r) => r.id), ["r1", "r2"]);
+    assert.ok(nodeSize(mainCard ?? card).height > nodeSize(card).height - 1);
+  });
+
+  it("lists the latest calls of an open card, then +N more, and keeps its width (UX-18)", () => {
+    const many = Array.from({ length: 30 }, (_, i) => tool(`t${i}`, i % 2 ? "Read" : "Grep"));
+    const g = agentGraph([agent("A", many)], { running: false, expanded: new Set(["A"]) });
+    const card = g.nodes.find((n) => n.id === toolsId("A"));
+    assert.ok(card?.kind === "tools");
+    assert.equal(card.rows.length, TOOL_ROWS);
+    assert.equal(card.rows.at(-1)?.id, "t29", "the latest last");
+    assert.equal(card.more, 30 - TOOL_ROWS);
+    assert.equal(g.nodes.length, 3, "main, the agent and one card, not 30 nodes");
+    const pos = layoutGraph(g);
+    assert.equal(pos.get("A")?.y !== undefined, true);
+    assert.equal(nodeSize(card).width, NODE_SIZE.agent.width);
+  });
+
+  it("shows the main agent's calls of the turn at hand only (UX-18)", () => {
+    const items: Item[] = [
+      { kind: "user", id: 1, text: "first" },
+      tool("old", "Edit"),
+      { kind: "user", id: 2, text: "second" },
+      tool("new", "Read"),
+    ];
+    const g = agentGraph(items, { running: false });
+    const main = g.nodes.find((n) => n.kind === "main");
+    assert.equal(main?.kind === "main" && main.tools, 1);
+    assert.ok(!g.nodes.some((n) => n.kind === "tools"), "the earlier turn's edit isn't on the card");
+  });
+
+  it("changes the structure key when a card opens, so the layout makes room", () => {
+    const items: Item[] = [agent("A", [tool("e", "Edit"), tool("r", "Read")])];
+    const closed = agentGraph(items, { running: false });
+    const open = agentGraph(items, { running: false, expanded: new Set(["A"]) });
+    assert.notEqual(structureKey(closed), structureKey(open));
   });
 
   it("folds finished subtrees above the cap but keeps live work", () => {

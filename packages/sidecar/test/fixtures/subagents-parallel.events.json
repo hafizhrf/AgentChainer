@@ -73,7 +73,8 @@
    "description": "List files in current directory"
   },
   "parentToolUseId": "toolu_01T7oHKGafV4ofyXWg3oRKUp",
-  "agentId": "a286136ee8c795a25"
+  "agentId": "a286136ee8c795a25",
+  "model": "claude-haiku-5-5"
  },
  {
   "type": "tool.completed",
@@ -101,7 +102,8 @@
    "description": "Print current date"
   },
   "parentToolUseId": "toolu_01LYQJkKBuBhQw6XSJrVBgsm",
-  "agentId": "a1413634dfe04abf4"
+  "agentId": "a1413634dfe04abf4",
+  "model": "claude-haiku-5-5"
  },
  {
   "type": "tool.completed",
@@ -114,7 +116,8 @@
   "type": "agent.text",
   "parentToolUseId": "toolu_01T7oHKGafV4ofyXWg3oRKUp",
   "agentId": "a286136ee8c795a25",
-  "text": "The `ls` in the current working directory returned no file names. The directory appears to be empty.\n\nSeveral claude.ai connectors (Adobe, Canva, Figma, Notion, Vercel) need to be authorized in your claude.ai connector settings before their tools can be used."
+  "text": "The `ls` in the current working directory returned no file names. The directory appears to be empty.\n\nSeveral claude.ai connectors (Adobe, Canva, Figma, Notion, Vercel) need to be authorized in your claude.ai connector settings before their tools can be used.",
+  "model": "claude-haiku-5-5"
  },
  {
   "type": "agent.updated",
@@ -145,7 +148,8 @@
   "type": "agent.text",
   "parentToolUseId": "toolu_01LYQJkKBuBhQw6XSJrVBgsm",
   "agentId": "a1413634dfe04abf4",
-  "text": "Wed Oct 28 14:53:36 WIB 2026\n\nSeparately, the harness reports that these MCP servers need authorization before their tools work: claude.ai Adobe, Canva, Figma, Notion, and Vercel. Authorize them in your claude.ai connector settings. Until then, those tools are unavailable."
+  "text": "Wed Oct 28 14:53:36 WIB 2026\n\nSeparately, the harness reports that these MCP servers need authorization before their tools work: claude.ai Adobe, Canva, Figma, Notion, and Vercel. Authorize them in your claude.ai connector settings. Until then, those tools are unavailable.",
+  "model": "claude-haiku-5-5"
  },
  {
   "type": "agent.updated",

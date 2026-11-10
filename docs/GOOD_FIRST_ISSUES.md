@@ -64,12 +64,11 @@ Labels: `good first issue`, `enhancement`
 
 ## M4 · The agent graph
 
-### [M4] "+1 agents": pluralize a folded subtree's count
-Labels: `good first issue`, `bug`
-- **Context:** `graph.sessionGraph.moreAgents` in `locales/en/graph.json` is `"+{{n}} agents"`, so one folded agent
-  reads "+1 agents". It's used in `apps/desktop/src/graph/SessionGraph.tsx` (around line 247).
-- **Done when** it passes `count` with `_one` and `_other` keys in English (Indonesian needs only `_other`), as
-  [CONTRIBUTING](../CONTRIBUTING.md#text-in-the-ui) shows.
+### [M4] Test the timeline's ticks for spans over eight hours
+Labels: `good first issue`, `enhancement`
+- **Context:** `ticks` in `apps/desktop/src/graph/timeline.ts` (around line 123) takes its step from a list, but past
+  8 hours it computes one instead. `timeline.test.ts` only tries spans of 500 ms, 10 s and 1 h.
+- **Done when** asserts cover a 10-hour span (at most 8 ticks, steps in whole hours) and a span of 0 (`[0]`).
 
 ### [M4] Test keyboard focus at the edges of the graph
 Labels: `good first issue`, `enhancement`

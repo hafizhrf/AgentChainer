@@ -132,6 +132,8 @@ export function normalize(m: SDKMessage): AgentEvent[] {
     case "assistant": {
       const events: AgentEvent[] = [];
       const agentId = agentIdOf(m);
+      // A subagent's messages say which model it runs (UX-18); the main agent's model comes with `session.started`.
+      const model = m.parent_tool_use_id !== null && m.message.model ? { model: m.message.model } : {};
       for (const block of m.message.content) {
         if (block.type === "tool_use") {
           events.push({
@@ -141,6 +143,7 @@ export function normalize(m: SDKMessage): AgentEvent[] {
             input: block.input,
             parentToolUseId: m.parent_tool_use_id,
             ...(agentId ? { agentId } : {}),
+            ...model,
           });
         } else if (block.type === "text" && m.parent_tool_use_id !== null && block.text.trim()) {
           events.push({
@@ -148,6 +151,7 @@ export function normalize(m: SDKMessage): AgentEvent[] {
             parentToolUseId: m.parent_tool_use_id,
             ...(agentId ? { agentId } : {}),
             text: block.text,
+            ...model,
           });
         }
       }

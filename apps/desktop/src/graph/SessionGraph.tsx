@@ -13,10 +13,11 @@ import {
 import { Bot, Loader2, Sparkles, Wrench } from "lucide-react";
 import { type KeyboardEvent, memo, useEffect, useMemo, useRef, useState } from "react";
 import { t } from "../i18n/index.ts";
-import type { Item } from "../transcript.ts";
+import { modelName } from "../modelName.ts";
+import { type Item, toolSummary } from "../transcript.ts";
 import { agentGraph, type GraphNode, MAIN_ID, moveFocus, structureKey } from "./agentGraph.ts";
 import { DotGrid } from "./DotGrid.tsx";
-import { layoutGraph, NODE_SIZE } from "./layout.ts";
+import { layoutGraph, nodeSize } from "./layout.ts";
 import { StatusIcon, statusLabel } from "./StatusIcon.tsx";
 import { useNow } from "./useNow.ts";
 
@@ -26,13 +27,17 @@ type NodeData = {
   selected: boolean;
   expanded: boolean;
   onToggle: (id: string) => void;
+  onSelect: (agentId: string) => void;
+  /** The session's model, which a subagent runs unless its messages say otherwise (UX-18). */
+  mainModel: string | undefined;
+  cwd: string;
 };
 export type FlowNode = Node<NodeData>;
 
 /**
- * The live agent graph of a session (M4-02): the main agent, its subagents under their parents, and the key tool
- * calls. The layout (dagre) is recomputed only when the structure changes; status updates patch node data. Click a
- * subagent, or move with the arrow keys and press Enter, to open its drawer; Esc closes it.
+ * The live agent graph of a session (M4-02): the main agent, its subagents under their parents, and each agent's tool
+ * calls as one card (UX-18). The layout (dagre) is recomputed only when the structure changes; status updates patch
+ * node data. Click a subagent, or move with the arrow keys and press Enter, to open its drawer; Esc closes it.
  */
 export default function SessionGraph({
   items,
@@ -41,6 +46,8 @@ export default function SessionGraph({
   selected,
   onSelect,
   onFlow,
+  model,
+  cwd = "",
 }: {
   items: Item[];
   running: boolean;
@@ -50,8 +57,12 @@ export default function SessionGraph({
   onSelect: (agentId: string | null) => void;
   /** The React Flow instance once it's ready: the M4-E2 bench drives the viewport through it. */
   onFlow?: (flow: ReactFlowInstance<FlowNode>) => void;
+  /** The session's model, as the CLI reports it (UX-18). */
+  model?: string | undefined;
+  /** The workspace, so a tool row shows paths relative to it. */
+  cwd?: string;
 }) {
-  // Every 2 s, so a tool call that turns long gets its node (design §4).
+  // Every 2 s, so a tool call that turns long shows its agent's card (design §4).
   const now = useNow(running, 2000);
   const [expanded, setExpanded] = useState<ReadonlySet<string>>(new Set());
   const [focused, setFocused] = useState<string | null>(null);
@@ -82,16 +93,19 @@ export default function SessionGraph({
       id: n.id,
       type: n.kind,
       position: positions.get(n.id) ?? { x: 0, y: 0 },
-      ...NODE_SIZE[n.kind],
+      ...nodeSize(n),
       data: {
         node: n,
         focused: focused === n.id,
         selected: selected === n.id,
-        expanded: expanded.has(n.id),
+        expanded: expanded.has(n.kind === "tools" ? n.parent : n.id),
         onToggle: toggle,
+        onSelect,
+        mainModel: model,
+        cwd,
       },
     }));
-  }, [graph, positions, focused, selected, expanded]);
+  }, [graph, positions, focused, selected, expanded, onSelect, model, cwd]);
 
   const edges = useMemo<Edge[]>(
     () =>
@@ -112,7 +126,14 @@ export default function SessionGraph({
       e.preventDefault();
       setFocused(next);
     } else if (e.key === "Enter" && focused && focused !== MAIN_ID) {
-      onSelect(focused);
+      const n = graph.nodes.find((x) => x.id === focused);
+      if (n?.kind === "agent") onSelect(focused);
+      else if (n?.kind === "tools")
+        setExpanded((prev) => {
+          const next = new Set(prev);
+          if (!next.delete(n.parent)) next.add(n.parent);
+          return next;
+        });
     } else if (e.key === "Escape" && selected) {
       e.preventDefault();
       onSelect(null);
@@ -178,6 +199,7 @@ const Handles = () => (
   </>
 );
 
+/** Opens or closes an agent's tools card: "12 tools" / "Fold tools". */
 function FoldButton({
   id,
   count,
@@ -204,6 +226,24 @@ function FoldButton({
   );
 }
 
+/** The model an agent runs, as a chip (UX-18). */
+function ModelChip({ model, inherited }: { model: string | undefined; inherited?: boolean }) {
+  const name = modelName(model);
+  if (!name) return null;
+  return (
+    <span
+      className={`graph-model${inherited ? " inherited" : ""}`}
+      title={
+        inherited
+          ? t("graph.sessionGraph.modelInherited", { model: name })
+          : t("graph.sessionGraph.model", { model: name })
+      }
+    >
+      {name}
+    </span>
+  );
+}
+
 const cls = (base: string, d: NodeData, status: string) =>
   `graph-node ${base} ${status}${d.selected ? " selected" : ""}${d.focused ? " focused" : ""}`;
 
@@ -216,9 +256,10 @@ const MainNodeView = memo(function MainNodeView({ data }: NodeProps<FlowNode>) {
       <div className="graph-node-title">
         <Sparkles size={14} aria-hidden />
         <strong>{t("graph.sessionGraph.mainAgent")}</strong>
+        <ModelChip model={data.mainModel} />
         {n.running && <Loader2 size={13} className="spin" aria-label={statusLabel("running")} />}
       </div>
-      <FoldButton id={n.id} count={n.foldedTools} expanded={data.expanded} onToggle={data.onToggle} />
+      <FoldButton id={n.id} count={n.tools} expanded={data.expanded} onToggle={data.onToggle} />
     </div>
   );
 });
@@ -241,33 +282,81 @@ const AgentNodeView = memo(function AgentNodeView({ data }: NodeProps<FlowNode>)
         <strong>{a.description}</strong>
         <StatusIcon status={a.status} />
       </div>
-      <div className="graph-node-meta">{n.waiting && live ? t("graph.sessionGraph.waiting") : meta.join(" · ")}</div>
       <div className="graph-node-meta">
-        <FoldButton id={n.id} count={n.foldedTools} expanded={data.expanded} onToggle={data.onToggle} />
-        {n.foldedAgents > 0 && <span>{t("graph.sessionGraph.moreAgents", { n: n.foldedAgents })}</span>}
+        <ModelChip model={a.model ?? data.mainModel} inherited={!a.model} />
+        <span className="graph-node-meta-text">
+          {n.waiting && live ? t("graph.sessionGraph.waiting") : meta.join(" · ")}
+        </span>
+      </div>
+      <div className="graph-node-meta">
+        <FoldButton id={n.id} count={n.tools} expanded={data.expanded} onToggle={data.onToggle} />
+        {n.foldedAgents > 0 && <span>{t("graph.sessionGraph.moreAgents", { count: n.foldedAgents })}</span>}
       </div>
     </div>
   );
 });
 
-const ToolNodeView = memo(function ToolNodeView({ data }: NodeProps<FlowNode>) {
+/** An agent's tool calls as one card (UX-18): counts by tool when closed; the latest calls, one a row, when open. */
+const ToolsNodeView = memo(function ToolsNodeView({ data }: NodeProps<FlowNode>) {
   const n = data.node;
-  if (n.kind !== "tool") return null;
-  const tool = n.tool;
+  if (n.kind !== "tools") return null;
+  const total = n.counts.reduce((sum, c) => sum + c.n, 0);
+  const status = n.waiting ? "waiting" : n.errors ? "error" : n.running ? "running" : "done";
   return (
-    <div className={cls("tool", data, n.waiting ? "waiting" : tool.status)}>
+    <div className={cls("tools", data, status)}>
       <Handles />
-      <div className="graph-node-title">
+      <button
+        type="button"
+        className="graph-node-title graph-tools-head nodrag"
+        aria-expanded={n.open}
+        onClick={(e) => {
+          e.stopPropagation();
+          data.onToggle(n.parent);
+        }}
+      >
         <Wrench size={13} aria-hidden />
-        <span>{tool.name}</span>
-        {n.waiting ? (
-          <span className="graph-node-meta">{t("graph.sessionGraph.approval")}</span>
-        ) : (
-          <StatusIcon status={tool.status} />
+        <span>{t("graph.sessionGraph.toolCalls", { count: total })}</span>
+        {n.waiting > 0 && <span className="graph-chip waiting">{t("graph.sessionGraph.approval")}</span>}
+        {n.errors > 0 && (
+          <span className="graph-chip error">{t("graph.sessionGraph.failed", { count: n.errors })}</span>
         )}
-      </div>
+        {n.running > 0 && <Loader2 size={12} className="spin" aria-label={statusLabel("running")} />}
+      </button>
+      {n.open ? (
+        <ul className="graph-tool-rows">
+          {n.rows.map((tool) => (
+            <li key={tool.id} className={`graph-tool-row ${tool.status}`} title={toolSummary(tool.input, data.cwd)}>
+              <span className="graph-tool-name">{tool.name}</span>
+              <span className="graph-tool-target">{toolSummary(tool.input, data.cwd)}</span>
+              <span className="graph-tool-status">
+                <StatusIcon status={tool.status} />
+              </span>
+            </li>
+          ))}
+          {n.more > 0 && (
+            <li className="graph-tool-row more">
+              {n.parent === MAIN_ID ? (
+                <span>{t("graph.sessionGraph.moreTools", { count: n.more })}</span>
+              ) : (
+                <button
+                  type="button"
+                  className="link nodrag"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    data.onSelect(n.parent);
+                  }}
+                >
+                  {t("graph.sessionGraph.moreTools", { count: n.more })}
+                </button>
+              )}
+            </li>
+          )}
+        </ul>
+      ) : (
+        <div className="graph-tool-counts">{n.counts.map((c) => `${c.name} ×${c.n}`).join(" · ")}</div>
+      )}
     </div>
   );
 });
 
-const NODE_TYPES = { main: MainNodeView, agent: AgentNodeView, tool: ToolNodeView };
+const NODE_TYPES = { main: MainNodeView, agent: AgentNodeView, tools: ToolsNodeView };

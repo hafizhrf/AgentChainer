@@ -249,6 +249,8 @@ export function SessionView({
                         waiting={waiting}
                         selected={agent ? agent.id : null}
                         onSelect={selectAgent}
+                        model={tab.model}
+                        cwd={tab.cwd}
                       />
                     </Suspense>
                   )}

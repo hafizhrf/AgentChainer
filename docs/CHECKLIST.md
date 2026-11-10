@@ -1997,7 +1997,7 @@ with the OpenAI Codex CLI and Google's Antigravity CLI (`agy`), in both directio
       without asking), THREAT_MODEL T-19.
   - Before a release ships M9, ask OpenAI and Google in writing whether a third-party app may drive their CLIs
     headless on a personal account, as M0-22 does for Anthropic.
-- [ ] **M9-02** Spike: Codex `app-server` and agy headless, on a scratch folder with cheap models.
+- [x] **M9-02** Spike: Codex `app-server` and agy headless, on a scratch folder with cheap models.
   - **Owner prerequisites:** Codex signed in (0.157.0 is installed on the dev machine); agy installed and signed in.
   - **To settle:**
     - Codex's approval messages and their answers;
@@ -2022,7 +2022,13 @@ with the OpenAI Codex CLI and Google's Antigravity CLI (`agy`), in both directio
     - usage comes as tokens only;
     - the user's own Codex config (model, hooks, MCP servers) applies, so a backend sets its own model.
   - The methods to pin go into `cli-contract.ts` with M9-04, where they're used.
-  - Left: the agy half, once `agy` is installed and signed in on the dev machine.
+  - The agy half (agy 1.5.4, `gemini-3.8-flash-low`), with `packages/sidecar/scripts/spike-agy.ts`:
+    - per-run settings go through `--settings`; the user's own settings were untouched;
+    - `--conversation <id>` resumes;
+    - a per-run write deny holds;
+    - **per-run command rules don't:** `request-review` refuses every command, `proceed-in-sandbox` runs every one.
+
+    So agy steps write files but run no commands, and the app runs the gates (ADR-0012 §3, R-20).
 - [ ] **M9-03** A step backend interface: `StepSession` (id, turn, inject, close, respond, fleet item) in
       `packages/sidecar/src/backends/`. Claude's `Session` implements it, and `tasks/runner.ts` picks the backend
       per step. No behavior change.
@@ -2034,13 +2040,16 @@ with the OpenAI Codex CLI and Google's Antigravity CLI (`agy`), in both directio
   - **Fix rounds** resume the thread.
   - **Cost:** tokens × a pinned price table.
   - Fixture replays in tests, no model calls.
-- [ ] **M9-05** The agy backend:
+- [ ] **M9-05** The agy backend (S8):
   - **Process:** `agy -p --output-format stream-json` in the task's worktree.
-  - **Read steps** run in its read-only sandbox.
-  - **Write steps** get a per-run allowlist: edits inside the worktree and the project's gate commands.
-  - **Afterwards:** every reported command is checked against the guard; a breach fails the step and goes into the
-    evidence.
-  - Read-only only if M9-02 finds no per-run settings path.
+  - **Settings:** through `--settings` only.
+  - **Write steps:** `--mode accept-edits --sandbox`, `toolPermission: request-review`. It edits files and runs no
+    commands; the gates run in the app.
+  - **Read steps:** also `deny: write_file(*)`.
+  - **Afterwards:** every path it wrote is checked against the guard and the worktree; a breach fails the step and goes
+    into the evidence.
+  - **Fix rounds:** `--conversation <id>`.
+  - **Readiness:** `agy models`.
 - [ ] **M9-06** Choosing agents, flexibly (ADR-0012 §5):
   - **Schema:** `agent: claude | codex | agy` (default `claude`) and an optional `model` per agent step.
   - **Per task:** an agent per role on the triage card, before approval.

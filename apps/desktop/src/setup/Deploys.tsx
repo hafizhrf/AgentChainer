@@ -7,6 +7,7 @@ import { Modal } from "../Dialog.tsx";
 import { dateTime } from "../i18n/format.ts";
 import { t } from "../i18n/index.ts";
 import { Rich } from "../i18n/Rich.tsx";
+import { deployError, smokeDetail } from "../i18n/shown.ts";
 import { request } from "../sidecar.ts";
 import { Field } from "../ui/Field.tsx";
 import { IconButton } from "../ui/IconButton.tsx";
@@ -200,13 +201,13 @@ function DeployRow({
         {live && <strong> · {t("setup.deploys.live")}</strong>}
         {d.rolledBackBy && <span className="muted"> · {t("setup.deploys.rolledBack")}</span>}
       </span>
-      <span className="grow muted deploy-detail" title={redactSecrets(d.error ?? d.smoke?.detail ?? "")}>
+      <span className="grow muted deploy-detail" title={redactSecrets(deployError(d) ?? smokeDetail(d) ?? "")}>
         {d.status === "failed"
-          ? redactSecrets(d.error ?? "")
+          ? redactSecrets(deployError(d) ?? "")
           : d.smoke
             ? d.smoke.ok
-              ? t("setup.deploys.smokePassed", { detail: redactSecrets(d.smoke.detail) })
-              : t("setup.deploys.smokeFailed", { detail: redactSecrets(d.smoke.detail) })
+              ? t("setup.deploys.smokePassed", { detail: redactSecrets(smokeDetail(d) ?? "") })
+              : t("setup.deploys.smokeFailed", { detail: redactSecrets(smokeDetail(d) ?? "") })
             : d.adapter === "docker" && d.deploymentId
               ? t("setup.deploys.pushed", { id: d.deploymentId })
               : ""}

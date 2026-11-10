@@ -4,6 +4,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { after, describe, it } from "node:test";
+import { resultText, setLanguage } from "@agentchainer/protocol";
 import type { RunResult } from "../run-async.ts";
 import { newTask, taskBranch } from "../tasks/service.ts";
 import { saveTask } from "../tasks/store.ts";
@@ -553,5 +554,17 @@ describe("the smoke test (M6-03)", () => {
     assert.deepEqual([ok.ok, ok.how], [true, "script"]);
     const wrong = await runSmoke(code, "https://other.example");
     assert.deepEqual([wrong.ok, wrong.how], [false, "script"]);
+  });
+
+  it("records its result in English, with a ref the app shows in its own language (X-15)", async () => {
+    const answer = (async () => new Response("", { status: 502 })) as unknown as typeof fetch;
+    await setLanguage("id");
+    try {
+      const smoke = await runSmoke(tmp(), "https://x.example", answer);
+      assert.equal(smoke.detail, "GET https://x.example answered 502.");
+      assert.equal(resultText(smoke.detailRef), "GET https://x.example menjawab 502.");
+    } finally {
+      await setLanguage("en");
+    }
   });
 });

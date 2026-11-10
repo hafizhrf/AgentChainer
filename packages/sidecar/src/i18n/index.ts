@@ -1,4 +1,5 @@
-import { catalog, type KeyOf, type Params } from "@agentchainer/protocol";
+import { catalog, currentLanguage, type KeyOf, type Language, type Params, setLanguage } from "@agentchainer/protocol";
+import { z } from "zod";
 import agents from "./locales/en/agents.json" with { type: "json" };
 import bootstrap from "./locales/en/bootstrap.json" with { type: "json" };
 import deploy from "./locales/en/deploy.json" with { type: "json" };
@@ -48,3 +49,27 @@ export type MessageKey = KeyOf<typeof english>;
 
 /** The message for `key` in the app's language, with `params` filled in. A `count` picks the plural form. */
 export const t = (key: MessageKey, params?: Params) => sidecar.t(key, params);
+
+/**
+ * Switches the process's language (X-13): every catalog, and zod's own messages. The catalogs are bundled, so it
+ * applies at once.
+ */
+export function useLanguage(language: Language): void {
+  void setLanguage(language);
+  z.config(language === "id" ? z.locales.id() : z.locales.en());
+}
+
+/**
+ * Runs `fn` with every message in English, for a synchronous check whose words go to Claude (X-15), then switches
+ * back. Nothing else runs in between: the switch, `fn` and the switch back happen in one turn of the event loop.
+ */
+export function inEnglishNow<T>(fn: () => T): T {
+  const was = currentLanguage();
+  if (was === "en") return fn();
+  useLanguage("en");
+  try {
+    return fn();
+  } finally {
+    useLanguage(was);
+  }
+}

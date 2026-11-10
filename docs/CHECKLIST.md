@@ -2263,11 +2263,23 @@ first.
             re-run. That failed bootstrap on Ubuntu and macOS and the catalog source check; none of them is a required
             check. Re-run once GitHub serves the assets again.
       - **Small leftovers** are tracked in X-15.
-- [ ] **X-15** X-13's small leftovers.
+- [x] **X-15** X-13's small leftovers. Done 2026-11-10 ([ADR-0011](adr/0011-ui-text-catalogs.md), addendum X-15):
       - Deploy smoke details and plugin warnings are stored in the language of the moment. `evidence.md` copies them,
         so an English report can hold Indonesian fragments. Store them as English plus a ref, like task results.
-      - `generate-workflow`'s retry reason to Claude follows the app's language; send the English.
-      - A parallel step's group label (`StepRun.group`) shows untranslated in the run's tooltip.
-      - Enum values shown as words (risk, scope, state, confidence) arrive as received, in English.
-      - An English XL outcome that quotes a child's outcome ending with a full stop shows "..".
-      - An error quoted raw in an English outcome is in the language of the moment.
+        - **Done for deploys:** a deploy's smoke detail and the sidecar's own deploy errors are stored as English
+          plus `detailRef`/`errorRef`, from a new `deploy` results catalog. The evidence and the deploy lists render
+          the refs.
+        - **Plugin warnings stay as written:** they're in setup runs' records, which ADR-0011 keeps in their
+          language. Nothing English copies them: they're shown only in History and on the Plugins page.
+      - `generate-workflow`'s retry reason to Claude follows the app's language; send the English. **Done:** the
+        check runs once more with every catalog and zod in English (`inEnglishNow`).
+      - A parallel step's group label (`StepRun.group`) shows untranslated in the run's tooltip. **Done:** a
+        `groupRef` from the workflow's translation.
+      - Enum values shown as words (risk, scope, state, confidence) arrive as received, in English. **Done:**
+        - the setup plan's risk and scope, the Commands and Triage confidence, the Metrics state;
+        - in results: the merge gates' run state, and the review severity in lesson signals.
+      - An English XL outcome that quotes a child's outcome ending with a full stop shows "..". **Done:** a value
+        that ends a sentence swallows the full stop after it, in every catalog.
+      - An error quoted raw in an English outcome is in the language of the moment. **Done:** the catalogs
+        remember the English of what they showed in another language (`inEnglish`), and English results map
+        quoted values through it.

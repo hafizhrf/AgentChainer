@@ -1,16 +1,8 @@
 import { existsSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
-import {
-  asLanguage,
-  folderProblems,
-  PROTOCOL_VERSION,
-  RpcErrorCode,
-  setLanguage,
-  type Task,
-} from "@agentchainer/protocol";
+import { asLanguage, folderProblems, PROTOCOL_VERSION, RpcErrorCode, type Task } from "@agentchainer/protocol";
 import type { SDKMessage } from "@anthropic-ai/claude-agent-sdk";
-import { z } from "zod";
 import pkg from "../package.json" with { type: "json" };
 import { agentTemplates } from "./agent-templates.ts";
 import { deleteAgent, listAgents, saveAgent } from "./agents.ts";
@@ -49,7 +41,7 @@ import {
   unstage,
 } from "./git.ts";
 import { githubStatus, systemGh } from "./github.ts";
-import { t } from "./i18n/index.ts";
+import { t, useLanguage } from "./i18n/index.ts";
 import {
   addMcpServer,
   installPlugin,
@@ -292,8 +284,7 @@ function prepareSdk() {
 // The app's language (X-13), passed at spawn from the settings; a change restarts the app. The catalogs are bundled,
 // so it applies at once, before the first request. zod's own messages (invalid params) follow it.
 const language = asLanguage(process.env.AGENTCHAINER_LANGUAGE);
-void setLanguage(language);
-if (language === "id") z.config(z.locales.id());
+useLanguage(language);
 
 serve(
   {

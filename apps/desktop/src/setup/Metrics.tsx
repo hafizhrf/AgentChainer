@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { compactDuration, percent, usd } from "../i18n/format.ts";
 import { t } from "../i18n/index.ts";
 import { request } from "../sidecar.ts";
+import { stateLabel } from "../tasks/run.ts";
 import { IconButton } from "../ui/IconButton.tsx";
 import { Select } from "../ui/Select.tsx";
 
@@ -269,7 +270,7 @@ export function Metrics({ cwd }: { cwd: string }) {
                   <span className="grow deploy-detail" title={task.request}>
                     {task.request}
                   </span>
-                  <span className="muted">{task.state}</span>
+                  <span className="muted">{stateLabel(task.state).label}</span>
                   <span className="muted">{t("setup.metrics.runs", { count: task.runs })}</span>
                   <span>{money(task.costUsd)}</span>
                 </li>

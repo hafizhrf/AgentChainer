@@ -1,5 +1,5 @@
 import { GATE_KINDS, STEP_INPUTS, type TaskContract, WORKFLOW_ROLES } from "@agentchainer/protocol";
-import { t } from "../i18n/index.ts";
+import { inEnglishNow, t } from "../i18n/index.ts";
 import type { AgentSdkModule } from "../sdk-loader.ts";
 import type { Library } from "./library.ts";
 import { checkWorkflowText } from "./project-workflows.ts";
@@ -87,7 +87,7 @@ export async function generateWorkflow(
   opts: { model?: string; abortController?: AbortController } = {},
 ): Promise<Generated> {
   let costUsd = 0;
-  let previous: { yaml: string; error: string } | undefined;
+  let previous: { yaml: string; error: string; shown: string } | undefined;
   for (let attempt = 0; attempt < 2; attempt++) {
     const q = sdk.query({
       prompt: generatePrompt(tier, current, ask, previous),
@@ -118,12 +118,13 @@ export async function generateWorkflow(
     if (!yaml) return { yaml: null, summary, error: t("tasks.generateWorkflow.noWorkflow"), costUsd };
     const error = checkWorkflowText(tier, yaml, shipped);
     if (!error) return { yaml: yaml.endsWith("\n") ? yaml : `${yaml}\n`, summary, costUsd };
-    previous = { yaml, error };
+    // Claude reads why in English, whatever the app's language (X-15); the person sees it in theirs.
+    previous = { yaml, error: inEnglishNow(() => checkWorkflowText(tier, yaml, shipped)) ?? error, shown: error };
   }
   return {
     yaml: null,
     summary: "",
-    error: t("tasks.generateWorkflow.failedChecks", { error: String(previous?.error) }),
+    error: t("tasks.generateWorkflow.failedChecks", { error: String(previous?.shown) }),
     costUsd,
   };
 }

@@ -1,6 +1,7 @@
 import {
   type GateKind,
   type GateRun,
+  inEnglish,
   type MessageRef,
   type ResultKey,
   resultRef,
@@ -96,7 +97,8 @@ const outcomeOf = (r: TaskRun | null | undefined): Said | undefined =>
 function failure(err: unknown): Said {
   const ref = (err as { ref?: unknown } | null)?.ref;
   return {
-    text: err instanceof Error ? err.message : String(err),
+    // In English, as every recorded text is: an error raised in the app's language comes back as its English (X-15).
+    text: inEnglish(err instanceof Error ? err.message : String(err)),
     ref:
       ref && typeof ref === "object" && typeof (ref as MessageRef).key === "string" ? (ref as MessageRef) : undefined,
   };

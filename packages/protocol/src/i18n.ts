@@ -79,16 +79,25 @@ export function catalog<E extends Messages>(english: E, translations: Partial<Re
     found ??= from[key] ?? key;
     return accented ? accent(found) : found;
   };
+  /** The English message; a value that is a translated message in turn goes in as its English. */
+  const englishOf = (key: string, params?: Params) =>
+    interpolate(
+      template(english, key, params, false, ENGLISH_RULES),
+      params &&
+        Object.fromEntries(Object.entries(params).map(([n, v]) => [n, typeof v === "string" ? inEnglish(v) : v])),
+    );
 
   return {
     /** The message for `key` in the current language, with `params` filled in. A `count` picks the plural form. */
     t(key: Key, params?: Params): string {
       const text = interpolate(template(entry.messages, key, params), params);
-      return pseudo ? `⟦${text}⟧` : text;
+      const shown = pseudo ? `⟦${text}⟧` : text;
+      if (language !== "en" || pseudo) remember(shown, englishOf(key, params));
+      return shown;
     },
     /** The English message, whatever the language: for text that goes into files, commits and pull requests. */
     english(key: Key, params?: Params): string {
-      return interpolate(template(english, key, params, false, ENGLISH_RULES), params);
+      return englishOf(key, params);
     },
     /**
      * A message with markup, e.g. "Press <kbd>{{keys}}</kbd> to search", split into plain text and tagged parts.
@@ -114,9 +123,36 @@ export function catalog<E extends Messages>(english: E, translations: Partial<Re
   };
 }
 
+/**
+ * Fills `{{name}}` with its value. A value that already ends a sentence swallows the full stop the message puts right
+ * after it, so quoting "The run failed." in "…: {{why}}." doesn't end in "..".
+ */
 function interpolate(text: string, params?: Params): string {
   if (!params) return text;
-  return text.replace(/\{\{(\w+)\}\}/g, (whole, name: string) => (name in params ? String(params[name]) : whole));
+  return text.replace(/\{\{(\w+)\}\}(\.)?/g, (whole, name: string, stop: string | undefined) => {
+    if (!(name in params)) return whole;
+    const value = String(params[name]);
+    return stop && /[.!?…]$/.test(value) ? value : value + (stop ?? "");
+  });
+}
+
+/**
+ * The English of the messages this process showed in another language (X-15): an error raised in Indonesian that a
+ * result quotes, say, has to read in English in a pull request. Recent ones only; nothing branches on them.
+ */
+const ENGLISH_OF = new Map<string, string>();
+const REMEMBERED = 2000;
+
+function remember(shown: string, english: string) {
+  if (shown === english) return;
+  ENGLISH_OF.delete(shown);
+  ENGLISH_OF.set(shown, english);
+  if (ENGLISH_OF.size > REMEMBERED) ENGLISH_OF.delete(ENGLISH_OF.keys().next().value as string);
+}
+
+/** A text this process showed, in English: a message from a catalog as its English, anything else as it is. */
+export function inEnglish(text: string): string {
+  return ENGLISH_OF.get(text) ?? text;
 }
 
 const ACCENTS: Record<string, string> = {

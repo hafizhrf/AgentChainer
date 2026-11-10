@@ -1338,7 +1338,13 @@ function TriageCard({
             {triage.model ? (
               <span>
                 {localized(triage.model.rationale, triage.model.rationaleRef)}{" "}
-                <span className="muted">{t("tasks.triage.confidence", { confidence: triage.model.confidence })}</span>
+                <span className="muted">
+                  {triage.model.confidence === "high"
+                    ? t("tasks.triage.confidenceHigh")
+                    : triage.model.confidence === "medium"
+                      ? t("tasks.triage.confidenceMedium")
+                      : t("tasks.triage.confidenceLow")}
+                </span>
               </span>
             ) : (
               <span className="muted">
@@ -1628,7 +1634,10 @@ function RunView({
               <span className="task-step-label">{localized(entry.label, entry.labelRef)}</span>
               {entry.role && <span className="chip step-role">{entry.role}</span>}
               {entry.group && (
-                <span className="badge" title={t("tasks.run.parallelHint", { group: entry.group })}>
+                <span
+                  className="badge"
+                  title={t("tasks.run.parallelHint", { group: localized(entry.group, entry.groupRef) })}
+                >
                   {t("tasks.run.parallel")}
                 </span>
               )}

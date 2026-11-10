@@ -11,6 +11,7 @@ import {
 import { AC_DIR, ensureIgnored } from "../ac-dir.ts";
 import { t } from "../i18n/index.ts";
 import { RpcFailure } from "../rpc.ts";
+import { result } from "../tasks/result.ts";
 import { loadTask } from "../tasks/store.ts";
 import { codeRootIn } from "../tasks/worktree.ts";
 import { git } from "../workspace.ts";
@@ -160,18 +161,18 @@ async function runDeploy(
   let record: DeployRecord;
   if (!out) {
     const tail = tailOf(r);
+    // Our own words go in English with a ref the app shows in its language (X-15); the CLI's output as it is.
+    const why =
+      r.status === 0
+        ? result("deploy.error.unreadableResult")
+        : adapter.id === "cloudflare" && base.env === "preview" && /does not exist|not found|deploy.*first/i.test(tail)
+          ? result("deploy.error.notDeployedYet", { tail })
+          : null;
     record = {
       ...base,
       endedAt: now().toISOString(),
       status: "failed",
-      error:
-        r.status === 0
-          ? t("deploy.service.unreadableResult")
-          : adapter.id === "cloudflare" &&
-              base.env === "preview" &&
-              /does not exist|not found|deploy.*first/i.test(tail)
-            ? t("deploy.cloudflare.notDeployedYet", { tail })
-            : tail || `exit ${r.status}`,
+      ...(why ? { error: why.text, errorRef: why.ref } : { error: tail || `exit ${r.status}` }),
     };
   } else {
     // A Docker image has no URL to smoke-test.

@@ -1,0 +1,9 @@
+{
+  "deploy.smoke.timedOut": "`{{command}}` timed out.",
+  "deploy.smoke.exited": "`{{command}}` exited {{code}}",
+  "deploy.smoke.exitedWithOutput": "`{{command}}` exited {{code}}: {{tail}}",
+  "deploy.smoke.answered": "GET {{url}} answered {{status}}.",
+  "deploy.smoke.failed": "GET {{url}} failed: {{error}}",
+  "deploy.error.unreadableResult": "The deploy finished, but its result couldn't be read from the output.",
+  "deploy.error.notDeployedYet": "The Worker hasn't been deployed yet, so it has no versions to preview. Deploy it once yourself (`wrangler deploy`), then preview from here. ({{tail}})"
+}

@@ -1,8 +1,12 @@
+import type { MessageRef } from "@agentchainer/protocol";
 import { runGuarded } from "../bootstrap/verify.ts";
-import { t } from "../i18n/index.ts";
 import { smokeCommand } from "../tasks/gates.ts";
+import { result } from "../tasks/result.ts";
 
-export type Smoke = { ok: boolean; how: "script" | "http"; detail: string };
+/** `detail` in English for records and evidence, `detailRef` for the app to show in its language (X-15). */
+export type Smoke = { ok: boolean; how: "script" | "http"; detail: string; detailRef: MessageRef };
+
+const said = (r: { text: string; ref: MessageRef }) => ({ detail: r.text, detailRef: r.ref });
 
 /**
  * The smoke test after a deploy (M6-03, design §6): the project's `scripts/smoke.*` with `SMOKE_URL` set to the
@@ -17,18 +21,20 @@ export async function runSmoke(code: string, url: string, fetchImpl: typeof fetc
     return {
       ok: r.exitCode === 0 && !r.timedOut,
       how: "script",
-      detail: r.timedOut
-        ? t("deploy.smoke.timedOut", { command })
-        : tail
-          ? t("deploy.smoke.exitedWithOutput", { command, code: String(r.exitCode), tail })
-          : t("deploy.smoke.exited", { command, code: String(r.exitCode) }),
+      ...said(
+        r.timedOut
+          ? result("deploy.smoke.timedOut", { command })
+          : tail
+            ? result("deploy.smoke.exitedWithOutput", { command, code: String(r.exitCode), tail })
+            : result("deploy.smoke.exited", { command, code: String(r.exitCode) }),
+      ),
     };
   }
   try {
     const res = await fetchImpl(url, { method: "GET", redirect: "follow", signal: AbortSignal.timeout(30_000) });
-    return { ok: res.ok, how: "http", detail: t("deploy.smoke.answered", { url, status: res.status }) };
+    return { ok: res.ok, how: "http", ...said(result("deploy.smoke.answered", { url, status: res.status })) };
   } catch (err) {
     const error = err instanceof Error ? err.message : String(err);
-    return { ok: false, how: "http", detail: t("deploy.smoke.failed", { url, error }) };
+    return { ok: false, how: "http", ...said(result("deploy.smoke.failed", { url, error })) };
   }
 }

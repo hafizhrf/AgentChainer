@@ -45,7 +45,11 @@ export function Commands({ profile }: { profile: Profile }) {
                     </td>
                     <td>
                       {c.confidence !== "high" && (
-                        <span className="badge">{t("setup.commands.confidence", { confidence: c.confidence })}</span>
+                        <span className="badge">
+                          {c.confidence === "medium"
+                            ? t("setup.commands.confidenceMedium")
+                            : t("setup.commands.confidenceLow")}
+                        </span>
                       )}
                     </td>
                     <td>

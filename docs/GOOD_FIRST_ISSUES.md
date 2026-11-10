@@ -110,11 +110,13 @@ Labels: `good first issue`, `enhancement`
 
 ## M7 · Metrics and evals
 
-### [M7] Show translated task states on the Metrics page
-Labels: `good first issue`, `bug`
-- **Context:** `apps/desktop/src/setup/Metrics.tsx` (around line 272) shows `{task.state}`, so it reads "unverified"
-  or "accepted". `stateLabel()` in `apps/desktop/src/tasks/run.ts` already gives each state its label.
-- **Done when** the list uses `stateLabel(task.state).label`.
+### [M7] Unit-test `succeeded`
+Labels: `good first issue`, `enhancement`
+- **Context:** `succeeded` in `packages/sidecar/src/tasks/metrics.ts` (around line 41) decides which tasks count as
+  successful on the Metrics page: Done, or a pull request merged without accepting a risk. `metrics.test.ts` only
+  reaches it through the totals.
+- **Done when** tests cover: a Done task; a failed task whose PR was merged normally (counts); a PR merged with an
+  accepted risk (doesn't count); an Accepted-with-risk task (doesn't count).
 
 ### [M7] Unit-test `percentile`
 Labels: `good first issue`, `enhancement`

@@ -169,9 +169,7 @@ function PlanRow({
   onFocus: () => void;
 }) {
   const selectable = a.state === "recommended" || a.state === "optional";
-  const meta = [a.tier, KIND[a.kind], t("setup.plan.scope", { scope: a.scope }), stateNote(a)]
-    .filter(Boolean)
-    .join(" · ");
+  const meta = [a.tier, KIND[a.kind], scopeWord(a.scope), stateNote(a)].filter(Boolean).join(" · ");
   return (
     <li className={`plan-row${focused ? " focused" : ""}${selectable ? "" : " inactive"}`}>
       <input
@@ -198,11 +196,36 @@ function stateNote(a: PlanAction): string | null {
   return null;
 }
 
+/** A setup item's scope in words, in the app's language (X-15). */
+function scopeWord(scope: PlanAction["scope"]): string {
+  switch (scope) {
+    case "project":
+      return t("setup.plan.scopeProject");
+    case "user":
+      return t("setup.plan.scopeUser");
+    case "local":
+      return t("setup.plan.scopeLocal");
+  }
+}
+
+/** A risk level in words, in the app's language (X-15). */
+function riskWord(risk: PlanAction["risk"]): string {
+  switch (risk) {
+    case "low":
+      return t("setup.plan.riskLow");
+    case "medium":
+      return t("setup.plan.riskMedium");
+    case "high":
+      return t("setup.plan.riskHigh");
+  }
+}
+
 export function RiskPill({ risk }: { risk: PlanAction["risk"] }) {
+  const word = riskWord(risk);
   return (
-    <span className={`risk risk-${risk}`} title={t("setup.plan.risk", { risk })}>
+    <span className={`risk risk-${risk}`} title={t("setup.plan.risk", { risk: word })}>
       <span className="risk-dot" />
-      {risk}
+      {word}
     </span>
   );
 }

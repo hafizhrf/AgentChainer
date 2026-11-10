@@ -5,6 +5,7 @@ import { CircleCheck, CircleX, ExternalLink, Loader2, RefreshCw, Rocket } from "
 import { useCallback, useEffect, useState } from "react";
 import { dateTime } from "../i18n/format.ts";
 import { t } from "../i18n/index.ts";
+import { deployError, smokeDetail } from "../i18n/shown.ts";
 import { request } from "../sidecar.ts";
 import { IconButton } from "../ui/IconButton.tsx";
 
@@ -104,12 +105,12 @@ export function DeployCard({ task, cwd, onChanged }: { task: Task; cwd: string; 
               <span className="deploy-what">
                 {d.env} · {d.adapter} · <code>{d.commit.slice(0, 7)}</code> · {dateTime(d.startedAt)}
               </span>
-              <span className="grow muted deploy-detail" title={redactSecrets(d.error ?? d.smoke?.detail ?? "")}>
+              <span className="grow muted deploy-detail" title={redactSecrets(deployError(d) ?? smokeDetail(d) ?? "")}>
                 {d.status === "failed"
-                  ? redactSecrets(d.error ?? "")
+                  ? redactSecrets(deployError(d) ?? "")
                   : d.smoke
                     ? t(d.smoke.ok ? "tasks.deploy.smokePassed" : "tasks.deploy.smokeFailed", {
-                        detail: redactSecrets(d.smoke.detail),
+                        detail: redactSecrets(smokeDetail(d) ?? ""),
                       })
                     : ""}
               </span>

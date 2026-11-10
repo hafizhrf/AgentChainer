@@ -805,8 +805,10 @@ export const StepRunSchema = z.object({
   /** The sub-task a `subtask` or `merge` entry is about. */
   taskId: z.string().optional(),
   role: z.string().optional(),
-  /** Steps that run at the same time (L's planners) share their parallel step's label. */
+  /** Steps that run at the same time (L's planners) share their parallel step's label, as the workflow names it. */
   group: z.string().optional(),
+  /** The group's label in the app's language, when the workflow translates it (X-15). */
+  groupRef: MessageRefSchema.optional(),
   status: z.enum(["running", "done", "failed", "cancelled"]),
   sessionId: z.string().optional(),
   startedAt: z.string(),
@@ -1144,8 +1146,18 @@ export const DeployRecordSchema = z.object({
   url: z.string().optional(),
   /** The provider's id for the deployment (Vercel: its URL; Cloudflare: a version; Firebase: site@version; Fly: an image), which rollback goes back to. */
   deploymentId: z.string().optional(),
+  /** Why it failed, in English; `errorRef` shows it in the app's language when the sidecar wrote it (X-15). */
   error: z.string().optional(),
-  smoke: z.object({ ok: z.boolean(), how: z.enum(["script", "http"]), detail: z.string() }).optional(),
+  errorRef: MessageRefSchema.optional(),
+  /** The smoke test; `detail` is English, `detailRef` the app's language (X-15). Older records have no refs. */
+  smoke: z
+    .object({
+      ok: z.boolean(),
+      how: z.enum(["script", "http"]),
+      detail: z.string(),
+      detailRef: MessageRefSchema.optional(),
+    })
+    .optional(),
   /** Production: what was live before this one, which Roll back goes back to (design §6). */
   previous: z
     .object({
@@ -2316,6 +2328,7 @@ export {
   catalog,
   currentLanguage,
   currentLocale,
+  inEnglish,
   type KeyOf,
   LANGUAGES,
   type Language,

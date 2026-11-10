@@ -9,6 +9,7 @@ import {
   setLanguage,
   type Task,
 } from "@agentchainer/protocol";
+import { t as message } from "../i18n/index.ts";
 import shipped from "./library.json" with { type: "json" };
 import { LibrarySchema } from "./library.ts";
 import { newRun } from "./orchestrator.ts";
@@ -432,10 +433,14 @@ describe("XL results in the app's language (X-13 part 2b)", () => {
     const step = done.run?.steps.find((s) => s.kind === "subtask");
     assert.deepEqual(step?.noteRef, own.ref, "the parent's step keeps the child's ref");
     assert.deepEqual(done.run?.outcomeRef?.params?.why, own.ref);
-    assert.match(done.run?.outcome ?? "", /^Sub-task 1 \(A\) wasn't verified: Some sub-tasks wait for others/);
+    // The quoted outcome's own full stop isn't doubled (X-15).
+    assert.match(
+      done.run?.outcome ?? "",
+      /^Sub-task 1 \(A\) wasn't verified: Some sub-tasks wait for others that couldn't run\. Open it/,
+    );
     assert.match(
       await inIndonesian(() => rendered(done.run?.outcomeRef)),
-      /^Sub-task 1 \(A\) belum diverifikasi: Beberapa sub-task menunggu sub-task lain yang tidak dapat berjalan\.\. Buka sub-task itu/,
+      /^Sub-task 1 \(A\) belum diverifikasi: Beberapa sub-task menunggu sub-task lain yang tidak dapat berjalan\. Buka sub-task itu/,
     );
   });
 
@@ -456,6 +461,18 @@ describe("XL results in the app's language (X-13 part 2b)", () => {
       await inIndonesian(() => rendered(done.run?.outcomeRef)),
       "Sub-task 1 (A) tidak dapat di-merge: git merge gagal: fatal: refusing to merge unrelated histories",
     );
+  });
+
+  it("records an error raised in the app's language in English (X-15)", async () => {
+    await setLanguage("id");
+    try {
+      const f = fakeWorld([task(A)], { mergeThrows: { [A]: new Error(message("git.repo.notARepo")) } });
+      const done = await orchestrate(parent({ subtasks: [A] }), f.world).o.run();
+      assert.equal(done.run?.outcome, "Sub-task 1 (A) couldn't be merged: This folder isn't a git repository.");
+      assert.equal(done.run?.steps.find((s) => s.kind === "merge")?.note, "This folder isn't a git repository.");
+    } finally {
+      await setLanguage("en");
+    }
   });
 
   it("joins the task branch's setup notes, each with its own ref", async () => {

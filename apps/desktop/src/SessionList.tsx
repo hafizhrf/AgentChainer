@@ -6,6 +6,7 @@ import { approxUsd, dateTime } from "./i18n/format.ts";
 import { t } from "./i18n/index.ts";
 import { Rich } from "./i18n/Rich.tsx";
 import { request } from "./sidecar.ts";
+import { agentLabel } from "./tasks/stepAgent.ts";
 import { ActionMenu } from "./ui/ActionMenu.tsx";
 
 /** From the local cost history (M1-33), kept by the Rust core. */
@@ -151,6 +152,9 @@ export function SessionList({
                         {s.title}
                       </span>
                     )}
+                    {s.agent && s.agent !== "claude" && (
+                      <span className="chip step-agent other">{agentLabel(s.agent, undefined)}</span>
+                    )}
                     {s.tag && <span className="badge">{s.tag}</span>}
                     {open && <span className="badge">{t("shell.sessionList.open")}</span>}
                   </div>
@@ -164,26 +168,29 @@ export function SessionList({
                   <button type="button" className="secondary small" onClick={() => onOpen(s)}>
                     {open ? t("shell.sessionList.show") : t("shell.sessionList.resume")}
                   </button>
-                  <ActionMenu
-                    label={t("shell.sessionList.actions", { title: s.title })}
-                    items={[
-                      { label: t("shell.sessionList.fork"), onSelect: () => void fork(s) },
-                      {
-                        label: t("shell.sessionList.rename"),
-                        onSelect: () => setEditing({ sessionId: s.sessionId, field: "title", value: s.title }),
-                      },
-                      {
-                        label: t("shell.sessionList.tag"),
-                        onSelect: () => setEditing({ sessionId: s.sessionId, field: "tag", value: s.tag ?? "" }),
-                      },
-                      {
-                        label: open ? t("shell.sessionList.deleteOpen") : t("shell.sessionList.delete"),
-                        danger: true,
-                        disabled: open,
-                        onSelect: () => void remove(s),
-                      },
-                    ]}
-                  />
+                  {/* Fork, rename, tag and delete are Claude's session calls; a Codex thread is Codex's to keep. */}
+                  {(!s.agent || s.agent === "claude") && (
+                    <ActionMenu
+                      label={t("shell.sessionList.actions", { title: s.title })}
+                      items={[
+                        { label: t("shell.sessionList.fork"), onSelect: () => void fork(s) },
+                        {
+                          label: t("shell.sessionList.rename"),
+                          onSelect: () => setEditing({ sessionId: s.sessionId, field: "title", value: s.title }),
+                        },
+                        {
+                          label: t("shell.sessionList.tag"),
+                          onSelect: () => setEditing({ sessionId: s.sessionId, field: "tag", value: s.tag ?? "" }),
+                        },
+                        {
+                          label: open ? t("shell.sessionList.deleteOpen") : t("shell.sessionList.delete"),
+                          danger: true,
+                          disabled: open,
+                          onSelect: () => void remove(s),
+                        },
+                      ]}
+                    />
+                  )}
                 </div>
               </li>
             );

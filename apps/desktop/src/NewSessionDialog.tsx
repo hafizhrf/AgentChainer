@@ -1,4 +1,10 @@
-import { type AgentDefinition, agentProblems, PERMISSION_MODES, type PermissionMode } from "@agentchainer/protocol";
+import {
+  type AgentDefinition,
+  agentProblems,
+  PERMISSION_MODES,
+  type PermissionMode,
+  type StepAgent,
+} from "@agentchainer/protocol";
 import { Folder, FolderOpen, Play } from "lucide-react";
 import { type FormEvent, useEffect, useState } from "react";
 import { Modal } from "./Dialog.tsx";
@@ -9,6 +15,7 @@ import type { WorkspaceDef } from "./settings.ts";
 import { shortPath } from "./shortPath.ts";
 import { request } from "./sidecar.ts";
 import { asMode, folderName } from "./tabs.ts";
+import type { AgentClis } from "./tasks/AgentPickers.tsx";
 import { Field } from "./ui/Field.tsx";
 import { Select } from "./ui/Select.tsx";
 
@@ -39,6 +46,8 @@ export function NewSessionDialog({
   onProfileChange,
   canAutonomous,
   onStart,
+  agent,
+  onAgentChange,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -58,8 +67,21 @@ export function NewSessionDialog({
   onProfileChange: (name: string) => void;
   canAutonomous: boolean;
   onStart: () => void;
+  /** The agent the chat runs on (M9-09). */
+  agent: StepAgent;
+  onAgentChange: (agent: StepAgent) => void;
 }) {
   const [typing, setTyping] = useState(false);
+  // The other agents' CLIs: Codex is offered when it's installed and signed in (M9-09).
+  const [clis, setClis] = useState<AgentClis | null>(null);
+  useEffect(() => {
+    if (open) void request("agents.available", {}).then(setClis, () => setClis(null));
+  }, [open]);
+  const onCodex = agent === "codex";
+  // A Codex chat has no plan mode: Safe stands in for it.
+  useEffect(() => {
+    if (onCodex && mode === "plan") onModeChange("default");
+  }, [onCodex, mode, onModeChange]);
   const workspace = cwd.trim();
   const profiles = useProfiles(open && ready ? workspace : "");
   // A profile the new folder doesn't have is dropped, so Start never names a missing one.
@@ -170,26 +192,58 @@ export function NewSessionDialog({
           </p>
         )}
         {isHome && <p className="warn">{t("home.workspace.homeWarning")}</p>}
+        {clis?.codex.installed && (
+          <Field label={t("home.newSession.agent")} help={onCodex ? t("home.newSession.codexHelp") : undefined}>
+            <Select
+              label={t("home.newSession.agent")}
+              value={agent}
+              onChange={(v) => onAgentChange(v as StepAgent)}
+              options={[
+                { value: "claude", label: t("tasks.agents.claude") },
+                {
+                  value: "codex",
+                  label: clis.codex.signedIn
+                    ? t("tasks.agents.codex")
+                    : t("tasks.agents.notSignedIn", { agent: t("tasks.agents.codex") }),
+                  disabled: !clis.codex.signedIn,
+                },
+              ]}
+            />
+          </Field>
+        )}
         <div className="field-row">
           <Field label={t("home.view.model")}>
-            <Select
-              label={t("home.view.model")}
-              value={model}
-              onChange={onModelChange}
-              options={modelChoices(undefined, model)}
-            />
+            {onCodex ? (
+              <Select
+                label={t("home.view.model")}
+                value=""
+                onChange={() => undefined}
+                options={[{ value: "", label: t("home.newSession.codexModel") }]}
+                disabled
+              />
+            ) : (
+              <Select
+                label={t("home.view.model")}
+                value={model}
+                onChange={onModelChange}
+                options={modelChoices(undefined, model)}
+              />
+            )}
           </Field>
           <Field label={t("home.view.permissionProfile")}>
             <Select
               label={t("home.view.permissionProfile")}
               value={mode}
               onChange={(m) => onModeChange(asMode(m))}
-              options={modeOptions(PERMISSION_MODES, canAutonomous)}
+              options={modeOptions(
+                onCodex ? PERMISSION_MODES.filter((m) => m !== "plan") : PERMISSION_MODES,
+                canAutonomous,
+              )}
             />
           </Field>
         </div>
         <p className="field-help">{MODE_HELP[mode]}</p>
-        {profiles && profiles.length > 0 && (
+        {!onCodex && profiles && profiles.length > 0 && (
           <Field label={t("home.view.agentProfile")} help={t("home.view.agentProfileHelp")}>
             <Select
               label={t("home.view.agentProfile")}

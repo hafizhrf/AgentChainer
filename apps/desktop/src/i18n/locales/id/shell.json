@@ -1,6 +1,7 @@
 {
   "shell.options.modelDefault": "Default (disarankan)",
   "shell.options.modelDefaultHint": "Dari pengaturan Claude Anda",
+  "shell.options.modelDefaultHintAgent": "Bawaan {{agent}} sendiri",
   "shell.options.modelOpus": "Opus",
   "shell.options.modelOpusHint": "Opus terbaru",
   "shell.options.modelSonnet": "Sonnet",

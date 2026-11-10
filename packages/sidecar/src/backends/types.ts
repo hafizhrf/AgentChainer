@@ -58,3 +58,17 @@ export interface LiveSession extends StepSession {
   /** Stops the turn running now; false when there's none. */
   interrupt(): Promise<boolean>;
 }
+
+/**
+ * A chat tab's session, whatever agent runs it (M9-09): the person sends messages and switches the model, the
+ * permission profile and the effort as they go. Claude's `Session` has more (rewind, subagents, Team), which only it
+ * offers.
+ */
+export interface ChatSession extends LiveSession {
+  readonly agent: import("@agentchainer/protocol").StepAgent;
+  /** Sends a message, or adds it to the turn that's running; returns its id. */
+  send(text: string, images?: { mediaType: string; data: string }[]): string;
+  setMode(mode: import("@agentchainer/protocol").PermissionMode): Promise<void>;
+  setModel(model: string): Promise<void>;
+  setEffort(effort: import("@agentchainer/protocol").Effort | null): Promise<void>;
+}

@@ -55,6 +55,8 @@ export function rememberModels(models: ModelOption[]): void {
 export function modelChoices(
   models: ModelOption[] = knownModels(),
   current = "",
+  /** Whose default "" means; another agent's isn't from the Claude settings (M9-09). */
+  agent = "Claude",
 ): { value: string; label: string; hint?: string }[] {
   const opts = models.map((m) => ({
     value: m.value === "default" ? "" : m.value,
@@ -62,7 +64,12 @@ export function modelChoices(
     ...(m.description ? { hint: m.description } : {}),
   }));
   if (!opts.some((o) => o.value === ""))
-    opts.unshift({ value: "", label: t("shell.options.modelDefault"), hint: t("shell.options.modelDefaultHint") });
+    opts.unshift({
+      value: "",
+      label: t("shell.options.modelDefault"),
+      hint:
+        agent === "Claude" ? t("shell.options.modelDefaultHint") : t("shell.options.modelDefaultHintAgent", { agent }),
+    });
   if (current && !opts.some((o) => o.value === current)) opts.push({ value: current, label: current });
   return opts;
 }

@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto";
 import { homedir } from "node:os";
 import path from "node:path";
 import { createInterface } from "node:readline";
-import type { AgentEvent, CostKind, FleetItem, PermissionMode, TaskTag } from "@agentchainer/protocol";
+import type { AgentEvent, CostKind, Effort, FleetItem, PermissionMode, TaskTag } from "@agentchainer/protocol";
 import type { Cli } from "../deploy/cli.ts";
 import { checkBash, checkToolCall, GUARD_PREFIX } from "../guard.ts";
 import { t } from "../i18n/index.ts";
@@ -20,7 +20,7 @@ import {
   usageOf,
 } from "./codex-events.ts";
 import { estimateUsd } from "./prices.ts";
-import type { LiveSession, StepBackend, StepOptions } from "./types.ts";
+import type { ChatSession, LiveSession, StepBackend, StepOptions } from "./types.ts";
 
 /**
  * Task steps on the user's own Codex CLI (M9-04, ADR-0012, spike S8), through `codex app-server`: JSON-RPC over stdio,
@@ -56,6 +56,32 @@ export function codexBackend(host: CodexHost): StepBackend {
   };
 }
 
+/**
+ * A chat on Codex (M9-09): the same session as a step's, opened as a chat. Its opening events wait for `release()`,
+ * once the UI has the tab.
+ */
+export async function openCodexChat(
+  host: CodexHost,
+  options: StepOptions,
+  callbacks: SessionCallbacks,
+): Promise<ChatSession & { release(): void }> {
+  const session = new CodexSession(
+    host,
+    options,
+    {
+      ...callbacks,
+      onEnd: () => {
+        host.unregister(session.id);
+        callbacks.onEnd();
+      },
+    },
+    true,
+  );
+  await session.open();
+  host.register(session);
+  return session;
+}
+
 /** Model names that are Claude's, which a Codex step can't use: it takes Codex's default instead. */
 const CLAUDE_MODEL = /^(inherit|default|opus|sonnet|haiku|fable)$|^claude-/i;
 
@@ -82,7 +108,8 @@ const minus = (a: CodexUsage, b: CodexUsage): CodexUsage => ({
   reasoningOutputTokens: Math.max(0, a.reasoningOutputTokens - b.reasoningOutputTokens),
 });
 
-class CodexSession implements LiveSession {
+class CodexSession implements ChatSession {
+  readonly agent = "codex" as const;
   id = "";
   tag: TaskTag | undefined;
   parentId: string | undefined;
@@ -110,6 +137,17 @@ class CodexSession implements LiveSession {
   /** The turn was stopped for passing the step's budget. */
   private overBudget = false;
   model = "";
+  /** The models this login can use, from `model/list`: a chat's model picker (M9-09). */
+  private models: { id: string; name: string; isDefault: boolean; efforts: string[] }[] = [];
+  /** A chat's choices for its next turns: `turn/start` takes them per turn. */
+  private nextModel: string | null = null;
+  private nextEffort: Effort | null = null;
+  /** A chat tab's session (M9-09), not a task's step. */
+  readonly chat: boolean;
+  /** A chat's events until its tab exists; null once released. */
+  private held: AgentEvent[] | null = null;
+  /** Messages sent while a turn was starting, before its id was known: steered in once it is. */
+  private queued: string[] = [];
   private turns = 0;
   private status: FleetItem["status"] = "idle";
   private readonly startedAt = new Date().toISOString();
@@ -118,13 +156,16 @@ class CodexSession implements LiveSession {
   private closing: Promise<void> | null = null;
 
   private readonly host: CodexHost;
-  private readonly options: StepOptions;
+  /** Mutable: a chat changes its permission profile as it goes. */
+  private options: StepOptions;
   private readonly callbacks: SessionCallbacks;
 
-  constructor(host: CodexHost, options: StepOptions, callbacks: SessionCallbacks) {
+  constructor(host: CodexHost, options: StepOptions, callbacks: SessionCallbacks, chat = false) {
     this.host = host;
     this.options = options;
     this.callbacks = callbacks;
+    this.chat = chat;
+    if (chat) this.held = [];
     this.child = spawn(host.cli.bin, [...host.cli.prefix, "app-server"], {
       cwd: options.cwd,
       stdio: ["pipe", "pipe", "pipe"],
@@ -139,8 +180,20 @@ class CodexSession implements LiveSession {
     });
   }
 
-  /** Starts the app-server, then a thread (or resumes one): the thread's id is the session's. */
+  /**
+   * Starts the app-server, then a thread (or resumes one): the thread's id is the session's. If that fails, the
+   * app-server is stopped, so it doesn't stay on as the thread's writer.
+   */
   async open(): Promise<void> {
+    try {
+      await this.start();
+    } catch (err) {
+      void this.close();
+      throw err;
+    }
+  }
+
+  private async start(): Promise<void> {
     await this.request("initialize", {
       clientInfo: { name: "agentchainer", title: "AgentChainer", version: "0" },
       capabilities: null,
@@ -170,6 +223,50 @@ class CodexSession implements LiveSession {
       claudeCodeVersion: this.host.version,
       permissionMode: this.options.permissionMode ?? "default",
     });
+    // A chat's model picker lists Codex's own models (M9-09).
+    if (this.chat && this.models.length) {
+      this.emit({
+        type: "models.changed",
+        models: this.models.map((m) => ({
+          value: m.id,
+          displayName: m.name,
+          description: m.isDefault ? t("tasks.codex.defaultModel") : "",
+          ...(m.efforts.length ? { efforts: m.efforts } : {}),
+        })),
+      });
+    }
+  }
+
+  /**
+   * A chat message (M9-09): a new turn, or added to the turn that's running (`turn/steer`). Codex keeps the thread,
+   * so each turn continues it. Images aren't sent to Codex yet.
+   */
+  send(text: string): string {
+    const id = randomUUID();
+    if (this.waiter) {
+      if (this.turnId) this.inject(text);
+      else this.queued.push(text);
+      return id;
+    }
+    void this.turn(text).catch((err: unknown) =>
+      this.emit({ type: "error", message: err instanceof Error ? err.message : String(err) }),
+    );
+    return id;
+  }
+
+  /** Plan mode isn't Codex's: it can't be asked to only plan. The others decide what's accepted without asking. */
+  async setMode(mode: PermissionMode): Promise<void> {
+    if (mode === "plan") throw new Error(t("rpc.session.codexNoPlan"));
+    this.options = { ...this.options, permissionMode: mode };
+  }
+
+  /** From the next turn; "" is Codex's own default. */
+  async setModel(model: string): Promise<void> {
+    this.nextModel = model && model !== "default" ? model : null;
+  }
+
+  async setEffort(effort: Effort | null): Promise<void> {
+    this.nextEffort = effort;
   }
 
   /**
@@ -178,10 +275,20 @@ class CodexSession implements LiveSession {
    */
   private async pickModel(): Promise<string | undefined> {
     const asked = this.options.model;
-    if (asked && !CLAUDE_MODEL.test(asked)) return asked;
     const r = await this.request("model/list", { limit: 50 });
-    const list = (r.result as { data?: { id?: string; isDefault?: boolean }[] } | undefined)?.data ?? [];
-    return (list.find((m) => m.isDefault) ?? list[0])?.id;
+    const list =
+      (r.result as { data?: { id?: string; name?: string; isDefault?: boolean; efforts?: unknown }[] } | undefined)
+        ?.data ?? [];
+    this.models = list
+      .filter((m): m is typeof m & { id: string } => typeof m.id === "string")
+      .map((m) => ({
+        id: m.id,
+        name: typeof m.name === "string" && m.name ? m.name : m.id,
+        isDefault: m.isDefault === true,
+        efforts: Array.isArray(m.efforts) ? m.efforts.filter((e): e is string => typeof e === "string") : [],
+      }));
+    if (asked && !CLAUDE_MODEL.test(asked)) return asked;
+    return (this.models.find((m) => m.isDefault) ?? this.models[0])?.id;
   }
 
   turn(prompt: string): Promise<TurnResult> {
@@ -192,10 +299,14 @@ class CodexSession implements LiveSession {
       this.waiter = { resolve, reject };
     });
     this.touch("working");
+    // A chat's model choice applies from this turn on; the turn's cost is priced at it.
+    if (this.nextModel) this.model = this.nextModel;
     void this.request("turn/start", {
       threadId: this.id,
       input: [{ type: "text", text: prompt, text_elements: [] }],
       ...(this.options.outputFormat ? { outputSchema: this.options.outputFormat.schema } : {}),
+      ...(this.nextModel ? { model: this.nextModel } : {}),
+      ...(this.nextEffort ? { effort: this.nextEffort } : {}),
     }).then((r) => {
       if (r.error) this.finishTurn("failed", r.error.message ?? "turn/start failed");
     });
@@ -278,7 +389,18 @@ class CodexSession implements LiveSession {
   }
 
   private emit(event: AgentEvent) {
-    this.callbacks.emit(event);
+    if (this.held) this.held.push(event);
+    else this.callbacks.emit(event);
+  }
+
+  /**
+   * A chat's events from opening (its start, its models) wait until the UI has its tab: `session.start` answers
+   * first, then this sends them.
+   */
+  release(): void {
+    const held = this.held ?? [];
+    this.held = null;
+    for (const e of held) this.callbacks.emit(e);
   }
 
   private touch(status: FleetItem["status"]) {
@@ -309,6 +431,8 @@ class CodexSession implements LiveSession {
     switch (method) {
       case "turn/started":
         this.turnId = String((params.turn as { id?: string } | undefined)?.id ?? "") || null;
+        // A chat's messages sent while the turn was starting join it now.
+        for (const text of this.queued.splice(0)) this.inject(text);
         return;
       case "item/started":
         if (item) {

@@ -295,6 +295,8 @@ export const SessionInfoSchema = z.object({
   createdAt: z.number().optional(),
   gitBranch: z.string().optional(),
   tag: z.string().optional(),
+  /** Which agent's history it's in (M9-09); absent is Claude's. */
+  agent: z.enum(["claude", "codex", "agy"]).optional(),
 });
 export type SessionInfo = z.infer<typeof SessionInfoSchema>;
 
@@ -1692,6 +1694,8 @@ export const methodSchemas = {
        * are available; `model` overrides its model.
        */
       profile: AgentNameSchema.optional(),
+      /** The agent the chat runs on (M9-09): Claude unless set. Profiles and Team are Claude's. */
+      agent: StepAgentSchema.optional(),
     }),
     /**
      * `attached`: the session was still running, e.g. after the window reloaded, and was handed back as it is
@@ -1852,7 +1856,7 @@ export const methodSchemas = {
    * happened (epoch ms), `null` when unknown.
    */
   "session.history": {
-    params: StoredSessionRef,
+    params: StoredSessionRef.extend({ agent: StepAgentSchema.optional() }),
     result: z.object({ events: z.array(AgentEventSchema), times: z.array(z.number().nullable()).optional() }),
   },
   "session.rename": { params: StoredSessionRef.extend({ title: z.string().trim().min(1).max(200) }), result: Ok },

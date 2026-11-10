@@ -6,6 +6,7 @@ import type {
   PermissionMode,
   PermissionRequest,
   SlashCommand,
+  StepAgent,
 } from "@agentchainer/protocol";
 import { PERMISSION_MODES } from "@agentchainer/protocol";
 import { percent, usd } from "./i18n/format.ts";
@@ -19,6 +20,8 @@ import { applyEvent, type Item } from "./transcript.ts";
 export type Tab = {
   sessionId: string;
   cwd: string;
+  /** The agent the chat runs on (M9-09); absent is Claude. */
+  agent?: StepAgent;
   /** A multi-folder workspace's other folders the session also reaches (M8-01). */
   folders?: string[];
   title: string;
@@ -108,11 +111,13 @@ export function newTab(
     profile?: string;
     /** A Team chat's cap (M8-03). */
     teamCapUsd?: number;
+    agent?: StepAgent;
   },
 ): Tab {
   return {
     sessionId,
     cwd,
+    ...(options.agent && options.agent !== "claude" ? { agent: options.agent } : {}),
     ...(options.folders?.length ? { folders: options.folders } : {}),
     ...(options.parentId ? { parentId: options.parentId } : {}),
     ...(options.access ? { access: options.access } : {}),

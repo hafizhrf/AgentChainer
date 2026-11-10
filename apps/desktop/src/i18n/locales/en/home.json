@@ -133,5 +133,8 @@
   "home.newSession.browse": "Browse…",
   "home.newSession.typePath": "Type a path…",
   "home.newSession.workspaceHint": "Workspace · {{count}} folders",
-  "home.newSession.chooseFolder": "Choose a folder…"
+  "home.newSession.chooseFolder": "Choose a folder…",
+  "home.newSession.agent": "Agent",
+  "home.newSession.codexHelp": "Your own Codex CLI, signed in by you. Its edits and commands go through the guard and your approvals, like Claude's. No plan mode, and no rewind.",
+  "home.newSession.codexModel": "Codex's default (pick another in the chat)"
 }

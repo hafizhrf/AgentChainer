@@ -28,7 +28,26 @@ export function toSessionInfo(s: SDKSessionInfo): SessionInfo {
  * Text the CLI stores as a user message but that the user didn't type: slash-command wrappers, command output and
  * reminders, e.g. `<command-name>/clear</command-name>`.
  */
-const META_TEXT = /^\s*<([a-z][a-z-]*)>[\s\S]*<\/\1>\s*$/;
+const META_TEXT = /^\s*(?:<([a-z][a-z-]*)>[\s\S]*?<\/\1>\s*)+$/;
+
+/**
+ * A slash command the person typed, as the CLI stores it (M1-37): `<command-name>/compact</command-name>`,
+ * `<command-message>…</command-message>`, `<command-args>…</command-args>`. Replayed as what was typed, `/compact` and
+ * its arguments, rather than hidden or shown as tags. Null for any other text.
+ */
+export function typedCommand(text: string): string | null {
+  if (!META_TEXT.test(text)) return null;
+  const name = /<command-name>\s*([^<]*?)\s*<\/command-name>/.exec(text)?.[1];
+  if (!name) return null;
+  const args = /<command-args>\s*([\s\S]*?)\s*<\/command-args>/.exec(text)?.[1] ?? "";
+  const command = name.startsWith("/") ? name : `/${name}`;
+  return args ? `${command} ${args}` : command;
+}
+
+/** A stored user text as the person typed it: a slash command as itself, the CLI's other wrappers not at all. */
+function typedText(text: string): string | null {
+  return typedCommand(text) ?? (META_TEXT.test(text) ? null : text);
+}
 
 type Block = { type?: unknown; text?: unknown; id?: unknown; name?: unknown; input?: unknown } & Record<
   string,
@@ -61,14 +80,16 @@ function messageEvents(m: SessionMessage, agent: string | null): AgentEvent[] {
   if (blocks === null) return events;
   if (m.type === "user") {
     if (typeof blocks === "string") {
-      if (agent === null && !META_TEXT.test(blocks)) {
-        events.push({ type: "user.message", messageId: m.uuid, text: blocks });
+      const typed = typedText(blocks);
+      if (agent === null && typed !== null) {
+        events.push({ type: "user.message", messageId: m.uuid, text: typed });
       }
       return events;
     }
     const text = blocks
-      .filter((b) => b.type === "text" && typeof b.text === "string" && !META_TEXT.test(b.text))
-      .map((b) => b.text as string)
+      .filter((b) => b.type === "text" && typeof b.text === "string")
+      .map((b) => typedText(b.text as string))
+      .filter((s): s is string => s !== null)
       .join("\n");
     const imageCount = blocks.filter((b) => b.type === "image").length;
     if (agent === null && (text.trim() || imageCount)) {

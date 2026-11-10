@@ -474,7 +474,7 @@
       - Everything is redacted first: the home folder becomes `~`, and API keys, tokens, bearer headers, passwords
         and emails are masked (`diagnostics.rs` tests).
       - Remaining: export from the app.
-- [ ] **M1-36** Bug: "Error: This session is already open in another tab." Owner report, 2026-11-10.
+- [x] **M1-36** Bug: "Error: This session is already open in another tab." Owner report, 2026-11-10.
   - **Where:** `session.start` refuses a `resume` id the sidecar still holds (`packages/sidecar/src/main.ts`), and
     `resume()` in `App.tsx` neither looks for an open tab first nor ignores a second click.
   - **Likely causes:**
@@ -485,6 +485,14 @@
     - The UI focuses an open tab, and ignores a resume already in flight.
     - The sidecar re-attaches a live plain chat instead of failing, and names the task when a step holds it.
     - After a reload, the UI re-attaches the live chats it lost.
+  Note: done.
+  - `live-resume.ts` decides between attach and refuse (3 tests); `orphanChats` in `tabs.ts` (1 test).
+  - Checked in the app over CDP (Windows), on haiku, ≈$0.01:
+    - a chat in a scratch folder, then a WebView reload: its tab came back on its own ("Resumed …"), with no error;
+    - a message in the re-attached chat was answered;
+    - Home → **Show** clicked twice on the open chat: no error.
+
+    The settings were restored and the scratch session deleted afterwards.
 
 ### Exit criteria
 

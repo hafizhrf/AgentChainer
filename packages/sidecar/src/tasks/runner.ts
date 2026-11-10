@@ -335,6 +335,7 @@ export function sessionRunner(
       session.tag = { ...tag, cwd: root };
       return turn(step, session, prompt, true);
     },
+    agentOf: (step) => agentFor(step, run.agents),
     async gates(kinds, round) {
       // Each folder runs its own commands (M8-01); a gate counts as run when any folder has it.
       const folders = [{ name: undefined, dir: root }, ...others];

@@ -75,6 +75,8 @@ Team supervisors and the app's own model calls.
      so.
    - Codex reports tokens during a turn, so its turn stops once the estimate passes the step's cap. agy reports them
      only at the end of a turn, so its spend is checked between steps.
+   - A step names its model, so it can be priced: Codex's default is `model/list`'s, and agy's is the first model
+     `agy models` lists, since agy doesn't report its own default.
 5. **Any role on any agent the user has** (owner, 2026-11-10: "gak selalu gitu, bisa diadjust… jadi fleksibel"). No
    pairing is built in.
    - **Examples:**

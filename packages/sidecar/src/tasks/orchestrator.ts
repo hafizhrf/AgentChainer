@@ -65,6 +65,8 @@ export type Runner = {
   stop(): void;
   /** The person's message to the step that's running (UX-13); false when no step's turn runs. */
   message?(text: string): boolean;
+  /** The agent a step runs on (M9-07), so its timeline entry names it while it runs; absent means Claude's. */
+  agentOf?(step: AgentStep): StepAgent;
   /** The run ended: close what's still open. Resolves once the sessions' processes have exited. */
   close(): Promise<void>;
 };
@@ -408,6 +410,12 @@ export class Orchestrator {
     );
   }
 
+  /** A step's agent for its timeline entry, known before it starts (M9-07). */
+  private agentField(step: AgentStep): { agent?: StepAgent } {
+    const agent = this.runner.agentOf?.(step);
+    return agent ? { agent } : {};
+  }
+
   private tag(stepId: string, label: string, role?: string): StepTag {
     const title = (this.task.title ?? this.task.request).slice(0, 80);
     return {
@@ -495,6 +503,7 @@ export class Orchestrator {
       role: step.role,
       ...(group ? { group } : {}),
       ...(groupRef ? { groupRef } : {}),
+      ...this.agentField(step),
     });
     const tag = this.tag(id, step.label, step.role);
     const out = previous
@@ -597,7 +606,14 @@ export class Orchestrator {
       if (!budget) return this.end("failed", result("run.outcome.budgetBeforeCiFix"));
       const label = result("run.label.fixCi", { check: ci.check });
       const step: AgentStep = { ...write, id: "ci-fix", label: label.text };
-      const id = this.begin({ step: step.id, label: step.label, labelRef: label.ref, kind: "agent", role: step.role });
+      const id = this.begin({
+        step: step.id,
+        label: step.label,
+        labelRef: label.ref,
+        kind: "agent",
+        role: step.role,
+        ...this.agentField(step),
+      });
       const diff = this.runner.diff();
       const prompt = [
         "CI failed on this task's pull request. Find the cause in the log below and fix it in the code, not in the checks, the CI workflow or the tests' expectations. Then summarize what you changed.",
@@ -753,7 +769,14 @@ export class Orchestrator {
       return false;
     }
     const label = result("run.label.fix", { what });
-    const id = this.begin({ step: target.id, label: label.text, labelRef: label.ref, kind: "fix", role: target.role });
+    const id = this.begin({
+      step: target.id,
+      label: label.text,
+      labelRef: label.ref,
+      kind: "fix",
+      role: target.role,
+      ...this.agentField(target),
+    });
     const out = await this.runner.followUp(target, sessionId, prompt, budget, this.tag(id, label.text, target.role));
     if (this.cancelled || !out.ok) {
       const why = stopped(out.subtype);

@@ -6,6 +6,7 @@ import { after, describe, it } from "node:test";
 import type { AgentEvent } from "@agentchainer/protocol";
 import { GUARD_PREFIX } from "../guard.ts";
 import { agyBackend, runSettings, turnArgs } from "./agy.ts";
+import { firstModel } from "./find.ts";
 import { estimateUsd } from "./prices.ts";
 import type { LiveSession } from "./types.ts";
 
@@ -18,7 +19,7 @@ appendFileSync(process.env.FAKE_ARGS, JSON.stringify(args) + "\n");
 const at = args.indexOf("--conversation");
 const conv = at >= 0 ? args[at + 1] : "conv-1";
 const out = (o) => process.stdout.write(JSON.stringify(o) + "\n");
-out({ event: "init", conversation_id: conv, init: { model: process.env.FAKE_MODEL || "gemini-fake", permission_mode: "request-review" } });
+out({ event: "init", conversation_id: conv, init: { ...(args.includes("--model") ? { model: args[args.indexOf("--model") + 1] } : {}), permission_mode: "request-review" } });
 const p = { Path: process.env.FAKE_WRITE };
 out({ event: "step_update", step_update: { conversation_id: conv, step_index: 1, state: "ACTIVE", step_type: "tool", tool_info: { name: "write_file", parameters: p } } });
 out({ event: "step_update", step_update: { conversation_id: conv, step_index: 1, state: "DONE", step_type: "tool", tool_info: { name: "write_file", parameters: p } } });
@@ -31,7 +32,7 @@ after(() => rmSync(dir, { recursive: true, force: true }));
 const script = path.join(dir, "fake-agy.mjs");
 writeFileSync(script, FAKE);
 
-async function run(write: string, opts: { readOnly?: boolean; turns?: number } = {}) {
+async function run(write: string, opts: { readOnly?: boolean; turns?: number; defaultModel?: string } = {}) {
   const argsFile = path.join(dir, `args-${Math.random().toString(36).slice(2)}.jsonl`);
   writeFileSync(argsFile, "");
   process.env.FAKE_ARGS = argsFile;
@@ -42,6 +43,7 @@ async function run(write: string, opts: { readOnly?: boolean; turns?: number } =
   const open = agyBackend({
     cli: { bin: process.execPath, prefix: [script] },
     version: "agy fake",
+    ...(opts.defaultModel ? { defaultModel: async () => opts.defaultModel ?? null } : {}),
     register: (s) => registered.set(s.id, s),
     unregister: (id) => registered.delete(id),
   });
@@ -67,10 +69,14 @@ async function run(write: string, opts: { readOnly?: boolean; turns?: number } =
 }
 
 describe("the Antigravity CLI step backend (M9-05)", () => {
-  it("estimates each turn's cost from its tokens at the model's price (M9-07)", async () => {
-    process.env.FAKE_MODEL = "gemini-3.8-flash-low";
-    try {
-      const { results, session } = await run(path.join(dir, "priced.txt"), { turns: 2 });
+  it("runs the model agy lists first when a step names none, and estimates its cost (M9-07)", async () => {
+    {
+      const { results, session, argv } = await run(path.join(dir, "priced.txt"), {
+        turns: 2,
+        defaultModel: "gemini-3.8-flash-low",
+      });
+      // The step asked for "haiku", a Claude alias: agy gets its first listed model instead, said on every turn.
+      for (const a of argv) assert.equal(a[a.indexOf("--model") + 1], "gemini-3.8-flash-low");
       const each = estimateUsd("gemini-3.8-flash-low", { input: 100, cached: 40, output: 10 }) ?? 0;
       assert.ok(each > 0);
       for (const r of results) {
@@ -78,9 +84,18 @@ describe("the Antigravity CLI step backend (M9-05)", () => {
         assert.ok(Math.abs(r.costUsd - each) < 1e-12);
       }
       assert.ok(Math.abs(session.fleetItem.costUsd - 2 * each) < 1e-12);
-    } finally {
-      delete process.env.FAKE_MODEL;
     }
+  });
+
+  it("reads the first model id from `agy models`", () => {
+    const out = [
+      "Fetching available models...",
+      "gemini-3.8-flash-high\tGemini 3.8 Flash (High)",
+      "claude-sonnet-4-6\tClaude Sonnet 4.6",
+      "",
+    ].join("\n");
+    assert.equal(firstModel(out), "gemini-3.8-flash-high");
+    assert.equal(firstModel("Fetching available models...\n"), null);
   });
 
   it("edits files with no commands, through per-run settings, and goes by agy's conversation id", async () => {
@@ -96,12 +111,12 @@ describe("the Antigravity CLI step backend (M9-05)", () => {
     );
     assert.equal(session.id, "conv-1");
     assert.deepEqual(ids, ["conv-1"], "registered again under the conversation's id");
-    // A model with no price: tokens, and a cost that's unknown (M9-07).
+    // No model named, and none listed to fall back on: tokens, and a cost that is unknown (M9-07).
     assert.deepEqual(
       results.map((r) => [r.model, r.costKind, r.tokens?.input, r.tokens?.output]),
       [
-        ["gemini-fake", "unknown", 100, 10],
-        ["gemini-fake", "unknown", 100, 10],
+        [undefined, "unknown", 100, 10],
+        [undefined, "unknown", 100, 10],
       ],
     );
     assert.equal(session.fleetItem.agent, "agy");

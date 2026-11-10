@@ -18,6 +18,7 @@ import { memo, useEffect, useMemo, useRef } from "react";
 import { DotGrid } from "../graph/DotGrid.tsx";
 import { usd } from "../i18n/format.ts";
 import { t } from "../i18n/index.ts";
+import { agentLabel, costText } from "../tasks/stepAgent.ts";
 import type { NodeState, NodeStatus } from "./flowStatus.ts";
 import type { WorkflowEdge, WorkflowNode } from "./workflowGraph.ts";
 
@@ -86,7 +87,9 @@ function StatusMark({ state }: { state: NodeState }) {
       <Icon size={12} className={state.status === "running" ? "spin" : undefined} aria-hidden />
       {STATUS_TEXT[state.status]}
       {state.turns > 1 ? ` · ${t("workflows.canvas.turns", { count: state.turns })}` : ""}
-      {state.costUsd > 0 ? ` · ${usd(state.costUsd, 3)}` : ""}
+      {state.costUsd > 0 || state.costKind === "unknown"
+        ? ` · ${costText(usd(state.costUsd, 3), state.costKind, undefined).text}`
+        : ""}
     </span>
   );
 }
@@ -111,9 +114,18 @@ const StepView = memo(function StepView({ data }: NodeProps<FlowNode>) {
       <Handle id="fix-in" type="target" position={Position.Right} style={{ top: "35%" }} isConnectable={false} />
       {state ? <StatusMark state={state} /> : <span className="workflow-step-kind">{KIND_TEXT[node.kind]}</span>}
       <strong className="truncate">{node.label}</strong>
-      <span className="muted clamp-2" title={node.detail}>
+      {/* With its agent's chip below, the detail gets one line so the node keeps its size. */}
+      <span className={`muted ${state?.agent || state?.model ? "clamp-1" : "clamp-2"}`} title={node.detail}>
         {node.detail}
       </span>
+      {(state?.agent || state?.model) && (
+        <span
+          className={`chip step-agent${state.agent && state.agent !== "claude" ? " other" : ""}`}
+          title={t("tasks.run.ranBy", { agent: agentLabel(state.agent, state.model) })}
+        >
+          {agentLabel(state.agent, state.model)}
+        </span>
+      )}
       <Handle type="source" position={Position.Bottom} isConnectable={false} />
       <Handle id="fix-out" type="source" position={Position.Right} style={{ top: "65%" }} isConnectable={false} />
     </div>

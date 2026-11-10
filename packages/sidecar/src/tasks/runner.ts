@@ -12,6 +12,7 @@ import {
   type Task,
   type TaskTag,
 } from "@agentchainer/protocol";
+import { type AgyHost, agyBackend } from "../backends/agy.ts";
 import { type ClaudeHost, claudeBackend } from "../backends/claude.ts";
 import { type CodexHost, codexBackend } from "../backends/codex.ts";
 import type { StepAgent, StepBackend, StepOptions, StepSession } from "../backends/types.ts";
@@ -31,6 +32,8 @@ import { type AgentOutcome, REVIEW_JSON_SCHEMA, type Runner } from "./orchestrat
 export type SessionHost = ClaudeHost & {
   /** The user's own Codex CLI, when it's installed (M9-04): steps that name `agent: codex` run on it. */
   codex?: () => CodexHost | null;
+  /** The user's own Antigravity CLI, when it's installed (M9-05): steps that name `agent: agy` run on it. */
+  agy?: () => AgyHost | null;
   event(sessionId: string, event: AgentEvent, task: TaskTag): void;
   permission(sessionId: string, request: Omit<PermissionRequest, "sessionId" | "task">, task: TaskTag): void;
   /** A step's session changed its fleet status (M8-02). */
@@ -171,7 +174,7 @@ export function sessionRunner(
   const live = new Map<string, StepSession>();
   /** Every session still open, to stop or close them. */
   const open = new Set<StepSession>();
-  /** The agents steps run on (ADR-0012): Claude, and the user's own Codex when a step names it (M9-04). */
+  /** The agents steps run on (ADR-0012): Claude, and the user's own Codex or Antigravity CLI when a step names it. */
   const backends: Partial<Record<StepAgent, StepBackend>> = { claude: claudeBackend(host) };
   const backendFor = (step: AgentStep): StepBackend => {
     const agent = step.agent ?? "claude";
@@ -180,12 +183,18 @@ export function sessionRunner(
       if (!codex) throw new Error(t("tasks.runner.codexMissing"));
       backends.codex = codexBackend(codex);
     }
+    if (agent === "agy" && !backends.agy) {
+      const agy = host.agy?.();
+      if (!agy) throw new Error(t("tasks.runner.agyMissing"));
+      backends.agy = agyBackend(agy);
+    }
     const backend = backends[agent];
     if (!backend) throw new Error(t("tasks.runner.agentNotYet", { agent }));
     return backend;
   };
   /** The tag each session's events carry now: it follows the timeline entry (a step, then its fixes). */
-  const tags = new Map<string, TaskTag>();
+  /** By session, not id: an agy step only learns its conversation's id once its first turn starts (M9-05). */
+  const tags = new Map<StepSession, TaskTag>();
   let gatesAbort: AbortController | null = null;
   /** Sessions in a turn now, newest last, with whether each is a write step's: where the person's message goes. */
   const inTurn: { session: StepSession; write: boolean }[] = [];
@@ -217,7 +226,7 @@ export function sessionRunner(
     const idOf = () => opened?.id ?? "";
     const session: StepSession = await backendFor(step)(options, {
       emit: (event) => {
-        const tag = tags.get(idOf());
+        const tag = opened ? tags.get(opened) : undefined;
         if (event.type === "tool.started")
           started.set(event.toolUseId, { tool: event.name, input: (event.input ?? {}) as Record<string, unknown> });
         if (event.type === "tool.completed") {
@@ -241,7 +250,7 @@ export function sessionRunner(
         if (tag) host.event(idOf(), event, tag);
       },
       answered: (request, answer) => {
-        const tag = tags.get(idOf());
+        const tag = opened ? tags.get(opened) : undefined;
         if (!tag) return;
         const described = describeRequest(request.toolName, request.input, root);
         recorder.approval({
@@ -257,7 +266,7 @@ export function sessionRunner(
         });
       },
       askPermission: (request) => {
-        const tag = tags.get(idOf());
+        const tag = opened ? tags.get(opened) : undefined;
         if (tag) host.permission(idOf(), request, tag);
       },
       statusChanged: (item) => host.status?.(item),
@@ -295,7 +304,7 @@ export function sessionRunner(
   return {
     async start(step, prompt, budgetUsd, tag) {
       const session = await openSession(step, budgetUsd);
-      tags.set(session.id, { ...tag, cwd: root });
+      tags.set(session, { ...tag, cwd: root });
       session.tag = { ...tag, cwd: root };
       if (step.access === "write") live.set(step.id, session);
       const out = await turn(session, prompt, step.access === "write");
@@ -309,7 +318,7 @@ export function sessionRunner(
         session = await openSession(step, budgetUsd, sessionId);
         live.set(step.id, session);
       }
-      tags.set(session.id, { ...tag, cwd: root });
+      tags.set(session, { ...tag, cwd: root });
       session.tag = { ...tag, cwd: root };
       return turn(session, prompt, true);
     },

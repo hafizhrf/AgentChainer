@@ -2084,7 +2084,7 @@ with the OpenAI Codex CLI and Google's Antigravity CLI (`agy`), in both directio
       spend isn't counted against the task's dollar budget. **Owner's call:** keep it so, or price tokens for API-key
       users.
     - **Drift:** pin the app-server methods it uses in `cli-contract.ts`, and have the weekly drift job check them.
-- [ ] **M9-05** The agy backend (S8):
+- [x] **M9-05** The agy backend (S8):
   - **Process:** `agy -p --output-format stream-json` in the task's worktree.
   - **Settings:** through `--settings` only.
   - **Write steps:** `--mode accept-edits --sandbox`, `toolPermission: request-review`. It edits files and runs no
@@ -2094,6 +2094,26 @@ with the OpenAI Codex CLI and Google's Antigravity CLI (`agy`), in both directio
     into the evidence.
   - **Fix rounds:** `--conversation <id>`.
   - **Readiness:** `agy models`.
+  Note: done (2026-11-10).
+  - **Code:**
+    - `backends/agy.ts`: one `agy -p` per turn. A write step uses `--mode accept-edits`, a read step denies every
+      write. Every step gets `--sandbox` and per-run `--settings` (`toolPermission: request-review`, the guard's
+      credential folders denied to agy's file tools).
+    - The first prompt carries the role's prompt and the rule that commands are refused.
+    - Fix rounds use `--conversation <id>`; the session goes by agy's conversation id once it's known.
+    - After each turn, every path it wrote is checked against the guard and the workspace; a breach fails the turn
+      and is recorded as a guard block.
+    - `backends/agy-events.ts` maps its stream (tools as `Write`/`Edit`/`Read`/`Bash`…).
+    - `backends/find.ts` finds it (`AGENTCHAINER_AGY_PATH`, PATH, or `%LOCALAPPDATA%gyingy.exe`).
+    - The runner tags sessions by object, since an agy session's id changes once.
+  - **Tests:** `agy-events.test.ts` (4); `agy.test.ts` (3), with a scripted `agy` (the per-run settings, resume, the
+    conversation id, a guard breach failing the turn, a read step's deny).
+  - **Live (agy 1.5.4, the owner's login; Claude haiku elsewhere):**
+    - tier S with `agent: agy` on its implement step: agy fixed `src/cart.js` and every gate passed (63 s);
+    - tier M with Claude planning and implementing and **agy reviewing**: its structured verdict ("approve") was read
+      and the task passed (77 s, ≈$0.014 for Claude's steps).
+  - The readiness row (`agy models`) comes with M9-06's rows for every CLI.
+
 - [ ] **M9-06** Choosing agents, flexibly (ADR-0012 §5):
   - **Schema:** `agent: claude | codex | agy` (default `claude`) and an optional `model` per agent step.
   - **Per task:** an agent per role on the triage card, before approval.

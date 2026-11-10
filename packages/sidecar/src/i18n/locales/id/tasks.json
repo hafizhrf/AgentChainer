@@ -110,5 +110,9 @@
   "tasks.codex.noThread": "Codex tidak memulai thread: {{error}}",
   "tasks.codex.ended": "Session Codex sudah berakhir.",
   "tasks.codex.exited": "App-server Codex berhenti.",
-  "tasks.codex.exitedMidTurn": "App-server Codex berhenti di tengah giliran."
+  "tasks.codex.exitedMidTurn": "App-server Codex berhenti di tengah giliran.",
+  "tasks.agy.ended": "Session Antigravity CLI sudah berakhir.",
+  "tasks.agy.outsideWorkspace": "agy menulis di luar workspace: {{path}}",
+  "tasks.agy.turnFailed": "Giliran Antigravity CLI gagal (exit {{code}}).",
+  "tasks.runner.agyMissing": "Langkah ini berjalan di Antigravity CLI, tetapi `agy` tidak ditemukan. Pasang CLI itu, atau jalankan langkahnya di Claude."
 }

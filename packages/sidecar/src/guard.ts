@@ -11,7 +11,8 @@ import type { HookCallback } from "@anthropic-ai/claude-agent-sdk";
  * a determined command can be written in ways these patterns don't catch.
  */
 
-const SECRET_DIRS = [
+/** Credential folders and files under the home folder that no agent may touch. */
+export const SECRET_DIRS = [
   ".ssh",
   ".aws",
   ".gnupg",

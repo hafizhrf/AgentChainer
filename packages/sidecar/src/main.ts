@@ -6,14 +6,14 @@ import type { SDKMessage } from "@anthropic-ai/claude-agent-sdk";
 import pkg from "../package.json" with { type: "json" };
 import { agentTemplates } from "./agent-templates.ts";
 import { deleteAgent, listAgents, saveAgent } from "./agents.ts";
-import { codexHost } from "./backends/find.ts";
+import { agyHost, codexHost } from "./backends/find.ts";
 import type { LiveSession } from "./backends/types.ts";
 import { applyActions, type Cli, listRuns, rollback } from "./bootstrap/apply.ts";
 import { autoApplicable } from "./bootstrap/auto-apply.ts";
 import { generate, resolveActionlint } from "./bootstrap/generate.ts";
 import { buildPlan, planEnv } from "./bootstrap/plan.ts";
 import { proposals } from "./bootstrap/proposals.ts";
-import { toolsDir } from "./bootstrap/tools.ts";
+import { onPath, toolsDir } from "./bootstrap/tools.ts";
 import { catalog } from "./catalog/index.ts";
 import { checkEnvironment, claudeVersion, findClaude } from "./claude.ts";
 import { setDockerImage } from "./deploy/adapters.ts";
@@ -223,6 +223,12 @@ function sessionHost({ sdk, claudePath }: Claude): SessionHost {
     // A step that names Codex runs on the user's own `codex` (M9-04), registered like Claude's steps.
     codex: () =>
       codexHost(resolveCli, {
+        register: (session) => sessions.set(session.id, session),
+        unregister: (id) => sessions.delete(id),
+      }),
+    // …and `agent: agy` on the user's own Antigravity CLI (M9-05).
+    agy: () =>
+      agyHost(onPath, {
         register: (session) => sessions.set(session.id, session),
         unregister: (id) => sessions.delete(id),
       }),

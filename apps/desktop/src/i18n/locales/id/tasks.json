@@ -472,5 +472,8 @@
   "tasks.defaults.budgetFor": "Budget untuk tier {{tier}}",
   "tasks.defaults.noBudget": "tanpa budget",
   "tasks.defaults.budgetsHelpApp": "Kosong memakai budget bawaan. Budget XL berlaku untuk tiap sub-task.",
-  "tasks.defaults.budgetsHelpWorkspace": "Kosong mengikuti default aplikasi, yang tampil samar. Budget XL berlaku untuk tiap sub-task."
+  "tasks.defaults.budgetsHelpWorkspace": "Kosong mengikuti default aplikasi, yang tampil samar. Budget XL berlaku untuk tiap sub-task.",
+  "tasks.defaults.agentsGroup": "Siapa menjalankan tiap langkah",
+  "tasks.defaults.runGroup": "Model dan izin",
+  "tasks.defaults.tierLabel": "Tier {{tier}}"
 }

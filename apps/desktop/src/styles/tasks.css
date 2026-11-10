@@ -1639,23 +1639,146 @@ fieldset.schedule-days > legend {
   overflow-wrap: anywhere;
 }
 
-/* Task defaults (Settings and Workspace settings): agents, model and profile, then the budget per tier. */
+/* Task defaults (Settings and Workspace settings): three titled groups, one under the other. */
 .task-defaults {
   display: flex;
   flex-direction: column;
+  gap: var(--space-4);
+}
+
+.defaults-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: 0;
+  padding: var(--space-4) 0 0;
+  border: 0;
+  border-top: 1px solid var(--border);
+}
+
+.defaults-group-title {
+  float: left;
+  width: 100%;
+  margin-bottom: var(--space-2);
+  padding: 0;
+  color: var(--muted);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.defaults-row {
+  display: grid;
   gap: var(--space-3);
 }
 
-.task-defaults-budgets {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(72px, 1fr));
-  gap: var(--space-2);
+.defaults-row.two {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
-.task-defaults-budgets input {
+.defaults-row.three {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.defaults-row.four {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+@media (max-width: 900px) {
+  .defaults-row.three,
+  .defaults-row.four {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* A dollar amount: the sign sits inside the field. */
+.money-input {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding-left: var(--space-3);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--muted);
+}
+
+.money-input:focus-within {
+  border-color: var(--accent);
+}
+
+.money-input > input {
   width: 100%;
+  min-width: 0;
+  padding-left: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
 }
 
-.task-defaults-legend {
+.money-input > input:focus {
+  outline: none;
+  box-shadow: none;
+}
+
+/* Workflows: a tier per row, its description on up to two lines, where it comes from under it. */
+.tier-list {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
   padding: 0;
+  list-style: none;
+}
+
+.tier-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) 0;
+}
+
+.tier-row + .tier-row {
+  border-top: 1px solid var(--border);
+}
+
+.tier-badge {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius);
+  background: var(--surface-3);
+  color: var(--fg);
+  font-weight: 600;
+}
+
+.tier-badge.project {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.tier-text {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.tier-description {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-height: 1.4;
+}
+
+.tier-meta {
+  overflow: hidden;
+  font-size: var(--text-xs);
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }

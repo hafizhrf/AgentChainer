@@ -1318,7 +1318,7 @@ for the desktop shell, start screen and session view to be cleaned up (UX-02, UX
   - **Checked in the app over CDP (Windows), on haiku (≈$0.01):**
     - two parallel Explore subagents, with cards closed and open, light and dark;
     - after a restart and a resume, the drawer and the chips showed Haiku 5.5 from the stored history.
-- [ ] **UX-19** App-wide task defaults, with a workspace's own over them. Owner feedback, 2026-11-10: "di workspace
+- [x] **UX-19** App-wide task defaults, with a workspace's own over them. Done in #160 and #162. Owner feedback, 2026-11-10: "di workspace
   setting juga masih terpisah pisah per repo, jadi rada ribet setting satu satu, gak ada opsi apply to all".
   - **Owner's choices:** app-wide defaults that each workspace can override, plus "Apply to all workspaces", for the
     agent per role, task model, permission profile and budget per tier, and for permissions and plugins (part 2).
@@ -1354,7 +1354,7 @@ for the desktop shell, start screen and session view to be cleaned up (UX-02, UX
   - **Tests:** `permissions.test.ts` (3 new: adding once with other keys kept, the user scope through a link that
     stays a link, a workspace link refused).
   - **Docs:** ADR-0013; THREAT_MODEL T-20, ARCHITECTURE, PRIVACY.
-- [ ] **UX-20** Starting like an IDE: a welcome page and a New session dialog. Owner feedback, 2026-11-10, with
+- [x] **UX-20** Starting like an IDE: a welcome page and a New session dialog. Done in #161. Owner feedback, 2026-11-10, with
   screenshots of the start screen: "rapihin tampilan ini biar lebih proper, sama bagian start session biar gak
   bingungin, ada popup atau apa gitu uxnya biar kaya proper IDE". Also: "di sini harusnya bisa liat, chat agent lagi
   pake claude, codex atau agy" (the composer).
@@ -1378,6 +1378,34 @@ for the desktop shell, start screen and session view to be cleaned up (UX-02, UX
     composer. Settings unchanged.
   - **Found:** the dialog's form class first collided with the sidebar's New button (`.new-session`), which turned it
     into a tile; it's renamed. Also M1-37.
+
+- [ ] **UX-21** The Files panel's own right-click menu, and image previews. Owner feedback, 2026-11-11, with a screenshot of
+  the browser's own menu (Back, Refresh, Save as, Print, Inspect) on a file in the Files tab: "di sini nanti buat ada
+  open in file explorer, lalu bisa preview gambar juga".
+  - **A menu of its own** on files and folders in the Files tab (and the Changes list). The WebView's default menu
+    never shows in the app.
+    - **Open in file explorer:** Explorer with the item selected on Windows, Finder's Reveal on macOS, the file
+      manager on Linux.
+    - **Open with the default app:** keep the existing safe rules (T-03: programs and scripts open in a text editor
+      or are refused).
+    - **Copy path** and **Copy relative path**.
+  - **Image preview:** a PNG, JPEG, GIF, WebP, SVG or ICO file opens as an image in the file viewer (fit to the panel,
+    with its size), not as text. SVG is shown as an image, never run as a page.
+  - **Checks:** keyboard access (Shift+F10 and the menu key open it), both themes, and the three platforms' reveal
+    commands.
+- [ ] **UX-22** A preview of the app being built, in the right sidebar. Owner request, 2026-11-11: "kalo task udah kelar,
+  atau lagi di mode chat, dan lagi ada agent / background task yang run localhost, bisa buka di sidebar kanan juga".
+  Builds on CP-12, which this moves forward.
+  - **Finding the address:** a `localhost` / `127.0.0.1` URL printed by a chat's command or background task (a dev
+    server's "Local: http://localhost:5173"), or by a task's step or gates, is offered as **Open preview**.
+  - **Opening it:**
+    - a **Preview** tab in the right panel shows the page, with reload, open in browser, and the address;
+    - it opens only local addresses, never a remote page inside the app;
+    - it stops when the server does, and says so.
+  - **After a task:** its card offers the preview when a dev server it started is still running.
+  - Later (CP-12): device sizes and devtools.
+  - **Threat model:** a local page in the app's window can't reach the app's IPC. It runs in its own frame or webview,
+    with no Tauri access.
 
 - [ ] **UX-E1** All M1/M2 screens use the design system, in light and dark themes.
 - [ ] **UX-E2** Usability test participants complete the M1 exit scenarios without help.

@@ -85,9 +85,9 @@ export function TaskDefaultsFields({
   return (
     <div className="task-defaults">
       {clis && (clis.codex.installed || clis.agy.installed) && (
-        <fieldset className="task-agents">
-          <legend className="field-label task-defaults-legend">{t("tasks.agents.title")}</legend>
-          <div className="task-agents-row">
+        <fieldset className="defaults-group">
+          <legend className="defaults-group-title">{t("tasks.defaults.agentsGroup")}</legend>
+          <div className="defaults-row three">
             {ALL_ROLES.map((role) => (
               <Field key={role} label={roleLabel(role)}>
                 <Select
@@ -101,48 +101,57 @@ export function TaskDefaultsFields({
           </div>
         </fieldset>
       )}
-      <div className="task-agents-row">
-        <Field label={t("tasks.defaults.model")} help={t("tasks.defaults.modelHelp")}>
-          <Select
-            label={t("tasks.defaults.model")}
-            value={value.model ?? INHERIT}
-            options={[{ value: INHERIT, label: inheritLabel(belowModel ?? t("tasks.defaults.chatModel")) }, ...models]}
-            onChange={(v) => setField("model", v)}
-          />
-        </Field>
-        <Field label={t("tasks.defaults.mode")} help={t("tasks.defaults.modeHelp")}>
-          <Select
-            label={t("tasks.defaults.mode")}
-            value={value.permissionMode ?? INHERIT}
-            options={[
-              {
-                value: INHERIT,
-                label: inheritLabel(belowMode ? MODE_NAMES[belowMode] : t("tasks.defaults.chatMode")),
-              },
-              ...MODES.map((m) => ({ value: m, label: MODE_NAMES[m] })),
-            ]}
-            onChange={(v) => setField("permissionMode", v)}
-          />
-        </Field>
-      </div>
-      <fieldset className="task-agents">
-        <legend className="field-label task-defaults-legend">{t("tasks.defaults.budgets")}</legend>
-        <div className="task-defaults-budgets">
+      <fieldset className="defaults-group">
+        <legend className="defaults-group-title">{t("tasks.defaults.runGroup")}</legend>
+        <div className="defaults-row two">
+          <Field label={t("tasks.defaults.model")} help={t("tasks.defaults.modelHelp")}>
+            <Select
+              label={t("tasks.defaults.model")}
+              value={value.model ?? INHERIT}
+              options={[
+                { value: INHERIT, label: inheritLabel(belowModel ?? t("tasks.defaults.chatModel")) },
+                ...models,
+              ]}
+              onChange={(v) => setField("model", v)}
+            />
+          </Field>
+          <Field label={t("tasks.defaults.mode")} help={t("tasks.defaults.modeHelp")}>
+            <Select
+              label={t("tasks.defaults.mode")}
+              value={value.permissionMode ?? INHERIT}
+              options={[
+                {
+                  value: INHERIT,
+                  label: inheritLabel(belowMode ? MODE_NAMES[belowMode] : t("tasks.defaults.chatMode")),
+                },
+                ...MODES.map((m) => ({ value: m, label: MODE_NAMES[m] })),
+              ]}
+              onChange={(v) => setField("permissionMode", v)}
+            />
+          </Field>
+        </div>
+      </fieldset>
+      <fieldset className="defaults-group">
+        <legend className="defaults-group-title">{t("tasks.defaults.budgets")}</legend>
+        <div className="defaults-row four">
           {TIERS.map((tier) => {
             const below = budgetBelow(tier);
             const own = value.budgetUsd?.[tier];
             return (
-              <Field key={tier} label={tier}>
-                <input
-                  type="number"
-                  min={0}
-                  step={0.5}
-                  inputMode="decimal"
-                  aria-label={t("tasks.defaults.budgetFor", { tier })}
-                  value={own === undefined || own === null ? "" : String(own)}
-                  placeholder={below === null ? t("tasks.defaults.noBudget") : `$${below}`}
-                  onChange={(e) => setBudget(tier, e.target.value)}
-                />
+              <Field key={tier} label={t("tasks.defaults.tierLabel", { tier })}>
+                <span className="money-input">
+                  <span aria-hidden>$</span>
+                  <input
+                    type="number"
+                    min={0}
+                    step={0.5}
+                    inputMode="decimal"
+                    aria-label={t("tasks.defaults.budgetFor", { tier })}
+                    value={own === undefined || own === null ? "" : String(own)}
+                    placeholder={below === null ? t("tasks.defaults.noBudget") : String(below)}
+                    onChange={(e) => setBudget(tier, e.target.value)}
+                  />
+                </span>
               </Field>
             );
           })}

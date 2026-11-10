@@ -33187,6 +33187,342 @@
         "additionalProperties": false
       }
     },
+    "usage.report": {
+      "params": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "sinceDays": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "exclusiveMinimum": 0,
+                "maximum": 3650
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "workspaces": {
+            "maxItems": 200,
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "sinceDays",
+          "workspaces"
+        ],
+        "additionalProperties": false
+      },
+      "result": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "generatedAt": {
+            "type": "string"
+          },
+          "sinceDays": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "totals": {
+            "type": "object",
+            "properties": {
+              "costUsd": {
+                "type": "number"
+              },
+              "tokens": {
+                "type": "number"
+              },
+              "input": {
+                "type": "number"
+              },
+              "output": {
+                "type": "number"
+              },
+              "cacheRead": {
+                "type": "number"
+              },
+              "cacheWrite": {
+                "type": "number"
+              },
+              "unpricedTokens": {
+                "type": "number"
+              },
+              "sessions": {
+                "type": "number"
+              }
+            },
+            "required": [
+              "costUsd",
+              "tokens",
+              "input",
+              "output",
+              "cacheRead",
+              "cacheWrite",
+              "unpricedTokens",
+              "sessions"
+            ],
+            "additionalProperties": false
+          },
+          "byModel": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "model": {
+                  "type": "string"
+                },
+                "family": {
+                  "type": "string",
+                  "enum": [
+                    "opus",
+                    "sonnet",
+                    "haiku",
+                    "fable",
+                    "codex",
+                    "agy",
+                    "other"
+                  ]
+                },
+                "costUsd": {
+                  "type": "number"
+                },
+                "tokens": {
+                  "type": "number"
+                },
+                "input": {
+                  "type": "number"
+                },
+                "output": {
+                  "type": "number"
+                },
+                "cacheRead": {
+                  "type": "number"
+                },
+                "cacheWrite": {
+                  "type": "number"
+                },
+                "unpricedTokens": {
+                  "type": "number"
+                },
+                "sessions": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "model",
+                "family",
+                "costUsd",
+                "tokens",
+                "input",
+                "output",
+                "cacheRead",
+                "cacheWrite",
+                "unpricedTokens",
+                "sessions"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "byProject": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "project": {
+                  "type": "string"
+                },
+                "costUsd": {
+                  "type": "number"
+                },
+                "tokens": {
+                  "type": "number"
+                },
+                "sessions": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "project",
+                "costUsd",
+                "tokens",
+                "sessions"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "byDay": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "day": {
+                  "type": "string"
+                },
+                "costUsd": {
+                  "type": "object",
+                  "propertyNames": {
+                    "type": "string",
+                    "enum": [
+                      "opus",
+                      "sonnet",
+                      "haiku",
+                      "fable",
+                      "codex",
+                      "agy",
+                      "other"
+                    ]
+                  },
+                  "additionalProperties": {
+                    "type": "number"
+                  }
+                }
+              },
+              "required": [
+                "day",
+                "costUsd"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "sessions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "project": {
+                  "type": "string"
+                },
+                "title": {
+                  "type": "string"
+                },
+                "day": {
+                  "type": "string"
+                },
+                "source": {
+                  "type": "string",
+                  "enum": [
+                    "claude",
+                    "codex",
+                    "agy"
+                  ]
+                },
+                "models": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "costUsd": {
+                  "type": "number"
+                },
+                "tokens": {
+                  "type": "number"
+                },
+                "unpricedTokens": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "id",
+                "project",
+                "title",
+                "day",
+                "source",
+                "models",
+                "costUsd",
+                "tokens",
+                "unpricedTokens"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "generatedAt",
+          "sinceDays",
+          "totals",
+          "byModel",
+          "byProject",
+          "byDay",
+          "sessions"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "usage.export": {
+      "params": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "sinceDays": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "exclusiveMinimum": 0,
+                "maximum": 3650
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "workspaces": {
+            "maxItems": 200,
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "path": {
+            "type": "string",
+            "minLength": 1
+          },
+          "format": {
+            "type": "string",
+            "enum": [
+              "csv",
+              "json"
+            ]
+          }
+        },
+        "required": [
+          "sinceDays",
+          "workspaces",
+          "path",
+          "format"
+        ],
+        "additionalProperties": false
+      },
+      "result": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "const": true
+          },
+          "rows": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "ok",
+          "rows"
+        ],
+        "additionalProperties": false
+      }
+    },
     "metrics.summary": {
       "params": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",

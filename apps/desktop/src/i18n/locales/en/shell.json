@@ -146,5 +146,6 @@
   "shell.treeRow.deleted": "deleted",
   "shell.treeRow.renamed": "renamed",
   "shell.treeRow.untracked": "untracked",
-  "shell.treeRow.conflicted": "conflicted"
+  "shell.treeRow.conflicted": "conflicted",
+  "shell.sidebar.usage": "Usage"
 }

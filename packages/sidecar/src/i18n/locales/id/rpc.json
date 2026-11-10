@@ -1,4 +1,5 @@
 {
+  "rpc.usage.exportExtension": "Simpan ekspor penggunaan sebagai file .{{format}}.",
   "rpc.dispatch.unknownMethod": "Metode tidak dikenal: {{method}}",
   "rpc.dispatch.invalidParams": "Parameter tidak valid untuk {{method}}: {{issues}}",
   "rpc.dispatch.invalidResult": "Hasil tidak valid dari {{method}}: {{issues}}",

@@ -1,5 +1,16 @@
 import type { FleetItem } from "@agentchainer/protocol";
-import { CircleAlert, CircleCheck, ClipboardList, Folder, Folders, Loader2, Plus, Radar, Settings } from "lucide-react";
+import {
+  BarChart3,
+  CircleAlert,
+  CircleCheck,
+  ClipboardList,
+  Folder,
+  Folders,
+  Loader2,
+  Plus,
+  Radar,
+  Settings,
+} from "lucide-react";
 import { t } from "./i18n/index.ts";
 import type { WorkspaceDef } from "./settings.ts";
 import { folderName, type Tab } from "./tabs.ts";
@@ -12,6 +23,8 @@ import { menuShortcut } from "./useMenuCommands.ts";
 
 /** The `active` key of the fleet view (M8-02). */
 export const FLEET = "fleet";
+/** The usage page (CP-01), shown like the fleet view in the main area. */
+export const USAGE = "usage";
 
 /**
  * The left column (UX-03): New, the open chats and tasks with their status (UX-13), recent workspaces, and at the
@@ -91,6 +104,15 @@ export function Sidebar({
               {t("shell.sidebar.workingCount", { n: fleet.filter((i) => i.status === "working").length })}
             </span>
           )}
+        </button>
+        <button
+          type="button"
+          className={`fleet-entry${active === USAGE ? " current" : ""}`}
+          aria-current={active === USAGE ? "page" : undefined}
+          onClick={() => onSelect(USAGE)}
+        >
+          <BarChart3 size={15} aria-hidden />
+          {t("shell.sidebar.usage")}
         </button>
       </div>
 

@@ -1,4 +1,5 @@
 {
+  "rpc.usage.exportExtension": "Save the usage export as a .{{format}} file.",
   "rpc.dispatch.unknownMethod": "Unknown method {{method}}",
   "rpc.dispatch.invalidParams": "Invalid params for {{method}}: {{issues}}",
   "rpc.dispatch.invalidResult": "Invalid result from {{method}}: {{issues}}",

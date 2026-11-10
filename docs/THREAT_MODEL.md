@@ -106,6 +106,7 @@ Nothing else. In particular, there is no file-system or shell plugin.
 **Other surfaces, reviewed 2026-11-04:**
 - **Agent drawer and replay (M4-03, M4-08):** subagent transcripts come from the SDK's session APIs (ADR-0004) and are shown with secrets masked. Nothing is written.
 - **Session management:** `session.fork`, `delete`, `rename` and `tag` change the CLI's own session records through the SDK's functions only, from a person's click.
+- **Usage (CP-01):** `usage.report` reads every stored Claude session's model and token counts through the SDK's session APIs (never the CLI's files, ADR-0004), and the task records of the workspaces the app already knows. Only totals, titles and folder names reach the UI; message text doesn't. `usage.export` writes only to a path from the system's save dialog, with the format's extension (`.csv` or `.json`); CSV cells starting with `=`, `+`, `-` or `@` are prefixed with `'` so a spreadsheet doesn't run them as formulas. No network.
 - **Metrics and evals (M7):** `metrics.summary` reads the workspace's task records locally. The eval harness and its CI check run in this repository's CI on fixture copies and make no calls from users' machines.
 - **On-demand actionlint:** downloaded like any catalog tool, pinned and checked by sha256, into the app's tools folder.
 

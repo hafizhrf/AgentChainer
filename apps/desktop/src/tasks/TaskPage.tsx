@@ -86,6 +86,7 @@ import {
   stateLabel,
   withStepEvent,
 } from "./run.ts";
+import { agentLabel, costText } from "./stepAgent.ts";
 import {
   approveBlocker,
   budgetText,
@@ -119,6 +120,21 @@ const RUN_MODES: Exclude<PermissionMode, "plan">[] = ["default", "acceptEdits", 
 
 const errorText = (err: unknown) => (err instanceof Error ? err.message : String(err));
 const usd = (n: number) => approxUsd(n, n < 0.1 ? 4 : 2);
+
+/** A task's spend, marked when a step on Codex or agy put an estimate in it (M9-07). */
+function taskCost(task: Task): string {
+  return costText(usd(task.costUsd), task.run?.steps.some((s) => s.costKind) ? "estimate" : undefined, undefined).text;
+}
+
+/** A step's cost, marked when it's an estimate from tokens or unknown (M9-07). */
+function StepCost({ entry }: { entry: StepRun }) {
+  const c = costText(usd(entry.costUsd), entry.costKind, entry.tokens);
+  return (
+    <span className="muted" title={c.title}>
+      {c.text}
+    </span>
+  );
+}
 
 /** One entry of a task's thread, in order: a drafting (its events) or the person's reply to the contract. */
 type ThreadEntry = { kind: "draft"; sessionId: string } | { kind: "reply"; text: string; at: number };
@@ -479,7 +495,7 @@ export function TaskPage({
             <span className="muted" title={cwd}>
               {t("tasks.page.spent", {
                 folders: [folderName(cwd), ...(task.folders ?? []).map((f) => f.name)].join(" + "),
-                cost: usd(task.costUsd),
+                cost: taskCost(task),
               })}
             </span>
           </div>
@@ -1061,7 +1077,7 @@ function TaskFacts({ task, cwd, onOpenTask }: { task: Task; cwd: string; onOpenT
           </>
         )}
         <dt>{t("tasks.facts.spent")}</dt>
-        <dd>{usd(task.costUsd)}</dd>
+        <dd>{taskCost(task)}</dd>
         {task.worktree && (
           <>
             <dt>{t("tasks.facts.branch")}</dt>
@@ -1640,6 +1656,8 @@ function RunView({
     }
   }
 
+  // Steps on Codex or agy count an estimate (M9-07): the run's total says it includes one.
+  const runCost = costText(usd(run.costUsd), run.steps.some((s) => s.costKind) ? "estimate" : undefined, undefined);
   return (
     <>
       <div className="run-divider">
@@ -1647,14 +1665,14 @@ function RunView({
         <span>{t("tasks.run.title")}</span>
         <span className={`badge tone-${tone}`}>{label}</span>
         <span className="grow" />
-        <span className="muted">
+        <span className="muted" title={runCost.title}>
           {isXl(task)
-            ? t("tasks.run.costXl", { mode: MODE_NAMES[run.permissionMode], cost: usd(run.costUsd) })
+            ? t("tasks.run.costXl", { mode: MODE_NAMES[run.permissionMode], cost: runCost.text })
             : task.triage?.budgetUsd === null
-              ? t("tasks.run.costNoBudget", { mode: MODE_NAMES[run.permissionMode], cost: usd(run.costUsd) })
+              ? t("tasks.run.costNoBudget", { mode: MODE_NAMES[run.permissionMode], cost: runCost.text })
               : t("tasks.run.costOf", {
                   mode: MODE_NAMES[run.permissionMode],
-                  cost: usd(run.costUsd),
+                  cost: runCost.text,
                   budget: budgetText(task.triage?.budgetUsd),
                 })}
         </span>
@@ -1676,6 +1694,14 @@ function RunView({
               <StepIcon status={entry.status} />
               <span className="task-step-label">{localized(entry.label, entry.labelRef)}</span>
               {entry.role && <span className="chip step-role">{entry.role}</span>}
+              {(entry.agent || entry.model) && (
+                <span
+                  className={`chip step-agent${entry.agent && entry.agent !== "claude" ? " other" : ""}`}
+                  title={t("tasks.run.ranBy", { agent: agentLabel(entry.agent, entry.model) })}
+                >
+                  {agentLabel(entry.agent, entry.model)}
+                </span>
+              )}
               {entry.group && (
                 <span
                   className="badge"
@@ -1687,7 +1713,7 @@ function RunView({
               <span className="grow muted task-step-note">{localized(entry.note, entry.noteRef)}</span>
               <span className="muted">{duration(entry.startedAt, entry.endedAt)}</span>
               {(entry.kind === "agent" || entry.kind === "fix" || entry.kind === "subtask") && (
-                <span className="muted">{usd(entry.costUsd)}</span>
+                <StepCost entry={entry} />
               )}
             </button>
             {expanded && (

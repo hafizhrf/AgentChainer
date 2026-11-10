@@ -1,4 +1,4 @@
-import { execFileSync } from "node:child_process";
+import { execFile, execFileSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import path from "node:path";
 import type { Cli } from "../deploy/cli.ts";
@@ -45,7 +45,16 @@ export function agyHost(
   if (!bin) return null;
   try {
     const version = execFileSync(bin, ["--version"], { encoding: "utf8", timeout: 15_000, windowsHide: true }).trim();
-    return { cli: { bin, prefix: [] }, version, ...registry };
+    let listed: Promise<string | null> | undefined;
+    const defaultModel = () => {
+      listed ??= new Promise<string | null>((resolve) =>
+        execFile(bin, ["models"], { encoding: "utf8", timeout: 30_000, windowsHide: true }, (err, out) =>
+          resolve(err ? null : firstModel(out)),
+        ),
+      );
+      return listed;
+    };
+    return { cli: { bin, prefix: [] }, version, defaultModel, ...registry };
   } catch {
     return null;
   }
@@ -76,4 +85,13 @@ export async function agentClis(
     codex: { installed: !!codex, ...(codex ? { version: codex.version } : {}), signedIn: codexIn },
     agy: { installed: !!agy, ...(agy ? { version: agy.version } : {}), signedIn: agyIn },
   };
+}
+
+/** The first model id `agy models` prints: lines of "<id>\t<name>", after a "Fetching…" line. */
+export function firstModel(out: string): string | null {
+  for (const line of out.split(/\r?\n/)) {
+    const [id, name] = line.split("\t");
+    if (id && name !== undefined && /^[\w.-]+$/.test(id.trim())) return id.trim();
+  }
+  return null;
 }

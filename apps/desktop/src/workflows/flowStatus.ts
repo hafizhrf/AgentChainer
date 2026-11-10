@@ -1,4 +1,4 @@
-import type { Task, TaskRun } from "@agentchainer/protocol";
+import type { CostKind, StepAgent, Task, TaskRun } from "@agentchainer/protocol";
 import type { WorkflowEdge, WorkflowNode } from "./workflowGraph.ts";
 
 /**
@@ -14,6 +14,10 @@ export type NodeState = {
   entryId?: string;
   /** Turns of the step in the run: its first one, and each fix round it took. */
   turns: number;
+  /** Who ran its latest turn (M9-07), and whether its cost includes an estimate from tokens. */
+  agent?: StepAgent;
+  model?: string;
+  costKind?: CostKind;
 };
 
 /**
@@ -32,6 +36,7 @@ export function flowStates(
     // A step's own entries and its fix rounds; the baseline (the gates before the task) isn't the gates step.
     const entries = (run?.steps ?? []).filter((e) => e.step === node.stepId && e.kind !== "baseline");
     const last = entries.at(-1);
+    const ranBy = [...entries].reverse().find((e) => e.agent || e.model);
     out[node.id] = {
       status: entries.some((e) => e.status === "running")
         ? live
@@ -45,6 +50,13 @@ export function flowStates(
       costUsd: entries.reduce((sum, e) => sum + e.costUsd, 0),
       ...(last ? { entryId: last.id } : {}),
       turns: entries.filter((e) => e.kind === "agent" || e.kind === "fix").length,
+      ...(ranBy?.agent ? { agent: ranBy.agent } : {}),
+      ...(ranBy?.model ? { model: ranBy.model } : {}),
+      ...(entries.some((e) => e.costKind === "unknown")
+        ? { costKind: "unknown" as const }
+        : entries.some((e) => e.costKind === "estimate")
+          ? { costKind: "estimate" as const }
+          : {}),
     };
   }
   return out;

@@ -2179,7 +2179,7 @@ with the OpenAI Codex CLI and Google's Antigravity CLI (`agy`), in both directio
   - **Checked live:** `--variant mix:implement=codex --cases sample-with-tax -n 1` passed 1/1 (hidden checks
     included), with Codex implementing and $0.0007 of Claude spend; the gate runs re-checked by hand matched.
 
-- [ ] **M9-07** The thread, Flow, Fleet and evidence show which agent and model ran each step.
+- [x] **M9-07** The thread, Flow, Fleet and evidence show which agent and model ran each step. Done in #155 and the UI PR.
   - **Cost** (owner, 2026-11-10: "just follow claude one"): Codex and agy steps are estimated from their tokens at
     the model's API price, and count toward the budget like Claude's spend (ADR-0012 §4).
   Progress (2026-11-10), part 1, the sidecar:
@@ -2193,17 +2193,38 @@ with the OpenAI Codex CLI and Google's Antigravity CLI (`agy`), in both directio
     for a model with no price, and a line saying how estimates are made.
   - **Tests:** `prices.test.ts` (4), the Codex fake (an estimate, an unknown model, the budget stop), the agy fake
     (an estimate per turn), the evidence table.
-  - **Left (part 2, the UI):** the agent and model in the thread, Flow, Fleet and the task page.
+  Progress, part 2 (the UI):
+  - **Task page:** each agent step has a chip with who ran it ("Haiku 5.5", or "Codex · gpt-6-luna" set apart). An
+    estimated cost reads "≈$0.0103 est.", its tokens in the tooltip; a model with no price reads "cost unknown". The
+    header, the Spent row and the run's total say "est." when a step put an estimate in them.
+  - **Flow:** each node has the chip and the marked cost. The detail line shrinks to one line so the node keeps its
+    size.
+  - **Fleet:** a step on Codex or agy adds its agent and model to the row, and its cost reads "est.".
+  - **The agent shows from the step's start:** the runner names it (`Runner.agentOf`), so a running step and its
+    fix rounds already say "Codex".
+  - **agy's default model:** with no `--model`, agy's init names no model and its cost couldn't be priced. A step
+    that names none of agy's now runs the first model `agy models` lists, as Codex steps take `model/list`'s default.
+  - **Tests:** `stepAgent.test.ts` (2), `flowStatus.test.ts` (agent and estimate), the orchestrator (the agent from
+    the start), the agy fake (the listed model on every turn), `firstModel`.
+  - **Checked in the app (Windows):** the task page, Flow and Fleet as above, on a task run with the mix below; the
+    owner's settings restored.
+  - **Known gap:** a Codex turn the person stops records $0, so its tokens before the stop aren't counted.
 - [ ] **M9-08** (later) Team workers on Codex or agy. The supervisor stays Claude.
 - [ ] **M9-09** (later) A chat on Codex or agy.
 
 ### Exit criteria
 
-- [ ] **M9-E1** On `fixtures/sample-app`, M tasks with two different mixes pass their gates:
+- [x] **M9-E1** On `fixtures/sample-app`, M tasks with two different mixes pass their gates:
   - Claude plans, Codex implements, agy reviews;
   - Claude plans and implements, agy reviews.
 
   Each evidence report names every step's agent and model, with costs marked as estimates.
+  Done (2026-11-10, Windows, `live-task.ts --tier M --agents …`, the owner's own logins):
+  - `implement=codex,review=agy`: Done in 139 s, ≈$0.085. The plan ran on Claude (Haiku 5.5, $0.0034), the
+    implementation on Codex (gpt-6-luna, ≈$0.0059 est., 228,021 tokens), and the review on agy
+    (gemini-3.8-flash-high, ≈$0.0710 est., 73,886 tokens), which approved with no must-fix findings.
+  - `review=agy`: Done in 92 s, ≈$0.069. Claude planned and implemented (Haiku 5.5), and agy reviewed (≈$0.0499 est.).
+  - In both, the gates re-run by hand gave the recorded exit codes, and the evidence's gate runs matched the run's.
 
 ---
 

@@ -18,6 +18,7 @@ import { approxUsd, dateTime } from "./i18n/format.ts";
 import { t } from "./i18n/index.ts";
 import { lastRunText, whenText } from "./schedules.ts";
 import { folderName, type Tab } from "./tabs.ts";
+import { agentLabel, costText } from "./tasks/stepAgent.ts";
 import { IconButton } from "./ui/IconButton.tsx";
 
 function StatusMark({ status }: { status: FleetItem["status"] }) {
@@ -124,6 +125,7 @@ export function FleetView({
                       <span className="muted fleet-step">
                         {i.task.label}
                         {i.task.role ? ` · ${i.task.role}` : ""}
+                        {i.agent && i.agent !== "claude" ? ` · ${agentLabel(i.agent, i.model)}` : ""}
                       </span>
                     )}
                   </button>
@@ -132,7 +134,7 @@ export function FleetView({
                   <span className="muted fleet-time" title={dateTime(i.since)}>
                     {ago(i.since, now)}
                   </span>
-                  <span className="muted fleet-cost">{approxUsd(i.costUsd, 3)}</span>
+                  <FleetCost item={i} />
                   {i.status === "waiting" ? (
                     <button type="button" className="small" onClick={() => open(i)}>
                       {t("graph.fleet.answer")}
@@ -220,3 +222,13 @@ export function FleetView({
 }
 
 export type ScheduleAction = "toggle" | "run" | "edit" | "delete";
+
+/** A row's spend: an estimate from tokens for a step on Codex or agy (M9-07). */
+function FleetCost({ item }: { item: FleetItem }) {
+  const c = costText(approxUsd(item.costUsd, 3), item.costKind, undefined);
+  return (
+    <span className="muted fleet-cost" title={c.title}>
+      {c.text}
+    </span>
+  );
+}

@@ -29,6 +29,12 @@ export type AgyHost = {
   cli: Cli;
   /** `agy --version`, for the session's start line. */
   version: string;
+  /**
+   * The model a step runs when it names none of agy's: the first `agy models` lists (M9-07). agy's own default isn't
+   * reported anywhere, so its cost couldn't be estimated; Codex's steps pick theirs the same way. Null when the list
+   * can't be had, and then agy keeps its default.
+   */
+  defaultModel?: () => Promise<string | null>;
   register(session: LiveSession): void;
   unregister(sessionId: string): void;
 };
@@ -89,7 +95,7 @@ class AgySession implements LiveSession {
   tag: TaskTag | undefined;
   parentId: string | undefined;
   private readonly host: AgyHost;
-  private readonly options: StepOptions;
+  private options: StepOptions;
   private readonly callbacks: SessionCallbacks;
   private conversation: string | null;
   private child: ChildProcessWithoutNullStreams | null = null;
@@ -111,8 +117,16 @@ class AgySession implements LiveSession {
     this.id = options.resume ?? `agy-${randomUUID()}`;
   }
 
-  turn(prompt: string): Promise<TurnResult> {
-    if (this.ended) return Promise.reject(new Error(t("tasks.agy.ended")));
+  async turn(prompt: string): Promise<TurnResult> {
+    if (this.ended) throw new Error(t("tasks.agy.ended"));
+    if (!this.options.model || CLAUDE_ALIAS.test(this.options.model)) {
+      const fallback = await this.host.defaultModel?.().catch(() => null);
+      if (fallback) this.options = { ...this.options, model: fallback };
+    }
+    return this.run(prompt);
+  }
+
+  private run(prompt: string): Promise<TurnResult> {
     const first = this.conversation === null;
     const text = first
       ? [this.options.appendSystemPrompt, NO_COMMANDS, prompt].filter(Boolean).join("\n\n---\n\n")

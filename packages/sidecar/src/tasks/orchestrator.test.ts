@@ -252,6 +252,35 @@ describe("orchestrator", () => {
     assert.ok(saves.length > 3, "every change is saved and reported");
   });
 
+  it("names a step's agent from its start, and keeps its model, tokens and estimate (M9-07)", async () => {
+    let whileRunning: string | undefined;
+    const { runner } = fakeRunner({
+      outcomes: {
+        "start:implement": {
+          agent: "codex",
+          model: "gpt-6-luna",
+          costKind: "estimate",
+          tokens: { input: 1000, output: 50 },
+          costUsd: 0.002,
+        },
+      },
+    });
+    runner.agentOf = () => "codex";
+    const { o, saves } = orchestrate(task("S"), runner);
+    const start = runner.start.bind(runner);
+    runner.start = async (...args) => {
+      whileRunning = saves.at(-1)?.run?.steps.find((s) => s.id === "implement")?.agent;
+      return start(...args);
+    };
+    const done = await o.run();
+    assert.equal(whileRunning, "codex", "the running entry already says which agent");
+    const implement = done.run?.steps.find((s) => s.id === "implement");
+    assert.deepEqual(
+      [implement?.agent, implement?.model, implement?.costKind, implement?.tokens],
+      ["codex", "gpt-6-luna", "estimate", { input: 1000, output: 50 }],
+    );
+  });
+
   it("sends failing gates back to the implementer, then runs every gate again", async () => {
     const { runner, calls } = fakeRunner({ gateResults: [[gate("lint", 1, 0), gate("test", 0, 0)]] });
     const { o } = orchestrate(task("S"), runner);

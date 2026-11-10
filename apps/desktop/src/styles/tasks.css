@@ -1031,6 +1031,12 @@ fieldset.workflow-fix > legend {
   white-space: nowrap;
 }
 
+.workflow-step .clamp-1 {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 /* A step's detail on up to two lines, the rest in its tooltip (UX-17). */
 .workflow-step .clamp-2 {
   display: -webkit-box;
@@ -1387,6 +1393,25 @@ div.draft-block.live {
 
 .step-role {
   font-size: var(--text-xs);
+}
+
+/* Who ran a step (M9-07): the model on Claude, "Codex · …" or "agy · …" on the others, which stand out. */
+.step-agent {
+  max-width: 220px;
+  overflow: hidden;
+  font-size: var(--text-xs);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.step-agent.other {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.workflow-step .step-agent {
+  align-self: flex-start;
+  max-width: 100%;
 }
 
 .step-body {

@@ -54,6 +54,33 @@ describe("a run on its workflow's canvas (UX-14)", () => {
     assert.equal(byLabel(states, "Review")?.status, "pending");
   });
 
+  it("names the agent and model of a step's latest turn, and marks an estimated cost (M9-07)", () => {
+    const states = flowStates(
+      nodes,
+      run([
+        { ...entry("plan", "plan", "agent", "done", 0.1), agent: "claude", model: "claude-haiku-5-5" },
+        {
+          ...entry("implement", "implement", "agent", "done", 0.01),
+          agent: "codex",
+          model: "gpt-6-luna",
+          costKind: "estimate",
+        },
+        { ...entry("review", "review", "agent", "done"), agent: "agy", model: "gpt-oss-120b", costKind: "unknown" },
+      ]),
+    );
+    assert.deepEqual(byLabel(states, "Plan"), {
+      status: "done",
+      costUsd: 0.1,
+      entryId: "plan",
+      turns: 1,
+      agent: "claude",
+      model: "claude-haiku-5-5",
+    });
+    assert.equal(byLabel(states, "Implement")?.agent, "codex");
+    assert.equal(byLabel(states, "Implement")?.costKind, "estimate");
+    assert.equal(byLabel(states, "Review")?.costKind, "unknown");
+  });
+
   it("marks steps a finished run never reached as not run, and counts fix rounds on the fix edge", () => {
     const finished = run(
       [

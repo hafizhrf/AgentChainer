@@ -6071,6 +6071,9 @@
                         "group": {
                           "type": "string"
                         },
+                        "groupRef": {
+                          "$ref": "#/$defs/__schema0"
+                        },
                         "status": {
                           "type": "string",
                           "enum": [
@@ -7375,6 +7378,9 @@
                         },
                         "group": {
                           "type": "string"
+                        },
+                        "groupRef": {
+                          "$ref": "#/$defs/__schema0"
                         },
                         "status": {
                           "type": "string",
@@ -8686,6 +8692,9 @@
                         },
                         "group": {
                           "type": "string"
+                        },
+                        "groupRef": {
+                          "$ref": "#/$defs/__schema0"
                         },
                         "status": {
                           "type": "string",
@@ -10100,6 +10109,9 @@
                         },
                         "group": {
                           "type": "string"
+                        },
+                        "groupRef": {
+                          "$ref": "#/$defs/__schema0"
                         },
                         "status": {
                           "type": "string",
@@ -11541,6 +11553,9 @@
                         "group": {
                           "type": "string"
                         },
+                        "groupRef": {
+                          "$ref": "#/$defs/__schema0"
+                        },
                         "status": {
                           "type": "string",
                           "enum": [
@@ -12842,6 +12857,9 @@
                         },
                         "group": {
                           "type": "string"
+                        },
+                        "groupRef": {
+                          "$ref": "#/$defs/__schema0"
                         },
                         "status": {
                           "type": "string",
@@ -14157,6 +14175,9 @@
                         "group": {
                           "type": "string"
                         },
+                        "groupRef": {
+                          "$ref": "#/$defs/__schema0"
+                        },
                         "status": {
                           "type": "string",
                           "enum": [
@@ -15462,6 +15483,9 @@
                         "group": {
                           "type": "string"
                         },
+                        "groupRef": {
+                          "$ref": "#/$defs/__schema0"
+                        },
                         "status": {
                           "type": "string",
                           "enum": [
@@ -16763,6 +16787,9 @@
                         },
                         "group": {
                           "type": "string"
+                        },
+                        "groupRef": {
+                          "$ref": "#/$defs/__schema0"
                         },
                         "status": {
                           "type": "string",
@@ -18160,6 +18187,9 @@
                         "group": {
                           "type": "string"
                         },
+                        "groupRef": {
+                          "$ref": "#/$defs/__schema0"
+                        },
                         "status": {
                           "type": "string",
                           "enum": [
@@ -19467,6 +19497,9 @@
                         },
                         "group": {
                           "type": "string"
+                        },
+                        "groupRef": {
+                          "$ref": "#/$defs/__schema0"
                         },
                         "status": {
                           "type": "string",
@@ -21172,6 +21205,9 @@
                         "group": {
                           "type": "string"
                         },
+                        "groupRef": {
+                          "$ref": "#/$defs/__schema0"
+                        },
                         "status": {
                           "type": "string",
                           "enum": [
@@ -22474,6 +22510,9 @@
                         "group": {
                           "type": "string"
                         },
+                        "groupRef": {
+                          "$ref": "#/$defs/__schema0"
+                        },
                         "status": {
                           "type": "string",
                           "enum": [
@@ -23775,6 +23814,9 @@
                         },
                         "group": {
                           "type": "string"
+                        },
+                        "groupRef": {
+                          "$ref": "#/$defs/__schema0"
                         },
                         "status": {
                           "type": "string",
@@ -25290,6 +25332,9 @@
                         "group": {
                           "type": "string"
                         },
+                        "groupRef": {
+                          "$ref": "#/$defs/__schema0"
+                        },
                         "status": {
                           "type": "string",
                           "enum": [
@@ -26716,6 +26761,9 @@
                         "group": {
                           "type": "string"
                         },
+                        "groupRef": {
+                          "$ref": "#/$defs/__schema0"
+                        },
                         "status": {
                           "type": "string",
                           "enum": [
@@ -28120,6 +28168,9 @@
                         "group": {
                           "type": "string"
                         },
+                        "groupRef": {
+                          "$ref": "#/$defs/__schema0"
+                        },
                         "status": {
                           "type": "string",
                           "enum": [
@@ -29441,6 +29492,9 @@
                         "group": {
                           "type": "string"
                         },
+                        "groupRef": {
+                          "$ref": "#/$defs/__schema0"
+                        },
                         "status": {
                           "type": "string",
                           "enum": [
@@ -30424,6 +30478,9 @@
           "error": {
             "type": "string"
           },
+          "errorRef": {
+            "$ref": "#/$defs/__schema0"
+          },
           "smoke": {
             "type": "object",
             "properties": {
@@ -30439,6 +30496,9 @@
               },
               "detail": {
                 "type": "string"
+              },
+              "detailRef": {
+                "$ref": "#/$defs/__schema0"
               }
             },
             "required": [
@@ -30483,7 +30543,40 @@
           "endedAt",
           "status"
         ],
-        "additionalProperties": false
+        "additionalProperties": false,
+        "$defs": {
+          "__schema0": {
+            "type": "object",
+            "properties": {
+              "key": {
+                "type": "string"
+              },
+              "params": {
+                "type": "object",
+                "propertyNames": {
+                  "type": "string"
+                },
+                "additionalProperties": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "$ref": "#/$defs/__schema0"
+                    }
+                  ]
+                }
+              }
+            },
+            "required": [
+              "key"
+            ],
+            "additionalProperties": false
+          }
+        }
       }
     },
     "deploy.plan": {
@@ -30601,6 +30694,9 @@
               "error": {
                 "type": "string"
               },
+              "errorRef": {
+                "$ref": "#/$defs/__schema0"
+              },
               "smoke": {
                 "type": "object",
                 "properties": {
@@ -30616,6 +30712,9 @@
                   },
                   "detail": {
                     "type": "string"
+                  },
+                  "detailRef": {
+                    "$ref": "#/$defs/__schema0"
                   }
                 },
                 "required": [
@@ -30671,7 +30770,40 @@
           "branch",
           "commit"
         ],
-        "additionalProperties": false
+        "additionalProperties": false,
+        "$defs": {
+          "__schema0": {
+            "type": "object",
+            "properties": {
+              "key": {
+                "type": "string"
+              },
+              "params": {
+                "type": "object",
+                "propertyNames": {
+                  "type": "string"
+                },
+                "additionalProperties": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "$ref": "#/$defs/__schema0"
+                    }
+                  ]
+                }
+              }
+            },
+            "required": [
+              "key"
+            ],
+            "additionalProperties": false
+          }
+        }
       }
     },
     "deploy.production": {
@@ -30767,6 +30899,9 @@
           "error": {
             "type": "string"
           },
+          "errorRef": {
+            "$ref": "#/$defs/__schema0"
+          },
           "smoke": {
             "type": "object",
             "properties": {
@@ -30782,6 +30917,9 @@
               },
               "detail": {
                 "type": "string"
+              },
+              "detailRef": {
+                "$ref": "#/$defs/__schema0"
               }
             },
             "required": [
@@ -30826,7 +30964,40 @@
           "endedAt",
           "status"
         ],
-        "additionalProperties": false
+        "additionalProperties": false,
+        "$defs": {
+          "__schema0": {
+            "type": "object",
+            "properties": {
+              "key": {
+                "type": "string"
+              },
+              "params": {
+                "type": "object",
+                "propertyNames": {
+                  "type": "string"
+                },
+                "additionalProperties": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "$ref": "#/$defs/__schema0"
+                    }
+                  ]
+                }
+              }
+            },
+            "required": [
+              "key"
+            ],
+            "additionalProperties": false
+          }
+        }
       }
     },
     "deploy.rollback": {
@@ -30911,6 +31082,9 @@
           "error": {
             "type": "string"
           },
+          "errorRef": {
+            "$ref": "#/$defs/__schema0"
+          },
           "smoke": {
             "type": "object",
             "properties": {
@@ -30926,6 +31100,9 @@
               },
               "detail": {
                 "type": "string"
+              },
+              "detailRef": {
+                "$ref": "#/$defs/__schema0"
               }
             },
             "required": [
@@ -30970,7 +31147,40 @@
           "endedAt",
           "status"
         ],
-        "additionalProperties": false
+        "additionalProperties": false,
+        "$defs": {
+          "__schema0": {
+            "type": "object",
+            "properties": {
+              "key": {
+                "type": "string"
+              },
+              "params": {
+                "type": "object",
+                "propertyNames": {
+                  "type": "string"
+                },
+                "additionalProperties": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "$ref": "#/$defs/__schema0"
+                    }
+                  ]
+                }
+              }
+            },
+            "required": [
+              "key"
+            ],
+            "additionalProperties": false
+          }
+        }
       }
     },
     "deploy.setDockerImage": {
@@ -31097,6 +31307,9 @@
                 "error": {
                   "type": "string"
                 },
+                "errorRef": {
+                  "$ref": "#/$defs/__schema0"
+                },
                 "smoke": {
                   "type": "object",
                   "properties": {
@@ -31112,6 +31325,9 @@
                     },
                     "detail": {
                       "type": "string"
+                    },
+                    "detailRef": {
+                      "$ref": "#/$defs/__schema0"
                     }
                   },
                   "required": [
@@ -31163,7 +31379,40 @@
         "required": [
           "deploys"
         ],
-        "additionalProperties": false
+        "additionalProperties": false,
+        "$defs": {
+          "__schema0": {
+            "type": "object",
+            "properties": {
+              "key": {
+                "type": "string"
+              },
+              "params": {
+                "type": "object",
+                "propertyNames": {
+                  "type": "string"
+                },
+                "additionalProperties": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "$ref": "#/$defs/__schema0"
+                    }
+                  ]
+                }
+              }
+            },
+            "required": [
+              "key"
+            ],
+            "additionalProperties": false
+          }
+        }
       }
     },
     "workflow.list": {
@@ -32563,6 +32812,9 @@
                         },
                         "group": {
                           "type": "string"
+                        },
+                        "groupRef": {
+                          "$ref": "#/$defs/__schema0"
                         },
                         "status": {
                           "type": "string",
@@ -34752,6 +35004,9 @@
                           },
                           "group": {
                             "type": "string"
+                          },
+                          "groupRef": {
+                            "$ref": "#/$defs/__schema0"
                           },
                           "status": {
                             "type": "string",

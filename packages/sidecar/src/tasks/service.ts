@@ -50,9 +50,11 @@ import {
   buildEvidence,
   type Evidence,
   type FileChange,
+  named,
   notScanned,
   renderEvidence,
   type SecretsScan,
+  STATE_TEXT,
   sectionLines,
 } from "./evidence.ts";
 import { branchFolders, folderDirs, folderFileStats, removeFolderWorktrees, taskFolders } from "./folders.ts";
@@ -1526,7 +1528,8 @@ export async function mergeGates(root: string, id: string, gh: Gh | null) {
   const head = state.headSha;
   const gates: MergeGate[] = [];
   // Worked out on each call and never stored: shown in the app's language as they are (X-13 part 2b).
-  const say = (key: ResultKey, params?: Record<string, string | number>) => resultText(resultRef(key, params));
+  const say = (key: ResultKey, params?: Record<string, string | number | MessageRef>) =>
+    resultText(resultRef(key, params));
 
   const local = say("run.mergeGates.localLabel");
   const outcome = task.run?.outcomeRef ? resultText(task.run.outcomeRef) : task.run?.outcome;
@@ -1540,7 +1543,12 @@ export async function mergeGates(root: string, id: string, gh: Gh | null) {
             state: "pass",
             detail: say("run.mergeGates.accepted", { reason: task.run?.acceptance?.reason ?? "" }),
           }
-        : { id: "local", label: local, state: "fail", detail: say("run.mergeGates.runState", { state: task.state }) },
+        : {
+            id: "local",
+            label: local,
+            state: "fail",
+            detail: say("run.mergeGates.runState", { state: named(STATE_TEXT, task.state) }),
+          },
   );
 
   const rv = pr.review;

@@ -62,7 +62,7 @@
   "run.mergeGates.ciLabel": "CI",
   "run.mergeGates.runDone": "The run ended Done.",
   "run.mergeGates.accepted": "Accepted with risk: {{reason}}",
-  "run.mergeGates.runState": "The run is {{state}}.",
+  "run.mergeGates.runState": "The run's state: {{state}}.",
   "run.mergeGates.noReview": "No independent review covers this PR yet.",
   "run.mergeGates.reviewStale": "The PR changed since its review. Review it again.",
   "run.mergeGates.reviewUnreadable": "The review couldn't be read.",

@@ -1,0 +1,9 @@
+{
+  "deploy.smoke.timedOut": "`{{command}}` melewati batas waktu.",
+  "deploy.smoke.exited": "`{{command}}` keluar dengan exit code {{code}}",
+  "deploy.smoke.exitedWithOutput": "`{{command}}` keluar dengan exit code {{code}}: {{tail}}",
+  "deploy.smoke.answered": "GET {{url}} menjawab {{status}}.",
+  "deploy.smoke.failed": "GET {{url}} gagal: {{error}}",
+  "deploy.error.unreadableResult": "Deploy selesai, tetapi hasilnya tidak bisa dibaca dari output.",
+  "deploy.error.notDeployedYet": "Worker ini belum pernah di-deploy, jadi belum ada versi untuk pratinjau. Deploy sekali secara manual (`wrangler deploy`), lalu buat pratinjau dari sini. ({{tail}})"
+}

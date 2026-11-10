@@ -346,7 +346,7 @@ export function buildEvidence({
 }
 
 /** The words for a recorded value, by the value; one this doesn't know is shown as it is. */
-const STATE_TEXT: Partial<Record<string, ResultKey>> = {
+export const STATE_TEXT: Partial<Record<string, ResultKey>> = {
   done: "evidence.state.done",
   failed: "evidence.state.failed",
   unverified: "evidence.state.unverified",
@@ -389,7 +389,7 @@ const VERDICT_TEXT: Partial<Record<string, ResultKey>> = {
   unreadable: "evidence.verdict.unreadable",
 };
 
-const SEVERITY_TEXT: Partial<Record<string, ResultKey>> = {
+export const SEVERITY_TEXT: Partial<Record<string, ResultKey>> = {
   "must-fix": "evidence.severity.mustFix",
   "should-fix": "evidence.severity.shouldFix",
   note: "evidence.severity.note",
@@ -401,7 +401,8 @@ const RISK_TEXT: Partial<Record<string, ResultKey>> = {
   low: "evidence.risk.low",
 };
 
-const named = (words: Partial<Record<string, ResultKey>>, value: string): MessageRef | string => {
+/** A recorded value as words the app translates; one the map doesn't know as it is. */
+export const named = (words: Partial<Record<string, ResultKey>>, value: string): MessageRef | string => {
   const key = words[value];
   return key ? resultRef(key) : value;
 };
@@ -622,14 +623,17 @@ export function renderEvidence(e: Evidence, render: (ref: MessageRef) => string 
       const where = { env: d.env, adapter: d.adapter, commit: d.commit.slice(0, 7) };
       add(
         d.status !== "done"
-          ? r("evidence.deploy.failed", { ...where, error: d.error ?? resultRef("evidence.deploy.noDetail") })
+          ? r("evidence.deploy.failed", {
+              ...where,
+              error: d.errorRef ?? d.error ?? resultRef("evidence.deploy.noDetail"),
+            })
           : d.smoke
             ? r("evidence.deploy.doneSmoke", {
                 ...where,
                 url: String(d.url),
                 how: d.smoke.how,
                 result: resultRef(d.smoke.ok ? "evidence.deploy.smokePassed" : "evidence.deploy.smokeFailed"),
-                detail: d.smoke.detail,
+                detail: d.smoke.detailRef ?? d.smoke.detail,
               })
             : r("evidence.deploy.done", { ...where, url: String(d.url) }),
       );

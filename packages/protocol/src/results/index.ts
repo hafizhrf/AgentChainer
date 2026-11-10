@@ -1,10 +1,12 @@
 import { catalog, currentLanguage, type KeyOf, type Language, type Params } from "../i18n.ts";
 import type { MessageRef } from "../index.ts";
+import deploy from "./en/deploy.json" with { type: "json" };
 import evidence from "./en/evidence.json" with { type: "json" };
 import lessons from "./en/lessons.json" with { type: "json" };
 import run from "./en/run.json" with { type: "json" };
 import triage from "./en/triage.json" with { type: "json" };
 import xl from "./en/xl.json" with { type: "json" };
+import deployId from "./id/deploy.json" with { type: "json" };
 import evidenceId from "./id/evidence.json" with { type: "json" };
 import lessonsId from "./id/lessons.json" with { type: "json" };
 import runId from "./id/run.json" with { type: "json" };
@@ -13,18 +15,26 @@ import xlId from "./id/xl.json" with { type: "json" };
 
 /**
  * Task results (X-13 part 2b): the outcomes, step labels and notes, triage details, lesson sources and evidence
- * report lines the sidecar writes. They're stored as English text plus a `MessageRef`, so the app shows them in its
+ * report lines the sidecar writes, and a deploy's smoke test and error (X-15). They're stored as English text plus a `MessageRef`, so the app shows them in its
  * language while pull requests, `evidence.md` and Claude get English. Shared by the UI and the sidecar, so both render
  * the same templates. Both languages are bundled.
  */
-export const RESULTS = { run, xl, triage, lessons, evidence };
-export const RESULTS_INDONESIAN = { run: runId, xl: xlId, triage: triageId, lessons: lessonsId, evidence: evidenceId };
+export const RESULTS = { run, xl, triage, lessons, evidence, deploy };
+export const RESULTS_INDONESIAN = {
+  run: runId,
+  xl: xlId,
+  triage: triageId,
+  lessons: lessonsId,
+  evidence: evidenceId,
+  deploy: deployId,
+};
 
 const english = Object.assign({}, ...Object.values(RESULTS)) as typeof run &
   typeof xl &
   typeof triage &
   typeof lessons &
-  typeof evidence;
+  typeof evidence &
+  typeof deploy;
 const results = catalog(english, { id: () => Object.assign({}, ...Object.values(RESULTS_INDONESIAN)) });
 
 export type ResultKey = KeyOf<typeof english>;

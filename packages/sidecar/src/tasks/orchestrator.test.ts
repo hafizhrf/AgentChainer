@@ -486,6 +486,14 @@ describe("orchestrator", () => {
       ["Plan", "Plan", "Plan", null],
       "the planners share their group; implement has none",
     );
+    // The group's name comes in the workflow's translation too (X-15); the record keeps the English.
+    assert.deepEqual(resultEnglish(done.run?.steps[1]?.groupRef ?? { key: "" }), "Plan");
+    await setLanguage("id");
+    try {
+      assert.equal(resultText(done.run?.steps[1]?.groupRef ?? { key: "" }), "Rencana");
+    } finally {
+      await setLanguage("en");
+    }
     const plan = files.get("plan.md") ?? "";
     assert.match(
       plan,

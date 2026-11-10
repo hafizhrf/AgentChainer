@@ -1,10 +1,13 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
+import { currentLanguage } from "@agentchainer/protocol";
+import { useLanguage } from "../i18n/index.ts";
 import type { AgentSdkModule } from "../sdk-loader.ts";
 import { generatePrompt, generateWorkflow } from "./generate-workflow.ts";
 import shipped from "./library.json" with { type: "json" };
 import { LibrarySchema } from "./library.ts";
+import { checkWorkflowText } from "./project-workflows.ts";
 
 const library = LibrarySchema.parse(shipped);
 const m = readFileSync(new URL("../../../../catalog/workflows/m.yaml", import.meta.url), "utf8");
@@ -47,6 +50,23 @@ describe("workflows made by AI (UX-14)", () => {
     assert.equal(r.yaml, m);
     assert.equal(r.costUsd, 0.06);
     assert.match(calls[1]?.prompt ?? "", /Your last answer was refused[\s\S]*wizard/);
+  });
+
+  it("tells Claude why in English while the app speaks Indonesian, and the person in Indonesian (X-15)", async () => {
+    const broken = m.replace("tier: M", "tier: S");
+    const english = checkWorkflowText("M", broken, library);
+    useLanguage("id");
+    try {
+      const shown = checkWorkflowText("M", broken, library);
+      assert.ok(english && shown && english !== shown, "the check speaks the app's language");
+      const { sdk, calls } = scripted([broken, broken]);
+      const r = await generateWorkflow(sdk, "claude", "/w", "M", m, { description: "x" }, library);
+      assert.ok(calls[1]?.prompt.includes(`Why: ${english}`), "Claude reads the English");
+      assert.ok(r.error?.includes(shown), "the person reads their language");
+      assert.equal(currentLanguage(), "id");
+    } finally {
+      useLanguage("en");
+    }
   });
 
   it("gives up after the second answer fails too, and says why", async () => {

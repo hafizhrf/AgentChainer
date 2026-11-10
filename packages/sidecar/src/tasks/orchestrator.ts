@@ -453,9 +453,9 @@ export class Orchestrator {
 
   private async turnOf(
     step: AgentStep,
-    opts: { group?: string; labelRef?: MessageRef; noBudget?: Said } = {},
+    opts: { group?: string; groupRef?: MessageRef; labelRef?: MessageRef; noBudget?: Said } = {},
   ): Promise<{ id: string; out: AgentOutcome } | null> {
-    const { group } = opts;
+    const { group, groupRef } = opts;
     const labelRef = opts.labelRef ?? this.labelOf(step);
     // A write step's session also takes its fix rounds, and the SDK caps a session as a whole: it gets what's left of
     // the task's budget. Read steps are fresh sessions with caps of their own.
@@ -477,6 +477,7 @@ export class Orchestrator {
       kind: "agent",
       role: step.role,
       ...(group ? { group } : {}),
+      ...(groupRef ? { groupRef } : {}),
     });
     const tag = this.tag(id, step.label, step.role);
     const out = previous
@@ -550,7 +551,8 @@ export class Orchestrator {
       while (next < members.length && !this.cancelled) {
         const i = next++;
         const member = members[i];
-        if (member) answers[i] = (await this.turnOf(member, { group: step.label }))?.out ?? null;
+        if (member)
+          answers[i] = (await this.turnOf(member, { group: step.label, groupRef: this.labelOf(step) }))?.out ?? null;
       }
     };
     await Promise.all(Array.from({ length: Math.min(MAX_PARALLEL, members.length) }, worker));

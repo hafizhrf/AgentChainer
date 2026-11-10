@@ -157,6 +157,19 @@ A change to the English shows its translation in the same diff.
 **The eval report (M7-03)** hashes a workflow without its `i18n` block, since translations don't change what a run
 reads. Translating a workflow needs no new benchmark, while a change to its steps still does.
 
+### Addendum (2026-11-10): the leftovers (X-15)
+
+- **English for what was shown in another language:** each catalog remembers the English of the last ~2,000
+  messages it rendered in another language. `inEnglish(text)` gives that English, or the text as it is. A catalog's
+  `english()` maps its string values through it, so an English result quoting an error raised in Indonesian reads in
+  English. It's a translation memory: no decision depends on it.
+- **A check whose words go to Claude:** `inEnglishNow(fn)` runs a synchronous function with every catalog and zod
+  in English, then switches back in the same turn of the event loop.
+- **Deploys:** a deploy record keeps its smoke detail and the sidecar's own errors as English plus a ref (a `deploy`
+  results catalog). The CLI's output stays as written.
+- **Punctuation:** a value that ends a sentence swallows the full stop the message puts right after it.
+- **Setup runs' warnings,** plugin warnings included, keep the language they were written in, as above.
+
 ## Alternatives considered
 
 | Option | Pros | Cons | Why not chosen |

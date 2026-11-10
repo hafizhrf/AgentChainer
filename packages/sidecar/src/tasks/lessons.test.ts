@@ -148,7 +148,8 @@ describe("lesson signals (M8-06)", () => {
         [
           "`pnpm typecheck` gagal, lalu lulus setelah diperbaiki:\nsrc/a.ts(3,1): error TS2304: Cannot find name 'x'.",
           "Formatter menulis ulang 2 file: src/a.ts, src/b.ts",
-          "must-fix di src/cart.js: Rounds half down; the spec says half up.",
+          // The severity is a word the app translates too (X-15).
+          "wajib diperbaiki di src/cart.js: Rounds half down; the spec says half up.",
           "Bash `rm -rf dist` diblokir: a recursive delete",
           "Anda menolak Bash `npm publish`",
           "The cart module has no types.",

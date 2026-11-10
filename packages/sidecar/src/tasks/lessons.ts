@@ -17,7 +17,7 @@ import { AC_DIR, ensureIgnored } from "../ac-dir.ts";
 import { applyFileEdits } from "../bootstrap/apply.ts";
 import { t } from "../i18n/index.ts";
 import type { AgentSdkModule } from "../sdk-loader.ts";
-import type { Evidence } from "./evidence.ts";
+import { type Evidence, named, SEVERITY_TEXT } from "./evidence.ts";
 import { result } from "./result.ts";
 
 /**
@@ -45,7 +45,7 @@ const keyOf = (kind: string, pkg: string) => (pkg === "." ? kind : `${kind} (${p
  */
 function said(
   key: ResultKey,
-  params: Record<string, string | number>,
+  params: Record<string, string | number | MessageRef>,
   last: string,
 ): { text: string; textRef?: MessageRef } {
   const full = result(key, params);
@@ -96,8 +96,12 @@ export function lessonSignals(e: Evidence): Signal[] {
       source: "review",
       ref: `review:${i + 1}`,
       ...(f.file
-        ? said("lessons.signal.reviewIn", { severity: f.severity, file: f.file, text: f.text }, "text")
-        : said("lessons.signal.review", { severity: f.severity, text: f.text }, "text")),
+        ? said(
+            "lessons.signal.reviewIn",
+            { severity: named(SEVERITY_TEXT, f.severity), file: f.file, text: f.text },
+            "text",
+          )
+        : said("lessons.signal.review", { severity: named(SEVERITY_TEXT, f.severity), text: f.text }, "text")),
     });
   }
   for (const [i, b] of e.security.guardBlocks.entries()) {

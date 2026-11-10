@@ -1,7 +1,17 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import type { AgentEvent } from "@agentchainer/protocol";
-import { agentUsd, budgetWarning, folderName, isFresh, newTab, type Tab, tabEvent, updateTab } from "./tabs.ts";
+import {
+  agentUsd,
+  budgetWarning,
+  folderName,
+  isFresh,
+  newTab,
+  orphanChats,
+  type Tab,
+  tabEvent,
+  updateTab,
+} from "./tabs.ts";
 
 const done = (totalCostUsd: number): AgentEvent => ({
   type: "turn.completed",
@@ -144,5 +154,33 @@ describe("background tasks (M4-07)", () => {
     assert.equal(tab.running, true);
     tab = tabEvent(tab, { type: "background.changed", tasks: [] });
     assert.deepEqual(tab.background, []);
+  });
+});
+
+describe("orphanChats (M1-36)", () => {
+  const item = (sessionId: string, more: Record<string, unknown> = {}) => ({
+    sessionId,
+    cwd: "/w",
+    status: "idle" as const,
+    waiting: 0,
+    costUsd: 0,
+    startedAt: "2026-11-10T00:00:00Z",
+    since: "2026-11-10T00:00:00Z",
+    ...more,
+  });
+
+  it("finds the running chats a reload left without a tab, and nothing else", () => {
+    const items = [
+      item("open"),
+      item("lost"),
+      item("lost-working", { status: "working" }),
+      item("ended", { status: "ended" }),
+      item("step", { task: { id: "t1", cwd: "/w", stepId: "implement", label: "Implement" } }),
+      item("worker", { parentId: "open" }),
+    ];
+    assert.deepEqual(
+      orphanChats(items, [{ sessionId: "open" }]).map((i) => i.sessionId),
+      ["lost", "lost-working"],
+    );
   });
 });

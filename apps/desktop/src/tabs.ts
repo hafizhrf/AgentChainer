@@ -1,6 +1,7 @@
 import type {
   AgentEvent,
   Effort,
+  FleetItem,
   ModelOption,
   PermissionMode,
   PermissionRequest,
@@ -250,6 +251,15 @@ export function permissionAnswered(tab: Tab, requestId: string, now: number): Ta
 export function closeWaits(waits: Wait[], now: number | undefined): Wait[] {
   if (now === undefined || waits.every((w) => w.end !== undefined)) return waits;
   return waits.map((w) => (w.end === undefined ? { ...w, end: now } : w));
+}
+
+/**
+ * Chats the runtime still runs that have no tab (M1-36): a WebView reload wipes the tabs but not the sidecar's
+ * sessions. A task's steps and a Team's workers have owners of their own, and an ended session needs no tab.
+ */
+export function orphanChats(items: FleetItem[], tabs: Pick<Tab, "sessionId">[]): FleetItem[] {
+  const open = new Set(tabs.map((x) => x.sessionId));
+  return items.filter((i) => !i.task && !i.parentId && i.status !== "ended" && !open.has(i.sessionId));
 }
 
 export function updateTab(tabs: Tab[], sessionId: string, fn: (tab: Tab) => Tab): Tab[] {

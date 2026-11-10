@@ -51,6 +51,7 @@ import {
   removeMcpServer,
   uninstallPlugin,
 } from "./installer.ts";
+import { liveResume } from "./live-resume.ts";
 import { normalize } from "./normalize.ts";
 import { listRules, removeRule } from "./permissions.ts";
 import { cliError, installListed, listPluginsFor, parseDetails, uninstallListed, updateListed } from "./plugins.ts";
@@ -347,8 +348,21 @@ serve(
       if (!claudePath) {
         throw new RpcFailure(RpcErrorCode.claudeNotFound, t("rpc.claude.notFoundSeeGuide"));
       }
-      if (resume && sessions.has(resume)) {
-        throw new RpcFailure(RpcErrorCode.sessionOpen, t("rpc.session.alreadyOpen"));
+      // A session still running (M1-36): a chat whose tab a reload wiped is handed back, with the options the tab asks
+      // for; a task's step or a Team worker stays with its owner.
+      const live = resume ? sessions.get(resume) : undefined;
+      const already = liveResume(live);
+      if (already.kind === "busy") {
+        throw new RpcFailure(
+          RpcErrorCode.sessionOpen,
+          already.task ? t("rpc.session.runningAsStep", { task: already.task }) : t("rpc.session.runningAsWorker"),
+        );
+      }
+      if (live && already.kind === "attach") {
+        if (permissionMode) await live.setMode(permissionMode);
+        if (model !== undefined) await live.setModel(model);
+        if (effort !== undefined) await live.setEffort(effort);
+        return { sessionId: live.id, attached: true };
       }
       // An agent profile (M8-04): its instructions come before the chat's own, and only its tools are there. A Team
       // chat keeps its MCP tools, the app's own among them.

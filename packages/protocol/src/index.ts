@@ -1513,7 +1513,11 @@ export const methodSchemas = {
        */
       profile: AgentNameSchema.optional(),
     }),
-    result: z.object({ sessionId: SessionIdSchema }),
+    /**
+     * `attached`: the session was still running, e.g. after the window reloaded, and was handed back as it is
+     * (M1-36). Its history comes from `session.history` as for any resume.
+     */
+    result: z.object({ sessionId: SessionIdSchema, attached: z.boolean().optional() }),
   },
   /**
    * `messageId` is the user message's uuid: the anchor for "Rewind files to here" (M1-23). `images` are pasted

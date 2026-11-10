@@ -12,23 +12,21 @@ import {
   type Task,
   type TaskTag,
 } from "@agentchainer/protocol";
+import { type ClaudeHost, claudeBackend } from "../backends/claude.ts";
+import type { StepOptions, StepSession } from "../backends/types.ts";
 import { detectWorkspace } from "../detect/detect.ts";
 import { GUARD_PREFIX } from "../guard.ts";
-import type { AgentSdkModule } from "../sdk-loader.ts";
-import { Session } from "../session.ts";
 import { git, repoOf } from "../workspace.ts";
 import type { FileChange } from "./evidence.ts";
 import { resolveGates, runGates } from "./gates.ts";
 import type { AgentStep, Library } from "./library.ts";
 import { type AgentOutcome, REVIEW_JSON_SCHEMA, type Runner } from "./orchestrator.ts";
 
-/** What the runner needs from the sidecar: the SDK, and the session registry and notifications of `main.ts`. */
-export type SessionHost = {
-  sdk: AgentSdkModule;
-  claudePath: string;
-  /** Adds a step's session where `permission.respond` and `session.interrupt` find it. */
-  register(session: Session): void;
-  unregister(sessionId: string): void;
+/**
+ * What the runner needs from the sidecar: the Claude CLI and the session registry (`register` adds a step's session
+ * where `permission.respond` and `session.interrupt` find it), and the notifications of `main.ts`.
+ */
+export type SessionHost = ClaudeHost & {
   event(sessionId: string, event: AgentEvent, task: TaskTag): void;
   permission(sessionId: string, request: Omit<PermissionRequest, "sessionId" | "task">, task: TaskTag): void;
   /** A step's session changed its fleet status (M8-02). */
@@ -166,98 +164,94 @@ export function sessionRunner(
   const run = task.run;
   if (!run) throw new Error("The task has no run.");
   /** Write steps' sessions, kept open for their fix rounds. */
-  const live = new Map<string, Session>();
+  const live = new Map<string, StepSession>();
   /** Every session still open, to stop or close them. */
-  const open = new Set<Session>();
+  const open = new Set<StepSession>();
+  /** The agent a step runs on (ADR-0012): Claude for now; M9-06 lets a step, a task or the workspace choose. */
+  const backend = claudeBackend(host);
   /** The tag each session's events carry now: it follows the timeline entry (a step, then its fixes). */
   const tags = new Map<string, TaskTag>();
   let gatesAbort: AbortController | null = null;
   /** Sessions in a turn now, newest last, with whether each is a write step's: where the person's message goes. */
-  const inTurn: { session: Session; write: boolean }[] = [];
+  const inTurn: { session: StepSession; write: boolean }[] = [];
   /** Tool calls in progress, to tell what a guard block was. */
   const started = new Map<string, { tool: string; input: Record<string, unknown> }>();
 
-  const openSession = (step: AgentStep, budgetUsd: number, resume?: string): Session => {
+  const openSession = (step: AgentStep, budgetUsd: number, resume?: string): StepSession => {
     const role = library.roles[step.role];
     if (!role) throw new Error(`No role ${step.role} in the library.`);
     const model = role.model !== "inherit" ? role.model : run.model;
-    const session: Session = new Session(
-      host.sdk,
-      {
-        cwd: root,
-        // The other folders' worktrees, so a step reaches them and the guard allows them (M8-01).
-        ...(others.length ? { additionalDirectories: others.map((o) => o.dir) } : {}),
-        claudePath: host.claudePath,
-        ...(model ? { model } : {}),
-        // Read steps only have read tools, which need no approval; write steps ask in the profile picked at Run.
-        permissionMode: step.access === "write" ? run.permissionMode : "default",
-        // A task with no budget gives its write step no cap at all (UX-13).
-        ...(Number.isFinite(budgetUsd) ? { maxBudgetUsd: budgetUsd } : {}),
-        readOnly: step.access === "read",
-        appendSystemPrompt: role.prompt,
-        maxTurns: step.limits.maxTurns,
-        ...(step.output === "review" ? { outputFormat: { type: "json_schema", schema: REVIEW_JSON_SCHEMA } } : {}),
-        ...(resume ? { resume } : {}),
-      },
-      {
-        emit: (event) => {
-          const tag = tags.get(session.id);
-          if (event.type === "tool.started")
-            started.set(event.toolUseId, { tool: event.name, input: (event.input ?? {}) as Record<string, unknown> });
-          if (event.type === "tool.completed") {
-            const call = started.get(event.toolUseId);
-            started.delete(event.toolUseId);
-            const at = event.output.indexOf(GUARD_PREFIX);
-            if (call && tag && event.isError && at !== -1) {
-              recorder.guardBlock({
-                stepId: tag.stepId,
-                tool: call.tool,
-                target: targetOf(describeRequest(call.tool, call.input, root), call.tool, root),
-                reason:
-                  event.output
-                    .slice(at + GUARD_PREFIX.length)
-                    .split("\n")[0]
-                    ?.trim() ?? "",
-                at: new Date().toISOString(),
-              });
-            }
+    const options: StepOptions = {
+      cwd: root,
+      // The other folders' worktrees, so a step reaches them and the guard allows them (M8-01).
+      ...(others.length ? { additionalDirectories: others.map((o) => o.dir) } : {}),
+      ...(model ? { model } : {}),
+      // Read steps only have read tools, which need no approval; write steps ask in the profile picked at Run.
+      permissionMode: step.access === "write" ? run.permissionMode : "default",
+      // A task with no budget gives its write step no cap at all (UX-13).
+      ...(Number.isFinite(budgetUsd) ? { maxBudgetUsd: budgetUsd } : {}),
+      readOnly: step.access === "read",
+      appendSystemPrompt: role.prompt,
+      maxTurns: step.limits.maxTurns,
+      ...(step.output === "review" ? { outputFormat: { type: "json_schema", schema: REVIEW_JSON_SCHEMA } } : {}),
+      ...(resume ? { resume } : {}),
+    };
+    const session = backend(options, {
+      emit: (event) => {
+        const tag = tags.get(session.id);
+        if (event.type === "tool.started")
+          started.set(event.toolUseId, { tool: event.name, input: (event.input ?? {}) as Record<string, unknown> });
+        if (event.type === "tool.completed") {
+          const call = started.get(event.toolUseId);
+          started.delete(event.toolUseId);
+          const at = event.output.indexOf(GUARD_PREFIX);
+          if (call && tag && event.isError && at !== -1) {
+            recorder.guardBlock({
+              stepId: tag.stepId,
+              tool: call.tool,
+              target: targetOf(describeRequest(call.tool, call.input, root), call.tool, root),
+              reason:
+                event.output
+                  .slice(at + GUARD_PREFIX.length)
+                  .split("\n")[0]
+                  ?.trim() ?? "",
+              at: new Date().toISOString(),
+            });
           }
-          if (tag) host.event(session.id, event, tag);
-        },
-        answered: (request, answer) => {
-          const tag = tags.get(session.id);
-          if (!tag) return;
-          const described = describeRequest(request.toolName, request.input, root);
-          recorder.approval({
-            stepId: tag.stepId,
-            label: tag.label,
-            tool: request.toolName,
-            target: targetOf(described, request.toolName, root),
-            risk: described.risk.level,
-            reasons: described.risk.reasons,
-            allowed: answer.allow,
-            always: answer.always === true,
-            at: new Date().toISOString(),
-          });
-        },
-        askPermission: (request) => {
-          const tag = tags.get(session.id);
-          if (tag) host.permission(session.id, request, tag);
-        },
-        statusChanged: (item) => host.status?.(item),
-        onEnd: () => {
-          open.delete(session);
-          host.unregister(session.id);
-          if (live.get(step.id) === session) live.delete(step.id);
-        },
+        }
+        if (tag) host.event(session.id, event, tag);
       },
-    );
+      answered: (request, answer) => {
+        const tag = tags.get(session.id);
+        if (!tag) return;
+        const described = describeRequest(request.toolName, request.input, root);
+        recorder.approval({
+          stepId: tag.stepId,
+          label: tag.label,
+          tool: request.toolName,
+          target: targetOf(described, request.toolName, root),
+          risk: described.risk.level,
+          reasons: described.risk.reasons,
+          allowed: answer.allow,
+          always: answer.always === true,
+          at: new Date().toISOString(),
+        });
+      },
+      askPermission: (request) => {
+        const tag = tags.get(session.id);
+        if (tag) host.permission(session.id, request, tag);
+      },
+      statusChanged: (item) => host.status?.(item),
+      onEnd: () => {
+        open.delete(session);
+        if (live.get(step.id) === session) live.delete(step.id);
+      },
+    });
     open.add(session);
-    host.register(session);
     return session;
   };
 
-  const turn = async (session: Session, prompt: string, write = false): Promise<AgentOutcome> => {
+  const turn = async (session: StepSession, prompt: string, write = false): Promise<AgentOutcome> => {
     const entry = { session, write };
     inTurn.push(entry);
     try {

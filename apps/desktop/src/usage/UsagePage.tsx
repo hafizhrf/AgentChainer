@@ -1,7 +1,7 @@
 import { USAGE_FAMILIES, type UsageFamily, type UsageReport } from "@agentchainer/protocol";
 import { save } from "@tauri-apps/plugin-dialog";
 import { BarChart3, Download, Loader2, RefreshCw } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { approxUsd } from "../i18n/format.ts";
 import { t } from "../i18n/index.ts";
 import { modelName } from "../modelName.ts";
@@ -60,7 +60,7 @@ export function UsagePage({ workspaces }: { workspaces: string[] }) {
   };
 
   return (
-    <div className="usage">
+    <div className="usage-page">
       <header className="usage-header">
         <BarChart3 size={18} aria-hidden />
         <h1>{t("graph.usage.title")}</h1>
@@ -129,15 +129,26 @@ function UsageBody({ report }: { report: UsageReport }) {
   const present = USAGE_FAMILIES.filter((f) => report.byModel.some((m) => m.family === f));
   return (
     <>
-      <section className="usage-tiles" aria-label={t("graph.usage.totals")}>
-        <Tile label={t("graph.usage.cost")} value={usd(totals.costUsd)} hint={t("graph.usage.costHint")} />
-        <Tile label={t("graph.usage.tokens")} value={short(totals.tokens)} hint={count(totals.tokens)} />
-        <Tile label={t("graph.usage.sessions")} value={count(totals.sessions)} />
+      <section className="metric-tiles" aria-label={t("graph.usage.totals")}>
+        <Tile label={t("graph.usage.cost")} value={usd(totals.costUsd)} detail={t("graph.usage.costHint")} />
+        <Tile
+          label={t("graph.usage.tokens")}
+          value={short(totals.tokens)}
+          detail={t("graph.usage.tokensDetail", {
+            input: short(totals.input + totals.cacheRead + totals.cacheWrite),
+            output: short(totals.output),
+          })}
+        />
+        <Tile
+          label={t("graph.usage.sessions")}
+          value={count(totals.sessions)}
+          detail={t("graph.usage.sessionsDetail", { projects: count(report.byProject.length) })}
+        />
         {totals.unpricedTokens > 0 && (
           <Tile
             label={t("graph.usage.unpriced")}
             value={short(totals.unpricedTokens)}
-            hint={t("graph.usage.unpricedHint", { tokens: count(totals.unpricedTokens) })}
+            detail={t("graph.usage.unpricedHint", { tokens: count(totals.unpricedTokens) })}
           />
         )}
       </section>
@@ -145,98 +156,98 @@ function UsageBody({ report }: { report: UsageReport }) {
       <section className="card usage-chart-card" aria-labelledby="usage-daily">
         <div className="card-title">
           <h2 id="usage-daily">{t("graph.usage.daily")}</h2>
+          <span className="grow" />
+          <ul className="usage-legend" aria-label={t("graph.usage.legend")}>
+            {present.map((f) => (
+              <li key={f}>
+                <span className={`usage-swatch series-${f}`} aria-hidden />
+                {FAMILY_NAMES[f]}
+              </li>
+            ))}
+          </ul>
         </div>
-        <ul className="usage-legend" aria-label={t("graph.usage.legend")}>
-          {present.map((f) => (
-            <li key={f}>
-              <span className={`usage-swatch series-${f}`} aria-hidden />
-              {FAMILY_NAMES[f]}
-            </li>
-          ))}
-        </ul>
         <DailyChart bars={bars} families={present} />
       </section>
 
-      <section className="card" aria-labelledby="usage-models">
-        <div className="card-title">
-          <h2 id="usage-models">{t("graph.usage.byModel")}</h2>
-        </div>
-        <table className="usage-table">
-          <thead>
-            <tr>
-              <th>{t("graph.usage.model")}</th>
-              <th className="num">{t("graph.usage.sessions")}</th>
-              <th className="num">{t("graph.usage.tokens")}</th>
-              <th className="num">{t("graph.usage.cost")}</th>
-            </tr>
-          </thead>
-          <tbody>
-            {report.byModel.map((m) => (
-              <tr key={m.model}>
-                <td>
-                  <span className={`usage-swatch series-${m.family}`} aria-hidden />
-                  <span title={m.model}>{modelName(m.model)}</span>
-                  <span className="muted"> · {FAMILY_NAMES[m.family]}</span>
-                </td>
-                <td className="num">{count(m.sessions)}</td>
-                <td className="num" title={count(m.tokens)}>
-                  {short(m.tokens)}
-                </td>
-                <td className="num">{m.unpricedTokens && !m.costUsd ? t("graph.usage.noPrice") : usd(m.costUsd)}</td>
+      <div className="metrics-tables">
+        <section className="card" aria-labelledby="usage-models">
+          <h2 id="usage-models" className="usage-card-heading">
+            {t("graph.usage.byModel")}
+          </h2>
+          <table className="metrics-table">
+            <thead>
+              <tr>
+                <th scope="col">{t("graph.usage.model")}</th>
+                <th scope="col">{t("graph.usage.sessions")}</th>
+                <th scope="col">{t("graph.usage.tokens")}</th>
+                <th scope="col">{t("graph.usage.cost")}</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
-      </section>
+            </thead>
+            <tbody>
+              {report.byModel.map((m) => (
+                <tr key={m.model}>
+                  <th scope="row" title={m.model}>
+                    <span className={`usage-swatch series-${m.family}`} aria-hidden />
+                    {modelName(m.model)}
+                  </th>
+                  <td>{count(m.sessions)}</td>
+                  <td title={count(m.tokens)}>{short(m.tokens)}</td>
+                  <td>{m.unpricedTokens && !m.costUsd ? t("graph.usage.noPrice") : usd(m.costUsd)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </section>
 
-      <section className="card" aria-labelledby="usage-projects">
-        <div className="card-title">
-          <h2 id="usage-projects">{t("graph.usage.byProject")}</h2>
-        </div>
-        <table className="usage-table">
-          <thead>
-            <tr>
-              <th>{t("graph.usage.project")}</th>
-              <th className="num">{t("graph.usage.sessions")}</th>
-              <th className="num">{t("graph.usage.tokens")}</th>
-              <th className="num">{t("graph.usage.cost")}</th>
-            </tr>
-          </thead>
-          <tbody>
-            {report.byProject.slice(0, 15).map((p) => (
-              <tr key={p.project}>
-                <td title={p.project}>{p.project ? folderName(p.project) : t("graph.usage.unknownProject")}</td>
-                <td className="num">{count(p.sessions)}</td>
-                <td className="num" title={count(p.tokens)}>
-                  {short(p.tokens)}
-                </td>
-                <td className="num">{usd(p.costUsd)}</td>
+        <section className="card" aria-labelledby="usage-projects">
+          <h2 id="usage-projects" className="usage-card-heading">
+            {t("graph.usage.byProject")}
+          </h2>
+          <table className="metrics-table">
+            <thead>
+              <tr>
+                <th scope="col">{t("graph.usage.project")}</th>
+                <th scope="col">{t("graph.usage.sessions")}</th>
+                <th scope="col">{t("graph.usage.tokens")}</th>
+                <th scope="col">{t("graph.usage.cost")}</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
-        {report.byProject.length > 15 && (
-          <p className="muted usage-more">{t("graph.usage.moreProjects", { count: report.byProject.length - 15 })}</p>
-        )}
-      </section>
+            </thead>
+            <tbody>
+              {report.byProject.slice(0, 10).map((p) => (
+                <tr key={p.project}>
+                  <th scope="row" title={p.project} className="usage-cell-text">
+                    {p.project ? folderName(p.project) : t("graph.usage.unknownProject")}
+                  </th>
+                  <td>{count(p.sessions)}</td>
+                  <td title={count(p.tokens)}>{short(p.tokens)}</td>
+                  <td>{usd(p.costUsd)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {report.byProject.length > 10 && (
+            <p className="muted usage-more">{t("graph.usage.moreProjects", { count: report.byProject.length - 10 })}</p>
+          )}
+        </section>
+      </div>
 
       <section className="card" aria-labelledby="usage-top">
-        <div className="card-title">
-          <h2 id="usage-top">{t("graph.usage.topSessions")}</h2>
-        </div>
-        <table className="usage-table">
+        <h2 id="usage-top" className="usage-card-heading">
+          {t("graph.usage.topSessions")}
+        </h2>
+        <table className="metrics-table">
           <thead>
             <tr>
-              <th>{t("graph.usage.session")}</th>
-              <th>{t("graph.usage.day")}</th>
-              <th className="num">{t("graph.usage.tokens")}</th>
-              <th className="num">{t("graph.usage.cost")}</th>
+              <th scope="col">{t("graph.usage.session")}</th>
+              <th scope="col">{t("graph.usage.day")}</th>
+              <th scope="col">{t("graph.usage.tokens")}</th>
+              <th scope="col">{t("graph.usage.cost")}</th>
             </tr>
           </thead>
           <tbody>
-            {report.sessions.slice(0, 20).map((s) => (
+            {report.sessions.slice(0, 15).map((s) => (
               <tr key={s.id}>
-                <td>
+                <th scope="row" className="usage-cell-text">
                   <span className="usage-title" title={s.title}>
                     {s.title}
                   </span>
@@ -245,12 +256,10 @@ function UsageBody({ report }: { report: UsageReport }) {
                       .filter(Boolean)
                       .join(" · ")}
                   </span>
-                </td>
+                </th>
                 <td>{s.day}</td>
-                <td className="num" title={count(s.tokens)}>
-                  {short(s.tokens)}
-                </td>
-                <td className="num">{usd(s.costUsd)}</td>
+                <td title={count(s.tokens)}>{short(s.tokens)}</td>
+                <td>{usd(s.costUsd)}</td>
               </tr>
             ))}
           </tbody>
@@ -260,11 +269,12 @@ function UsageBody({ report }: { report: UsageReport }) {
   );
 }
 
-function Tile({ label, value, hint }: { label: string; value: string; hint?: string }) {
+function Tile({ label, value, detail }: { label: string; value: string; detail?: string }) {
   return (
-    <div className="card usage-tile" title={hint}>
-      <span className="muted">{label}</span>
-      <strong>{value}</strong>
+    <div className="metric-tile usage-tile">
+      <span className="metric-label">{label}</span>
+      <span className="metric-value">{value}</span>
+      {detail && <span className="metric-detail muted">{detail}</span>}
     </div>
   );
 }
@@ -275,7 +285,18 @@ const PAD = { top: 8, right: 8, bottom: 22, left: 52 };
 /** Estimated cost per day, stacked by family. Each bar answers on hover; the tables hold the numbers too. */
 function DailyChart({ bars, families }: { bars: DayBar[]; families: readonly UsageFamily[] }) {
   const [hover, setHover] = useState<number | null>(null);
-  const W = 720;
+  // Drawn at the card's real width, so text and marks keep their size at any window width.
+  const box = useRef<HTMLDivElement>(null);
+  const [W, setW] = useState(720);
+  useEffect(() => {
+    const el = box.current;
+    if (!el) return;
+    const fit = () => setW(Math.max(320, Math.round(el.clientWidth)));
+    fit();
+    const ro = new ResizeObserver(fit);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
   const max = Math.max(...bars.map((b) => b.total), 0);
   const top = niceMax(max);
   const plotW = W - PAD.left - PAD.right;
@@ -284,10 +305,13 @@ function DailyChart({ bars, families }: { bars: DayBar[]; families: readonly Usa
   const barW = Math.max(2, Math.min(28, slot * 0.7));
   const y = (v: number) => PAD.top + plotH - (top ? (v / top) * plotH : 0);
   const ticks = [0, top / 2, top];
-  const labelEvery = Math.ceil(bars.length / 8);
+  // About one date label per 72px; the last day is labelled unless the one before it is too close.
+  const labelEvery = Math.max(1, Math.ceil(bars.length / Math.max(2, Math.floor(plotW / 72))));
+  const labelled = (i: number) =>
+    i === bars.length - 1 ? (bars.length - 1) % labelEvery >= labelEvery / 2 || labelEvery === 1 : i % labelEvery === 0;
   const shown = hover === null ? null : bars[hover];
   return (
-    <div className="usage-chart">
+    <div className="usage-chart" ref={box}>
       <svg
         viewBox={`0 0 ${W} ${H}`}
         role="img"
@@ -333,7 +357,7 @@ function DailyChart({ bars, families }: { bars: DayBar[]; families: readonly Usa
                   </g>
                 </>
               )}
-              {(i % labelEvery === 0 || i === bars.length - 1) && (
+              {labelled(i) && (
                 <text className="usage-axis" x={x + barW / 2} y={H - 6} textAnchor="middle">
                   {b.day.slice(5)}
                 </text>
@@ -359,7 +383,12 @@ function DailyChart({ bars, families }: { bars: DayBar[]; families: readonly Usa
       {shown && hover !== null && (
         <div
           className="usage-tooltip"
-          style={{ left: `${((PAD.left + (hover + 0.5) * slot) / W) * 100}%` }}
+          // Beside the bar, not over it: to its right, or to its left past the middle of the chart.
+          style={
+            PAD.left + (hover + 0.5) * slot < W / 2
+              ? { left: PAD.left + (hover + 1) * slot + 4 }
+              : { right: W - (PAD.left + hover * slot) + 4 }
+          }
           role="status"
         >
           <strong>{shown.day}</strong>

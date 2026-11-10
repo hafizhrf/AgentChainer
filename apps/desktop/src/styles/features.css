@@ -136,25 +136,25 @@ fieldset.folder-switcher {
   border: 0;
 }
 
-/* Usage (CP-01): totals, the daily chart and the tables, in the main area like the fleet view. */
-.usage {
+/* Usage (CP-01): totals, the daily chart and the tables, in the main area like the fleet view. Its own root class:
+   `.usage` and `.usage-table` belong to the composer's /usage popup (session.css). Tiles and tables reuse Metrics'. */
+.usage-page {
   position: absolute;
   inset: 0;
   overflow-y: auto;
   padding: var(--space-5) var(--space-6);
 }
 
-.usage > * {
+.usage-page > * {
   max-width: 1080px;
-  margin-right: auto;
-  margin-left: auto;
+  margin: 0 auto var(--space-4);
 }
 
 .usage-header {
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  margin-bottom: var(--space-2);
+  margin-bottom: var(--space-1);
 }
 
 .usage-header > h1 {
@@ -162,8 +162,7 @@ fieldset.folder-switcher {
   font-size: var(--text-xl);
 }
 
-.usage-note {
-  margin-top: 0;
+.usage-page > .usage-note {
   margin-bottom: var(--space-3);
   font-size: var(--text-sm);
 }
@@ -172,43 +171,41 @@ fieldset.folder-switcher {
   color: var(--err);
 }
 
-.usage-tiles {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-  gap: var(--space-3);
-  margin-bottom: var(--space-4);
-}
-
 .usage-tile {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
+  min-height: 0;
+}
+
+.usage-card-heading {
   margin: 0;
+  font-size: var(--text-md);
 }
 
-.usage-tile > strong {
-  font-size: var(--text-xl);
-  font-variant-numeric: tabular-nums;
+.usage-page .card {
+  gap: var(--space-3);
 }
 
-.usage .card {
-  margin-bottom: var(--space-4);
+.usage-page .metrics-tables {
+  align-items: start;
+}
+
+.usage-page .metrics-tables > .card {
+  margin: 0;
 }
 
 .usage-legend {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--space-1) var(--space-4);
-  margin: 0 0 var(--space-2);
+  gap: var(--space-1) var(--space-3);
+  margin: 0;
   padding: 0;
   list-style: none;
   font-size: var(--text-sm);
+  font-weight: 400;
 }
 
 .usage-legend li {
   display: inline-flex;
   align-items: center;
-  gap: var(--space-1);
 }
 
 .usage-swatch {
@@ -216,9 +213,8 @@ fieldset.folder-switcher {
   flex: none;
   width: 10px;
   height: 10px;
-  margin-right: var(--space-1);
+  margin-right: 6px;
   border-radius: 2px;
-  vertical-align: baseline;
 }
 
 .series-opus {
@@ -284,7 +280,7 @@ fieldset.folder-switcher {
 
 .usage-axis {
   fill: var(--muted);
-  font-size: 10px;
+  font-size: 11px;
   font-variant-numeric: tabular-nums;
 }
 
@@ -294,16 +290,17 @@ fieldset.folder-switcher {
 
 .usage-hit:hover {
   fill: var(--surface-3);
-  fill-opacity: 0.4;
+  fill-opacity: 0.5;
 }
 
 .usage-tooltip {
   position: absolute;
   top: 0;
+  z-index: 1;
   display: flex;
   flex-direction: column;
   gap: 2px;
-  min-width: 150px;
+  min-width: 160px;
   padding: var(--space-2) var(--space-3);
   border: 1px solid var(--border);
   border-radius: var(--radius);
@@ -312,7 +309,6 @@ fieldset.folder-switcher {
   font-size: var(--text-sm);
   font-variant-numeric: tabular-nums;
   pointer-events: none;
-  transform: translateX(-50%);
 }
 
 .usage-tooltip-row {
@@ -321,45 +317,24 @@ fieldset.folder-switcher {
   gap: var(--space-1);
 }
 
-.usage-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: var(--text-sm);
+.usage-page .metrics-table th[scope="row"] {
+  max-width: 0;
+  width: 55%;
 }
 
-.usage-table th {
-  color: var(--muted);
-  font-weight: 500;
-  text-align: left;
-}
-
-.usage-table th,
-.usage-table td {
-  padding: var(--space-1) var(--space-2);
-  border-bottom: 1px solid var(--border);
-  vertical-align: top;
-}
-
-.usage-table .num {
-  text-align: right;
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
-}
-
-.usage-title {
+.usage-title,
+.usage-sub {
   display: block;
-  max-width: 560px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .usage-sub {
-  display: block;
   font-size: var(--text-xs);
 }
 
 .usage-more {
-  margin: var(--space-2) 0 0;
+  margin: 0;
   font-size: var(--text-sm);
 }

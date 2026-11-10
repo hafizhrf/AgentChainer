@@ -161,5 +161,7 @@
   "graph.usage.moreProjects": "Dan {{count}} lagi di ekspor.",
   "graph.usage.topSessions": "Sesi termahal",
   "graph.usage.session": "Sesi",
-  "graph.usage.day": "Terakhir aktif"
+  "graph.usage.day": "Terakhir aktif",
+  "graph.usage.tokensDetail": "{{input}} masuk · {{output}} keluar",
+  "graph.usage.sessionsDetail": "Di {{projects}} folder"
 }

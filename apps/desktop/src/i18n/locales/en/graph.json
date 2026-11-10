@@ -165,5 +165,7 @@
   "graph.usage.moreProjects": "And {{count}} more in the export.",
   "graph.usage.topSessions": "Costliest sessions",
   "graph.usage.session": "Session",
-  "graph.usage.day": "Last active"
+  "graph.usage.day": "Last active",
+  "graph.usage.tokensDetail": "{{input}} in · {{output}} out",
+  "graph.usage.sessionsDetail": "In {{projects}} folders"
 }

@@ -1,8 +1,8 @@
 import { spawnSync } from "node:child_process";
 import { existsSync, readdirSync, readFileSync, rmSync, statSync } from "node:fs";
 import path from "node:path";
-import type { FileDiff, FileStatus, Hunk, WorkspaceFile, WorkspaceFiles } from "@agentchainer/protocol";
-import { RpcErrorCode } from "@agentchainer/protocol";
+import type { FileDiff, FileStatus, Hunk, WorkspaceFile, WorkspaceFiles, WorkspaceImage } from "@agentchainer/protocol";
+import { imageType, RpcErrorCode } from "@agentchainer/protocol";
 import { t } from "./i18n/index.ts";
 import { RpcFailure } from "./rpc.ts";
 import { type RunResult, runAsync } from "./run-async.ts";
@@ -255,6 +255,22 @@ export function fileDiff(cwd: string, rel: string): FileDiff {
     tooLarge,
     hunks: hunks.map(({ lines: _lines, ...h }) => h),
   };
+}
+
+/** Images over this aren't sent to the viewer: base64 over the IPC channel grows them by a third. */
+export const MAX_IMAGE_BYTES = 10_000_000;
+
+/** An image in the workspace for the file viewer (UX-21), read like `fileDiff` reads a file. */
+export function workspaceImage(cwd: string, rel: string, max = MAX_IMAGE_BYTES): WorkspaceImage {
+  const mediaType = imageType(rel);
+  if (!mediaType) throw new RpcFailure(RpcErrorCode.invalidParams, t("git.workspace.notImage", { path: rel }));
+  const abs = insideWorkspace(cwd, rel);
+  if (!existsSync(abs) || !statSync(abs).isFile()) {
+    throw new RpcFailure(RpcErrorCode.invalidParams, t("git.workspace.noFile", { path: rel }));
+  }
+  const bytes = statSync(abs).size;
+  if (bytes > max) return { mediaType, bytes, data: null, tooLarge: true };
+  return { mediaType, bytes, data: readFileSync(abs).toString("base64"), tooLarge: false };
 }
 
 /** The file's content at HEAD, or null when it isn't in HEAD (new file, or a repo without commits). */

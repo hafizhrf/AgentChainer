@@ -1,4 +1,4 @@
-import type { Effort, PermissionMode, PermissionRequest } from "@agentchainer/protocol";
+import { type Effort, imageType, type PermissionMode, type PermissionRequest } from "@agentchainer/protocol";
 import { ArrowDown, ClipboardList, Loader2 } from "lucide-react";
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { Group, Panel, Separator, useDefaultLayout, usePanelRef } from "react-resizable-panels";
@@ -28,6 +28,7 @@ import { useWorkspace } from "./useWorkspace.ts";
 
 // Monaco and xterm are large; load them when first used.
 const DiffView = lazy(() => import("./DiffView.tsx"));
+const ImageView = lazy(() => import("./ImageView.tsx"));
 const TerminalPanel = lazy(() => import("./TerminalPanel.tsx"));
 // React Flow and dagre load with the first graph.
 const SessionGraph = lazy(() => import("./graph/SessionGraph.tsx"));
@@ -438,14 +439,26 @@ export function SessionView({
               )}
               {selected && (
                 <Suspense fallback={<p className="muted">{t("session.view.loadingDiff")}</p>}>
-                  <DiffView
-                    cwd={panelDir}
-                    path={selected}
-                    version={workspace.files}
-                    confirm={confirm}
-                    onClose={() => setSelected(null)}
-                    onOpenInEditor={(line) => onOpenFile(joinPath(panelDir, selected), line)}
-                  />
+                  {/* An image shows as a picture, not as text (UX-21). */}
+                  {imageType(selected) ? (
+                    <ImageView
+                      cwd={panelDir}
+                      path={selected}
+                      version={workspace.files}
+                      status={workspace.files?.files.find((f) => f.path === selected)?.status}
+                      onClose={() => setSelected(null)}
+                      onOpenInEditor={() => onOpenFile(joinPath(panelDir, selected))}
+                    />
+                  ) : (
+                    <DiffView
+                      cwd={panelDir}
+                      path={selected}
+                      version={workspace.files}
+                      confirm={confirm}
+                      onClose={() => setSelected(null)}
+                      onOpenInEditor={(line) => onOpenFile(joinPath(panelDir, selected), line)}
+                    />
+                  )}
                 </Suspense>
               )}
             </aside>

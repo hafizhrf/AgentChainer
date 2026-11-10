@@ -358,6 +358,32 @@ export const FileDiffSchema = z.object({
 });
 export type FileDiff = z.infer<typeof FileDiffSchema>;
 
+/** Images the file viewer shows as pictures (UX-21), by extension. SVG is shown as an image, never run as a page. */
+export const IMAGE_TYPES: Readonly<Record<string, string>> = {
+  png: "image/png",
+  jpg: "image/jpeg",
+  jpeg: "image/jpeg",
+  gif: "image/gif",
+  webp: "image/webp",
+  svg: "image/svg+xml",
+  ico: "image/x-icon",
+};
+
+/** The media type of an image path the viewer shows, or null. */
+export function imageType(path: string): string | null {
+  const ext = /\.([^./\\]+)$/.exec(path)?.[1]?.toLowerCase();
+  return (ext && IMAGE_TYPES[ext]) ?? null;
+}
+
+/** A workspace image for the file viewer (UX-21): its bytes as base64, unless it's over the cap. */
+export const WorkspaceImageSchema = z.object({
+  mediaType: z.string(),
+  bytes: z.number().int().min(0),
+  data: z.string().nullable(),
+  tooLarge: z.boolean(),
+});
+export type WorkspaceImage = z.infer<typeof WorkspaceImageSchema>;
+
 /* ---------- Workspace profile and readiness (M2-06…M2-10) ---------- */
 
 export const COMMAND_KINDS = ["install", "build", "lint", "format", "typecheck", "test", "dev"] as const;
@@ -1874,6 +1900,8 @@ export const methodSchemas = {
   /* Workspace files and git (M1-25…M1-27), through the system git CLI. */
   "workspace.files": { params: WorkspaceRef, result: WorkspaceFilesSchema },
   "workspace.diff": { params: WorkspacePath, result: FileDiffSchema },
+  /** An image in the workspace, for the file viewer (UX-21). Read-only. */
+  "workspace.image": { params: WorkspacePath, result: WorkspaceImageSchema },
   /** Reverts a file to HEAD (a new file is deleted), or only hunk `hunk` of `workspace.diff`. */
   "workspace.revert": { params: WorkspacePath.extend({ hunk: z.number().int().min(0).optional() }), result: Ok },
   /** Offered when the workspace isn't a git repository (M1-06). */

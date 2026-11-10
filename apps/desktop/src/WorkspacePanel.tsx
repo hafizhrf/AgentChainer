@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { type KeyboardEvent, type ReactNode, useMemo, useRef, useState } from "react";
 import type { Confirm } from "./Dialog.tsx";
+import { FileMenu } from "./FileMenu.tsx";
 import { agentEdits, buildTree, filterTree, folderPaths, visibleRows } from "./files.ts";
 import { GitPanel } from "./GitPanel.tsx";
 import { count } from "./i18n/format.ts";
@@ -76,7 +77,8 @@ export function WorkspacePanel({
   const [menuOpen, setMenuOpen] = useState(false);
   const visible = visibleTabs(hiddenTabs);
   const active = pickTab(view, visible);
-  const [initError, setInitError] = useState<string | null>(null);
+  // A failed git init or file-menu action (UX-21), shown above the tabs' content.
+  const [actionError, setActionError] = useState<string | null>(null);
   const changed = files?.files.filter((f) => f.status) ?? [];
 
   async function initGit() {
@@ -84,9 +86,16 @@ export function WorkspacePanel({
       await request("workspace.gitInit", { cwd });
       onRefresh();
     } catch (err) {
-      setInitError(String(err));
+      setActionError(String(err));
     }
   }
+
+  /** A row's right-click menu (UX-21): open, reveal, copy its path. */
+  const withMenu = (path: string, row: ReactNode, folder = false) => (
+    <FileMenu key={path} cwd={cwd} path={path} folder={folder} onOpenFile={onOpenFile} onError={setActionError}>
+      {row}
+    </FileMenu>
+  );
 
   const openAction = (path: string) => (
     <IconButton label={t("panel.workspace.openInEditor")} tabIndex={-1} onClick={() => onOpenFile(path)}>
@@ -124,7 +133,7 @@ export function WorkspacePanel({
         />
       </div>
       <div className="panel-body">
-        {(error || initError) && <p className="warn">{error ?? initError}</p>}
+        {(error || actionError) && <p className="warn">{error ?? actionError}</p>}
         {files && !files.isGitRepo && (
           <p className="warn">
             <Rich
@@ -148,12 +157,19 @@ export function WorkspacePanel({
               selected={selected}
               onSelect={onSelect}
               openAction={openAction}
+              withMenu={withMenu}
             />
           </Tabs.Content>
         )}
         {visible.includes("files") && (
           <Tabs.Content value="files" className="files-content">
-            <FileTree files={files} selected={selected} onSelect={onSelect} openAction={openAction} />
+            <FileTree
+              files={files}
+              selected={selected}
+              onSelect={onSelect}
+              openAction={openAction}
+              withMenu={withMenu}
+            />
           </Tabs.Content>
         )}
         {visible.includes("git") && (
@@ -247,6 +263,7 @@ function TabsMenu({
 }
 
 type OpenAction = (path: string) => ReactNode;
+type WithMenu = (path: string, row: ReactNode, folder?: boolean) => ReactNode;
 
 function ChangesView({
   files,
@@ -255,6 +272,7 @@ function ChangesView({
   selected,
   onSelect,
   openAction,
+  withMenu,
 }: {
   files: WorkspaceFiles["files"];
   items: Item[];
@@ -262,6 +280,7 @@ function ChangesView({
   selected: string | null;
   onSelect: (path: string) => void;
   openAction: OpenAction;
+  withMenu: WithMenu;
 }) {
   // Latest turn first: that's what the user is reviewing.
   const edits = useMemo(() => agentEdits(items, cwd).reverse(), [items, cwd]);
@@ -282,17 +301,20 @@ function ChangesView({
               <div className="turn-label" title={turn.prompt}>
                 {turn.prompt || t("panel.changes.earlier")}
               </div>
-              {turn.files.map((file) => (
-                <FileRow
-                  key={file}
-                  path={file}
-                  status={status.get(file)}
-                  selected={selected === file}
-                  outside={outside(file)}
-                  onSelect={() => onSelect(file)}
-                  {...(outside(file) ? {} : { actions: openAction(file) })}
-                />
-              ))}
+              {turn.files.map((file) => {
+                const row = (
+                  <FileRow
+                    key={file}
+                    path={file}
+                    status={status.get(file)}
+                    selected={selected === file}
+                    outside={outside(file)}
+                    onSelect={() => onSelect(file)}
+                    {...(outside(file) ? {} : { actions: openAction(file) })}
+                  />
+                );
+                return outside(file) || status.get(file) === "deleted" ? row : withMenu(file, row);
+              })}
             </div>
           ))
         )}
@@ -301,16 +323,19 @@ function ChangesView({
         {files.length === 0 ? (
           <EmptyState icon={<CircleCheck size={14} />}>{t("panel.changes.noUncommitted")}</EmptyState>
         ) : (
-          files.map((f) => (
-            <FileRow
-              key={f.path}
-              path={f.path}
-              status={f.status}
-              selected={selected === f.path}
-              onSelect={() => onSelect(f.path)}
-              {...(f.status === "deleted" ? {} : { actions: openAction(f.path) })}
-            />
-          ))
+          files.map((f) => {
+            const row = (
+              <FileRow
+                key={f.path}
+                path={f.path}
+                status={f.status}
+                selected={selected === f.path}
+                onSelect={() => onSelect(f.path)}
+                {...(f.status === "deleted" ? {} : { actions: openAction(f.path) })}
+              />
+            );
+            return f.status === "deleted" ? row : withMenu(f.path, row);
+          })
         )}
       </Section>
     </div>
@@ -326,11 +351,13 @@ function FileTree({
   selected,
   onSelect,
   openAction,
+  withMenu,
 }: {
   files: WorkspaceFiles | null;
   selected: string | null;
   onSelect: (path: string) => void;
   openAction: OpenAction;
+  withMenu: WithMenu;
 }) {
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [query, setQuery] = useState("");
@@ -444,35 +471,39 @@ function FileTree({
           {rows.map(({ node, depth }, i) => {
             const folder = node.children !== undefined;
             const isOpen = folder && open.has(node.path);
+            const deleted = node.file?.status === "deleted";
+            const row = (
+              <TreeRow
+                depth={depth}
+                chevron={folder ? isOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} /> : null}
+                icon={<FileIcon path={node.name} folder={folder} />}
+                name={node.name}
+                status={node.file?.status}
+                dot={folder && node.changes > 0}
+                selected={selected === node.path}
+                title={node.path}
+                onClick={() => {
+                  setFocus(i);
+                  if (folder) toggle(node.path);
+                  else onSelect(node.path);
+                }}
+                buttonRef={(el) => {
+                  if (el) rowRefs.current.set(i, el);
+                  else rowRefs.current.delete(i);
+                }}
+                buttonProps={{
+                  role: "treeitem",
+                  tabIndex: i === current ? 0 : -1,
+                  "aria-level": depth + 1,
+                  "aria-selected": selected === node.path,
+                  ...(folder ? { "aria-expanded": isOpen } : {}),
+                }}
+                {...(folder || deleted ? {} : { actions: openAction(node.path) })}
+              />
+            );
             return (
               <div key={node.path} role="none">
-                <TreeRow
-                  depth={depth}
-                  chevron={folder ? isOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} /> : null}
-                  icon={<FileIcon path={node.name} folder={folder} />}
-                  name={node.name}
-                  status={node.file?.status}
-                  dot={folder && node.changes > 0}
-                  selected={selected === node.path}
-                  title={node.path}
-                  onClick={() => {
-                    setFocus(i);
-                    if (folder) toggle(node.path);
-                    else onSelect(node.path);
-                  }}
-                  buttonRef={(el) => {
-                    if (el) rowRefs.current.set(i, el);
-                    else rowRefs.current.delete(i);
-                  }}
-                  buttonProps={{
-                    role: "treeitem",
-                    tabIndex: i === current ? 0 : -1,
-                    "aria-level": depth + 1,
-                    "aria-selected": selected === node.path,
-                    ...(folder ? { "aria-expanded": isOpen } : {}),
-                  }}
-                  {...(folder || node.file?.status === "deleted" ? {} : { actions: openAction(node.path) })}
-                />
+                {deleted ? row : withMenu(node.path, row, folder)}
               </div>
             );
           })}

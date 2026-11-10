@@ -17,6 +17,8 @@
   "git.draft.noResult": "Penyusunan pesan commit berakhir tanpa hasil.",
   "git.github.unreadablePr": "gh sudah membuat pull request, tetapi tidak bisa membacanya kembali: {{output}}",
   "git.workspace.outsidePath": "Path harus berada di dalam workspace: {{path}}",
+  "git.workspace.notImage": "Bukan gambar yang ditampilkan penampil: {{path}}",
+  "git.workspace.noFile": "Tidak ada file ini di workspace: {{path}}",
   "git.revert.noRepo": "Mengembalikan perubahan memerlukan repositori git.",
   "git.revert.noChanges": "{{path}} tidak memiliki perubahan untuk dikembalikan.",
   "git.revert.hunkGone": "Perubahan itu sudah tidak ada. Muat ulang diff.",

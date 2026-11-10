@@ -5,6 +5,7 @@ import {
   AgentEventSchema,
   agentProblems,
   CriterionCheckSchema,
+  imageType,
   methodSchemas,
   PERMISSION_MODES,
   PermissionRequestSchema,
@@ -119,5 +120,17 @@ describe("agentProblems (M8-04)", () => {
     );
     assert.match(agentProblems(ok, ["reviewer"])[0] ?? "", /already exists/);
     assert.match(agentProblems({ ...ok, tools: "Fly, Swim" }).join(), /Fly, Swim aren't a known tool/);
+  });
+});
+
+describe("imageType (UX-21)", () => {
+  it("names the images the viewer shows, by extension, in any case", () => {
+    assert.equal(imageType("assets/logo.png"), "image/png");
+    assert.equal(imageType("Photo.JPEG"), "image/jpeg");
+    assert.equal(imageType("public/favicon.ico"), "image/x-icon");
+    assert.equal(imageType("icons/a.svg"), "image/svg+xml");
+    assert.equal(imageType("notes.txt"), null);
+    assert.equal(imageType("png"), null);
+    assert.equal(imageType("dir.png/readme"), null);
   });
 });

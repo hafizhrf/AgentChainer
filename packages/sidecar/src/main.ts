@@ -143,7 +143,7 @@ import { sessionWorkers, Team, teamTools, type WorkerBase } from "./team.ts";
 import { codexAccountUsage } from "./usage/codex-account.ts";
 import { readRuns } from "./usage/ledger.ts";
 import { allTasks, type UsageSources, usageFile, usageReport } from "./usage/report.ts";
-import { fileDiff, gitInit, listFiles, revert } from "./workspace.ts";
+import { fileDiff, gitInit, listFiles, revert, workspaceImage } from "./workspace.ts";
 
 /** The other agents' CLIs, as last probed (M9-06). */
 let agentsCache: { at: number; value: Awaited<ReturnType<typeof agentClis>> } | null = null;
@@ -827,6 +827,7 @@ serve(
     "workspace.files": ({ cwd }) => listFiles(cwd),
 
     "workspace.diff": ({ cwd, path }) => fileDiff(cwd, path),
+    "workspace.image": ({ cwd, path }) => workspaceImage(cwd, path),
 
     "workspace.revert": ({ cwd, path, hunk }) => {
       revert(cwd, path, hunk);

@@ -55,3 +55,7 @@ export const thousands = (n: number | string) => t("common.format.thousands", { 
 
 /** "1.5 MB". */
 export const megabytes = (bytes: number) => t("common.format.megabytes", { n: (bytes / 1_000_000).toFixed(1) });
+
+/** A file's size: "12 KB" under a megabyte, else "1.5 MB" (UX-21). */
+export const fileSize = (bytes: number) =>
+  bytes < 1_000_000 ? t("common.format.kilobytes", { n: Math.max(1, Math.round(bytes / 1000)) }) : megabytes(bytes);

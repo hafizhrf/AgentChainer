@@ -6,5 +6,6 @@
   "common.format.compactSeconds": "{{n}}s",
   "common.format.compactMinutesSeconds": "{{m}}m {{s}}s",
   "common.format.thousands": "{{n}}k",
-  "common.format.megabytes": "{{n}} MB"
+  "common.format.megabytes": "{{n}} MB",
+  "common.format.kilobytes": "{{n}} KB"
 }

@@ -17,6 +17,8 @@
   "git.draft.noResult": "Drafting the commit message ended without a result.",
   "git.github.unreadablePr": "gh made the pull request, but it can't be read back: {{output}}",
   "git.workspace.outsidePath": "Path must be inside the workspace: {{path}}",
+  "git.workspace.notImage": "Not an image the viewer shows: {{path}}",
+  "git.workspace.noFile": "No such file in the workspace: {{path}}",
   "git.revert.noRepo": "Reverting needs a git repository.",
   "git.revert.noChanges": "{{path}} has no changes to revert.",
   "git.revert.hunkGone": "That change no longer exists. Refresh the diff.",

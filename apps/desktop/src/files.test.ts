@@ -9,6 +9,7 @@ import {
   relativeTo,
   sameListing,
   splitPath,
+  systemPath,
   visibleRows,
 } from "./files.ts";
 import type { Item, ToolItem } from "./transcript.ts";
@@ -77,6 +78,11 @@ describe("paths", () => {
   it("joins with the workspace's own separator", () => {
     assert.equal(joinPath("/repo/", "src/a.ts"), "/repo/src/a.ts");
     assert.equal(joinPath("C:\\code\\app", "src/a.ts"), "C:\\code\\app\\src\\a.ts");
+  });
+
+  it("writes a path as the system does, for the file menu (UX-21)", () => {
+    assert.equal(systemPath("C:/code/app/src/a.ts", true), "C:\\code\\app\\src\\a.ts");
+    assert.equal(systemPath("/repo/src/a.ts", false), "/repo/src/a.ts");
   });
 
   it("makes paths relative only inside the workspace", () => {

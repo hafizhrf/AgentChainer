@@ -22,6 +22,7 @@ import {
   parseHunks,
   parseStatus,
   revert,
+  workspaceImage,
 } from "./workspace.ts";
 
 const git = (cwd: string, ...args: string[]) =>
@@ -177,6 +178,38 @@ describe("workspace on a real git repo", () => {
     assert.equal(d.binary, true);
     assert.equal(d.modified, null);
     rmSync(join(dir, "img.bin"));
+  });
+});
+
+describe("an image for the file viewer (UX-21)", () => {
+  it("reads one inside the workspace as base64, says when it's over the cap, and refuses the rest", () => {
+    const dir = realpathSync(mkdtempSync(join(tmpdir(), "ac-ws-img-")));
+    try {
+      const png = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 13]);
+      mkdirSync(join(dir, "assets"));
+      writeFileSync(join(dir, "assets", "Logo.PNG"), png);
+      writeFileSync(join(dir, "icon.svg"), '<svg xmlns="http://www.w3.org/2000/svg"/>');
+      writeFileSync(join(dir, "notes.txt"), "hi");
+
+      assert.deepEqual(workspaceImage(dir, "assets/Logo.PNG"), {
+        mediaType: "image/png",
+        bytes: png.length,
+        data: png.toString("base64"),
+        tooLarge: false,
+      });
+      assert.equal(workspaceImage(dir, "icon.svg").mediaType, "image/svg+xml");
+      assert.deepEqual(workspaceImage(dir, "assets/Logo.PNG", 4), {
+        mediaType: "image/png",
+        bytes: png.length,
+        data: null,
+        tooLarge: true,
+      });
+      assert.throws(() => workspaceImage(dir, "notes.txt"), /Not an image/);
+      assert.throws(() => workspaceImage(dir, "missing.png"), /No such file/);
+      assert.throws(() => workspaceImage(dir, "../outside.png"), /inside the workspace/);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });
 

@@ -93,6 +93,11 @@ export function joinPath(cwd: string, rel: string): string {
   return `${cwd.replace(/[\\/]+$/, "")}${s}${rel.split("/").join(s)}`;
 }
 
+/** A path as the system writes it (UX-21): backslashes on Windows, for a copied path or the file manager. */
+export function systemPath(path: string, windows: boolean): string {
+  return windows ? path.replaceAll("/", "\\") : path;
+}
+
 /** `abs` relative to `cwd` with `/` separators, or null when it's outside the workspace. */
 export function relativeTo(cwd: string, abs: string): string | null {
   const norm = (p: string) => p.replace(/\\/g, "/").replace(/\/+$/, "");

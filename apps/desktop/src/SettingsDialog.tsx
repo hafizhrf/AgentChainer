@@ -2,14 +2,17 @@ import { EFFORTS, type Methods, PERMISSION_MODES } from "@agentchainer/protocol"
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { relaunch } from "@tauri-apps/plugin-process";
 import { Download, RefreshCw } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { applyTheme } from "./appearance.ts";
 import { Modal, useConfirm } from "./Dialog.tsx";
 import { asLanguage, LANGUAGES, t } from "./i18n/index.ts";
 import { Rich } from "./i18n/Rich.tsx";
 import { EDITORS, EFFORT_OPTIONS, MODE_HELP, modelChoices, modeOptions, THEMES } from "./options.ts";
 import type { Settings } from "./settings.ts";
+import { request } from "./sidecar.ts";
 import { asMode } from "./tabs.ts";
+import type { AgentClis } from "./tasks/AgentPickers.tsx";
+import { TaskDefaultsFields } from "./tasks/TaskDefaultsFields.tsx";
 import { asTheme } from "./theme.ts";
 import { Field } from "./ui/Field.tsx";
 import { Select } from "./ui/Select.tsx";
@@ -43,6 +46,11 @@ export function SettingsDialog({
   onClose: () => void;
 }) {
   const [draft, setDraft] = useState(settings);
+  // The other agents' CLIs, so the task defaults offer only agents this computer has (M9).
+  const [clis, setClis] = useState<AgentClis | null>(null);
+  useEffect(() => {
+    void request("agents.available", {}).then(setClis, () => setClis(null));
+  }, []);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [exported, setExported] = useState<string | null>(null);
@@ -195,6 +203,16 @@ export function SettingsDialog({
             <p className="field-help">
               {t("home.settings.tasksPreviewHelp", { keys: menuShortcut("new-task") ?? "" })}
             </p>
+          </section>
+
+          <section className="settings-section">
+            <h3>{t("home.settings.taskDefaults")}</h3>
+            <p className="muted">{t("home.settings.taskDefaultsHelp")}</p>
+            <TaskDefaultsFields
+              value={draft.taskDefaults ?? {}}
+              onChange={(next) => setDraft({ ...draft, taskDefaults: next })}
+              clis={clis}
+            />
           </section>
 
           <section className="settings-section">

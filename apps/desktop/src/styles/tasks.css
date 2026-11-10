@@ -1638,3 +1638,24 @@ fieldset.schedule-days > legend {
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
+
+/* Task defaults (Settings and Workspace settings): agents, model and profile, then the budget per tier. */
+.task-defaults {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.task-defaults-budgets {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(72px, 1fr));
+  gap: var(--space-2);
+}
+
+.task-defaults-budgets input {
+  width: 100%;
+}
+
+.task-defaults-legend {
+  padding: 0;
+}

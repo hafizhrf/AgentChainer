@@ -295,6 +295,8 @@ export function triageRecord(
   found: { signals: TriageSignal[]; floor: Tier },
   model: { model: Triage["model"]; error?: string; errorRef?: MessageRef },
   now = new Date(),
+  /** A tier's budget: the workspace's or app's default, else the built-in one (`null`: no budget). */
+  budgetOf: (tier: Tier) => number | null = (tier) => DEFAULT_BUDGET_USD[tier],
 ): Triage {
   const proposed = model.model ? maxTier(model.model.tier, found.floor) : found.floor;
   return {
@@ -304,7 +306,7 @@ export function triageRecord(
     ...(model.error ? { modelError: model.error, ...(model.errorRef ? { modelErrorRef: model.errorRef } : {}) } : {}),
     proposed,
     chosen: proposed,
-    budgetUsd: DEFAULT_BUDGET_USD[proposed],
+    budgetUsd: budgetOf(proposed),
     at: now.toISOString(),
   };
 }

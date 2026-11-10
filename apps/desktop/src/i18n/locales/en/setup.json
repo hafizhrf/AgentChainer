@@ -351,8 +351,6 @@
   "setup.permissions.empty": "No saved rules yet.",
   "setup.workflows.intro": "The steps a task runs, by tier. A project can replace a tier's with its own <code>{{file}}</code>, shared through git; it's checked like the app's own, and a run keeps a copy of the one it started with.",
   "setup.workflows.tiers": "Tiers",
-  "setup.workflows.agentsTitle": "Default agents",
-  "setup.workflows.agentsHelp": "Which agent runs each kind of step when a task doesn't choose. A step a workflow gives an agent of its own keeps it. Saved on this computer only (.agentchainer/agents.json, out of git).",
   "setup.workflows.checkAgain": "Check again",
   "setup.workflows.reading": "Reading the workflows…",
   "setup.workflows.sourceProject": "project",
@@ -391,5 +389,14 @@
   "setup.overview.eachHasFix": "Each one has a fix in the plan.",
   "setup.overview.nothingNeeded": "Nothing in the readiness checks needs attention.",
   "setup.overview.statusCount": "{{n}} {{status}}",
-  "setup.overview.fix": "Fix"
+  "setup.overview.fix": "Fix",
+
+  "setup.workflows.defaultsTitle": "Task defaults",
+  "setup.workflows.defaultsHelp": "How this workspace's tasks run unless a task chooses. Each field follows the app's default (Settings) until you set it here. Saved on change, out of git.",
+  "setup.workflows.useApp": "Use the app's defaults",
+  "setup.workflows.applyAll": "Apply to all workspaces",
+  "setup.workflows.applyAllTitle": "Apply to all workspaces?",
+  "setup.workflows.applyAllBody": "This workspace's own task defaults replace those of the {{count}} other workspaces the app knows (recent and named ones). A field this workspace leaves to the app's default is left to it there too.",
+  "setup.workflows.applied": "Applied to {{count}} workspaces.",
+  "setup.workflows.appliedSome": "Applied to {{count}} workspaces; couldn't write to {{failed}}."
 }

@@ -181,6 +181,19 @@ export function App() {
       () => undefined,
     );
   }, [hello, watchKey]);
+  // The app's task defaults reach the runtime at the start and on every change, scheduled runs included.
+  const defaultsKey = JSON.stringify(settings?.taskDefaults ?? {});
+  useEffect(() => {
+    if (!hello) return;
+    request("app.setDefaults", { defaults: JSON.parse(defaultsKey) }).catch(() => undefined);
+  }, [hello, defaultsKey]);
+  /** Every workspace the app knows (recent ones, named ones' folders): "Apply to all workspaces". */
+  const knownWorkspaces = [
+    ...new Set([
+      ...(settings?.recentWorkspaces ?? []),
+      ...(settings?.workspaces ?? []).flatMap((w) => [w.primary, ...w.folders]),
+    ]),
+  ];
   /** For each open task thread, the tasks whose approvals it shows as cards (the task and its sub-tasks). */
   const [shownTasks, setShownTasks] = useState<Record<string, string[]>>({});
   /** Self-test screenshots only: the right panel's tab. */
@@ -1373,16 +1386,7 @@ export function App() {
                     onSchedule={(action, s) => void scheduleAction(action, s)}
                   />
                 )}
-                {active === USAGE && !setup && (
-                  <UsagePage
-                    workspaces={[
-                      ...new Set([
-                        ...(settings?.recentWorkspaces ?? []),
-                        ...(settings?.workspaces ?? []).flatMap((w) => [w.primary, ...w.folders]),
-                      ]),
-                    ]}
-                  />
-                )}
+                {active === USAGE && !setup && <UsagePage workspaces={knownWorkspaces} />}
                 {active === null && !setup && (
                   <HomeView
                     env={env}
@@ -1482,6 +1486,7 @@ export function App() {
                       {...(setup.view ? { initialView: setup.view } : {})}
                       folders={setup.folders ?? []}
                       onFolderChange={(dir) => setSetup({ ...setup, cwd: dir })}
+                      workspaces={knownWorkspaces}
                     />
                   </Suspense>
                 )}

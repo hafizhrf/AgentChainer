@@ -25,7 +25,7 @@ import type { SDKMessage } from "@anthropic-ai/claude-agent-sdk";
 import { stringify as stringifyYaml } from "yaml";
 import { AC_DIR } from "../ac-dir.ts";
 import { agentsNeeded } from "../backends/choose.ts";
-import { readDefaults } from "../backends/defaults.ts";
+import { budgetFor, readDefaults } from "../backends/defaults.ts";
 import { findTool, toolsDir } from "../bootstrap/tools.ts";
 import { listDeploys } from "../deploy/service.ts";
 import { detectWorkspace } from "../detect/detect.ts";
@@ -178,7 +178,8 @@ async function triage(
     classifyPrompt(request, contract, found.signals),
     controller,
   );
-  return { triage: triageRecord(found, model), costUsd: model.costUsd };
+  const budgetOf = (tier: Tier) => budgetFor(root, tier, DEFAULT_BUDGET_USD[tier]);
+  return { triage: triageRecord(found, model, new Date(), budgetOf), costUsd: model.costUsd };
 }
 
 /**
@@ -870,7 +871,11 @@ export async function splitTask(root: string, id: string, claude: Claude, model?
         triage: {
           ...proposal,
           chosen,
-          budgetUsd: budgetUsd === null ? DEFAULT_BUDGET_USD[chosen] : Math.min(DEFAULT_BUDGET_USD[chosen], budgetUsd),
+          // The tier's default (the workspace's or app's), within the XL task's own budget per sub-task.
+          budgetUsd: ((tierBudget) =>
+            budgetUsd === null ? tierBudget : tierBudget === null ? budgetUsd : Math.min(tierBudget, budgetUsd))(
+            budgetFor(root, chosen, DEFAULT_BUDGET_USD[chosen]),
+          ),
           ...(chosen !== proposal.proposed ? { override: { reason: reason.text, reasonRef: reason.ref } } : {}),
         },
         parent: { id, index },

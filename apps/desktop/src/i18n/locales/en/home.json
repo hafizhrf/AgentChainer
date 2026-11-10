@@ -122,5 +122,8 @@
   "home.update.installHelp": "Installing stops running agents and closes terminals. Resume your sessions from the sidebar after the restart.",
   "home.update.downloading": "Downloading…",
   "home.update.progress": "{{received}} of {{total}}",
-  "home.update.installing": "Installing… AgentChainer restarts when it's done."
+  "home.update.installing": "Installing… AgentChainer restarts when it's done.",
+
+  "home.settings.taskDefaults": "Task defaults",
+  "home.settings.taskDefaultsHelp": "How every workspace's tasks run unless the task or the workspace chooses otherwise. A workspace can set its own in Workspace settings → Workflows."
 }

@@ -122,5 +122,8 @@
   "home.update.installHelp": "Pemasangan menghentikan agent yang berjalan dan menutup terminal. Lanjutkan session Anda dari sidebar setelah dimulai ulang.",
   "home.update.downloading": "Mengunduh…",
   "home.update.progress": "{{received}} dari {{total}}",
-  "home.update.installing": "Memasang… AgentChainer dimulai ulang setelah selesai."
+  "home.update.installing": "Memasang… AgentChainer dimulai ulang setelah selesai.",
+
+  "home.settings.taskDefaults": "Default task",
+  "home.settings.taskDefaultsHelp": "Cara task di semua workspace berjalan, kecuali task atau workspace-nya memilih lain. Sebuah workspace bisa mengatur sendiri di Pengaturan workspace → Workflow."
 }

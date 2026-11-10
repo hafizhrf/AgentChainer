@@ -60,6 +60,7 @@ export function SetupPage({
   initialView = "overview",
   folders = [],
   onFolderChange,
+  workspaces = [],
 }: {
   cwd: string;
   /** Model alias for generators ("" = the CLI's default). */
@@ -71,6 +72,8 @@ export function SetupPage({
   /** A multi-folder workspace's folders, primary first (M8-01): readiness, the plan and the rest are per folder. */
   folders?: string[];
   onFolderChange?: (dir: string) => void;
+  /** Every workspace the app knows, for "Apply to all workspaces". */
+  workspaces?: string[];
 }) {
   const [view, setView] = useState<SetupView>(initialView);
   const [focus, setFocus] = useState<string | null>(null);
@@ -226,7 +229,7 @@ export function SetupPage({
             <Plugins cwd={cwd} confirm={confirm} onChanged={() => void bootstrap.load()} onUpdates={setPluginUpdates} />
           )}
           {view === "permissions" && <Permissions cwd={cwd} confirm={confirm} />}
-          {view === "workflows" && <Workflows cwd={cwd} confirm={confirm} />}
+          {view === "workflows" && <Workflows cwd={cwd} confirm={confirm} workspaces={workspaces} />}
           {view === "deploy" && <Deploys cwd={cwd} />}
           {view === "metrics" && <Metrics cwd={cwd} />}
           {view === "history" && <History bootstrap={bootstrap} />}

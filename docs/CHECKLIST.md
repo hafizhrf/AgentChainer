@@ -1315,6 +1315,30 @@ for the desktop shell, start screen and session view to be cleaned up (UX-02, UX
   - **Checked in the app over CDP (Windows), on haiku (≈$0.01):**
     - two parallel Explore subagents, with cards closed and open, light and dark;
     - after a restart and a resume, the drawer and the chips showed Haiku 5.5 from the stored history.
+- [ ] **UX-19** App-wide task defaults, with a workspace's own over them. Owner feedback, 2026-11-10: "di workspace
+  setting juga masih terpisah pisah per repo, jadi rada ribet setting satu satu, gak ada opsi apply to all".
+  - **Owner's choices:** app-wide defaults that each workspace can override, plus "Apply to all workspaces", for the
+    agent per role, task model, permission profile and budget per tier, and for permissions and plugins (part 2).
+  Progress (2026-11-10), part 1 (task defaults):
+  - **Settings → Task defaults:** agent per role (only installed agents), model, permission profile, and budget per
+    tier. Kept in the app's settings (`taskDefaults`, checked in `settings.rs`) and sent to the runtime at start and
+    on every change (`app.setDefaults`), so scheduled runs use them too.
+  - **Workspace settings → Workflows → Task defaults** replaces the Default agents card.
+    - Each field shows "App default (…)" until the workspace sets its own, in `.agentchainer/defaults.json`, out of
+      git. An older `agents.json` is still read.
+    - "Use the app's defaults" clears them. "Apply to all workspaces" copies them to every recent and named
+      workspace, after a confirmation.
+  - **Precedence:** a step's `agent:` > the task's choice > the workspace > the app > the built-in (Claude, the chat's
+    model and profile, the triage budgets). The task page starts from the effective values.
+    - A workspace can set Claude explicitly over an app default (it was dropped before).
+    - A tier's `null` budget is "no budget".
+  - **Tests:** `defaults.test.ts` (4: levels, the old file, a broken file, clearing); `settings.rs` (bad values
+    dropped).
+  - **Checked in the app:**
+    - with the app default Implement on Codex and S at $2, ux12-ws's card showed "App default (Codex)" and "$2";
+    - $0.50 for S saved to `defaults.json` (git-ignored), and "Use the app's defaults" emptied it;
+    - the owner's settings were restored.
+  - **Left (part 2):** permission rules and plugins for all projects (ADR-0013).
 - [ ] **UX-E1** All M1/M2 screens use the design system, in light and dark themes.
 - [ ] **UX-E2** Usability test participants complete the M1 exit scenarios without help.
 

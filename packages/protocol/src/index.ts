@@ -892,6 +892,29 @@ export const AgentRolesSchema = z
   .partial();
 export type AgentRoles = z.infer<typeof AgentRolesSchema>;
 
+/**
+ * How tasks run unless they choose otherwise (owner request, 2026-11-10): the agent per role, the model, the
+ * permission profile and the budget per tier. Kept for the whole app (Settings) and per workspace
+ * (`.agentchainer/defaults.json`); a workspace's value wins over the app's, and each falls back to the built-in one
+ * (Claude, the chat's model and profile, the triage budgets). A budget of `null` is "no budget".
+ */
+export const TaskDefaultsSchema = z
+  .object({
+    agents: AgentRolesSchema,
+    model: z.string().min(1).max(100),
+    permissionMode: z.enum(["default", "acceptEdits", "auto"]),
+    budgetUsd: z.partialRecord(z.enum(["S", "M", "L", "XL"]), z.number().min(0).max(1_000_000).nullable()),
+  })
+  .partial();
+export type TaskDefaults = z.infer<typeof TaskDefaultsSchema>;
+/** Both levels and what they come to for a workspace: what its task page and its defaults card show. */
+export const TaskDefaultsViewSchema = z.object({
+  app: TaskDefaultsSchema,
+  workspace: TaskDefaultsSchema,
+  effective: TaskDefaultsSchema,
+});
+export type TaskDefaultsView = z.infer<typeof TaskDefaultsViewSchema>;
+
 export const TaskRunSchema = z.object({
   /**
    * The workflow it runs; `source: "project"` when the project's file replaced the app's (M6-04), `"task"` when the
@@ -2279,6 +2302,15 @@ export const methodSchemas = {
   "workspace.agents": { params: WorkspaceRef, result: AgentRolesSchema },
   /** Saves them to `.agentchainer/agents.json`, out of git; Claude for a role is the same as no default. */
   "workspace.setAgents": { params: WorkspaceRef.extend({ agents: AgentRolesSchema }), result: AgentRolesSchema },
+  /** The app's task defaults, from Settings: sent at the start and on every change, so scheduled runs use them too. */
+  "app.setDefaults": { params: z.object({ defaults: TaskDefaultsSchema }), result: z.object({ ok: z.literal(true) }) },
+  /** A workspace's task defaults, the app's, and what they come to. */
+  "workspace.defaults": { params: WorkspaceRef, result: TaskDefaultsViewSchema },
+  /** Replaces a workspace's own task defaults (`.agentchainer/defaults.json`, out of git); `{}` follows the app. */
+  "workspace.setDefaults": {
+    params: WorkspaceRef.extend({ defaults: TaskDefaultsSchema }),
+    result: TaskDefaultsViewSchema,
+  },
   "workflow.list": {
     params: WorkspaceRef,
     result: z.object({ workflows: z.array(TierWorkflowSchema), problems: z.array(ProjectWorkflowProblemSchema) }),

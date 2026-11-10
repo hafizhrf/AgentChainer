@@ -2,12 +2,10 @@ import {
   type AcceptanceCriterion,
   type AgentRoles,
   type GateRun,
-  type MethodResult,
   type PermissionMode,
   type PermissionRequest,
   RpcErrorCode,
   redactSecrets,
-  type StepAgent,
   type StepRun,
   type Task,
   type TaskContract,
@@ -59,6 +57,7 @@ import { Field } from "../ui/Field.tsx";
 import { IconButton } from "../ui/IconButton.tsx";
 import { EmptyState } from "../ui/Section.tsx";
 import { Select } from "../ui/Select.tsx";
+import { type AgentClis, AgentPickers, type AgentRole } from "./AgentPickers.tsx";
 import { ApprovalCard } from "./ApprovalCard.tsx";
 import { CreatePrDialog } from "./CreatePr.tsx";
 import { DeployCard } from "./DeployCard.tsx";
@@ -101,9 +100,6 @@ import {
   TIERS,
   tidyContract,
 } from "./taskForm.ts";
-
-/** What `agents.available` says about Codex and the Antigravity CLI (M9-06). */
-type AgentClis = MethodResult<"agents.available">;
 
 type Busy =
   | "draft"
@@ -184,7 +180,9 @@ export function TaskPage({
   const [clis, setClis] = useState<AgentClis | null>(null);
   useEffect(() => {
     void request("agents.available", {}).then(setClis, () => setClis(null));
-  }, []);
+    // The pickers start from the workspace's defaults (M9-06); a role picked here overrides its default.
+    void request("workspace.agents", { cwd }).then(setAgents, () => undefined);
+  }, [cwd]);
   const [runMode, setRunMode] = useState<Exclude<PermissionMode, "plan">>(mode === "plan" ? "default" : mode);
   const [stepItems, setStepItems] = useState<StepItems>({});
   /**
@@ -369,7 +367,7 @@ export function TaskPage({
         id,
         permissionMode: runMode,
         ...(modelAlias ? { model: modelAlias } : {}),
-        ...(Object.values(agents).some((a) => a !== "claude") ? { agents } : {}),
+        ...(Object.keys(agents).length ? { agents } : {}),
       }),
     );
   }
@@ -1441,75 +1439,26 @@ function TriageCard({
           {t("tasks.triage.noBudget")}
         </label>
       )}
-      {agents && onAgents && clis && <AgentPickers tier={tier} agents={agents} onAgents={onAgents} clis={clis} />}
+      {agents && onAgents && clis && (
+        <AgentPickers
+          roles={ROLES_BY_TIER[tier]}
+          agents={agents}
+          onAgents={onAgents}
+          clis={clis}
+          help={t("tasks.agents.help")}
+        />
+      )}
     </aside>
   );
 }
 
 /** The roles a tier's steps take (M9-06): S implements; M and L also plan and review. XL's sub-tasks choose their own. */
-const ROLES_BY_TIER: Record<Tier, (keyof AgentRoles)[]> = {
+const ROLES_BY_TIER: Record<Tier, AgentRole[]> = {
   S: ["implement"],
   M: ["plan", "implement", "review"],
   L: ["plan", "implement", "review"],
   XL: [],
 };
-
-/**
- * Which agent runs each kind of step (M9-06, ADR-0012 §5): any role on any agent installed and signed in on this
- * computer. Shown only when there's more than Claude to choose from.
- */
-function AgentPickers({
-  tier,
-  agents,
-  onAgents,
-  clis,
-}: {
-  tier: Tier;
-  agents: AgentRoles;
-  onAgents: (a: AgentRoles) => void;
-  clis: AgentClis;
-}) {
-  const roles = ROLES_BY_TIER[tier];
-  if (!roles.length || (!clis.codex.installed && !clis.agy.installed)) return null;
-  const option = (agent: "codex" | "agy") => {
-    const cli = clis[agent];
-    const name = agent === "codex" ? t("tasks.agents.codex") : t("tasks.agents.agy");
-    return cli.installed
-      ? [
-          {
-            value: agent,
-            label: cli.signedIn ? name : t("tasks.agents.notSignedIn", { agent: name }),
-            disabled: !cli.signedIn,
-          },
-        ]
-      : [];
-  };
-  const options = [{ value: "claude", label: t("tasks.agents.claude") }, ...option("codex"), ...option("agy")];
-  const roleLabel = (role: keyof AgentRoles) =>
-    role === "plan"
-      ? t("tasks.agents.plan")
-      : role === "implement"
-        ? t("tasks.agents.implement")
-        : t("tasks.agents.review");
-  return (
-    <fieldset className="task-agents">
-      <legend className="field-label">{t("tasks.agents.title")}</legend>
-      <div className="task-agents-row">
-        {roles.map((role) => (
-          <Field key={role} label={roleLabel(role)}>
-            <Select
-              label={roleLabel(role)}
-              value={agents[role] ?? "claude"}
-              options={options}
-              onChange={(v) => onAgents({ ...agents, [role]: v as StepAgent })}
-            />
-          </Field>
-        ))}
-      </div>
-      <span className="field-help">{t("tasks.agents.help")}</span>
-    </fieldset>
-  );
-}
 
 /**
  * The approved contract, read-only: the request, the facts on one label column, the criteria with how each is checked,

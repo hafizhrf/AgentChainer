@@ -2160,6 +2160,10 @@ export const methodSchemas = {
    * The workflow each tier runs in this workspace, and the project workflow files that can't be used, with why
    * (M6-04). Reads `.agentchainer/workflows/` only.
    */
+  /** The workspace's default agent per role (M9-06): who plans, implements and reviews when a task doesn't choose. */
+  "workspace.agents": { params: WorkspaceRef, result: AgentRolesSchema },
+  /** Saves them to `.agentchainer/agents.json`, out of git; Claude for a role is the same as no default. */
+  "workspace.setAgents": { params: WorkspaceRef.extend({ agents: AgentRolesSchema }), result: AgentRolesSchema },
   "workflow.list": {
     params: WorkspaceRef,
     result: z.object({ workflows: z.array(TierWorkflowSchema), problems: z.array(ProjectWorkflowProblemSchema) }),

@@ -25,6 +25,7 @@ import type { SDKMessage } from "@anthropic-ai/claude-agent-sdk";
 import { stringify as stringifyYaml } from "yaml";
 import { AC_DIR } from "../ac-dir.ts";
 import { agentsNeeded } from "../backends/choose.ts";
+import { readDefaults } from "../backends/defaults.ts";
 import { findTool, toolsDir } from "../bootstrap/tools.ts";
 import { listDeploys } from "../deploy/service.ts";
 import { detectWorkspace } from "../detect/detect.ts";
@@ -719,6 +720,9 @@ export function startTask(
   const own = flowOf(task);
   const workflow = own ?? eff.library.workflows[task.triage.chosen];
   if (!workflow) throw invalid(t("tasks.service.noWorkflow", { tier: task.triage.chosen }));
+  // The task's choice per role over the workspace's defaults (M9-06): step > task > workspace > Claude.
+  const chosen = { ...readDefaults(root), ...opts.agents };
+  opts = Object.keys(chosen).length ? { ...opts, agents: chosen } : opts;
   // Every agent the run needs is installed, before anything starts (M9-06): the step that names a missing one would
   // otherwise fail mid-run, after the branch and the baseline.
   for (const agent of agentsNeeded(workflow, opts.agents)) {

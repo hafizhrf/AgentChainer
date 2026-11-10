@@ -54,6 +54,8 @@ export const keyOf = (path: Path) => path.join(".");
 function agentDetail(s: Obj): string {
   const limits = obj(s.limits);
   const parts = [str(s.role, "?"), str(s.access, "?")];
+  // A step that names its own agent says so (M9); one that doesn't takes the task's or the workspace's.
+  if (typeof s.agent === "string") parts.push(`@${s.agent}`);
   if (typeof s.output === "string") parts.push(`→ ${s.output}`);
   if (typeof limits.maxBudgetUsd === "number") parts.push(`$${limits.maxBudgetUsd}`);
   return parts.join(" · ");

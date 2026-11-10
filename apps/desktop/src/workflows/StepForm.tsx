@@ -223,6 +223,22 @@ export function StepForm({
           onChange={(v) => onSet(at("access"), v)}
         />
       </Field>
+      {node.kind !== "split" && (
+        // Which agent runs this step (M9, ADR-0012): left unset, the task's or the workspace's choice for its role.
+        <Field label={t("workflows.stepForm.agent")} help={t("workflows.stepForm.agentHelp")}>
+          <Select
+            label={t("workflows.stepForm.agent")}
+            value={text(step.agent)}
+            options={[
+              { value: "", label: t("workflows.stepForm.agentTask") },
+              { value: "claude", label: t("tasks.agents.claude") },
+              { value: "codex", label: t("tasks.agents.codex") },
+              { value: "agy", label: t("tasks.agents.agy") },
+            ]}
+            onChange={(v) => onSet(at("agent"), v || undefined)}
+          />
+        </Field>
+      )}
       <Checks
         label={t("workflows.stepForm.inputs")}
         options={STEP_INPUTS}

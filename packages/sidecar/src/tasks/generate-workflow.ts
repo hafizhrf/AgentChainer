@@ -36,6 +36,8 @@ output only. Rules the file must follow (it is checked; anything else is refused
   maxRounds, maxBudgetUsd } to send failures back.
 - A review step may have fix: { step: <the write step's id>, maxRounds, maxBudgetUsd } for its must-fix findings.
 - A parallel group: { label, parallel: [read-only agent steps without output or fix] }.
+- Leave out an agent step's optional agent (claude | codex | agy: which CLI runs it) unless the request names one: the
+  task and the workspace choose it otherwise.
 - Keep budgets modest (a step's maxBudgetUsd at most 3) and fix rounds at most 3.
 Change only what the request asks for; keep the rest of the given workflow as it is.`;
 

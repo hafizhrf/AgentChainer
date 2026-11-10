@@ -32051,6 +32051,131 @@
         }
       }
     },
+    "workspace.agents": {
+      "params": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "cwd": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "cwd"
+        ],
+        "additionalProperties": false
+      },
+      "result": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "plan": {
+            "type": "string",
+            "enum": [
+              "claude",
+              "codex",
+              "agy"
+            ]
+          },
+          "implement": {
+            "type": "string",
+            "enum": [
+              "claude",
+              "codex",
+              "agy"
+            ]
+          },
+          "review": {
+            "type": "string",
+            "enum": [
+              "claude",
+              "codex",
+              "agy"
+            ]
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "workspace.setAgents": {
+      "params": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "cwd": {
+            "type": "string",
+            "minLength": 1
+          },
+          "agents": {
+            "type": "object",
+            "properties": {
+              "plan": {
+                "type": "string",
+                "enum": [
+                  "claude",
+                  "codex",
+                  "agy"
+                ]
+              },
+              "implement": {
+                "type": "string",
+                "enum": [
+                  "claude",
+                  "codex",
+                  "agy"
+                ]
+              },
+              "review": {
+                "type": "string",
+                "enum": [
+                  "claude",
+                  "codex",
+                  "agy"
+                ]
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "cwd",
+          "agents"
+        ],
+        "additionalProperties": false
+      },
+      "result": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "plan": {
+            "type": "string",
+            "enum": [
+              "claude",
+              "codex",
+              "agy"
+            ]
+          },
+          "implement": {
+            "type": "string",
+            "enum": [
+              "claude",
+              "codex",
+              "agy"
+            ]
+          },
+          "review": {
+            "type": "string",
+            "enum": [
+              "claude",
+              "codex",
+              "agy"
+            ]
+          }
+        },
+        "additionalProperties": false
+      }
+    },
     "workflow.list": {
       "params": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",

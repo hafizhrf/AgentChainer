@@ -2148,8 +2148,22 @@ with the OpenAI Codex CLI and Google's Antigravity CLI (`agy`), in both directio
     - with agy picked for Implement, the run recorded `agents: { implement: "agy" }`, the step ran under agy's
       conversation id with no Claude spend, and the task ended Done.
     - It found a Fleet row stuck at "working" under agy's temporary id, now fixed.
-  - **Left (part 2):** the workspace's defaults per role, the canvas picker, the generator's guide, readiness rows
-    and CLI paths in Settings, and the eval variant.
+  Progress, part 2a:
+  - **Workspace defaults per role:** Workspace settings → Workflows → **Default agents**, saved on change to
+    `.agentchainer/agents.json`, out of git (`workspace.agents` / `workspace.setAgents`).
+    - Precedence: step > task > workspace > Claude.
+    - The task's pickers start from them, and an explicit Claude overrides them.
+  - **Canvas:**
+    - an **Agent** picker on agent steps and parallel members ("The task's choice" by default; XL's split stays
+      Claude);
+    - a node says `@codex` when its step names an agent;
+    - the YAML gets `agent: …`.
+  - **The generator's guide** leaves `agent` out unless the request names one.
+  - **Tests:** `defaults.test.ts` (2); the service test now also covers a workspace default naming a missing agent.
+  - **Checked in the app:** Review set to agy saved `{"review":"agy"}`, and the file was git-ignored. In tier M's
+    editor, the review step's Agent set to Codex showed `@codex` on the node and `agent: codex` in the YAML (not
+    saved).
+  - **Left (part 2b):** readiness rows and CLI paths in Settings; the eval variant.
 
 - [ ] **M9-07** The thread, Flow, Fleet and evidence show which agent and model ran each step.
 - [ ] **M9-08** (later) Team workers on Codex or agy. The supervisor stays Claude.

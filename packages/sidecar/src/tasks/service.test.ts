@@ -15,6 +15,7 @@ import { join } from "node:path";
 import { after, describe, it } from "node:test";
 import { fileURLToPath } from "node:url";
 import { RpcErrorCode, resultEnglish, resultText, setLanguage } from "@agentchainer/protocol";
+import { writeDefaults } from "../backends/defaults.ts";
 import { copyFixture, removeFixtureCopies } from "../detect/fixture-copy.ts";
 import type { Gh, GhResult } from "../github.ts";
 import type { AgentSdkModule } from "../sdk-loader.ts";
@@ -960,6 +961,12 @@ describe("a task's agents (M9-06)", () => {
     );
     assert.equal(loadTask(root, task.id).state, "ready", "nothing started: no branch, no run");
     assert.ok(!loadTask(root, task.id).run);
+    // The workspace's default counts too when the task chooses nothing.
+    writeDefaults(root, { implement: "codex" });
+    assert.throws(
+      () => startTask(root, task.id, host, { permissionMode: "default" }, () => undefined),
+      /runs a step on Codex, which isn't installed/,
+    );
   });
 });
 

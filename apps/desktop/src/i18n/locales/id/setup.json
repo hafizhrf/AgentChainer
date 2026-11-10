@@ -340,6 +340,8 @@
   "setup.permissions.empty": "Belum ada aturan yang disimpan.",
   "setup.workflows.intro": "Langkah-langkah yang dijalankan sebuah task, per tier. Sebuah proyek dapat mengganti workflow suatu tier dengan <code>{{file}}</code> miliknya sendiri, yang dibagikan lewat git; file itu diperiksa sama seperti milik aplikasi, dan setiap run menyimpan salinan workflow yang dipakainya saat mulai.",
   "setup.workflows.tiers": "Tier",
+  "setup.workflows.agentsTitle": "Agent bawaan",
+  "setup.workflows.agentsHelp": "Agent yang menjalankan tiap jenis langkah bila task tidak memilih. Langkah yang diberi agent sendiri oleh workflow tetap memakainya. Disimpan di komputer ini saja (.agentchainer/agents.json, di luar git).",
   "setup.workflows.checkAgain": "Periksa lagi",
   "setup.workflows.reading": "Membaca workflow…",
   "setup.workflows.sourceProject": "proyek",

@@ -351,6 +351,8 @@
   "setup.permissions.empty": "No saved rules yet.",
   "setup.workflows.intro": "The steps a task runs, by tier. A project can replace a tier's with its own <code>{{file}}</code>, shared through git; it's checked like the app's own, and a run keeps a copy of the one it started with.",
   "setup.workflows.tiers": "Tiers",
+  "setup.workflows.agentsTitle": "Default agents",
+  "setup.workflows.agentsHelp": "Which agent runs each kind of step when a task doesn't choose. A step a workflow gives an agent of its own keeps it. Saved on this computer only (.agentchainer/agents.json, out of git).",
   "setup.workflows.checkAgain": "Check again",
   "setup.workflows.reading": "Reading the workflows…",
   "setup.workflows.sourceProject": "project",

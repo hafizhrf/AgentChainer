@@ -1,10 +1,11 @@
-import type { Methods, TierWorkflow } from "@agentchainer/protocol";
-import { Pencil, RefreshCw, Workflow } from "lucide-react";
+import type { AgentRoles, Methods, TierWorkflow } from "@agentchainer/protocol";
+import { Bot, Pencil, RefreshCw, Workflow } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import type { Confirm } from "../Dialog.tsx";
 import { t } from "../i18n/index.ts";
 import { Rich } from "../i18n/Rich.tsx";
 import { request } from "../sidecar.ts";
+import { type AgentClis, AgentPickers, ALL_ROLES, otherAgents } from "../tasks/AgentPickers.tsx";
 import { IconButton } from "../ui/IconButton.tsx";
 import { WorkflowEditor } from "../workflows/WorkflowEditor.tsx";
 
@@ -111,6 +112,48 @@ export function Workflows({ cwd, confirm }: { cwd: string; confirm: Confirm }) {
           </div>
         )}
       </section>
+      <DefaultAgents cwd={cwd} />
     </div>
+  );
+}
+
+/**
+ * The workspace's default agent per role (M9-06, ADR-0012 §5): who plans, implements and reviews when a task doesn't
+ * choose. Saved as soon as one changes, in `.agentchainer/agents.json`, out of git. Shown when there's more than Claude.
+ */
+function DefaultAgents({ cwd }: { cwd: string }) {
+  const [clis, setClis] = useState<AgentClis | null>(null);
+  const [agents, setAgents] = useState<AgentRoles>({});
+  const [error, setError] = useState<string | null>(null);
+  useEffect(() => {
+    void request("agents.available", {}).then(setClis, () => setClis(null));
+    void request("workspace.agents", { cwd }).then(setAgents, (err: unknown) => setError(message(err)));
+  }, [cwd]);
+  if (!clis || !otherAgents(clis)) return null;
+  const save = async (next: AgentRoles) => {
+    setAgents(next);
+    try {
+      setAgents(await request("workspace.setAgents", { cwd, agents: next }));
+      setError(null);
+    } catch (err) {
+      setError(message(err));
+    }
+  };
+  return (
+    <section className="card deploy-card">
+      <div className="card-title">
+        <Bot size={16} aria-hidden />
+        <h2>{t("setup.workflows.agentsTitle")}</h2>
+      </div>
+      <AgentPickers
+        roles={ALL_ROLES}
+        agents={agents}
+        onAgents={(next) => void save(next)}
+        clis={clis}
+        help={t("setup.workflows.agentsHelp")}
+        titled={false}
+      />
+      {error && <p className="warn">{error}</p>}
+    </section>
   );
 }

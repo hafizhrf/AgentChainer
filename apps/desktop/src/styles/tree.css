@@ -610,3 +610,8 @@
 .git-status.error {
   color: var(--err);
 }
+
+/* A row's right-click menu (UX-21) wraps it without taking part in the layout. */
+.file-menu-trigger {
+  display: contents;
+}

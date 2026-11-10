@@ -126,6 +126,16 @@ fn open_in_editor(
     }
 }
 
+/// Shows `path` selected in the system's file manager (UX-21): Explorer on Windows, Finder on macOS, the file manager
+/// on Linux. Nothing is opened or run; a network path is refused like the editor's.
+#[tauri::command]
+fn reveal_in_folder(app: AppHandle, path: String) -> Result<(), String> {
+    editor::check_file(&path)?;
+    app.opener()
+        .reveal_item_in_dir(&path)
+        .map_err(|e| e.to_string())
+}
+
 /// Starts the user's shell in `cwd` for the integrated terminal (M1-29) and returns its id.
 #[tauri::command]
 fn pty_open(
@@ -345,6 +355,7 @@ pub fn run() {
             workspace_watch,
             workspace_unwatch,
             open_in_editor,
+            reveal_in_folder,
             pty_open,
             pty_write,
             pty_resize,

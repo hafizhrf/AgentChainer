@@ -86,6 +86,7 @@ Nothing else. In particular, there is no file-system or shell plugin.
 |---|---|---|
 | `sidecar_send` | A JSON-RPC frame | The sidecar validates every frame against the protocol schema. |
 | `open_in_editor` | Absolute file, line, editor | A local file that exists (no network or device paths). Editors come from an allowlist and get an argument array. "System default" is as T-03 says. |
+| `reveal_in_folder` | Absolute path | The same local-file check as `open_in_editor` (no network or device paths). Shows the item selected in the system file manager through the opener plugin: nothing is opened or run (UX-21). |
 | `pty_open` / `pty_write` | Folder, size, data | The user's own shell, in a folder the user opened. This is the terminal feature itself. |
 | `open_terminal` | Folder | Must be a folder. On Windows it's passed as the working directory, never on cmd's command line. |
 | `workspace_watch` | Folder | Watches only, without following links; emits change events. |

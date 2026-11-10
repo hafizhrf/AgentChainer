@@ -15,6 +15,15 @@ import "./styles/features.css";
 import "./styles/tasks.css";
 import "./styles/graph.css";
 
+// The WebView's own menu (Back, Reload, Save as, Inspect) never shows (UX-21): the app's menus take its place. Text
+// fields and selected text keep it, for cut, copy and paste.
+document.addEventListener("contextmenu", (e) => {
+  const target = e.target instanceof Element ? e.target : null;
+  const editable = target?.closest("input, textarea, [contenteditable=''], [contenteditable='true']");
+  const selected = (window.getSelection()?.toString() ?? "") !== "";
+  if (!editable && !selected) e.preventDefault();
+});
+
 // The language comes from the saved settings (X-13), before anything is drawn: a change in Settings restarts the app.
 // A debug build may render the pseudo-locale on top.
 async function start() {

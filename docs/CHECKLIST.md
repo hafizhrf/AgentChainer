@@ -1399,6 +1399,23 @@ for the desktop shell, start screen and session view to be cleaned up (UX-02, UX
     with its size), not as text. SVG is shown as an image, never run as a page.
   - **Checks:** keyboard access (Shift+F10 and the menu key open it), both themes, and the three platforms' reveal
     commands.
+  Progress (2026-11-11, PR pending): built.
+  - **Menu:** Radix ContextMenu on the Files tree's files and folders and the Changes list's rows (not deleted or
+    outside ones). It has Open in editor, Open with default app (`open_in_editor` with "system", so T-03's rules),
+    Reveal (`reveal_in_folder`, the opener plugin's `reveal_item_in_dir`), Copy path and Copy relative path. A failed
+    action shows above the tabs' content.
+  - **No WebView menu:** a document-wide handler stops it everywhere but text fields and selected text.
+  - **Images:** `workspace.image` reads a workspace image as base64 (10 MB cap, inside the workspace); `ImageView`
+    shows it fit to the panel on a checkerboard, with its pixel and file size. SVG goes in an `<img>`.
+  - **Tests:** `workspaceImage` (base64, the cap, not an image, missing, outside), `imageType`, `systemPath`.
+  - **Checked in the app (Windows):**
+    - a PNG and an SVG previewed, dark and light;
+    - the menu on a right-click, Shift+F10 and the menu key, the first item focused;
+    - Copy path and Copy relative path read back from the clipboard;
+    - Reveal opened Explorer on the folder;
+    - the WebView's menu blocked on the UI and kept in text fields;
+    - the owner's settings restored.
+  - **Left:** Reveal on macOS (Finder) and Linux (the file manager) by hand.
 - [ ] **UX-22** A preview of the app being built, in the right sidebar. Owner request, 2026-11-11: "kalo task udah kelar,
   atau lagi di mode chat, dan lagi ada agent / background task yang run localhost, bisa buka di sidebar kanan juga".
   Builds on CP-12, which this moves forward.

@@ -112,6 +112,7 @@ Planned surface (v0.1):
 | request | `permissions.list` / `permissions.add` / `permissions.remove` | The `permissions` lists of `.claude/settings.local.json`, `.claude/settings.json` and the user's own `~/.claude/settings.json` (UX-19, ADR-0013); nothing else in those files leaves the sidecar |
 | request | `workspace.files` | Files under the workspace (tracked + untracked, minus ignored) with git status and branch |
 | request | `workspace.diff` | HEAD vs working tree for one file, with its `-U0` hunks |
+| request | `workspace.image` | An image in the workspace (PNG, JPEG, GIF, WebP, SVG, ICO) as base64 for the file viewer, up to 10 MB (UX-21). Read-only, inside the workspace like `workspace.diff` |
 | request | `workspace.revert` | Revert a file to HEAD (new files are deleted) or one hunk (`git apply -R`), worktree only |
 | request | `workspace.gitInit` | `git init`, offered when the workspace isn't a repository |
 | request | `git.branches` / `git.switch` / `git.stage` / `git.unstage` / `git.commit` / `git.push` | Git panel (M1-30). `git.branches` includes remote-only branches and a merge in progress; `git.switch` with `track` checks out a remote branch. Push is never forced and runs with `GIT_TERMINAL_PROMPT=0` |
@@ -171,6 +172,7 @@ Workspace paths are relative to `cwd`; the sidecar rejects absolute paths and `.
 | `workspace_watch` / `workspace_unwatch` | `notify` watcher; emits `workspace://changed {cwd}` debounced to 300 ms. Ignores `node_modules`, `target`, `.git/objects` and similar; on Linux those folders aren't watched at all (inotify needs one watch per folder) |
 | `pty_open` / `pty_write` / `pty_resize` / `pty_close` | Integrated terminal: the user's login shell (PowerShell on Windows) in a `portable-pty` PTY; output as `pty://data {id, data}`, `pty://exit {id}` |
 | `open_in_editor` | `code`/`cursor --goto file:line`, `zed file:line`, `idea --line N file`, or the OS default app |
+| `reveal_in_folder` | Shows a file or folder selected in Explorer, Finder or the Linux file manager (UX-21), through the opener plugin |
 | `cost_record` / `cost_sessions` / `cost_summary` | Local cost history in SQLite (§7) |
 | `diagnostics_export` | Redacted diagnostics bundle (versions, settings, readiness, recent log, crash logs) to a user-picked file |
 

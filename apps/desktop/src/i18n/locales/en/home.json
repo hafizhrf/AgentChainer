@@ -136,5 +136,7 @@
   "home.newSession.chooseFolder": "Choose a folder…",
   "home.newSession.agent": "Agent",
   "home.newSession.codexHelp": "Your own Codex CLI, signed in by you. Its edits and commands go through the guard and your approvals, like Claude's. No plan mode, and no rewind.",
-  "home.newSession.codexModel": "Codex's default (pick another in the chat)"
+  "home.newSession.codexModel": "Codex's default (pick another in the chat)",
+  "home.newSession.agyHelp": "Your own Antigravity CLI, signed in by you. It edits files but runs no commands, and never asks first: Standard edits, Plan only reads. A message sent while it works waits for the next turn. The chat can't be reopened after the app restarts.",
+  "home.newSession.agyModel": "agy's first listed model"
 }

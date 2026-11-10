@@ -5,8 +5,8 @@ import path from "node:path";
 import { after, describe, it } from "node:test";
 import type { AgentEvent } from "@agentchainer/protocol";
 import { GUARD_PREFIX } from "../guard.ts";
-import { agyBackend, runSettings, turnArgs } from "./agy.ts";
-import { firstModel } from "./find.ts";
+import { agyBackend, openAgyChat, runSettings, turnArgs } from "./agy.ts";
+import { firstModel, listModels } from "./find.ts";
 import { estimateUsd } from "./prices.ts";
 import type { LiveSession } from "./types.ts";
 
@@ -158,6 +158,99 @@ describe("the Antigravity CLI step backend (M9-05)", () => {
     assert.deepEqual(args.slice(args.indexOf("--model"), args.indexOf("--model") + 2), [
       "--model",
       "gemini-3.8-flash-low",
+    ]);
+  });
+});
+
+describe("a chat on agy (M9-09)", () => {
+  const host = (registered: Map<string, LiveSession>) => ({
+    cli: { bin: process.execPath, prefix: [script] },
+    version: "agy fake",
+    defaultModel: async () => "gemini-fake",
+    models: async () => [
+      { id: "gemini-fake", name: "Gemini Fake" },
+      { id: "gemini-other", name: "Gemini Other" },
+    ],
+    register: (s: LiveSession) => registered.set(s.id, s),
+    unregister: (id: string) => registered.delete(id),
+  });
+
+  it("keeps its tab's id, queues a message sent mid-turn, switches mode and model, and resumes by that id", async () => {
+    const argsFile = path.join(dir, "chat-args.jsonl");
+    writeFileSync(argsFile, "");
+    process.env.FAKE_ARGS = argsFile;
+    process.env.FAKE_WRITE = path.join(dir, "chat.txt");
+    const registered = new Map<string, LiveSession>();
+    const events: AgentEvent[] = [];
+    const callbacks = {
+      emit: (e: AgentEvent) => events.push(e),
+      askPermission: () => undefined,
+      onEnd: () => undefined,
+    };
+    const turns = () => events.filter((e) => e.type === "turn.completed").length;
+    const until = async (n: number) => {
+      for (let i = 0; i < 250 && turns() < n; i++) await new Promise((r) => setTimeout(r, 20));
+    };
+
+    await assert.rejects(
+      openAgyChat(host(registered), { cwd: dir, permissionMode: "default" }, callbacks),
+      /never asks/,
+    );
+    const chat = await openAgyChat(host(registered), { cwd: dir }, callbacks);
+    assert.equal(chat.agent, "agy");
+    assert.equal(events.length, 0, "nothing goes out before the tab exists");
+    chat.release();
+    const opening = events.map((e) => e.type);
+    assert.deepEqual(opening, ["session.started", "models.changed"]);
+    const id = chat.id;
+    assert.match(id, /^[0-9a-f-]{36}$/, "a UUID, as the protocol takes");
+
+    chat.send("First.");
+    chat.send("Second, while the first runs.");
+    await until(2);
+    assert.equal(chat.id, id, "the tab's id stays, though agy named the conversation");
+    assert.ok(registered.has(id));
+
+    await assert.rejects(chat.setMode("auto"), /never asks/);
+    await chat.setMode("plan");
+    await chat.setModel("gemini-other");
+    chat.send("Third.");
+    await until(3);
+    assert.ok(chat.transcript.some((e) => e.type === "user.message" && e.text === "Third."));
+    await chat.close();
+
+    const resumed = await openAgyChat(host(registered), { cwd: dir, resume: id }, callbacks);
+    assert.equal(resumed.id, id);
+    resumed.release();
+    resumed.send("Fourth.");
+    await until(4);
+    await resumed.close();
+    await assert.rejects(
+      openAgyChat(host(registered), { cwd: dir, resume: "00000000-0000-4000-8000-000000000000" }, callbacks),
+      /restarted/,
+    );
+
+    const argv = readFileSync(argsFile, "utf8")
+      .trim()
+      .split("\n")
+      .map((l) => JSON.parse(l) as string[]);
+    const value = (args: string[], flag: string) => (args.includes(flag) ? args[args.indexOf(flag) + 1] : undefined);
+    assert.equal(argv.length, 4, "the queued message ran as a turn of its own");
+    assert.equal(value(argv[0] ?? [], "--conversation"), undefined);
+    assert.ok(value(argv[0] ?? [], "-p")?.endsWith("First."), "the no-commands note comes first");
+    assert.equal(value(argv[1] ?? [], "-p"), "Second, while the first runs.");
+    assert.equal(value(argv[1] ?? [], "--conversation"), "conv-1");
+    assert.equal(value(argv[1] ?? [], "--model"), "gemini-fake");
+    assert.equal(value(argv[2] ?? [], "--model"), "gemini-other");
+    assert.ok(value(argv[2] ?? [], "--settings")?.includes("write_file(*)"), "Plan only reads");
+    assert.equal(argv[2]?.includes("--mode"), false);
+    assert.equal(value(argv[3] ?? [], "--conversation"), "conv-1", "resumed by the tab's id");
+  });
+
+  it("lists the models agy prints", () => {
+    assert.deepEqual(listModels("Fetching models…\ngemini-a\tGemini A\ngemini-b\tGemini B\n"), [
+      { id: "gemini-a", name: "Gemini A" },
+      { id: "gemini-b", name: "Gemini B" },
     ]);
   });
 });

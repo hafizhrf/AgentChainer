@@ -6,7 +6,6 @@ import {
   type FleetItem,
   folderKey,
   type Methods,
-  PERMISSION_MODES,
   type PermissionMode,
   type PermissionRequest,
   PROTOCOL_VERSION,
@@ -34,7 +33,7 @@ import { HomeView, pickFolder } from "./HomeView.tsx";
 import { approxUsd, count, usd as dollars } from "./i18n/format.ts";
 import { t } from "./i18n/index.ts";
 import { NewSessionDialog } from "./NewSessionDialog.tsx";
-import { MODE_NAMES, modelChoices, rememberModels, THEMES } from "./options.ts";
+import { agentModes, fitMode, MODE_NAMES, modelChoices, rememberModels, THEMES } from "./options.ts";
 import { type PermissionAnswer, PermissionDialog } from "./PermissionDialog.tsx";
 import { PANEL_TAB_LABEL, PANEL_TABS, type PanelTab, parseHidden, serializeHidden, toggleHidden } from "./panelTabs.ts";
 import { SessionView } from "./SessionView.tsx";
@@ -598,8 +597,9 @@ export function App() {
       const applied = settings?.autoApply ? await autoApply(dir) : [];
       const { sessionId } = await request("session.start", {
         cwd: dir,
-        permissionMode: mode,
-        ...(modelAlias ? { model: modelAlias } : {}),
+        permissionMode: fitMode(agent, mode),
+        // Another agent's chat takes its own models, so a Claude model picked isn't sent (M9-09).
+        ...(modelAlias && agent === "claude" ? { model: modelAlias } : {}),
         ...(effort ? { effort } : {}),
         ...(budgetUsd ? { maxBudgetUsd: budgetUsd } : {}),
         showThinking,
@@ -676,7 +676,7 @@ export function App() {
         resume: sessionId,
         ...(asProfile ? { profile: asProfile } : {}),
         // A Codex chat has no plan mode; its own models only (M9-09).
-        permissionMode: agent === "codex" && mode === "plan" ? "default" : mode,
+        permissionMode: fitMode(agent, mode),
         ...(modelAlias && agent === "claude" ? { model: modelAlias } : {}),
         ...(agent !== "claude" ? { agent } : {}),
         ...(effort ? { effort } : {}),
@@ -684,16 +684,22 @@ export function App() {
         showThinking,
         ...(folders.length ? { folders } : {}),
       });
+      // A chat with no stored title (an agy chat after a reload, M9-09) goes by its first message, as it did.
+      const asked = events.find((e) => e.type === "user.message");
+      const shown =
+        title === t("app.session.newTitle") && asked?.type === "user.message"
+          ? (asked.text.split("\n")[0]?.trim().slice(0, 80) ?? "") || title
+          : title;
       const items = closeAssistant(
         // Stored times rebuild the agents' timing for the graph and the timeline (M4-08).
         events.reduce<Item[]>(
           (acc, e, i) => applyEvent(acc, e, times?.[i] ?? undefined),
-          [notice(t("app.session.resumed", { title, folder: folderName(dir) }))],
+          [notice(t("app.session.resumed", { title: shown, folder: folderName(dir) }))],
         ),
       );
       const tab = newTab(sessionId, dir, {
-        title,
-        mode,
+        title: shown,
+        mode: fitMode(agent, mode),
         items,
         resumed: true,
         modelAlias,
@@ -1222,7 +1228,7 @@ export function App() {
         shortcut: menuShortcut("close-session"),
       });
       if (!cur.ended) {
-        for (const m of PERMISSION_MODES)
+        for (const m of agentModes(cur.agent))
           if (m !== cur.mode)
             add(
               session,

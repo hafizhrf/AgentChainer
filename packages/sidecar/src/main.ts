@@ -2,6 +2,7 @@ import { existsSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import {
+  type AgentEvent,
   asLanguage,
   type Effort,
   folderProblems,
@@ -14,6 +15,7 @@ import type { SDKMessage } from "@anthropic-ai/claude-agent-sdk";
 import pkg from "../package.json" with { type: "json" };
 import { agentTemplates } from "./agent-templates.ts";
 import { deleteAgent, listAgents, saveAgent } from "./agents.ts";
+import { openAgyChat } from "./backends/agy.ts";
 import { openCodexChat } from "./backends/codex.ts";
 import { codexThreadEvents, codexThreads } from "./backends/codex-history.ts";
 import {
@@ -206,6 +208,51 @@ async function startCodexChat(opts: {
   );
   id = chat.id;
   if (opts.effort) await chat.setEffort(opts.effort);
+  // Its opening events go out once the UI has the tab, after this answer.
+  setTimeout(() => chat.release(), 0);
+  return { sessionId: chat.id };
+}
+
+/** A chat on the user's own Antigravity CLI (M9-09): a turn per message, the conversation continued. */
+async function startAgyChat(opts: {
+  cwd: string;
+  model?: string | undefined;
+  permissionMode?: PermissionMode | undefined;
+  resume?: string | undefined;
+  folders?: string[] | undefined;
+}): Promise<{ sessionId: string; attached?: boolean }> {
+  const live = opts.resume ? sessions.get(opts.resume) : undefined;
+  if (live) {
+    const chat = requireChat(live.id);
+    if (opts.permissionMode) await chat.setMode(opts.permissionMode).catch(() => undefined);
+    if (opts.model !== undefined) await chat.setModel(opts.model);
+    return { sessionId: chat.id, attached: true };
+  }
+  const host = agyHost(onPath, {
+    register: (session) => sessions.set(session.id, session),
+    unregister: (id) => sessions.delete(id),
+  });
+  if (!host) throw new RpcFailure(RpcErrorCode.invalidParams, t("rpc.session.agyMissing"));
+  let id = "";
+  const chat = await openAgyChat(
+    host,
+    {
+      cwd: opts.cwd,
+      ...(opts.model ? { model: opts.model } : {}),
+      ...(opts.permissionMode ? { permissionMode: opts.permissionMode } : {}),
+      ...(opts.resume ? { resume: opts.resume } : {}),
+      ...(opts.folders?.length ? { additionalDirectories: opts.folders } : {}),
+    },
+    {
+      emit: (event) => notify("agent.event", { sessionId: id, event }),
+      askPermission: () => undefined,
+      statusChanged: (item) => notify("fleet.changed", { item }),
+      onEnd: () => undefined,
+    },
+  ).catch((err: unknown) => {
+    throw new RpcFailure(RpcErrorCode.invalidParams, err instanceof Error ? err.message : String(err));
+  });
+  id = chat.id;
   // Its opening events go out once the UI has the tab, after this answer.
   setTimeout(() => chat.release(), 0);
   return { sessionId: chat.id };
@@ -508,7 +555,8 @@ serve(
       const running = resume ? sessions.get(resume) : undefined;
       if (agent === "codex" || (running && "agent" in running && running.agent === "codex"))
         return startCodexChat({ cwd, model, permissionMode, effort, resume, folders });
-      if (agent === "agy") throw new RpcFailure(RpcErrorCode.invalidParams, t("rpc.session.claudeOnly"));
+      if (agent === "agy" || (running && "agent" in running && running.agent === "agy"))
+        return startAgyChat({ cwd, model, permissionMode, resume, folders });
       // A Team chat (M8-03) runs workers on the person's budget, so it needs a cap for them all.
       if (team && !maxBudgetUsd) {
         throw new RpcFailure(RpcErrorCode.invalidParams, t("rpc.team.needsBudget"));
@@ -666,6 +714,11 @@ serve(
         const cli = codexCli();
         if (!cli) throw new RpcFailure(RpcErrorCode.invalidParams, t("rpc.session.codexMissing"));
         return { events: await codexThreadEvents(cli, sessionId) };
+      }
+      // agy keeps no history the app can read: a chat still running hands back what it said (M9-09).
+      if (agent === "agy") {
+        const live = sessions.get(sessionId) as { transcript?: readonly AgentEvent[] } | undefined;
+        return { events: [...(live?.transcript ?? [])] };
       }
       const { sdk } = await prepareSdk();
       const main = await sdk.getSessionMessages(sessionId, { dir: cwd });

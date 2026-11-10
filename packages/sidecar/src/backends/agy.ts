@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto";
 import { homedir } from "node:os";
 import path from "node:path";
 import { createInterface } from "node:readline";
-import type { AgentEvent, CostKind, FleetItem, TaskTag } from "@agentchainer/protocol";
+import type { AgentEvent, CostKind, Effort, FleetItem, PermissionMode, TaskTag } from "@agentchainer/protocol";
 import type { Cli } from "../deploy/cli.ts";
 import { checkToolCall, GUARD_PREFIX, SECRET_DIRS } from "../guard.ts";
 import { t } from "../i18n/index.ts";
@@ -12,7 +12,7 @@ import type { SessionCallbacks, TurnResult } from "../session.ts";
 import { recordRun } from "../usage/ledger.ts";
 import { type AgyEvent, type AgyUsage, eventsOf, parseLine, usageOfResult, writesOf } from "./agy-events.ts";
 import { estimateUsd } from "./prices.ts";
-import type { LiveSession, StepBackend, StepOptions } from "./types.ts";
+import type { ChatSession, LiveSession, StepBackend, StepOptions } from "./types.ts";
 
 /**
  * Task steps on the user's own Antigravity CLI (M9-05, ADR-0012 §3, spike S8): one headless `agy -p` per turn, the
@@ -36,6 +36,8 @@ export type AgyHost = {
    * can't be had, and then agy keeps its default.
    */
   defaultModel?: () => Promise<string | null>;
+  /** Every model `agy models` lists, for a chat's model picker (M9-09). */
+  models?: () => Promise<{ id: string; name: string }[]>;
   register(session: LiveSession): void;
   unregister(sessionId: string): void;
 };
@@ -52,6 +54,45 @@ export function agyBackend(host: AgyHost): StepBackend {
     host.register(session);
     return session;
   };
+}
+
+/** A chat's conversation, by the id its tab knows it by, so a closed tab resumes it while the app runs (M9-09). */
+const chats = new Map<string, string>();
+
+/** The modes an agy chat has: it edits files, or with Plan only reads. It never asks, so there's no Safe. */
+export const AGY_MODES: readonly PermissionMode[] = ["acceptEdits", "plan"];
+
+/**
+ * A chat on agy (M9-09): each message runs one `agy -p` turn that continues the conversation. Its opening events wait
+ * for `release()`, once the UI has the tab. The tab knows it by an id of the app's, since agy names a conversation
+ * only once its first turn starts.
+ */
+export async function openAgyChat(
+  host: AgyHost,
+  options: StepOptions,
+  callbacks: SessionCallbacks,
+): Promise<ChatSession & { release(): void; readonly transcript: readonly AgentEvent[] }> {
+  const mode = options.permissionMode ?? "acceptEdits";
+  if (!AGY_MODES.includes(mode)) throw new Error(t("rpc.session.agyModes"));
+  const resume = options.resume;
+  // The tab's id is the app's own: once the app has restarted, nothing says which conversation it was.
+  const conversation = resume ? (chats.get(resume) ?? null) : null;
+  if (resume && conversation === null) throw new Error(t("rpc.session.agyGone"));
+  const session: AgySession = new AgySession(
+    host,
+    { ...options, permissionMode: mode, readOnly: mode === "plan" },
+    {
+      ...callbacks,
+      onEnd: () => {
+        host.unregister(session.id);
+        callbacks.onEnd();
+      },
+    },
+    { id: resume ?? randomUUID(), conversation },
+  );
+  await session.opened();
+  host.register(session);
+  return session;
 }
 
 /** Model names that are the app's Claude aliases: agy takes its own default instead. Its `claude-…` models pass. */
@@ -91,7 +132,8 @@ const NO_COMMANDS =
   "You can read and edit files but not run commands: commands are refused. Don't try to run tests, builds or git; " +
   "AgentChainer runs the project's checks after you and tells you what failed.";
 
-class AgySession implements LiveSession {
+class AgySession implements ChatSession {
+  readonly agent = "agy";
   id: string;
   tag: TaskTag | undefined;
   parentId: string | undefined;
@@ -108,24 +150,121 @@ class AgySession implements LiveSession {
   private readonly startedAt = new Date().toISOString();
   private since = this.startedAt;
   private ended = false;
+  /** A chat (M9-09): its id stays the tab's, and what it said is kept for a reloaded tab. */
+  private readonly chat: boolean;
+  private held: AgentEvent[] | null = null;
+  private readonly said: AgentEvent[] = [];
+  /** Messages sent while a turn runs: agy takes none mid-turn, so they go together as the next one. */
+  private queued: string[] = [];
+  /** The person stopped the turn: it isn't reported as a failure. */
+  private stopped = false;
 
-  constructor(host: AgyHost, options: StepOptions, callbacks: SessionCallbacks) {
+  constructor(
+    host: AgyHost,
+    options: StepOptions,
+    callbacks: SessionCallbacks,
+    chat?: { id: string; conversation: string | null },
+  ) {
     this.host = host;
     this.options = options;
     this.callbacks = callbacks;
-    this.conversation = options.resume ?? null;
+    this.chat = chat !== undefined;
+    this.conversation = chat ? chat.conversation : (options.resume ?? null);
     // agy names a conversation once its first turn starts: until then the session goes by an id of its own.
-    this.id = options.resume ?? `agy-${randomUUID()}`;
+    this.id = chat?.id ?? options.resume ?? `agy-${randomUUID()}`;
+    if (chat) this.held = [];
+  }
+
+  /** A chat's opening: its model, the list to pick from, and the start line, held until `release()`. */
+  async opened(): Promise<void> {
+    const models = (await this.host.models?.().catch(() => [])) ?? [];
+    await this.pickModel();
+    this.model = this.options.model ?? "";
+    this.emit({
+      type: "session.started",
+      sessionId: this.id,
+      model: this.model || "agy",
+      cwd: this.options.cwd,
+      claudeCodeVersion: this.host.version,
+      permissionMode: this.options.permissionMode ?? "acceptEdits",
+    });
+    if (models.length) {
+      this.emit({
+        type: "models.changed",
+        models: models.map((m, i) => ({
+          value: m.id,
+          displayName: m.name || m.id,
+          description: i === 0 ? t("tasks.agy.defaultModel") : "",
+        })),
+      });
+    }
+  }
+
+  release(): void {
+    const held = this.held ?? [];
+    this.held = null;
+    for (const e of held) this.callbacks.emit(e);
+  }
+
+  /** What a chat said so far, for a tab a reload left (agy has no history to read back). */
+  get transcript(): readonly AgentEvent[] {
+    return this.said;
   }
 
   async turn(prompt: string): Promise<TurnResult> {
     if (this.ended) throw new Error(t("tasks.agy.ended"));
+    await this.pickModel();
+    return this.run(prompt);
+  }
+
+  /** The model asked for when it's one of agy's, else the first `agy models` lists (M9-07). */
+  private async pickModel() {
     if (!this.options.model || CLAUDE_ALIAS.test(this.options.model)) {
       const fallback = await this.host.defaultModel?.().catch(() => null);
       if (fallback) this.options = { ...this.options, model: fallback };
     }
-    return this.run(prompt);
   }
+
+  /** A chat message (M9-09): a turn of its own, or, while one runs, part of the next. Images aren't sent to agy. */
+  send(text: string): string {
+    const id = randomUUID();
+    this.said.push({ type: "user.message", messageId: id, text });
+    if (this.child || this.busy) {
+      this.queued.push(text);
+      return id;
+    }
+    this.chatTurn(text);
+    return id;
+  }
+
+  /** A chat's turn is under way, from before agy starts until its queue is empty. */
+  private busy = false;
+
+  private chatTurn(text: string) {
+    this.busy = true;
+    void this.turn(text)
+      .catch((err: unknown) => this.emit({ type: "error", message: err instanceof Error ? err.message : String(err) }))
+      .finally(() => {
+        const next = this.queued.splice(0);
+        if (next.length && !this.ended) this.chatTurn(next.join("\n\n"));
+        else this.busy = false;
+      });
+  }
+
+  /** Edits, or Plan, which only reads; from the next turn. agy never asks, so the other modes aren't offered. */
+  async setMode(mode: PermissionMode): Promise<void> {
+    if (!AGY_MODES.includes(mode)) throw new Error(t("rpc.session.agyModes"));
+    this.options = { ...this.options, permissionMode: mode, readOnly: mode === "plan" };
+  }
+
+  /** From the next turn; "" is the first model agy lists. */
+  async setModel(model: string): Promise<void> {
+    const { model: _old, ...rest } = this.options;
+    this.options = model && model !== "default" ? { ...rest, model } : rest;
+  }
+
+  /** agy's models carry their effort in their names: there's nothing to set. */
+  async setEffort(_effort: Effort | null): Promise<void> {}
 
   private run(prompt: string): Promise<TurnResult> {
     const first = this.conversation === null;
@@ -158,7 +297,7 @@ class AgySession implements LiveSession {
       }
       const init = e as { model?: unknown };
       if (e.kind === "init" && typeof init.model === "string") this.model = init.model;
-      if (e.kind === "init" && first) {
+      if (e.kind === "init" && first && !this.chat) {
         this.emit({
           type: "session.started",
           sessionId: this.id,
@@ -191,6 +330,10 @@ class AgySession implements LiveSession {
   private named(conversation: string) {
     if (this.conversation === conversation) return;
     this.conversation = conversation;
+    if (this.chat) {
+      chats.set(this.id, conversation);
+      return;
+    }
     if (this.id !== conversation) {
       this.host.unregister(this.id);
       this.id = conversation;
@@ -282,7 +425,10 @@ class AgySession implements LiveSession {
         cacheCreationTokens: 0,
       },
     });
-    if (!ok && !breaches.size) this.emit({ type: "error", message: t("tasks.agy.turnFailed", { code: String(code) }) });
+    const stopped = this.stopped;
+    this.stopped = false;
+    if (!ok && !breaches.size && !stopped)
+      this.emit({ type: "error", message: t("tasks.agy.turnFailed", { code: String(code) }) });
     this.touch("idle");
     return {
       subtype: ok ? "success" : "error_during_execution",
@@ -319,6 +465,8 @@ class AgySession implements LiveSession {
 
   async interrupt(): Promise<boolean> {
     if (!this.child) return false;
+    this.stopped = true;
+    this.queued = [];
     this.child.kill();
     return true;
   }
@@ -363,7 +511,9 @@ class AgySession implements LiveSession {
   }
 
   private emit(event: AgentEvent) {
-    this.callbacks.emit(event);
+    if (this.chat) this.said.push(event);
+    if (this.held) this.held.push(event);
+    else this.callbacks.emit(event);
   }
 
   private touch(status: FleetItem["status"]) {

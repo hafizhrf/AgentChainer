@@ -30,7 +30,7 @@ after(() => removeFixtureCopies());
 const repoRoot = fileURLToPath(new URL("../../../../", import.meta.url));
 const evalsDir = fileURLToPath(new URL("../../test/evals/", import.meta.url));
 const suite = readSuite(path.join(evalsDir, "suite.json"));
-const app: Variant = { name: "app", model: "haiku", workflows: {}, workflowsFrom: null };
+const app: Variant = { name: "app", model: "haiku", workflows: {}, workflowsFrom: null, agents: {} };
 const close = (a: number, b: number) => Math.abs(a - b) < 1e-4;
 
 /**
@@ -175,6 +175,15 @@ describe("eval suite (M7-02)", () => {
     });
     assert.equal(seen, variant.workflows["s.yaml"]);
     assert.equal(client.calls.find((c) => c.method === "task.start")?.params.model, "sonnet");
+    assert.equal(client.calls.find((c) => c.method === "task.start")?.params.agents, undefined);
+  });
+
+  it("starts the task with the variant's agents (M9-06)", async () => {
+    const client = fakeClient(() => {});
+    const variant = parseVariant("mix:implement=agy", repoRoot);
+    await runCase(client as unknown as SidecarClient, caseOf("sample-with-tax"), variant, { root, cancelAbove: 5 });
+    assert.deepEqual(client.calls.find((c) => c.method === "task.start")?.params.agents, { implement: "agy" });
+    assert.equal(summarize(variant, [], ["sample-with-tax"]).agents?.implement, "agy");
   });
 });
 
@@ -249,6 +258,19 @@ describe("variants", () => {
     const ref = parseVariant("main:workflows-ref=HEAD", repoRoot);
     assert.deepEqual(Object.keys(ref.workflows), ["s.yaml", "m.yaml", "l.yaml", "xl.yaml"]);
     assert.equal(ref.workflowsFrom, "catalog/workflows@HEAD");
+  });
+
+  it("puts a role's steps on another agent, or every role's (M9-06)", () => {
+    assert.deepEqual(parseVariant("codex:agent=codex", repoRoot).agents, {
+      plan: "codex",
+      implement: "codex",
+      review: "codex",
+    });
+    assert.deepEqual(parseVariant("mix:implement=codex,review=agy", repoRoot).agents, {
+      implement: "codex",
+      review: "agy",
+    });
+    assert.throws(() => parseVariant("a:agent=gemini", repoRoot), /claude, codex or agy/);
   });
 
   it("refuses unknown keys, empty values and odd names", () => {

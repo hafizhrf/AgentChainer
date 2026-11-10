@@ -1,7 +1,7 @@
 import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import path from "node:path";
-import { TaskContractSchema, TierSchema } from "@agentchainer/protocol";
+import { type AgentRoles, StepAgentSchema, TaskContractSchema, TierSchema } from "@agentchainer/protocol";
 import { z } from "zod";
 import { FIXTURE_SETUPS } from "../detect/fixture-copy.ts";
 
@@ -61,19 +61,24 @@ export type Variant = {
   workflows: Record<string, string>;
   /** Where the workflows came from, for the report. */
   workflowsFrom: string | null;
+  /** The agent per role (M9-06), as a task's own choice would set it; empty runs every step on Claude. */
+  agents: AgentRoles;
 };
+
+const ROLES = ["plan", "implement", "review"] as const;
 
 const WORKFLOW_FILES = ["s.yaml", "m.yaml", "l.yaml", "xl.yaml"];
 
 /**
  * Parses `name[:key=value,…]`. Keys: `model=<model>`; `workflows=<dir>` (a folder of tier workflow files);
  * `workflows-ref=<git rev>` (the app's `catalog/workflows/` at that revision, e.g. `origin/main`, the usual baseline
- * for a workflow change).
+ * for a workflow change); `agent=<claude|codex|agy>` for every role, or `plan=`, `implement=`, `review=` for one
+ * (M9-06). Only Claude's spend counts toward the cost: the other CLIs report tokens, not dollars.
  */
 export function parseVariant(spec: string, repoRoot: string): Variant {
   const [name = "", rest] = spec.split(/:(.*)/s, 2);
   if (!/^[\w.-]+$/.test(name)) throw new Error(`variant "${spec}": name it with letters, digits, . _ or -`);
-  const v: Variant = { name, model: "haiku", workflows: {}, workflowsFrom: null };
+  const v: Variant = { name, model: "haiku", workflows: {}, workflowsFrom: null, agents: {} };
   for (const pair of rest ? rest.split(",") : []) {
     const [key, value] = pair.split(/=(.*)/s, 2);
     if (!value) throw new Error(`variant "${spec}": ${pair} has no value`);
@@ -84,7 +89,15 @@ export function parseVariant(spec: string, repoRoot: string): Variant {
     } else if (key === "workflows-ref") {
       v.workflows = workflowsAt(repoRoot, value);
       v.workflowsFrom = `catalog/workflows@${value}`;
-    } else throw new Error(`variant "${spec}": unknown key ${key} (model, workflows, workflows-ref)`);
+    } else if (key === "agent" || (ROLES as readonly string[]).includes(key ?? "")) {
+      const agent = StepAgentSchema.safeParse(value);
+      if (!agent.success) throw new Error(`variant "${spec}": ${key} is claude, codex or agy, not ${value}`);
+      for (const role of key === "agent" ? ROLES : [key as (typeof ROLES)[number]]) v.agents[role] = agent.data;
+    } else {
+      throw new Error(
+        `variant "${spec}": unknown key ${key} (model, workflows, workflows-ref, agent, plan, implement, review)`,
+      );
+    }
   }
   return v;
 }

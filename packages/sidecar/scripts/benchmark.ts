@@ -4,7 +4,9 @@
 //
 // Usage: node scripts/benchmark.ts [--variant <spec>]… [-n 3] [--max-usd 3] [--cases id,id] [--suite <file>]
 //          [--out <path without extension>] [--dry-run]
-//   --variant name[:model=<m>,workflows=<dir>,workflows-ref=<rev>]  repeatable; the first is the baseline. Default: one
+//   --variant name[:model=<m>,workflows=<dir>,workflows-ref=<rev>,agent=<a>|plan=<a>,implement=<a>,review=<a>]
+//       repeatable; the first is the baseline. An agent (claude, codex or agy) runs a role's steps on that CLI, with
+//       its own login; their spend isn't counted, since those CLIs report tokens, not dollars. Default: one
 //       variant "app" with the app's workflows on haiku. For a workflow change: --variant main:workflows-ref=origin/main
 //       --variant branch
 //   -n         runs per case and variant (single runs are noisy)
@@ -53,7 +55,10 @@ if (!(maxUsd > 0)) throw new Error("--max-usd takes a positive amount");
 const plan = Array.from({ length: n }, () => cases.flatMap((c) => variants.map((v) => ({ c, v })))).flat();
 console.log(`${cases.length} cases × ${variants.length} variants × N=${n} = ${plan.length} runs, cap $${maxUsd}`);
 for (const v of variants) {
-  console.log(`  ${v.name}: ${v.model}, workflows ${v.workflowsFrom ?? "the app's"}`);
+  const agents = Object.entries(v.agents).map(([role, a]) => `${role} on ${a}`);
+  console.log(
+    `  ${v.name}: ${v.model}, workflows ${v.workflowsFrom ?? "the app's"}${agents.length ? `, ${agents.join(", ")}` : ""}`,
+  );
 }
 if (values["dry-run"]) process.exit(0);
 

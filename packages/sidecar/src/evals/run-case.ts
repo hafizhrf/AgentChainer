@@ -116,7 +116,13 @@ export async function runCase(
       budgetUsd: triaged.triage.budgetUsd,
     });
     const ended = client.ended(taskId);
-    await client.request("task.start", { cwd, id: taskId, permissionMode: "acceptEdits", model: variant.model });
+    await client.request("task.start", {
+      cwd,
+      id: taskId,
+      permissionMode: "acceptEdits",
+      model: variant.model,
+      ...(Object.keys(variant.agents).length ? { agents: variant.agents } : {}),
+    });
     const end = await ended;
     Object.assign(row, {
       state: end.state,

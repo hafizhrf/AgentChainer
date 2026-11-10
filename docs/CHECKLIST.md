@@ -2044,7 +2044,7 @@ with the OpenAI Codex CLI and Google's Antigravity CLI (`agy`), in both directio
     evidence that matches the recorded runs, on this branch and on `main`.
   - `respond` and the fleet item stay on Claude's session for now: M9-04 adds them to the interface when Codex's
     approvals need them.
-- [ ] **M9-04** The Codex backend:
+- [x] **M9-04** The Codex backend:
   - **Process:** `codex app-server` over stdio, found like the Claude CLI.
   - **Events:** commands become `Bash` and file changes `Edit`/`Write` events.
   - **Approvals:** each one is checked by the guard first, then the profile and the approval dialog.
@@ -2079,11 +2079,20 @@ with the OpenAI Codex CLI and Google's Antigravity CLI (`agy`), in both directio
     - Codex's commands asked and were approved, its edit to `src/cart.js` was accepted under Standard, and every gate
       passed (42–79 s).
     - A first run found a bug: the runner's callbacks read the session before it was opened. Fixed.
-  - **Left:**
-    - **Cost:** a ChatGPT login is plan usage with no price per token, so a Codex step reports tokens and $0. Its
-      spend isn't counted against the task's dollar budget. **Owner's call:** keep it so, or price tokens for API-key
-      users.
-    - **Drift:** pin the app-server methods it uses in `cli-contract.ts`, and have the weekly drift job check them.
+  - **Cost:** settled by M9-07 (owner, 2026-11-10: count it like Claude's). A Codex step's tokens are priced at the
+    model's API price, as an estimate, and count toward the budget.
+  - **Drift**, done (2026-11-10):
+    - `backends/contracts.ts` pins what the backend uses: 18 app-server methods by direction, and 15 definitions'
+      values and fields (sandbox modes, approval policies, item types, token counts, approval decisions).
+    - `cli-contract.ts --codex <path>` checks Codex's commands, then generates the app-server's JSON Schema
+      (`codex app-server generate-json-schema`, no login) and checks it against the pins.
+    - `--agy <path>` checks agy's flags, `models` and the values the app passes. agy has no package CI can install
+      without an install script, so it stays a check by hand.
+    - The weekly Drift workflow gets a **Latest Codex CLI** job (npm, `--ignore-scripts`); its result joins the drift
+      issue.
+    - **Tests:** `contracts.test.ts` (5): a schema with everything passes, and a dropped method, value or field, or a
+      missing schema, is named; agy's help as 1.5.4 prints it.
+    - **Checked:** on Codex 0.157.0 and agy 1.5.4 (Windows), all three contracts hold.
 - [x] **M9-05** The agy backend (S8):
   - **Process:** `agy -p --output-format stream-json` in the task's worktree.
   - **Settings:** through `--settings` only.

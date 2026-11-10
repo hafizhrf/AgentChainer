@@ -62,7 +62,7 @@ Prerequisites:
 | Packaged sidecar smoke: first-run SDK download + verify, then cache | `node scripts/sidecar-smoke.mjs` |
 | The same behind an HTTP proxy (X-14): through a local CONNECT proxy, a dead proxy, and `NO_PROXY` | `node scripts/proxy-smoke.mjs` |
 | Re-pin the Agent SDK after bumping it (updates `sdk-pin.json` from the lockfile; then update the pin in `docs/COMPATIBILITY.md`) | `node packages/sidecar/scripts/pin-sdk.ts` |
-| Check a `claude` CLI still has every command and flag the app runs (X-05; no login, no model calls) / the compatibility page matches the code (X-08) | `node packages/sidecar/scripts/cli-contract.ts [--claude <path>]` / `node scripts/check-compatibility.mjs` |
+| Check a `claude` CLI still has every command and flag the app runs (X-05; no login, no model calls), and with `--codex`/`--agy` the Codex app-server protocol and agy's flags (M9) / the compatibility page matches the code (X-08) | `node packages/sidecar/scripts/cli-contract.ts [--claude <path>] [--codex <bin/codex.js>] [--agy <path>] [--skip-claude]` / `node scripts/check-compatibility.mjs` |
 | Regenerate the protocol JSON Schema after changing `packages/protocol/src/index.ts` | `pnpm --filter @agentchainer/protocol export-schema` |
 | Typecheck all TS packages | `pnpm typecheck` |
 | Rust check / lint / format | `cargo check --workspace` · `cargo clippy --workspace` · `cargo fmt --all` |

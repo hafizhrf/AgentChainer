@@ -133,5 +133,8 @@
   "home.newSession.browse": "Telusuri…",
   "home.newSession.typePath": "Ketik path…",
   "home.newSession.workspaceHint": "Workspace · {{count}} folder",
-  "home.newSession.chooseFolder": "Pilih folder…"
+  "home.newSession.chooseFolder": "Pilih folder…",
+  "home.newSession.agent": "Agent",
+  "home.newSession.codexHelp": "Codex CLI milikmu sendiri, login olehmu. Edit dan perintahnya lewat guard dan persetujuanmu, seperti Claude. Tanpa mode rencana dan tanpa rewind.",
+  "home.newSession.codexModel": "Default Codex (pilih lainnya di chat)"
 }

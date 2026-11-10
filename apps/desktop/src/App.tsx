@@ -13,6 +13,7 @@ import {
   RpcErrorCode,
   type Schedule,
   type SessionInfo,
+  type StepAgent,
   type Task,
 } from "@agentchainer/protocol";
 import * as Tooltip from "@radix-ui/react-tooltip";
@@ -154,6 +155,8 @@ export function App() {
   const [wsDialog, setWsDialog] = useState<WorkspaceDef | "new" | null>(null);
   /** The New session dialog (UX-20): New, Ctrl+N, the palette and the home page open it. */
   const [newSession, setNewSession] = useState(false);
+  /** The agent a new chat runs on (M9-09). */
+  const [newAgent, setNewAgent] = useState<StepAgent>("claude");
   /** Every live session's fleet status, by session id (M8-02); ended ones stay until cleared or the app restarts. */
   const [fleet, setFleet] = useState<Record<string, FleetItem>>({});
   /** Chats the runtime still runs with no tab, after a reload (M1-36); re-attached once the settings are in. */
@@ -585,6 +588,7 @@ export function App() {
     folders: string[] = [],
     team = false,
     agentProfile = "",
+    agent: StepAgent = "claude",
   ): Promise<string | null> {
     try {
       const { effort, budgetUsd: cap, showThinking } = sessionOptions(mode);
@@ -602,6 +606,8 @@ export function App() {
         ...(folders.length ? { folders } : {}),
         ...(team ? { team } : {}),
         ...(agentProfile ? { profile: agentProfile } : {}),
+        // A chat on another agent (M9-09): its own models, so the Claude model picked isn't sent.
+        ...(agent !== "claude" ? { agent } : {}),
       });
       const items = [
         notice(startedNotice(dir, folders, agentProfile)),
@@ -621,6 +627,7 @@ export function App() {
           folders,
           ...(agentProfile ? { profile: agentProfile } : {}),
           ...(team && budgetUsd ? { teamCapUsd: budgetUsd } : {}),
+          agent,
         }),
       ]);
       setActive(sessionId);
@@ -635,7 +642,14 @@ export function App() {
   }
 
   /** Resumes a stored session into a tab: replaces its ended tab, or opens a new one (M1-22). */
-  async function resume(sessionId: string, dir: string, title: string, modelAlias = model, known?: string[]) {
+  async function resume(
+    sessionId: string,
+    dir: string,
+    title: string,
+    modelAlias = model,
+    known?: string[],
+    agent: StepAgent = tabsRef.current.find((x) => x.sessionId === sessionId)?.agent ?? "claude",
+  ) {
     // Already open: show it (M1-36). Already being resumed: the first click does it.
     if (tabsRef.current.some((x) => x.sessionId === sessionId && !x.ended)) {
       setActive(sessionId);
@@ -646,7 +660,11 @@ export function App() {
     const mode = asMode(settings?.defaultMode);
     try {
       const { effort, budgetUsd, showThinking } = sessionOptions(mode);
-      const { events, times } = await request("session.history", { cwd: dir, sessionId });
+      const { events, times } = await request("session.history", {
+        cwd: dir,
+        sessionId,
+        ...(agent !== "claude" ? { agent } : {}),
+      });
       // A chat of a multi-folder workspace resumes across the same folders (M8-01): its tab's, or else the ones recorded
       // when it ran, or its named workspace's (M8-07), e.g. opened from the sidebar after a restart, or a fork.
       const folders =
@@ -657,8 +675,10 @@ export function App() {
         cwd: dir,
         resume: sessionId,
         ...(asProfile ? { profile: asProfile } : {}),
-        permissionMode: mode,
-        ...(modelAlias ? { model: modelAlias } : {}),
+        // A Codex chat has no plan mode; its own models only (M9-09).
+        permissionMode: agent === "codex" && mode === "plan" ? "default" : mode,
+        ...(modelAlias && agent === "claude" ? { model: modelAlias } : {}),
+        ...(agent !== "claude" ? { agent } : {}),
         ...(effort ? { effort } : {}),
         ...(budgetUsd ? { maxBudgetUsd: budgetUsd } : {}),
         showThinking,
@@ -681,6 +701,7 @@ export function App() {
         budgetUsd,
         folders,
         ...(asProfile ? { profile: asProfile } : {}),
+        agent,
       });
       setTabs((ts) => (ts.some((x) => x.sessionId === sessionId) ? updateTab(ts, sessionId, () => tab) : [...ts, tab]));
       setActive(sessionId);
@@ -703,7 +724,7 @@ export function App() {
       for (const item of lost) {
         const stored = await request("session.list", { cwd: item.cwd }).catch(() => ({ sessions: [] }));
         const title = stored.sessions.find((x) => x.sessionId === item.sessionId)?.title ?? t("app.session.newTitle");
-        await resume(item.sessionId, item.cwd, title);
+        await resume(item.sessionId, item.cwd, title, undefined, undefined, item.agent ?? "claude");
         if (item.status === "working") patchTab(item.sessionId, (tab) => ({ ...tab, running: true }));
       }
     })();
@@ -712,7 +733,7 @@ export function App() {
   function openStored(s: SessionInfo) {
     const open = tabs.find((x) => x.sessionId === s.sessionId);
     if (open && !open.ended) setActive(s.sessionId);
-    else void resume(s.sessionId, cwd.trim(), s.title);
+    else void resume(s.sessionId, cwd.trim(), s.title, model, undefined, s.agent ?? "claude");
   }
 
   async function sendText(sessionId: string, text: string, images: Attachment[] = []) {
@@ -1573,9 +1594,19 @@ export function App() {
           profile={profile}
           onProfileChange={setProfile}
           canAutonomous={settings?.budgetUsd != null}
+          agent={newAgent}
+          onAgentChange={setNewAgent}
           onStart={() => {
             setNewSession(false);
-            void startSession(workspace, model, mode, homeDef?.folders ?? [], false, profile);
+            void startSession(
+              workspace,
+              newAgent === "claude" ? model : "",
+              mode,
+              homeDef?.folders ?? [],
+              false,
+              newAgent === "claude" ? profile : "",
+              newAgent,
+            );
           }}
         />
         {wsDialog && (

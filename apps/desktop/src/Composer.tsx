@@ -76,6 +76,7 @@ export function Composer({
   onEffortChange: (effort: Effort | null) => void;
 }) {
   const [draft, setDraft] = useState("");
+  const agentName = agentLabel(tab.agent ?? "claude", undefined);
   const [cursor, setCursor] = useState(0);
   const [queue, setQueue] = useState<Queued[]>([]);
   const [images, setImages] = useState<Attachment[]>([]);
@@ -377,7 +378,7 @@ export function Composer({
       {popup === "model" && (
         <PickerPopup
           title={t("session.composer.modelPicker")}
-          items={modelChoices(tab.models.length ? tab.models : undefined, tab.modelAlias)}
+          items={modelChoices(tab.models.length ? tab.models : undefined, tab.modelAlias, agentName)}
           current={tab.modelAlias}
           onPick={(v) => {
             onModelChange(v);
@@ -471,8 +472,8 @@ export function Composer({
                 : kind === "task"
                   ? t("session.composer.placeholderTask")
                   : tab.running
-                    ? t("session.composer.placeholderRunning")
-                    : t("session.composer.placeholder")
+                    ? t("session.composer.placeholderRunning", { agent: agentName })
+                    : t("session.composer.placeholder", { agent: agentName })
           }
           onChange={(e) => {
             setDraft(e.target.value);
@@ -507,19 +508,20 @@ export function Composer({
                 ))}
               </fieldset>
             )}
-            {/* Which agent the chat runs on (UX-20). Chats are on Claude for now; Codex and agy chats are M9-09. */}
-            <span
-              className="chip composer-agent"
-              title={t("session.composer.agentTitle", { agent: agentLabel("claude", undefined) })}
-            >
+            {/* Which agent the chat runs on (UX-20, M9-09). */}
+            <span className="chip composer-agent" title={t("session.composer.agentTitle", { agent: agentName })}>
               <Bot size={12} aria-hidden />
-              {agentLabel("claude", undefined)}
+              {agentName}
             </span>
             <Select
               compact
               label={t("session.composer.modeLabel")}
               value={tab.mode}
-              options={modeOptions(PERMISSION_MODES, canAutonomous)}
+              // A Codex chat has no plan mode (M9-09).
+              options={modeOptions(
+                tab.agent === "codex" ? PERMISSION_MODES.filter((m) => m !== "plan") : PERMISSION_MODES,
+                canAutonomous,
+              )}
               onChange={(m) => onModeChange(asMode(m))}
               disabled={tab.ended}
             />
@@ -528,7 +530,7 @@ export function Composer({
               compact
               label={t("session.composer.modelLabel")}
               value={tab.modelAlias}
-              options={modelChoices(tab.models.length ? tab.models : undefined, tab.modelAlias)}
+              options={modelChoices(tab.models.length ? tab.models : undefined, tab.modelAlias, agentName)}
               onChange={onModelChange}
               disabled={tab.ended}
             />
@@ -550,8 +552,8 @@ export function Composer({
             >
               <Paperclip size={14} />
             </button>
-            {/* A Team chat (M8-03) is chosen before the first message; a worker's tab can't be one. */}
-            {!tab.parentId && isFresh(tab) && (
+            {/* A Team chat (M8-03) is chosen before the first message; a worker's tab can't be one, nor a Codex chat. */}
+            {!tab.parentId && !tab.agent && isFresh(tab) && (
               <button
                 type="button"
                 className="ghost small team-toggle"

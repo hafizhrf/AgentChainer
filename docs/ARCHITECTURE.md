@@ -94,7 +94,7 @@ Planned surface (v0.1):
 | request | `env.check` | Return CLI path, version, auth state (no secrets) |
 | request | `sdk.prepare` | Make the Agent SDK ready: node_modules (dev), or download + verify + cache (packaged) |
 | request | `debug.log` | Dev only: write a UI line to the sidecar log (self-test metrics) |
-| request | `session.start` | Start or resume a session `{cwd, model?, permissionMode?, resume?, folders?}` → `{sessionId}`. `folders` are a multi-folder workspace's other folders (M8-01), passed as `additionalDirectories` after the same checks as the New workspace dialog. Planned: effort, profile, budgetUsd |
+| request | `session.start` | Start or resume a session `{cwd, model?, permissionMode?, resume?, folders?, agent?}` → `{sessionId}`. `agent: "codex"` runs the chat on a Codex app-server (M9-09): a message during a turn steers it, model and effort apply per turn, and there is no plan mode, rewind or Team. A live chat is re-attached on its own agent. `folders` are a multi-folder workspace's other folders (M8-01), passed as `additionalDirectories` after the same checks as the New workspace dialog. Planned: effort, profile, budgetUsd |
 | request | `session.send` | Push a user message into the streaming input `{sessionId, text}` → `{messageId}`. Planned: @files, images |
 | request | `session.interrupt` | Interrupt the running turn |
 | request | `session.stopAgent` | Stop one subagent by its task id; the turn goes on (M4-05) |
@@ -106,7 +106,7 @@ Planned surface (v0.1):
 | request | `session.setModel` / `session.setEffort` | `setModel()` / `applyFlagSettings({effortLevel})` mid-session |
 | request | `session.close` | End a live session (tab closed); the transcript stays resumable |
 | request | `session.rewind` | `rewindFiles(messageId, {dryRun})` |
-| request | `session.list` / `session.history` / `session.rename` / `session.tag` / `session.delete` / `session.fork` | SDK session APIs on stored sessions `{cwd, sessionId}`; `session.history` includes the subagents' transcripts and the stored times (M4-08) |
+| request | `session.list` / `session.history` / `session.rename` / `session.tag` / `session.delete` / `session.fork` | SDK session APIs on stored sessions `{cwd, sessionId}`; `session.history` includes the subagents' transcripts and the stored times (M4-08). `session.list` also lists the folder's Codex threads (`agent: "codex"`, from Codex's `thread/list`), and `session.history {agent: "codex"}` replays one through `thread/turns/list` (M9-09); Codex keeps them, and the app reads them only through its protocol |
 | request | `session.retention` | `cleanupPeriodDays` only, from the user's effective settings |
 | request | `permission.respond` | Answer a pending permission request `{allow, always?, updatedInput?, message?, mode?}` |
 | request | `permissions.list` / `permissions.add` / `permissions.remove` | The `permissions` lists of `.claude/settings.local.json`, `.claude/settings.json` and the user's own `~/.claude/settings.json` (UX-19, ADR-0013); nothing else in those files leaves the sidecar |

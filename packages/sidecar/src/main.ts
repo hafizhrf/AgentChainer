@@ -1,11 +1,21 @@
 import { existsSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
-import { asLanguage, folderProblems, PROTOCOL_VERSION, RpcErrorCode, type Task } from "@agentchainer/protocol";
+import {
+  asLanguage,
+  type Effort,
+  folderProblems,
+  type PermissionMode,
+  PROTOCOL_VERSION,
+  RpcErrorCode,
+  type Task,
+} from "@agentchainer/protocol";
 import type { SDKMessage } from "@anthropic-ai/claude-agent-sdk";
 import pkg from "../package.json" with { type: "json" };
 import { agentTemplates } from "./agent-templates.ts";
 import { deleteAgent, listAgents, saveAgent } from "./agents.ts";
+import { openCodexChat } from "./backends/codex.ts";
+import { codexThreadEvents, codexThreads } from "./backends/codex-history.ts";
 import {
   defaultsView,
   readDefaults,
@@ -14,7 +24,7 @@ import {
   writeWorkspaceDefaults,
 } from "./backends/defaults.ts";
 import { agentClis, agyHost, codexHost } from "./backends/find.ts";
-import type { LiveSession } from "./backends/types.ts";
+import type { ChatSession, LiveSession } from "./backends/types.ts";
 import { applyActions, type Cli, listRuns, rollback } from "./bootstrap/apply.ts";
 import { autoApplicable } from "./bootstrap/auto-apply.ts";
 import { generate, resolveActionlint } from "./bootstrap/generate.ts";
@@ -151,13 +161,78 @@ function requireSession(sessionId: string): LiveSession {
 }
 
 /** A chat's session: sending, modes, models and rewind are Claude's (chats stay on Claude, ADR-0012). */
-function requireChat(sessionId: string): Session {
-  const session = requireSession(sessionId);
-  if (!(session instanceof Session)) {
-    throw new RpcFailure(RpcErrorCode.invalidParams, t("rpc.session.notAChat"));
+/**
+ * A chat on the user's own Codex (M9-09): Codex's app-server for the thread, its approvals through the guard and the
+ * approval dialog, as task steps have them. A thread still live (a reload wiped its tab) is handed back.
+ */
+async function startCodexChat(opts: {
+  cwd: string;
+  model?: string | undefined;
+  permissionMode?: PermissionMode | undefined;
+  effort?: Effort | undefined;
+  resume?: string | undefined;
+  folders?: string[] | undefined;
+}): Promise<{ sessionId: string; attached?: boolean }> {
+  const live = opts.resume ? sessions.get(opts.resume) : undefined;
+  if (live) {
+    const chat = requireChat(live.id);
+    if (opts.permissionMode) await chat.setMode(opts.permissionMode);
+    if (opts.model !== undefined) await chat.setModel(opts.model);
+    if (opts.effort !== undefined) await chat.setEffort(opts.effort);
+    return { sessionId: chat.id, attached: true };
   }
-  return session;
+  if (opts.permissionMode === "plan") throw new RpcFailure(RpcErrorCode.invalidParams, t("rpc.session.codexNoPlan"));
+  const host = codexHost(resolveCli, {
+    register: (session) => sessions.set(session.id, session),
+    unregister: (id) => sessions.delete(id),
+  });
+  if (!host) throw new RpcFailure(RpcErrorCode.invalidParams, t("rpc.session.codexMissing"));
+  let id = "";
+  const chat = await openCodexChat(
+    host,
+    {
+      cwd: opts.cwd,
+      ...(opts.model ? { model: opts.model } : {}),
+      permissionMode: opts.permissionMode ?? "default",
+      ...(opts.resume ? { resume: opts.resume } : {}),
+      ...(opts.folders?.length ? { additionalDirectories: opts.folders } : {}),
+    },
+    {
+      emit: (event) => notify("agent.event", { sessionId: id, event }),
+      askPermission: (request) => notify("permission.request", { sessionId: id, ...request }),
+      statusChanged: (item) => notify("fleet.changed", { item }),
+      onEnd: () => undefined,
+    },
+  );
+  id = chat.id;
+  if (opts.effort) await chat.setEffort(opts.effort);
+  // Its opening events go out once the UI has the tab, after this answer.
+  setTimeout(() => chat.release(), 0);
+  return { sessionId: chat.id };
 }
+
+/** A chat tab's session, on any agent (M9-09); a task's step isn't one. */
+function requireChat(sessionId: string): ChatSession {
+  const session = requireSession(sessionId);
+  const chat = session as Partial<ChatSession>;
+  if (session instanceof Session || (typeof chat.send === "function" && !session.tag && !session.parentId)) {
+    return session as ChatSession;
+  }
+  throw new RpcFailure(RpcErrorCode.invalidParams, t("rpc.session.notAChat"));
+}
+
+/** What only a Claude chat does: rewinding files, stopping a subagent (M9-09). */
+function requireClaudeChat(sessionId: string): Session {
+  const chat = requireChat(sessionId);
+  if (!(chat instanceof Session)) throw new RpcFailure(RpcErrorCode.invalidParams, t("rpc.session.claudeOnly"));
+  return chat;
+}
+
+/** The user's own Codex CLI, as task steps find it (M9-04). */
+const codexCli = () => {
+  const set = process.env.AGENTCHAINER_CODEX_PATH;
+  return set ? { bin: set, prefix: [] } : resolveCli("codex");
+};
 
 /**
  * A Team chat's crew (M8-03): its workers are live sessions like any tab's, opened by the sidecar, so the UI is told
@@ -427,7 +502,13 @@ serve(
       folders,
       team,
       profile: profileName,
+      agent,
     }) => {
+      // A live chat is handed back on its own agent, whatever the tab asked for (M1-36, M9-09).
+      const running = resume ? sessions.get(resume) : undefined;
+      if (agent === "codex" || (running && "agent" in running && running.agent === "codex"))
+        return startCodexChat({ cwd, model, permissionMode, effort, resume, folders });
+      if (agent === "agy") throw new RpcFailure(RpcErrorCode.invalidParams, t("rpc.session.claudeOnly"));
       // A Team chat (M8-03) runs workers on the person's budget, so it needs a cap for them all.
       if (team && !maxBudgetUsd) {
         throw new RpcFailure(RpcErrorCode.invalidParams, t("rpc.team.needsBudget"));
@@ -534,7 +615,7 @@ serve(
 
     "session.stopAgent": async ({ sessionId, taskId }) => ({
       ok: true,
-      stopped: await requireChat(sessionId).stopAgent(taskId),
+      stopped: await requireClaudeChat(sessionId).stopAgent(taskId),
     }),
 
     "session.setMode": async ({ sessionId, mode }) => {
@@ -548,7 +629,8 @@ serve(
       return { ok: true };
     },
 
-    "session.rewind": ({ sessionId, messageId, dryRun }) => requireChat(sessionId).rewind(messageId, dryRun ?? false),
+    "session.rewind": ({ sessionId, messageId, dryRun }) =>
+      requireClaudeChat(sessionId).rewind(messageId, dryRun ?? false),
 
     "session.setModel": async ({ sessionId, model }) => {
       await requireChat(sessionId).setModel(model);
@@ -570,10 +652,21 @@ serve(
     "session.list": async ({ cwd, limit }) => {
       const { sdk } = await prepareSdk();
       const found = await sdk.listSessions({ dir: cwd, limit: limit ?? 50 });
-      return { sessions: found.map(toSessionInfo) };
+      // The folder's Codex threads too (M9-09), when Codex is installed; a failure there leaves Claude's list.
+      const cli = codexCli();
+      const codex = cli ? await codexThreads(cli, cwd, limit ?? 50).catch(() => []) : [];
+      const sessions = [...found.map(toSessionInfo), ...codex]
+        .sort((a, b) => b.lastModified - a.lastModified)
+        .slice(0, limit ?? 50);
+      return { sessions };
     },
 
-    "session.history": async ({ cwd, sessionId }) => {
+    "session.history": async ({ cwd, sessionId, agent }) => {
+      if (agent === "codex") {
+        const cli = codexCli();
+        if (!cli) throw new RpcFailure(RpcErrorCode.invalidParams, t("rpc.session.codexMissing"));
+        return { events: await codexThreadEvents(cli, sessionId) };
+      }
       const { sdk } = await prepareSdk();
       const main = await sdk.getSessionMessages(sessionId, { dir: cwd });
       const ids = await sdk.listSubagents(sessionId, { dir: cwd });

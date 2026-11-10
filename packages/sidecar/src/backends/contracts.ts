@@ -20,6 +20,9 @@ export const CODEX_CONTRACT = {
     // The usage page (CP-01): the account's daily tokens and the plan's quota.
     "account/usage/read",
     "account/rateLimits/read",
+    // Chats on Codex (M9-09): Previous sessions and a thread's history.
+    "thread/list",
+    "thread/turns/list",
   ],
   /** In `ClientNotification.json`. */
   clientNotifications: ["initialized"],
@@ -45,10 +48,15 @@ export const CODEX_CONTRACT = {
     AskForApproval: ["never", "untrusted"],
     ThreadStartParams: ["cwd", "sandbox", "approvalPolicy", "model", "developerInstructions"],
     ThreadResumeParams: ["threadId", "excludeTurns"],
-    TurnStartParams: ["threadId", "input"],
+    TurnStartParams: ["threadId", "input", "model", "effort"],
+    ThreadListParams: ["cwd", "limit", "sortKey", "sourceKinds", "useStateDbOnly"],
+    ThreadTurnsListParams: ["threadId", "itemsView", "limit", "sortDirection", "cursor"],
+    Thread: ["id", "name", "preview", "createdAt", "updatedAt"],
     TurnInterruptParams: ["threadId", "turnId"],
     ModelListResponse: ["data", "id", "isDefault"],
     ThreadItem: [
+      "userMessage",
+      "content",
       "agentMessage",
       "commandExecution",
       "fileChange",

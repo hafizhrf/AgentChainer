@@ -1375,8 +1375,7 @@ for the desktop shell, start screen and session view to be cleaned up (UX-02, UX
   - **New session dialog** (New, Ctrl+N, the palette, the welcome page and the folder page): the folder (recent ones,
     a named workspace, Browse…, Type a path…), model, permission profile with its explanation, and the agent profile.
     It says why Start can't run yet; Enter starts.
-  - **Composer:** a chip says which agent the chat runs on (Claude for now). It becomes a picker with M9-09 (Codex
-    and agy chats).
+  - **Composer:** a chip says which agent the chat runs on. Codex chats came with M9-09 part 1; agy is next.
   Progress (2026-11-10): built.
   - **Code:** `HomeView.tsx` (welcome and folder page, `shortPath`), `NewSessionDialog.tsx`, App wiring, the
     composer chip, and new home styles replacing the old ones.
@@ -2318,7 +2317,25 @@ with the OpenAI Codex CLI and Google's Antigravity CLI (`agy`), in both directio
     owner's settings restored.
   - **Known gap:** a Codex turn the person stops records $0, so its tokens before the stop aren't counted.
 - [ ] **M9-08** (later) Team workers on Codex or agy. The supervisor stays Claude.
-- [ ] **M9-09** (later) A chat on Codex or agy.
+- [ ] **M9-09** A chat on Codex or agy.
+  - [x] **Part 1, Codex** (PR pending):
+    - **Starting one:** New session has an Agent picker (shown when Codex is installed; Codex is greyed out while
+      signed out). On Codex the model is Codex's default until changed in the chat, plan mode isn't offered, and
+      agent profiles are hidden.
+    - **The chat:** a message during a turn steers it (`turn/steer`). Model and effort apply from the next turn
+      (`turn/start`). The model list comes from Codex's `model/list`. The composer's chip and placeholder name Codex.
+      Rewind, Team and subagent stop are Claude-only and hidden.
+    - **History:** Previous sessions lists the folder's Codex threads beside Claude's, with a badge (`thread/list`).
+      Opening one replays it (`thread/turns/list`); resuming continues the thread.
+    - **Reload:** a chat a reload left without a tab comes back on its own agent. A failed open stops its
+      app-server, so it isn't left as the thread's writer.
+    - **Contracts:** `thread/list`, `thread/turns/list` and the per-turn model/effort are pinned for the drift check.
+    - **Tests:** a chat on the fake app-server (held opening events, a turn, plan refused, a failed open stopping
+      it), history replay.
+    - **Checked in the app (Windows, 2026-11-11):** a new Codex chat (gpt-6-luna, "OK"), resumed from Previous
+      sessions with its history, re-attached after a reload, then a second turn. About $0.004 in all. The owner's
+      settings were restored.
+  - [ ] **Part 2, agy.**
 
 ### Exit criteria
 

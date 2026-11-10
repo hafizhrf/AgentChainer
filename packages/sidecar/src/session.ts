@@ -167,6 +167,8 @@ export type SessionCallbacks = {
  * follow-up messages and interrupt, with tool approvals brokered through `canUseTool`.
  */
 export class Session {
+  /** A chat on Claude (M9-09: chats can run on other agents too). */
+  readonly agent = "claude" as const;
   /** The SDK session id. We choose it for new sessions so it is known before the first turn. */
   readonly id: string;
   private readonly input = new InputQueue<SDKUserMessage>();

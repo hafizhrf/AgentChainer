@@ -28,5 +28,8 @@
   "rpc.sdk.unreachable": "Claude Agent SDK tidak bisa diunduh (sedang offline atau diblokir proxy?): {{reason}}",
   "rpc.sdk.httpError": "Pengunduhan Claude Agent SDK gagal: HTTP {{status}}",
   "rpc.sdk.integrity": "Claude Agent SDK yang diunduh gagal dalam pemeriksaan integritas, jadi tidak dimuat.",
-  "rpc.sdk.extractFailed": "Ekstraksi Claude Agent SDK gagal: {{detail}}"
+  "rpc.sdk.extractFailed": "Ekstraksi Claude Agent SDK gagal: {{detail}}",
+  "rpc.session.codexNoPlan": "Chat Codex tidak punya mode rencana: pilih Aman, Standar atau Otonom.",
+  "rpc.session.claudeOnly": "Hanya chat Claude yang bisa melakukannya.",
+  "rpc.session.codexMissing": "Codex belum terpasang atau tidak merespons. Pasang, atau atur path-nya di Pengaturan."
 }

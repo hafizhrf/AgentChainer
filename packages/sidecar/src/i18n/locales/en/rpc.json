@@ -28,5 +28,8 @@
   "rpc.sdk.unreachable": "Couldn't download the Claude Agent SDK (offline or blocked by a proxy?): {{reason}}",
   "rpc.sdk.httpError": "Downloading the Claude Agent SDK failed: HTTP {{status}}",
   "rpc.sdk.integrity": "The downloaded Claude Agent SDK failed its integrity check, so it was not loaded.",
-  "rpc.sdk.extractFailed": "Extracting the Claude Agent SDK failed: {{detail}}"
+  "rpc.sdk.extractFailed": "Extracting the Claude Agent SDK failed: {{detail}}",
+  "rpc.session.codexNoPlan": "A Codex chat has no plan mode: choose Safe, Standard or Autonomous.",
+  "rpc.session.claudeOnly": "Only a Claude chat can do that.",
+  "rpc.session.codexMissing": "Codex isn't installed, or doesn't answer. Install it, or set its path in Settings."
 }

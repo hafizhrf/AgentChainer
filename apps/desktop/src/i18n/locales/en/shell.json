@@ -1,6 +1,7 @@
 {
   "shell.options.modelDefault": "Default (recommended)",
   "shell.options.modelDefaultHint": "From your Claude settings",
+  "shell.options.modelDefaultHintAgent": "{{agent}}'s own default",
   "shell.options.modelOpus": "Opus",
   "shell.options.modelOpusHint": "The latest Opus",
   "shell.options.modelSonnet": "Sonnet",

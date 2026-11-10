@@ -1,6 +1,5 @@
-import { spawn } from "node:child_process";
-import { createInterface } from "node:readline";
 import type { CodexAccountUsage } from "@agentchainer/protocol";
+import { type Frame, withAppServer } from "../backends/app-server.ts";
 import type { Cli } from "../deploy/cli.ts";
 import { log } from "../rpc.ts";
 
@@ -10,9 +9,6 @@ import { log } from "../rpc.ts";
  * calls; a short-lived `codex app-server` answers and exits. Only totals and percentages are kept: account ids and
  * credit details are dropped. An API-key login gets nothing from these, and the page says why.
  */
-type Frame = { id?: number; result?: unknown; error?: { message?: string } };
-
-const TIMEOUT_MS = 20_000;
 const CACHE_MS = 5 * 60_000;
 let cached: { at: number; value: CodexAccountUsage } | null = null;
 
@@ -33,43 +29,13 @@ export function clearCodexAccountCache(): void {
 }
 
 async function read(cli: Cli): Promise<CodexAccountUsage> {
-  const child = spawn(cli.bin, [...cli.prefix, "app-server"], { stdio: ["pipe", "pipe", "ignore"], windowsHide: true });
-  const pending = new Map<number, (f: Frame) => void>();
-  let next = 1;
-  createInterface({ input: child.stdout }).on("line", (line) => {
-    try {
-      const f = JSON.parse(line) as Frame;
-      if (typeof f.id === "number") pending.get(f.id)?.(f);
-    } catch {
-      // not a frame
-    }
-  });
-  const request = (method: string, params: unknown) =>
-    new Promise<Frame>((resolve, reject) => {
-      const id = next++;
-      pending.set(id, resolve);
-      child.stdin.write(`${JSON.stringify({ id, method, params })}\n`);
-      setTimeout(() => reject(new Error(`${method} timed out`)), TIMEOUT_MS).unref();
-    });
-  const exited = new Promise<never>((_, reject) => {
-    child.on("error", reject);
-    child.on("exit", (code) => reject(new Error(`codex app-server exited (${code})`)));
-  });
-  try {
-    const ask = (method: string, params: unknown) => Promise.race([request(method, params), exited]);
-    await ask("initialize", {
-      clientInfo: { name: "agentchainer", title: "AgentChainer", version: "0" },
-      capabilities: null,
-    });
-    child.stdin.write(`${JSON.stringify({ method: "initialized" })}\n`);
+  return withAppServer(cli, undefined, async (ask) => {
     const [usage, limits] = await Promise.all([
       ask("account/usage/read", null),
       ask("account/rateLimits/read", { excludeResetCreditDetails: true }),
     ]);
     return parseAccount(usage, limits);
-  } finally {
-    child.kill();
-  }
+  });
 }
 
 /** The two answers as the page shows them; an error (no ChatGPT login) makes the usage unavailable. */

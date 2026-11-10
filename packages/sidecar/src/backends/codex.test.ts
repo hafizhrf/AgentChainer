@@ -5,7 +5,7 @@ import path from "node:path";
 import { after, describe, it } from "node:test";
 import type { AgentEvent, PermissionRequest } from "@agentchainer/protocol";
 import { GUARD_PREFIX } from "../guard.ts";
-import { codexBackend } from "./codex.ts";
+import { codexBackend, openCodexChat } from "./codex.ts";
 import type { LiveSession } from "./types.ts";
 
 // A stand-in `codex app-server`: the protocol as spike S8 recorded it, scripted. One turn edits a file (asking first),
@@ -28,6 +28,8 @@ createInterface({ input: process.stdin }).on("line", async (line) => {
   if (f.id !== undefined && !f.method) return waiting.get(f.id)?.(f.result);
   if (f.method === "initialize") return send({ id: f.id, result: { userAgent: "fake" } });
   if (f.method === "model/list") return send({ id: f.id, result: { data: [{ id: "gpt-fake", isDefault: true }] } });
+  if (f.params?.threadId === "taken")
+    return send({ id: f.id, error: { message: "thread taken already has an active writer" } });
   if (f.method === "thread/start" || f.method === "thread/resume")
     return send({ id: f.id, result: { thread: { id: f.params.threadId ?? "thread-1", model: f.params.model } } });
   if (f.method === "turn/interrupt") {
@@ -162,5 +164,78 @@ describe("the Codex step backend (M9-04)", () => {
     assert.equal(session.id, "thread-7");
     await new Promise((r) => setTimeout(r, 50));
     assert.equal(registered.size, 0);
+  });
+});
+
+describe("a chat on Codex (M9-09)", () => {
+  it("holds its opening events until released, then a message runs a turn and plan mode is refused", async () => {
+    process.env.FAKE_FILE = path.join(dir, "chat.txt");
+    delete process.env.FAKE_WAIT_INTERRUPT;
+    const events: AgentEvent[] = [];
+    const host = {
+      cli: { bin: process.execPath, prefix: [script] },
+      version: "codex-cli fake",
+      register: () => undefined,
+      unregister: () => undefined,
+    };
+    let chat: Awaited<ReturnType<typeof openCodexChat>> | undefined;
+    chat = await openCodexChat(
+      host,
+      { cwd: dir, permissionMode: "acceptEdits" },
+      {
+        emit: (e) => events.push(e),
+        askPermission: (r) => queueMicrotask(() => chat?.respond(r.requestId, { allow: true })),
+        onEnd: () => undefined,
+      },
+    );
+    assert.equal(chat.agent, "codex");
+    assert.equal(events.length, 0, "nothing goes out before the tab exists");
+    chat.release();
+    assert.deepEqual(
+      events.map((e) => e.type),
+      ["session.started", "models.changed"],
+    );
+    const models = events.find((e) => e.type === "models.changed");
+    assert.deepEqual(models?.type === "models.changed" ? models.models.map((m) => m.value) : [], ["gpt-fake"]);
+    const ended = new Promise<void>((resolve) => {
+      const check = setInterval(() => {
+        if (events.some((e) => e.type === "turn.completed")) {
+          clearInterval(check);
+          resolve();
+        }
+      }, 20);
+    });
+    assert.equal(typeof chat.send("Create chat.txt"), "string");
+    await ended;
+    assert.ok(events.some((e) => e.type === "text.delta" || e.type === "tool.started"));
+    await assert.rejects(chat.setMode("plan"), /plan mode/);
+    await chat.setModel("gpt-other");
+    await chat.close();
+  });
+
+  it("stops its app-server when the thread can't be opened, so it isn't left as the thread's writer", async () => {
+    let ended = false;
+    const host = {
+      cli: { bin: process.execPath, prefix: [script] },
+      version: "codex-cli fake",
+      register: () => undefined,
+      unregister: () => undefined,
+    };
+    await assert.rejects(
+      openCodexChat(
+        host,
+        { cwd: dir, resume: "taken" },
+        {
+          emit: () => undefined,
+          askPermission: () => undefined,
+          onEnd: () => {
+            ended = true;
+          },
+        },
+      ),
+      /active writer/,
+    );
+    for (let i = 0; i < 100 && !ended; i++) await new Promise((r) => setTimeout(r, 20));
+    assert.ok(ended, "the app-server exited");
   });
 });

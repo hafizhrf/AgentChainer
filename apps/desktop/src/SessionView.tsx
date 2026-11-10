@@ -278,7 +278,7 @@ export function SessionView({
                         cwd={tab.cwd}
                         items={tab.items}
                         onOpenFile={(file) => onOpenFile(file)}
-                        {...(tab.running || tab.ended ? {} : { onRewind })}
+                        {...(tab.running || tab.ended || tab.agent ? {} : { onRewind })}
                       />
                       {tab.running && (
                         <div className="working">

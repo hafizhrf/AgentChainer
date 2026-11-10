@@ -1900,6 +1900,8 @@ export const methodSchemas = {
   /* Workspace files and git (M1-25…M1-27), through the system git CLI. */
   "workspace.files": { params: WorkspaceRef, result: WorkspaceFilesSchema },
   "workspace.diff": { params: WorkspacePath, result: FileDiffSchema },
+  /** Whether a local server still answers, for the preview (UX-22): a TCP connect to this machine only. */
+  "preview.probe": { params: z.object({ url: z.string().min(1) }), result: z.object({ up: z.boolean() }) },
   /** An image in the workspace, for the file viewer (UX-21). Read-only. */
   "workspace.image": { params: WorkspacePath, result: WorkspaceImageSchema },
   /** Reverts a file to HEAD (a new file is deleted), or only hunk `hunk` of `workspace.diff`. */

@@ -1429,6 +1429,26 @@ for the desktop shell, start screen and session view to be cleaned up (UX-02, UX
   - Later (CP-12): device sizes and devtools.
   - **Threat model:** a local page in the app's window can't reach the app's IPC. It runs in its own frame or webview,
     with no Tauri access.
+  Progress (2026-11-11, PR pending): built for chats; ADR-0014, THREAT_MODEL T-21.
+  - **Finding it:** `previewUrls` reads the chat's tool output, background tasks' included: colours stripped,
+    `0.0.0.0` read as localhost, remote hosts ignored. The newest address is offered above the composer
+    (**Open preview**, dismissable), and the pane lists the others.
+  - **The Preview tab:** an address bar (local addresses only), reload and open in browser. The page is in a
+    sandboxed `<iframe>`, kept mounted while other tabs are looked at. `preview.probe` checks the server every 3 s:
+    when it stops the pane says so, and when it answers again the page reloads.
+  - **Isolation, checked first:** a probe page in the frame had every app command and plugin call refused (the
+    capabilities are for the app's own origin), and no reach into the parent document. The CSP gains `frame-src`
+    for the three local hosts.
+  - **Tests:** `localUrl` / `localUrls` / `previewUrls`, `probeTarget` / `probe` (refuses other hosts, up and
+    down), the panel tabs.
+  - **Checked in the app (Windows, 2026-11-11):**
+    - a Haiku chat printed two local addresses (≈$0.011);
+    - the offer opened the Preview tab on the newest, with the other listed;
+    - the server stopped and the pane said so; it restarted and the page came back;
+    - a remote address was refused;
+    - dark and light; the owner's settings restored.
+  - **Left:** the task card's offer after a task (tasks run gates, not dev servers, so there's nothing to find yet),
+    and CP-12's device sizes and devtools.
 
 - [ ] **UX-E1** All M1/M2 screens use the design system, in light and dark themes.
 - [ ] **UX-E2** Usability test participants complete the M1 exit scenarios without help.

@@ -3,6 +3,7 @@
   "panel.tabs.files": "File",
   "panel.tabs.git": "Git",
   "panel.tabs.setup": "Setup",
+  "panel.tabs.preview": "Pratinjau",
   "panel.workspace.openInEditor": "Buka di editor",
   "panel.workspace.tabsLabel": "Workspace",
   "panel.workspace.refresh": "Muat ulang",
@@ -141,5 +142,14 @@
   "panel.folders.label": "Folder",
   "panel.folders.primary": "{{dir}} (utama)",
   "panel.terminal.exited": "[shell berhenti — tutup lalu buka lagi terminal untuk memulai yang baru]",
-  "panel.terminal.startFailed": "Gagal memulai shell: {{error}}"
+  "panel.terminal.startFailed": "Gagal memulai shell: {{error}}",
+  "panel.preview.reload": "Muat ulang",
+  "panel.preview.address": "Alamat",
+  "panel.preview.placeholder": "localhost:5173",
+  "panel.preview.openInBrowser": "Buka di browser",
+  "panel.preview.notLocal": "Hanya alamat di komputer ini yang dibuka di sini (localhost, 127.0.0.1). Buka halaman lain di browser Anda.",
+  "panel.preview.found": "Juga berjalan:",
+  "panel.preview.empty": "Saat perintah di chat ini menjalankan server di localhost, halamannya bisa tampil di sini. Anda juga bisa mengetik alamat di atas.",
+  "panel.preview.down": "{{url}} tidak merespons: servernya mungkin sudah berhenti. Halaman muncul lagi saat server kembali.",
+  "panel.preview.frameTitle": "Pratinjau {{url}}"
 }

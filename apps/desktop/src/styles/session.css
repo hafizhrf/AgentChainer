@@ -1056,8 +1056,10 @@
 }
 
 .panel-tabs [role="tab"] {
+  flex: none;
   min-height: 0;
-  padding: 0 var(--space-2);
+  /* Five tabs fit a narrow panel; past that the bar scrolls, the open tab kept in view. */
+  padding: 0 5px;
   border: none;
   border-bottom: 2px solid transparent;
   border-radius: 0;
@@ -1428,4 +1430,118 @@
 
 .team-spend.stopped {
   color: var(--err);
+}
+
+/* ---------- The app being built, in the right panel (UX-22) ---------- */
+
+.preview-offer {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  /* As wide as the composer below it. */
+  width: calc(100% - 2 * var(--space-6));
+  max-width: calc(848px - 2 * var(--space-6));
+  margin: 0 auto var(--space-2);
+  padding: var(--space-1) var(--space-1) var(--space-1) var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  font-size: var(--text-sm);
+}
+
+.preview-content[hidden] {
+  display: none;
+}
+
+.preview-content:not([hidden]) {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  flex-direction: column;
+}
+
+.preview-pane {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.preview-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.preview-address {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 0 var(--space-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+}
+
+.preview-address input {
+  flex: 1;
+  min-width: 0;
+  padding: 4px 0;
+  border: 0;
+  background: transparent;
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+}
+
+.preview-address input:focus {
+  outline: none;
+}
+
+.preview-address:focus-within {
+  border-color: var(--accent);
+}
+
+.preview-found {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1);
+  font-size: var(--text-sm);
+}
+
+.preview-stage {
+  position: relative;
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: #ffffff;
+}
+
+.preview-stage iframe {
+  flex: 1;
+  width: 100%;
+  border: 0;
+}
+
+.preview-stage iframe[hidden] {
+  display: none;
+}
+
+.preview-down {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  padding: var(--space-4);
+  background: var(--surface);
+  color: var(--muted);
+  text-align: center;
 }

@@ -3,6 +3,7 @@
   "panel.tabs.files": "Files",
   "panel.tabs.git": "Git",
   "panel.tabs.setup": "Setup",
+  "panel.tabs.preview": "Preview",
   "panel.workspace.openInEditor": "Open in editor",
   "panel.workspace.tabsLabel": "Workspace",
   "panel.workspace.refresh": "Refresh",
@@ -143,5 +144,14 @@
   "panel.folders.label": "Folder",
   "panel.folders.primary": "{{dir}} (primary)",
   "panel.terminal.exited": "[shell exited — close and reopen the terminal to start a new one]",
-  "panel.terminal.startFailed": "Couldn't start a shell: {{error}}"
+  "panel.terminal.startFailed": "Couldn't start a shell: {{error}}",
+  "panel.preview.reload": "Reload",
+  "panel.preview.address": "Address",
+  "panel.preview.placeholder": "localhost:5173",
+  "panel.preview.openInBrowser": "Open in browser",
+  "panel.preview.notLocal": "Only this machine's addresses open here (localhost, 127.0.0.1). Open other pages in your browser.",
+  "panel.preview.found": "Also running:",
+  "panel.preview.empty": "When a command in this chat starts a server on localhost, its page can show here. You can also type an address above.",
+  "panel.preview.down": "{{url}} isn't answering: its server may have stopped. The page comes back when it does.",
+  "panel.preview.frameTitle": "Preview of {{url}}"
 }

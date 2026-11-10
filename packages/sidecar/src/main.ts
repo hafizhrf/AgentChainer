@@ -77,6 +77,7 @@ import { liveResume } from "./live-resume.ts";
 import { normalize } from "./normalize.ts";
 import { addRule, listRules, removeRule } from "./permissions.ts";
 import { cliError, installListed, listPluginsFor, parseDetails, uninstallListed, updateListed } from "./plugins.ts";
+import { probe } from "./preview.ts";
 import { CHAT_TOOLS, loadProfile, type ProfileOptions, profileOptions, profileSummaries } from "./profiles.ts";
 import { log, notify, RpcFailure, serve } from "./rpc.ts";
 import { runAsync } from "./run-async.ts";
@@ -828,6 +829,7 @@ serve(
 
     "workspace.diff": ({ cwd, path }) => fileDiff(cwd, path),
     "workspace.image": ({ cwd, path }) => workspaceImage(cwd, path),
+    "preview.probe": ({ url }) => probe(url),
 
     "workspace.revert": ({ cwd, path, hunk }) => {
       revert(cwd, path, hunk);

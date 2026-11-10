@@ -4,7 +4,7 @@ import { t } from "./i18n/index.ts";
  * The right panel's tabs (UX-03), in order. Which ones show is a per-device choice, like VS Code's views: people who
  * only want the chat can hide Git or Files, and ⌘B hides the whole panel. At least one tab always stays.
  */
-export const PANEL_TABS = ["changes", "files", "git", "setup"] as const;
+export const PANEL_TABS = ["changes", "files", "git", "setup", "preview"] as const;
 export type PanelTab = (typeof PANEL_TABS)[number];
 
 /** Each tab's name; getters, so it's read in the UI's language when shown (X-13). */
@@ -20,6 +20,9 @@ export const PANEL_TAB_LABEL: Record<PanelTab, string> = {
   },
   get setup() {
     return t("panel.tabs.setup");
+  },
+  get preview() {
+    return t("panel.tabs.preview");
   },
 };
 

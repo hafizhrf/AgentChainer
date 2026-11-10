@@ -39,7 +39,7 @@
   "evidence.report.security": "## Security notes",
   "evidence.report.guardBlocked": "Blocked by the guard:",
   "evidence.report.guardNothing": "The guard blocked nothing.",
-  "evidence.report.approvals": "Approvals Claude asked for, riskiest first:",
+  "evidence.report.approvals": "Approvals the agents asked for, riskiest first:",
   "evidence.report.approval": "- {{risk}} · {{tool}} `{{target}}` ({{label}}): {{decision}}",
   "evidence.report.noApprovals": "No approvals were asked for.",
   "evidence.report.notListed": "Calls your settings or the permission profile allowed without asking aren't listed.",

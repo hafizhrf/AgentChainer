@@ -13,9 +13,11 @@ import {
   type TaskTag,
 } from "@agentchainer/protocol";
 import { type ClaudeHost, claudeBackend } from "../backends/claude.ts";
-import type { StepOptions, StepSession } from "../backends/types.ts";
+import { type CodexHost, codexBackend } from "../backends/codex.ts";
+import type { StepAgent, StepBackend, StepOptions, StepSession } from "../backends/types.ts";
 import { detectWorkspace } from "../detect/detect.ts";
 import { GUARD_PREFIX } from "../guard.ts";
+import { t } from "../i18n/index.ts";
 import { git, repoOf } from "../workspace.ts";
 import type { FileChange } from "./evidence.ts";
 import { resolveGates, runGates } from "./gates.ts";
@@ -27,6 +29,8 @@ import { type AgentOutcome, REVIEW_JSON_SCHEMA, type Runner } from "./orchestrat
  * where `permission.respond` and `session.interrupt` find it), and the notifications of `main.ts`.
  */
 export type SessionHost = ClaudeHost & {
+  /** The user's own Codex CLI, when it's installed (M9-04): steps that name `agent: codex` run on it. */
+  codex?: () => CodexHost | null;
   event(sessionId: string, event: AgentEvent, task: TaskTag): void;
   permission(sessionId: string, request: Omit<PermissionRequest, "sessionId" | "task">, task: TaskTag): void;
   /** A step's session changed its fleet status (M8-02). */
@@ -167,8 +171,19 @@ export function sessionRunner(
   const live = new Map<string, StepSession>();
   /** Every session still open, to stop or close them. */
   const open = new Set<StepSession>();
-  /** The agent a step runs on (ADR-0012): Claude for now; M9-06 lets a step, a task or the workspace choose. */
-  const backend = claudeBackend(host);
+  /** The agents steps run on (ADR-0012): Claude, and the user's own Codex when a step names it (M9-04). */
+  const backends: Partial<Record<StepAgent, StepBackend>> = { claude: claudeBackend(host) };
+  const backendFor = (step: AgentStep): StepBackend => {
+    const agent = step.agent ?? "claude";
+    if (agent === "codex" && !backends.codex) {
+      const codex = host.codex?.();
+      if (!codex) throw new Error(t("tasks.runner.codexMissing"));
+      backends.codex = codexBackend(codex);
+    }
+    const backend = backends[agent];
+    if (!backend) throw new Error(t("tasks.runner.agentNotYet", { agent }));
+    return backend;
+  };
   /** The tag each session's events carry now: it follows the timeline entry (a step, then its fixes). */
   const tags = new Map<string, TaskTag>();
   let gatesAbort: AbortController | null = null;
@@ -177,7 +192,7 @@ export function sessionRunner(
   /** Tool calls in progress, to tell what a guard block was. */
   const started = new Map<string, { tool: string; input: Record<string, unknown> }>();
 
-  const openSession = (step: AgentStep, budgetUsd: number, resume?: string): StepSession => {
+  const openSession = async (step: AgentStep, budgetUsd: number, resume?: string): Promise<StepSession> => {
     const role = library.roles[step.role];
     if (!role) throw new Error(`No role ${step.role} in the library.`);
     const model = role.model !== "inherit" ? role.model : run.model;
@@ -196,9 +211,13 @@ export function sessionRunner(
       ...(step.output === "review" ? { outputFormat: { type: "json_schema", schema: REVIEW_JSON_SCHEMA } } : {}),
       ...(resume ? { resume } : {}),
     };
-    const session = backend(options, {
+    // Set once the backend has opened it: a backend may emit while it opens (Codex's `session.started`), before the
+    // step is tagged, and those events have no tag to go out with.
+    let opened: StepSession | undefined;
+    const idOf = () => opened?.id ?? "";
+    const session: StepSession = await backendFor(step)(options, {
       emit: (event) => {
-        const tag = tags.get(session.id);
+        const tag = tags.get(idOf());
         if (event.type === "tool.started")
           started.set(event.toolUseId, { tool: event.name, input: (event.input ?? {}) as Record<string, unknown> });
         if (event.type === "tool.completed") {
@@ -219,10 +238,10 @@ export function sessionRunner(
             });
           }
         }
-        if (tag) host.event(session.id, event, tag);
+        if (tag) host.event(idOf(), event, tag);
       },
       answered: (request, answer) => {
-        const tag = tags.get(session.id);
+        const tag = tags.get(idOf());
         if (!tag) return;
         const described = describeRequest(request.toolName, request.input, root);
         recorder.approval({
@@ -238,15 +257,17 @@ export function sessionRunner(
         });
       },
       askPermission: (request) => {
-        const tag = tags.get(session.id);
-        if (tag) host.permission(session.id, request, tag);
+        const tag = tags.get(idOf());
+        if (tag) host.permission(idOf(), request, tag);
       },
       statusChanged: (item) => host.status?.(item),
       onEnd: () => {
-        open.delete(session);
-        if (live.get(step.id) === session) live.delete(step.id);
+        if (!opened) return;
+        open.delete(opened);
+        if (live.get(step.id) === opened) live.delete(step.id);
       },
     });
+    opened = session;
     open.add(session);
     return session;
   };
@@ -273,7 +294,7 @@ export function sessionRunner(
 
   return {
     async start(step, prompt, budgetUsd, tag) {
-      const session = openSession(step, budgetUsd);
+      const session = await openSession(step, budgetUsd);
       tags.set(session.id, { ...tag, cwd: root });
       session.tag = { ...tag, cwd: root };
       if (step.access === "write") live.set(step.id, session);
@@ -285,7 +306,7 @@ export function sessionRunner(
       let session = live.get(step.id);
       if (!session || session.id !== sessionId) {
         // After a restart: continue the step's stored session.
-        session = openSession(step, budgetUsd, sessionId);
+        session = await openSession(step, budgetUsd, sessionId);
         live.set(step.id, session);
       }
       tags.set(session.id, { ...tag, cwd: root });

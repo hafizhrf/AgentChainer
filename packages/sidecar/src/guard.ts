@@ -21,6 +21,8 @@ const SECRET_DIRS = [
   ".docker/config.json",
   ".netrc",
   ".claude/.credentials.json",
+  // The Codex CLI's login and sessions (M9-04, T-19): no agent reads another agent's credentials.
+  ".codex",
 ];
 
 const FILE_TOOLS: Record<string, string> = {

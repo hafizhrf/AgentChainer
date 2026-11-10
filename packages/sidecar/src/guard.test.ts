@@ -130,6 +130,7 @@ describe("checkBash", () => {
     blocked("cat ~/.ssh/id_ed25519");
     blocked("cp $HOME/.aws/credentials /tmp/x");
     blocked("cat /home/dev/.claude/.credentials.json");
+    blocked("cat ~/.codex/auth.json");
   });
 });
 
@@ -137,6 +138,7 @@ describe("checkToolCall", () => {
   it("blocks file tools on credential paths", () => {
     assert.notEqual(checkToolCall("Read", { file_path: "~/.ssh/id_rsa" }, cwd, home), null);
     assert.notEqual(checkToolCall("Read", { file_path: "/home/dev/.aws/config" }, cwd, home), null);
+    assert.notEqual(checkToolCall("Read", { file_path: "/home/dev/.codex/auth.json" }, cwd, home), null);
     assert.notEqual(checkToolCall("Write", { file_path: "../.ssh/authorized_keys" }, cwd, home), null);
   });
 

@@ -198,7 +198,7 @@ const ENGLISH = [
   "",
   "The guard blocked nothing.",
   "",
-  "Approvals Claude asked for, riskiest first:",
+  "Approvals the agents asked for, riskiest first:",
   "- high risk · Bash `git push` (Implement): denied",
   "- low risk · Edit `src/cart.js` (Implement): allowed once",
   "Calls your settings or the permission profile allowed without asking aren't listed.",

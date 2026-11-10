@@ -104,5 +104,11 @@
   "tasks.split.noResult": "Pemecahan berakhir tanpa hasil.",
   "tasks.generateWorkflow.stopped": "Pembuatan berhenti: {{reason}}.",
   "tasks.generateWorkflow.noWorkflow": "Jawabannya tidak berisi workflow.",
-  "tasks.generateWorkflow.failedChecks": "Workflow yang dibuat tidak lolos pemeriksaan: {{error}}"
+  "tasks.generateWorkflow.failedChecks": "Workflow yang dibuat tidak lolos pemeriksaan: {{error}}",
+  "tasks.runner.codexMissing": "Langkah ini berjalan di Codex, tetapi CLI `codex` tidak ditemukan. Pasang CLI itu, atau jalankan langkahnya di Claude.",
+  "tasks.runner.agentNotYet": "Langkah ini berjalan di {{agent}}, yang belum bisa dijalankan versi ini.",
+  "tasks.codex.noThread": "Codex tidak memulai thread: {{error}}",
+  "tasks.codex.ended": "Session Codex sudah berakhir.",
+  "tasks.codex.exited": "App-server Codex berhenti.",
+  "tasks.codex.exitedMidTurn": "App-server Codex berhenti di tengah giliran."
 }

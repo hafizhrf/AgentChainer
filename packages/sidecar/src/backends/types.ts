@@ -1,5 +1,5 @@
-import type { TaskTag } from "@agentchainer/protocol";
-import type { SessionCallbacks, SessionOptions, TurnResult } from "../session.ts";
+import type { FleetItem, TaskTag } from "@agentchainer/protocol";
+import type { PermissionAnswer, SessionCallbacks, SessionOptions, TurnResult } from "../session.ts";
 
 /**
  * Task steps on other agents' CLIs (M9, ADR-0012): the seam between a task's runner and whatever agent runs a step.
@@ -40,6 +40,21 @@ export type StepOptions = Pick<
 
 /**
  * Opens a step's session. Its callbacks feed the runner's records (approvals, guard blocks) and the UI; `onEnd` runs
- * once the session is over, however it ended.
+ * once the session is over, however it ended. Opening may wait for the agent's CLI: a Codex thread's id, which fix
+ * rounds resume by, only exists once its app-server answers (M9-04).
  */
-export type StepBackend = (options: StepOptions, callbacks: SessionCallbacks) => StepSession;
+export type StepBackend = (options: StepOptions, callbacks: SessionCallbacks) => StepSession | Promise<StepSession>;
+
+/**
+ * A session the sidecar keeps live, whatever agent runs it: what `permission.respond`, `session.interrupt`, the fleet
+ * view and closing need (M9-04). Chats add more (sending, modes, rewind), which only Claude's `Session` has.
+ */
+export interface LiveSession extends StepSession {
+  /** A Team chat's worker: the supervisor's session id (M8-03). */
+  parentId?: string | undefined;
+  readonly fleetItem: FleetItem;
+  /** The person's answer to one of its approval requests; false when the request is gone. */
+  respond(requestId: string, answer: PermissionAnswer): boolean;
+  /** Stops the turn running now; false when there's none. */
+  interrupt(): Promise<boolean>;
+}

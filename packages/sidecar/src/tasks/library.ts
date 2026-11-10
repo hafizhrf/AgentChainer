@@ -30,6 +30,11 @@ export const AgentStepSchema = z
     role: z.enum(ROLES),
     /** read: Read, Grep and Glob only, isolated from the user's settings. write: the normal tools and approvals. */
     access: z.enum(["read", "write"]),
+    /**
+     * The agent that runs the step (M9, ADR-0012): the user's own Claude, Codex or Antigravity CLI. Claude when absent.
+     * M9-06 adds the task's and the workspace's choices on top.
+     */
+    agent: z.enum(["claude", "codex", "agy"]).optional(),
     /** What the step's prompt includes: the contract, the plan step's output, the diff since the base, gate runs. */
     inputs: z.array(z.enum(STEP_INPUTS)),
     /** What the orchestrator keeps from the step's answer: `plan.md`, or `review.json` (structured output). */

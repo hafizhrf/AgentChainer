@@ -430,6 +430,17 @@
 }
 
 /* Welcome page (UX-20): the ways to start beside the recent folders, like an IDE's. */
+/* Centered in the window both ways; it scrolls from the top when the window is too short for it. */
+.home-welcome {
+  justify-content: center;
+  min-height: 100%;
+}
+
+.home-welcome > .welcome-header {
+  align-items: center;
+  text-align: center;
+}
+
 .welcome-header {
   display: flex;
   flex-direction: column;

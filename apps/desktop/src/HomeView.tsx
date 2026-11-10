@@ -90,7 +90,7 @@ export function HomeView({
     );
     return (
       <div className="home">
-        <div className="home-inner">
+        <div className="home-inner home-welcome">
           {readiness}
           <header className="welcome-header">
             <h1>{t("home.welcome.title")}</h1>

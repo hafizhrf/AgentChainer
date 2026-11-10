@@ -429,51 +429,50 @@
   gap: var(--space-4);
 }
 
-.home-header {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
-  margin-bottom: var(--space-2);
+/* Welcome page (UX-20): the ways to start beside the recent folders, like an IDE's. */
+/* Centered in the window both ways; it scrolls from the top when the window is too short for it. */
+.home-welcome {
+  justify-content: center;
+  min-height: 100%;
 }
 
-.workspace-selected {
+.welcome-header {
   display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: var(--space-3);
-  padding: var(--space-3);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: var(--surface-2);
+  text-align: center;
+  gap: var(--space-1);
+  margin: var(--space-4) 0 var(--space-2);
 }
 
-.workspace-icon {
-  flex-shrink: 0;
-  color: var(--accent);
+.welcome-header > h1 {
+  margin: 0;
+  font-size: 26px;
+  font-weight: 600;
 }
 
-.workspace-text {
-  flex: 1;
+.welcome-grid {
+  display: grid;
+  grid-template-columns: minmax(200px, 1fr) minmax(260px, 1.4fr);
+  gap: var(--space-8);
+}
+
+@media (max-width: 720px) {
+  .welcome-grid {
+    grid-template-columns: 1fr;
+    gap: var(--space-5);
+  }
+}
+
+.welcome-col {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
   min-width: 0;
-  display: flex;
-  flex-direction: column;
 }
 
-.workspace-text span {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: var(--text-sm);
-}
-
-.workspace-empty {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: var(--space-3);
-}
-
-.recent-heading {
-  margin-bottom: var(--space-1);
+.welcome-heading {
+  margin: 0;
   color: var(--muted);
   font-size: var(--text-xs);
   font-weight: 600;
@@ -481,44 +480,127 @@
   text-transform: uppercase;
 }
 
-.recent ul {
-  list-style: none;
+.welcome-actions,
+.welcome-recent {
+  display: flex;
+  flex-direction: column;
   margin: 0 calc(-1 * var(--space-2));
   padding: 0;
+  list-style: none;
 }
 
-.recent-row {
+.welcome-action,
+.welcome-recent-row {
   width: 100%;
   min-height: 0;
   justify-content: flex-start;
   gap: var(--space-2);
   padding: 6px var(--space-2);
-  background: none;
   border: none;
   border-radius: var(--radius-sm);
-  color: var(--fg);
+  background: none;
   font-weight: 400;
 }
 
-.recent-row:hover {
+.welcome-action {
+  color: var(--accent);
+  text-align: left;
+}
+
+.welcome-recent-row {
+  color: var(--fg);
+}
+
+.welcome-action:hover,
+.welcome-recent-row:hover {
   background: var(--surface-3);
 }
 
-.recent-row svg {
+.welcome-action kbd {
+  color: var(--muted);
+}
+
+.welcome-recent-row svg {
   flex-shrink: 0;
   color: var(--muted);
 }
 
-.recent-name {
+.welcome-recent-name {
   flex-shrink: 0;
   font-weight: 500;
 }
 
-.recent-path {
+.welcome-recent-path {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
+  white-space: nowrap;
   color: var(--muted);
+  font-size: var(--text-xs);
+}
+
+/* A folder's page: its name and path, then its sessions and tasks. */
+.folder-head {
+  flex-direction: row;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-5);
+}
+
+.folder-head-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.folder-head-text > h1 {
+  margin: 0;
+  overflow: hidden;
+  font-size: var(--text-lg);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.folder-head-text > span {
+  overflow: hidden;
+  font-size: var(--text-sm);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.workspace-icon {
+  flex-shrink: 0;
+  color: var(--accent);
+}
+
+/* The New session dialog. */
+.new-session-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.new-session-path {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  margin-top: calc(-1 * var(--space-2));
+  overflow: hidden;
+  font-size: var(--text-xs);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.new-session-blocked {
+  margin-right: auto;
+  font-size: var(--text-sm);
+}
+
+/* Which agent a chat runs on, in the composer. */
+.composer-agent {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   font-size: var(--text-xs);
 }
 

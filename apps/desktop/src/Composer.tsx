@@ -1,7 +1,7 @@
 import { type Effort, type Image, PERMISSION_MODES, type PermissionMode } from "@agentchainer/protocol";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { open } from "@tauri-apps/plugin-dialog";
-import { ArrowUp, ListPlus, Paperclip, Pencil, Play, SendHorizontal, Square, Users, X } from "lucide-react";
+import { ArrowUp, Bot, ListPlus, Paperclip, Pencil, Play, SendHorizontal, Square, Users, X } from "lucide-react";
 import { type ClipboardEvent, type KeyboardEvent, useEffect, useMemo, useRef, useState } from "react";
 import { HelpPopup, PickerPopup, type PopupKind, UsagePopup } from "./ComposerPopup.tsx";
 import {
@@ -18,6 +18,7 @@ import { t } from "./i18n/index.ts";
 import { ModeHelp } from "./ModeHelp.tsx";
 import { EFFORT_OPTIONS, MODE_HELP, MODE_NAMES, modelChoices, modeOptions } from "./options.ts";
 import { asMode, isFresh, type Tab } from "./tabs.ts";
+import { agentLabel } from "./tasks/stepAgent.ts";
 import { teamSpend, usdShort } from "./team.ts";
 import { Select } from "./ui/Select.tsx";
 
@@ -506,6 +507,14 @@ export function Composer({
                 ))}
               </fieldset>
             )}
+            {/* Which agent the chat runs on (UX-20). Chats are on Claude for now; Codex and agy chats are M9-09. */}
+            <span
+              className="chip composer-agent"
+              title={t("session.composer.agentTitle", { agent: agentLabel("claude", undefined) })}
+            >
+              <Bot size={12} aria-hidden />
+              {agentLabel("claude", undefined)}
+            </span>
             <Select
               compact
               label={t("session.composer.modeLabel")}

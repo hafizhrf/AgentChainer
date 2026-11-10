@@ -67,6 +67,13 @@ describe("accessibility (X-12)", () => {
         timeout: 120_000,
       })
     ).click();
+    // New opens the New session dialog over Home (UX-20): its audit comes first, then Escape closes it.
+    await app.find("//*[@role='dialog']//form[@id='new-session-form']", { timeout: 60_000 });
+    await audit("new-session-dialog");
+    await app.chord(KEY.escape);
+    await waitFor(async () => (await app.findAll("//*[@role='dialog']")).length === 0, {
+      what: "the New session dialog to close",
+    });
     await app.find("//section[contains(@class, 'readiness')]", { timeout: 60_000 });
   });
   after(async () => {

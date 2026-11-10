@@ -32,6 +32,7 @@ import { joinPath } from "./files.ts";
 import { HomeView, pickFolder } from "./HomeView.tsx";
 import { approxUsd, count, usd as dollars } from "./i18n/format.ts";
 import { t } from "./i18n/index.ts";
+import { NewSessionDialog } from "./NewSessionDialog.tsx";
 import { MODE_NAMES, modelChoices, rememberModels, THEMES } from "./options.ts";
 import { type PermissionAnswer, PermissionDialog } from "./PermissionDialog.tsx";
 import { PANEL_TAB_LABEL, PANEL_TABS, type PanelTab, parseHidden, serializeHidden, toggleHidden } from "./panelTabs.ts";
@@ -151,6 +152,8 @@ export function App() {
   const [wsId, setWsId] = useState<string | null>(null);
   /** The New or Edit workspace dialog. */
   const [wsDialog, setWsDialog] = useState<WorkspaceDef | "new" | null>(null);
+  /** The New session dialog (UX-20): New, Ctrl+N, the palette and the home page open it. */
+  const [newSession, setNewSession] = useState(false);
   /** Every live session's fleet status, by session id (M8-02); ended ones stay until cleared or the app restarts. */
   const [fleet, setFleet] = useState<Record<string, FleetItem>>({});
   /** Chats the runtime still runs with no tab, after a reload (M1-36); re-attached once the settings are in. */
@@ -1132,7 +1135,7 @@ export function App() {
     setTerminals((open) => withToggled(open, sessionId, !open.has(sessionId)));
 
   const menuHandlers: Record<MenuCommand, () => void> = {
-    "new-session": () => show(null),
+    "new-session": () => setNewSession(true),
     "new-task": newTask,
     "open-folder": () => void openFolder(),
     "close-session": () => active && closeTab(active),
@@ -1170,7 +1173,7 @@ export function App() {
     const view = t("app.palette.groupView");
     const app = t("app.palette.groupApp");
 
-    add(session, "new-session", t("app.palette.newSession"), () => show(null), {
+    add(session, "new-session", t("app.palette.newSession"), () => setNewSession(true), {
       shortcut: menuShortcut("new-session"),
     });
     add(session, "fleet", t("app.palette.fleet"), () => show(FLEET));
@@ -1343,7 +1346,10 @@ export function App() {
                 waitingTasks={new Set(taskApprovals.flatMap((p) => (p.task ? [p.task.id] : [])))}
                 recent={settings?.recentWorkspaces ?? []}
                 ready={env ? env.ready : null}
-                onNew={() => show(null)}
+                onNew={() => {
+                  show(null);
+                  setNewSession(true);
+                }}
                 {...(settings?.tasksPreview === true ? { onNewTask: () => void newTask() } : {})}
                 onSelect={show}
                 onClose={closeTab}
@@ -1397,14 +1403,9 @@ export function App() {
                     cwd={cwd}
                     onCwdChange={setCwd}
                     recent={settings?.recentWorkspaces ?? []}
-                    model={model}
-                    onModelChange={setModel}
-                    mode={mode}
-                    onModeChange={setMode}
-                    canAutonomous={settings?.budgetUsd != null}
-                    profile={profile}
-                    onProfileChange={setProfile}
-                    onStart={() => void startSession(workspace, model, mode, homeDef?.folders ?? [], false, profile)}
+                    onNewSession={() => setNewSession(true)}
+                    {...(settings?.tasksPreview === true ? { onNewTask: () => void newTask() } : {})}
+                    onNewWorkspace={() => setWsDialog("new")}
                     onOpenSetup={() =>
                       setSetup({
                         cwd: workspace,
@@ -1416,17 +1417,19 @@ export function App() {
                     openIds={new Set(tabs.filter((x) => !x.ended).map((x) => x.sessionId))}
                     onOpenStored={openStored}
                     confirm={confirm}
+                    workspaces={
+                      settings && (
+                        <WorkspacesCard
+                          workspaces={settings.workspaces}
+                          selected={homeDef}
+                          onPick={openWorkspaceDef}
+                          onNew={() => setWsDialog("new")}
+                          onEdit={setWsDialog}
+                          onDelete={(def) => void deleteWorkspaceDef(def)}
+                        />
+                      )
+                    }
                   >
-                    {settings && (
-                      <WorkspacesCard
-                        workspaces={settings.workspaces}
-                        selected={homeDef}
-                        onPick={openWorkspaceDef}
-                        onNew={() => setWsDialog("new")}
-                        onEdit={setWsDialog}
-                        onDelete={(def) => void deleteWorkspaceDef(def)}
-                      />
-                    )}
                     {settings?.tasksPreview === true && hello !== null && workspace && (
                       <HomeTasks cwd={workspace} onOpen={(id, title) => openTask(workspace, id, { title })} />
                     )}
@@ -1547,6 +1550,34 @@ export function App() {
             onStopTask={() => void stopTaskStep(stepApproval)}
           />
         )}
+        <NewSessionDialog
+          open={newSession}
+          onOpenChange={setNewSession}
+          ready={env?.ready === true}
+          homeDir={hello?.homeDir ?? null}
+          cwd={cwd}
+          onCwdChange={(dir) => {
+            setCwd(dir);
+            setWsId(null);
+          }}
+          recent={settings?.recentWorkspaces ?? []}
+          workspaces={settings?.workspaces ?? []}
+          onPickWorkspace={(def) => {
+            setCwd(def.primary);
+            setWsId(def.id);
+          }}
+          model={model}
+          onModelChange={setModel}
+          mode={mode}
+          onModeChange={setMode}
+          profile={profile}
+          onProfileChange={setProfile}
+          canAutonomous={settings?.budgetUsd != null}
+          onStart={() => {
+            setNewSession(false);
+            void startSession(workspace, model, mode, homeDef?.folders ?? [], false, profile);
+          }}
+        />
         {wsDialog && (
           <WorkspaceDialog
             initial={wsDialog === "new" ? null : wsDialog}

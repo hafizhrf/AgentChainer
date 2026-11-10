@@ -139,7 +139,7 @@ type Pending = {
   always: PermissionUpdate[];
 };
 
-type SessionCallbacks = {
+export type SessionCallbacks = {
   emit: (event: AgentEvent) => void;
   askPermission: (request: Omit<PermissionRequest, "sessionId">) => void;
   /** The query ended: closed, or the CLI process exited. */

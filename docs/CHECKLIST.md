@@ -2029,9 +2029,21 @@ with the OpenAI Codex CLI and Google's Antigravity CLI (`agy`), in both directio
     - **per-run command rules don't:** `request-review` refuses every command, `proceed-in-sandbox` runs every one.
 
     So agy steps write files but run no commands, and the app runs the gates (ADR-0012 §3, R-20).
-- [ ] **M9-03** A step backend interface: `StepSession` (id, turn, inject, close, respond, fleet item) in
+- [x] **M9-03** A step backend interface: `StepSession` (id, turn, inject, close, respond, fleet item) in
       `packages/sidecar/src/backends/`. Claude's `Session` implements it, and `tasks/runner.ts` picks the backend
       per step. No behavior change.
+  Note: done.
+  - `backends/types.ts`: `StepSession` (id, tag, turn, inject, close: what the runner uses), `StepOptions`, and
+    `StepBackend`.
+  - `backends/claude.ts`: `claudeBackend` builds Claude's `Session` and registers it with the sidecar, so approvals
+    and interrupts reach it; it unregisters it when it ends.
+  - The runner opens every step through a backend and knows only the interface. Approvals and fleet status still
+    come through the session's callbacks.
+  - **Tests:** `backends/claude.test.ts`; the runner's tests unchanged.
+  - **Live, on haiku (≈$0.01 each):** a tier-S task on `fixtures/sample-app` (`live-task.ts`) passed its gates, with
+    evidence that matches the recorded runs, on this branch and on `main`.
+  - `respond` and the fleet item stay on Claude's session for now: M9-04 adds them to the interface when Codex's
+    approvals need them.
 - [ ] **M9-04** The Codex backend:
   - **Process:** `codex app-server` over stdio, found like the Claude CLI.
   - **Events:** commands become `Bash` and file changes `Edit`/`Write` events.

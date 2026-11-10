@@ -443,5 +443,14 @@
   "tasks.schedule.upTo": "hingga {{amount}}",
   "tasks.schedule.edits": "Edit diterima; persetujuan lain menunggu Anda, dan Anda akan mendapat notifikasi.",
   "tasks.schedule.onlyOpen": "Hanya berjalan saat AgentChainer terbuka. Jadwal yang terlewat saat aplikasi tertutup dijalankan sekali saat dibuka.",
-  "tasks.schedule.enabled": "Aktif"
+  "tasks.schedule.enabled": "Aktif",
+  "tasks.agents.title": "Agent",
+  "tasks.agents.help": "Agent yang menjalankan tiap jenis langkah. Hanya agent yang terpasang dan sudah masuk di komputer ini yang ditawarkan; pemeriksaannya tetap dijalankan aplikasi.",
+  "tasks.agents.plan": "Rencana",
+  "tasks.agents.implement": "Implementasi",
+  "tasks.agents.review": "Tinjauan",
+  "tasks.agents.claude": "Claude",
+  "tasks.agents.codex": "Codex",
+  "tasks.agents.agy": "Antigravity CLI (agy)",
+  "tasks.agents.notSignedIn": "{{agent}} (belum masuk)"
 }

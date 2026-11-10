@@ -28,6 +28,22 @@
   top: 0;
 }
 
+/* Which agent runs each kind of step (M9-06): one picker per role, in a row that wraps on a narrow card. */
+.task-agents {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.task-agents-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: var(--space-3);
+}
+
 @media (max-width: 1180px) {
   .task-review {
     grid-template-columns: minmax(0, 1fr);

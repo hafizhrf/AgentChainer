@@ -3,6 +3,7 @@ import { createHash } from "node:crypto";
 import { existsSync } from "node:fs";
 import path from "node:path";
 import {
+  type AgentRoles,
   MAX_CI_FIXES,
   type MergeGate,
   type MessageRef,
@@ -23,6 +24,7 @@ import {
 import type { SDKMessage } from "@anthropic-ai/claude-agent-sdk";
 import { stringify as stringifyYaml } from "yaml";
 import { AC_DIR } from "../ac-dir.ts";
+import { agentsNeeded } from "../backends/choose.ts";
 import { findTool, toolsDir } from "../bootstrap/tools.ts";
 import { listDeploys } from "../deploy/service.ts";
 import { detectWorkspace } from "../detect/detect.ts";
@@ -72,6 +74,10 @@ import {
 import { result } from "./result.ts";
 import { runEvidenceFile, withPastRun } from "./run-history.ts";
 import { changedPaths, fileStats, type SessionHost, sessionRunner, startBase, untracked } from "./runner.ts";
+
+/** The agents' CLIs as a person knows them. */
+const AGENT_NAME = { claude: "Claude", codex: "Codex", agy: "the Antigravity CLI (agy)" } as const;
+
 import { semgrepScan, trivyScan } from "./scanners.ts";
 import { proposeSplit } from "./split.ts";
 import { createTask, deleteTask, listTasks, loadTask, readTaskFile, saveTask, writeTaskFile } from "./store.ts";
@@ -697,7 +703,7 @@ export function startTask(
   root: string,
   id: string,
   host: SessionHost,
-  opts: { permissionMode: PermissionMode; model?: string; scheduled?: boolean },
+  opts: { permissionMode: PermissionMode; model?: string; scheduled?: boolean; agents?: AgentRoles },
   notify: (task: Task) => void,
   now = new Date(),
 ): Task {
@@ -713,6 +719,12 @@ export function startTask(
   const own = flowOf(task);
   const workflow = own ?? eff.library.workflows[task.triage.chosen];
   if (!workflow) throw invalid(t("tasks.service.noWorkflow", { tier: task.triage.chosen }));
+  // Every agent the run needs is installed, before anything starts (M9-06): the step that names a missing one would
+  // otherwise fail mid-run, after the branch and the baseline.
+  for (const agent of agentsNeeded(workflow, opts.agents)) {
+    const found = agent === "codex" ? host.codex?.() : agent === "agy" ? host.agy?.() : null;
+    if (!found) throw invalid(t("tasks.service.agentMissing", { agent: AGENT_NAME[agent] }));
+  }
   // A sub-task runs in the worktree its XL task made; any other task gets its own, in each of its folders (M8-01).
   const primary = task.parent ? { task, fresh: false } : taskBranch(root, task);
   const folders = task.parent ? { task: primary.task, fresh: [] } : branchFolders(primary.task);

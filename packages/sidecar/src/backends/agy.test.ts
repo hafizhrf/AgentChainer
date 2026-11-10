@@ -36,6 +36,7 @@ async function run(write: string, opts: { readOnly?: boolean; turns?: number } =
   process.env.FAKE_ARGS = argsFile;
   process.env.FAKE_WRITE = write;
   const events: AgentEvent[] = [];
+  const statuses: string[] = [];
   const registered = new Map<string, LiveSession>();
   const open = agyBackend({
     cli: { bin: process.execPath, prefix: [script] },
@@ -45,7 +46,12 @@ async function run(write: string, opts: { readOnly?: boolean; turns?: number } =
   });
   const session = (await open(
     { cwd: dir, readOnly: opts.readOnly === true, appendSystemPrompt: "You are the implementer.", model: "haiku" },
-    { emit: (e) => events.push(e), askPermission: () => undefined, onEnd: () => undefined },
+    {
+      emit: (e) => events.push(e),
+      askPermission: () => undefined,
+      onEnd: () => undefined,
+      statusChanged: (item) => statuses.push(`${item.sessionId}:${item.status}`),
+    },
   )) as LiveSession;
   const results = [];
   for (let i = 0; i < (opts.turns ?? 1); i++)
@@ -56,12 +62,14 @@ async function run(write: string, opts: { readOnly?: boolean; turns?: number } =
     .trim()
     .split("\n")
     .map((l) => JSON.parse(l) as string[]);
-  return { session, results, events, argv, ids, registered };
+  return { session, results, events, argv, ids, registered, statuses };
 }
 
 describe("the Antigravity CLI step backend (M9-05)", () => {
   it("edits files with no commands, through per-run settings, and goes by agy's conversation id", async () => {
-    const { session, results, events, argv, ids } = await run(path.join(dir, "hello.txt"), { turns: 2 });
+    const { session, results, events, argv, ids, statuses } = await run(path.join(dir, "hello.txt"), { turns: 2 });
+    // The fleet only hears of the conversation's id: no row is left behind under the temporary one.
+    assert.ok(statuses.length > 0 && statuses.every((s) => s.startsWith("conv-1:")), statuses.join(", "));
     assert.deepEqual(
       results.map((r) => [r.subtype, r.text, r.costUsd]),
       [

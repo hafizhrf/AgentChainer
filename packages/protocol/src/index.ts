@@ -866,6 +866,18 @@ export const GuardBlockSchema = z.object({
 });
 export type GuardBlock = z.infer<typeof GuardBlockSchema>;
 
+/** The agents a task's step can run on (M9, ADR-0012): the user's own Claude, Codex or Antigravity CLI. */
+export const StepAgentSchema = z.enum(["claude", "codex", "agy"]);
+export type StepAgent = z.infer<typeof StepAgentSchema>;
+/**
+ * A task's agent per role (M9-06): a write step implements, a read step with a verdict reviews, other read steps plan.
+ * A step's own `agent:` in its workflow wins; a role left out runs on Claude.
+ */
+export const AgentRolesSchema = z
+  .object({ plan: StepAgentSchema, implement: StepAgentSchema, review: StepAgentSchema })
+  .partial();
+export type AgentRoles = z.infer<typeof AgentRolesSchema>;
+
 export const TaskRunSchema = z.object({
   /**
    * The workflow it runs; `source: "project"` when the project's file replaced the app's (M6-04), `"task"` when the
@@ -880,6 +892,8 @@ export const TaskRunSchema = z.object({
   }),
   permissionMode: PermissionModeSchema,
   model: z.string().optional(),
+  /** The agent per role the person chose at Run (M9-06); fix rounds and resumes keep it. */
+  agents: AgentRolesSchema.optional(),
   /** What the task's changes are measured from: a snapshot of the tree at the start, or null outside git. */
   base: z.string().nullable(),
   /** Files already untracked at the start: not the task's changes. */
@@ -1477,6 +1491,17 @@ export const methodSchemas = {
   /** Readiness of the user's machine (spike S5). Never includes account identity (email, org). */
   "env.check": { params: Empty, result: EnvCheckSchema },
   /**
+   * The other agents' CLIs a task step can run on (M9-06), each by its own status command: Codex's `login status`,
+   * agy's `models`. Only version and signed in or not; never an account detail (ADR-0002).
+   */
+  "agents.available": {
+    params: Empty,
+    result: z.object({
+      codex: z.object({ installed: z.boolean(), version: z.string().optional(), signedIn: z.boolean() }),
+      agy: z.object({ installed: z.boolean(), version: z.string().optional(), signedIn: z.boolean() }),
+    }),
+  },
+  /**
    * Makes the Claude Agent SDK ready. The packaged app downloads and verifies the pinned SDK on first use (ADR-0003);
    * dev builds use node_modules.
    */
@@ -1927,7 +1952,12 @@ export const methodSchemas = {
    * Write steps ask for approvals in `permissionMode`.
    */
   "task.start": {
-    params: TaskRef.extend({ permissionMode: PermissionModeSchema.exclude(["plan"]), model: z.string().optional() }),
+    params: TaskRef.extend({
+      permissionMode: PermissionModeSchema.exclude(["plan"]),
+      model: z.string().optional(),
+      /** The agent per role (M9-06); every agent it names must be installed, or the run doesn't start. */
+      agents: AgentRolesSchema.optional(),
+    }),
     result: TaskSchema,
   },
   /**

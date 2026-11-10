@@ -445,5 +445,14 @@
   "tasks.schedule.upTo": "up to {{amount}}",
   "tasks.schedule.edits": "Edits are accepted; any other approval waits for you, and you get a notification.",
   "tasks.schedule.onlyOpen": "Runs only while AgentChainer is open. A time missed while it was closed runs once when it opens.",
-  "tasks.schedule.enabled": "Enabled"
+  "tasks.schedule.enabled": "Enabled",
+  "tasks.agents.title": "Agents",
+  "tasks.agents.help": "Which agent runs each kind of step. Only agents installed and signed in on this computer are offered; the app runs the checks either way.",
+  "tasks.agents.plan": "Plan",
+  "tasks.agents.implement": "Implement",
+  "tasks.agents.review": "Review",
+  "tasks.agents.claude": "Claude",
+  "tasks.agents.codex": "Codex",
+  "tasks.agents.agy": "Antigravity CLI (agy)",
+  "tasks.agents.notSignedIn": "{{agent}} (not signed in)"
 }

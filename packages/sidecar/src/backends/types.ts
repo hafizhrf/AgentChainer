@@ -7,7 +7,7 @@ import type { PermissionAnswer, SessionCallbacks, SessionOptions, TurnResult } f
  */
 
 /** The agents a task step can run on. */
-export type StepAgent = "claude" | "codex" | "agy";
+export type { StepAgent } from "@agentchainer/protocol";
 
 /** What a task's runner needs from a step's session, whatever agent runs it. */
 export interface StepSession {

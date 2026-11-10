@@ -114,5 +114,6 @@
   "tasks.agy.ended": "The Antigravity CLI session has ended.",
   "tasks.agy.outsideWorkspace": "agy wrote outside the workspace: {{path}}",
   "tasks.agy.turnFailed": "The Antigravity CLI's turn failed (exit {{code}}).",
-  "tasks.runner.agyMissing": "This step runs on the Antigravity CLI, but no `agy` was found. Install it, or run the step on Claude."
+  "tasks.runner.agyMissing": "This step runs on the Antigravity CLI, but no `agy` was found. Install it, or run the step on Claude.",
+  "tasks.service.agentMissing": "This task runs a step on {{agent}}, which isn't installed. Install it, or choose another agent for that step."
 }

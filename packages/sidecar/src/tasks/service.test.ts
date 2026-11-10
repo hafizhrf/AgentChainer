@@ -944,6 +944,25 @@ function approvedXl(task: ReturnType<typeof newTask>): ReturnType<typeof newTask
   };
 }
 
+describe("a task's agents (M9-06)", () => {
+  it("doesn't start a run that names an agent this computer doesn't have", () => {
+    const root = copyFixture("sample-app");
+    const xl = approvedXl(newTask(root, "Fix total()"));
+    if (!xl.triage) throw new Error("no triage");
+    const task = { ...xl, triage: { ...xl.triage, proposed: "S" as const, chosen: "S" as const } };
+    saveTask(root, task);
+    // No Codex and no agy on this host.
+    const host = { codex: () => null, agy: () => null } as unknown as Parameters<typeof startTask>[2];
+    assert.throws(
+      () =>
+        startTask(root, task.id, host, { permissionMode: "default", agents: { implement: "codex" } }, () => undefined),
+      /runs a step on Codex, which isn't installed/,
+    );
+    assert.equal(loadTask(root, task.id).state, "ready", "nothing started: no branch, no run");
+    assert.ok(!loadTask(root, task.id).run);
+  });
+});
+
 describe("messages to a running task (UX-13)", () => {
   it("refuses a message for a task that isn't running", () => {
     assert.throws(() => messageRun("t-20261103-00000000", "hi"), /isn't running/);

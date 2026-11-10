@@ -288,6 +288,63 @@
         "additionalProperties": false
       }
     },
+    "agents.available": {
+      "params": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "result": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "codex": {
+            "type": "object",
+            "properties": {
+              "installed": {
+                "type": "boolean"
+              },
+              "version": {
+                "type": "string"
+              },
+              "signedIn": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "installed",
+              "signedIn"
+            ],
+            "additionalProperties": false
+          },
+          "agy": {
+            "type": "object",
+            "properties": {
+              "installed": {
+                "type": "boolean"
+              },
+              "version": {
+                "type": "string"
+              },
+              "signedIn": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "installed",
+              "signedIn"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "codex",
+          "agy"
+        ],
+        "additionalProperties": false
+      }
+    },
     "sdk.prepare": {
       "params": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -6014,6 +6071,36 @@
                   "model": {
                     "type": "string"
                   },
+                  "agents": {
+                    "type": "object",
+                    "properties": {
+                      "plan": {
+                        "type": "string",
+                        "enum": [
+                          "claude",
+                          "codex",
+                          "agy"
+                        ]
+                      },
+                      "implement": {
+                        "type": "string",
+                        "enum": [
+                          "claude",
+                          "codex",
+                          "agy"
+                        ]
+                      },
+                      "review": {
+                        "type": "string",
+                        "enum": [
+                          "claude",
+                          "codex",
+                          "agy"
+                        ]
+                      }
+                    },
+                    "additionalProperties": false
+                  },
                   "base": {
                     "type": [
                       "string",
@@ -7321,6 +7408,36 @@
                   },
                   "model": {
                     "type": "string"
+                  },
+                  "agents": {
+                    "type": "object",
+                    "properties": {
+                      "plan": {
+                        "type": "string",
+                        "enum": [
+                          "claude",
+                          "codex",
+                          "agy"
+                        ]
+                      },
+                      "implement": {
+                        "type": "string",
+                        "enum": [
+                          "claude",
+                          "codex",
+                          "agy"
+                        ]
+                      },
+                      "review": {
+                        "type": "string",
+                        "enum": [
+                          "claude",
+                          "codex",
+                          "agy"
+                        ]
+                      }
+                    },
+                    "additionalProperties": false
                   },
                   "base": {
                     "type": [
@@ -8635,6 +8752,36 @@
                   },
                   "model": {
                     "type": "string"
+                  },
+                  "agents": {
+                    "type": "object",
+                    "properties": {
+                      "plan": {
+                        "type": "string",
+                        "enum": [
+                          "claude",
+                          "codex",
+                          "agy"
+                        ]
+                      },
+                      "implement": {
+                        "type": "string",
+                        "enum": [
+                          "claude",
+                          "codex",
+                          "agy"
+                        ]
+                      },
+                      "review": {
+                        "type": "string",
+                        "enum": [
+                          "claude",
+                          "codex",
+                          "agy"
+                        ]
+                      }
+                    },
+                    "additionalProperties": false
                   },
                   "base": {
                     "type": [
@@ -10052,6 +10199,36 @@
                   },
                   "model": {
                     "type": "string"
+                  },
+                  "agents": {
+                    "type": "object",
+                    "properties": {
+                      "plan": {
+                        "type": "string",
+                        "enum": [
+                          "claude",
+                          "codex",
+                          "agy"
+                        ]
+                      },
+                      "implement": {
+                        "type": "string",
+                        "enum": [
+                          "claude",
+                          "codex",
+                          "agy"
+                        ]
+                      },
+                      "review": {
+                        "type": "string",
+                        "enum": [
+                          "claude",
+                          "codex",
+                          "agy"
+                        ]
+                      }
+                    },
+                    "additionalProperties": false
                   },
                   "base": {
                     "type": [
@@ -11496,6 +11673,36 @@
                   "model": {
                     "type": "string"
                   },
+                  "agents": {
+                    "type": "object",
+                    "properties": {
+                      "plan": {
+                        "type": "string",
+                        "enum": [
+                          "claude",
+                          "codex",
+                          "agy"
+                        ]
+                      },
+                      "implement": {
+                        "type": "string",
+                        "enum": [
+                          "claude",
+                          "codex",
+                          "agy"
+                        ]
+                      },
+                      "review": {
+                        "type": "string",
+                        "enum": [
+                          "claude",
+                          "codex",
+                          "agy"
+                        ]
+                      }
+                    },
+                    "additionalProperties": false
+                  },
                   "base": {
                     "type": [
                       "string",
@@ -12801,6 +13008,36 @@
                   "model": {
                     "type": "string"
                   },
+                  "agents": {
+                    "type": "object",
+                    "properties": {
+                      "plan": {
+                        "type": "string",
+                        "enum": [
+                          "claude",
+                          "codex",
+                          "agy"
+                        ]
+                      },
+                      "implement": {
+                        "type": "string",
+                        "enum": [
+                          "claude",
+                          "codex",
+                          "agy"
+                        ]
+                      },
+                      "review": {
+                        "type": "string",
+                        "enum": [
+                          "claude",
+                          "codex",
+                          "agy"
+                        ]
+                      }
+                    },
+                    "additionalProperties": false
+                  },
                   "base": {
                     "type": [
                       "string",
@@ -13700,6 +13937,36 @@
           },
           "model": {
             "type": "string"
+          },
+          "agents": {
+            "type": "object",
+            "properties": {
+              "plan": {
+                "type": "string",
+                "enum": [
+                  "claude",
+                  "codex",
+                  "agy"
+                ]
+              },
+              "implement": {
+                "type": "string",
+                "enum": [
+                  "claude",
+                  "codex",
+                  "agy"
+                ]
+              },
+              "review": {
+                "type": "string",
+                "enum": [
+                  "claude",
+                  "codex",
+                  "agy"
+                ]
+              }
+            },
+            "additionalProperties": false
           }
         },
         "required": [
@@ -14117,6 +14384,36 @@
                   },
                   "model": {
                     "type": "string"
+                  },
+                  "agents": {
+                    "type": "object",
+                    "properties": {
+                      "plan": {
+                        "type": "string",
+                        "enum": [
+                          "claude",
+                          "codex",
+                          "agy"
+                        ]
+                      },
+                      "implement": {
+                        "type": "string",
+                        "enum": [
+                          "claude",
+                          "codex",
+                          "agy"
+                        ]
+                      },
+                      "review": {
+                        "type": "string",
+                        "enum": [
+                          "claude",
+                          "codex",
+                          "agy"
+                        ]
+                      }
+                    },
+                    "additionalProperties": false
                   },
                   "base": {
                     "type": [
@@ -15426,6 +15723,36 @@
                   "model": {
                     "type": "string"
                   },
+                  "agents": {
+                    "type": "object",
+                    "properties": {
+                      "plan": {
+                        "type": "string",
+                        "enum": [
+                          "claude",
+                          "codex",
+                          "agy"
+                        ]
+                      },
+                      "implement": {
+                        "type": "string",
+                        "enum": [
+                          "claude",
+                          "codex",
+                          "agy"
+                        ]
+                      },
+                      "review": {
+                        "type": "string",
+                        "enum": [
+                          "claude",
+                          "codex",
+                          "agy"
+                        ]
+                      }
+                    },
+                    "additionalProperties": false
+                  },
                   "base": {
                     "type": [
                       "string",
@@ -16730,6 +17057,36 @@
                   },
                   "model": {
                     "type": "string"
+                  },
+                  "agents": {
+                    "type": "object",
+                    "properties": {
+                      "plan": {
+                        "type": "string",
+                        "enum": [
+                          "claude",
+                          "codex",
+                          "agy"
+                        ]
+                      },
+                      "implement": {
+                        "type": "string",
+                        "enum": [
+                          "claude",
+                          "codex",
+                          "agy"
+                        ]
+                      },
+                      "review": {
+                        "type": "string",
+                        "enum": [
+                          "claude",
+                          "codex",
+                          "agy"
+                        ]
+                      }
+                    },
+                    "additionalProperties": false
                   },
                   "base": {
                     "type": [
@@ -18130,6 +18487,36 @@
                   "model": {
                     "type": "string"
                   },
+                  "agents": {
+                    "type": "object",
+                    "properties": {
+                      "plan": {
+                        "type": "string",
+                        "enum": [
+                          "claude",
+                          "codex",
+                          "agy"
+                        ]
+                      },
+                      "implement": {
+                        "type": "string",
+                        "enum": [
+                          "claude",
+                          "codex",
+                          "agy"
+                        ]
+                      },
+                      "review": {
+                        "type": "string",
+                        "enum": [
+                          "claude",
+                          "codex",
+                          "agy"
+                        ]
+                      }
+                    },
+                    "additionalProperties": false
+                  },
                   "base": {
                     "type": [
                       "string",
@@ -19440,6 +19827,36 @@
                   },
                   "model": {
                     "type": "string"
+                  },
+                  "agents": {
+                    "type": "object",
+                    "properties": {
+                      "plan": {
+                        "type": "string",
+                        "enum": [
+                          "claude",
+                          "codex",
+                          "agy"
+                        ]
+                      },
+                      "implement": {
+                        "type": "string",
+                        "enum": [
+                          "claude",
+                          "codex",
+                          "agy"
+                        ]
+                      },
+                      "review": {
+                        "type": "string",
+                        "enum": [
+                          "claude",
+                          "codex",
+                          "agy"
+                        ]
+                      }
+                    },
+                    "additionalProperties": false
                   },
                   "base": {
                     "type": [
@@ -21148,6 +21565,36 @@
                   "model": {
                     "type": "string"
                   },
+                  "agents": {
+                    "type": "object",
+                    "properties": {
+                      "plan": {
+                        "type": "string",
+                        "enum": [
+                          "claude",
+                          "codex",
+                          "agy"
+                        ]
+                      },
+                      "implement": {
+                        "type": "string",
+                        "enum": [
+                          "claude",
+                          "codex",
+                          "agy"
+                        ]
+                      },
+                      "review": {
+                        "type": "string",
+                        "enum": [
+                          "claude",
+                          "codex",
+                          "agy"
+                        ]
+                      }
+                    },
+                    "additionalProperties": false
+                  },
                   "base": {
                     "type": [
                       "string",
@@ -22453,6 +22900,36 @@
                   "model": {
                     "type": "string"
                   },
+                  "agents": {
+                    "type": "object",
+                    "properties": {
+                      "plan": {
+                        "type": "string",
+                        "enum": [
+                          "claude",
+                          "codex",
+                          "agy"
+                        ]
+                      },
+                      "implement": {
+                        "type": "string",
+                        "enum": [
+                          "claude",
+                          "codex",
+                          "agy"
+                        ]
+                      },
+                      "review": {
+                        "type": "string",
+                        "enum": [
+                          "claude",
+                          "codex",
+                          "agy"
+                        ]
+                      }
+                    },
+                    "additionalProperties": false
+                  },
                   "base": {
                     "type": [
                       "string",
@@ -23757,6 +24234,36 @@
                   },
                   "model": {
                     "type": "string"
+                  },
+                  "agents": {
+                    "type": "object",
+                    "properties": {
+                      "plan": {
+                        "type": "string",
+                        "enum": [
+                          "claude",
+                          "codex",
+                          "agy"
+                        ]
+                      },
+                      "implement": {
+                        "type": "string",
+                        "enum": [
+                          "claude",
+                          "codex",
+                          "agy"
+                        ]
+                      },
+                      "review": {
+                        "type": "string",
+                        "enum": [
+                          "claude",
+                          "codex",
+                          "agy"
+                        ]
+                      }
+                    },
+                    "additionalProperties": false
                   },
                   "base": {
                     "type": [
@@ -25275,6 +25782,36 @@
                   "model": {
                     "type": "string"
                   },
+                  "agents": {
+                    "type": "object",
+                    "properties": {
+                      "plan": {
+                        "type": "string",
+                        "enum": [
+                          "claude",
+                          "codex",
+                          "agy"
+                        ]
+                      },
+                      "implement": {
+                        "type": "string",
+                        "enum": [
+                          "claude",
+                          "codex",
+                          "agy"
+                        ]
+                      },
+                      "review": {
+                        "type": "string",
+                        "enum": [
+                          "claude",
+                          "codex",
+                          "agy"
+                        ]
+                      }
+                    },
+                    "additionalProperties": false
+                  },
                   "base": {
                     "type": [
                       "string",
@@ -26704,6 +27241,36 @@
                   "model": {
                     "type": "string"
                   },
+                  "agents": {
+                    "type": "object",
+                    "properties": {
+                      "plan": {
+                        "type": "string",
+                        "enum": [
+                          "claude",
+                          "codex",
+                          "agy"
+                        ]
+                      },
+                      "implement": {
+                        "type": "string",
+                        "enum": [
+                          "claude",
+                          "codex",
+                          "agy"
+                        ]
+                      },
+                      "review": {
+                        "type": "string",
+                        "enum": [
+                          "claude",
+                          "codex",
+                          "agy"
+                        ]
+                      }
+                    },
+                    "additionalProperties": false
+                  },
                   "base": {
                     "type": [
                       "string",
@@ -28111,6 +28678,36 @@
                   "model": {
                     "type": "string"
                   },
+                  "agents": {
+                    "type": "object",
+                    "properties": {
+                      "plan": {
+                        "type": "string",
+                        "enum": [
+                          "claude",
+                          "codex",
+                          "agy"
+                        ]
+                      },
+                      "implement": {
+                        "type": "string",
+                        "enum": [
+                          "claude",
+                          "codex",
+                          "agy"
+                        ]
+                      },
+                      "review": {
+                        "type": "string",
+                        "enum": [
+                          "claude",
+                          "codex",
+                          "agy"
+                        ]
+                      }
+                    },
+                    "additionalProperties": false
+                  },
                   "base": {
                     "type": [
                       "string",
@@ -29434,6 +30031,36 @@
                   },
                   "model": {
                     "type": "string"
+                  },
+                  "agents": {
+                    "type": "object",
+                    "properties": {
+                      "plan": {
+                        "type": "string",
+                        "enum": [
+                          "claude",
+                          "codex",
+                          "agy"
+                        ]
+                      },
+                      "implement": {
+                        "type": "string",
+                        "enum": [
+                          "claude",
+                          "codex",
+                          "agy"
+                        ]
+                      },
+                      "review": {
+                        "type": "string",
+                        "enum": [
+                          "claude",
+                          "codex",
+                          "agy"
+                        ]
+                      }
+                    },
+                    "additionalProperties": false
                   },
                   "base": {
                     "type": [
@@ -32756,6 +33383,36 @@
                   "model": {
                     "type": "string"
                   },
+                  "agents": {
+                    "type": "object",
+                    "properties": {
+                      "plan": {
+                        "type": "string",
+                        "enum": [
+                          "claude",
+                          "codex",
+                          "agy"
+                        ]
+                      },
+                      "implement": {
+                        "type": "string",
+                        "enum": [
+                          "claude",
+                          "codex",
+                          "agy"
+                        ]
+                      },
+                      "review": {
+                        "type": "string",
+                        "enum": [
+                          "claude",
+                          "codex",
+                          "agy"
+                        ]
+                      }
+                    },
+                    "additionalProperties": false
+                  },
                   "base": {
                     "type": [
                       "string",
@@ -34953,6 +35610,36 @@
                     },
                     "model": {
                       "type": "string"
+                    },
+                    "agents": {
+                      "type": "object",
+                      "properties": {
+                        "plan": {
+                          "type": "string",
+                          "enum": [
+                            "claude",
+                            "codex",
+                            "agy"
+                          ]
+                        },
+                        "implement": {
+                          "type": "string",
+                          "enum": [
+                            "claude",
+                            "codex",
+                            "agy"
+                          ]
+                        },
+                        "review": {
+                          "type": "string",
+                          "enum": [
+                            "claude",
+                            "codex",
+                            "agy"
+                          ]
+                        }
+                      },
+                      "additionalProperties": false
                     },
                     "base": {
                       "type": [

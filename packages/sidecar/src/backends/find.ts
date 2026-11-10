@@ -50,3 +50,30 @@ export function agyHost(
     return null;
   }
 }
+
+export type AgentCliStatus = { installed: boolean; version?: string; signedIn: boolean };
+
+/**
+ * Codex and the Antigravity CLI for the task's agent pickers (M9-06): installed, their version, and signed in by
+ * their own status command (`codex login status`, `agy models`). Only the exit code is kept: no account detail is
+ * read (ADR-0002).
+ */
+export async function agentClis(
+  run: (bin: string, args: string[]) => Promise<{ status: number | null }>,
+  onPath: (name: string) => string | null,
+  resolve: (name: string) => Cli | null,
+): Promise<{ codex: AgentCliStatus; agy: AgentCliStatus }> {
+  const none = { register: () => undefined, unregister: () => undefined };
+  const codex = codexHost(resolve, none);
+  const agy = agyHost(onPath, none);
+  const signedIn = async (cli: Cli | undefined, args: string[]) =>
+    cli ? (await run(cli.bin, [...cli.prefix, ...args]).catch(() => ({ status: null }))).status === 0 : false;
+  const [codexIn, agyIn] = await Promise.all([
+    signedIn(codex?.cli, ["login", "status"]),
+    signedIn(agy?.cli, ["models"]),
+  ]);
+  return {
+    codex: { installed: !!codex, ...(codex ? { version: codex.version } : {}), signedIn: codexIn },
+    agy: { installed: !!agy, ...(agy ? { version: agy.version } : {}), signedIn: agyIn },
+  };
+}

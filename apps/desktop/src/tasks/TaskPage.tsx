@@ -1,10 +1,13 @@
 import {
   type AcceptanceCriterion,
+  type AgentRoles,
   type GateRun,
+  type MethodResult,
   type PermissionMode,
   type PermissionRequest,
   RpcErrorCode,
   redactSecrets,
+  type StepAgent,
   type StepRun,
   type Task,
   type TaskContract,
@@ -99,6 +102,9 @@ import {
   tidyContract,
 } from "./taskForm.ts";
 
+/** What `agents.available` says about Codex and the Antigravity CLI (M9-06). */
+type AgentClis = MethodResult<"agents.available">;
+
 type Busy =
   | "draft"
   | "retriage"
@@ -172,6 +178,13 @@ export function TaskPage({
   const [tier, setTier] = useState<Tier>("S");
   const [reason, setReason] = useState("");
   const [budget, setBudget] = useState("");
+  /** The agent per role the person picked (M9-06); a role left out runs on Claude. */
+  const [agents, setAgents] = useState<AgentRoles>({});
+  /** The other agents' CLIs on this computer, for the pickers; null until they've been checked. */
+  const [clis, setClis] = useState<AgentClis | null>(null);
+  useEffect(() => {
+    void request("agents.available", {}).then(setClis, () => setClis(null));
+  }, []);
   const [runMode, setRunMode] = useState<Exclude<PermissionMode, "plan">>(mode === "plan" ? "default" : mode);
   const [stepItems, setStepItems] = useState<StepItems>({});
   /**
@@ -351,7 +364,13 @@ export function TaskPage({
   async function runTask(id: string) {
     setStepItems({});
     await step("run", id, () =>
-      request("task.start", { cwd, id, permissionMode: runMode, ...(modelAlias ? { model: modelAlias } : {}) }),
+      request("task.start", {
+        cwd,
+        id,
+        permissionMode: runMode,
+        ...(modelAlias ? { model: modelAlias } : {}),
+        ...(Object.values(agents).some((a) => a !== "claude") ? { agents } : {}),
+      }),
     );
   }
 
@@ -578,6 +597,9 @@ export function TaskPage({
                   onReason={setReason}
                   budget={budget}
                   onBudget={setBudget}
+                  agents={agents}
+                  onAgents={setAgents}
+                  clis={clis}
                   {...(task.parent ? { tiers: TIERS.filter((x) => x !== "XL") } : {})}
                 />
                 <div className="thread-actions">
@@ -1290,6 +1312,9 @@ function TriageCard({
   onReason,
   budget,
   onBudget,
+  agents,
+  onAgents,
+  clis,
   tiers = TIERS,
 }: {
   triage: Triage;
@@ -1300,6 +1325,9 @@ function TriageCard({
   onReason: (r: string) => void;
   budget: string;
   onBudget: (b: string) => void;
+  agents?: AgentRoles;
+  onAgents?: (a: AgentRoles) => void;
+  clis?: AgentClis | null;
   /** The tiers on offer: a sub-task runs as S, M or L. */
   tiers?: readonly Tier[];
 }) {
@@ -1413,7 +1441,73 @@ function TriageCard({
           {t("tasks.triage.noBudget")}
         </label>
       )}
+      {agents && onAgents && clis && <AgentPickers tier={tier} agents={agents} onAgents={onAgents} clis={clis} />}
     </aside>
+  );
+}
+
+/** The roles a tier's steps take (M9-06): S implements; M and L also plan and review. XL's sub-tasks choose their own. */
+const ROLES_BY_TIER: Record<Tier, (keyof AgentRoles)[]> = {
+  S: ["implement"],
+  M: ["plan", "implement", "review"],
+  L: ["plan", "implement", "review"],
+  XL: [],
+};
+
+/**
+ * Which agent runs each kind of step (M9-06, ADR-0012 §5): any role on any agent installed and signed in on this
+ * computer. Shown only when there's more than Claude to choose from.
+ */
+function AgentPickers({
+  tier,
+  agents,
+  onAgents,
+  clis,
+}: {
+  tier: Tier;
+  agents: AgentRoles;
+  onAgents: (a: AgentRoles) => void;
+  clis: AgentClis;
+}) {
+  const roles = ROLES_BY_TIER[tier];
+  if (!roles.length || (!clis.codex.installed && !clis.agy.installed)) return null;
+  const option = (agent: "codex" | "agy") => {
+    const cli = clis[agent];
+    const name = agent === "codex" ? t("tasks.agents.codex") : t("tasks.agents.agy");
+    return cli.installed
+      ? [
+          {
+            value: agent,
+            label: cli.signedIn ? name : t("tasks.agents.notSignedIn", { agent: name }),
+            disabled: !cli.signedIn,
+          },
+        ]
+      : [];
+  };
+  const options = [{ value: "claude", label: t("tasks.agents.claude") }, ...option("codex"), ...option("agy")];
+  const roleLabel = (role: keyof AgentRoles) =>
+    role === "plan"
+      ? t("tasks.agents.plan")
+      : role === "implement"
+        ? t("tasks.agents.implement")
+        : t("tasks.agents.review");
+  return (
+    <fieldset className="task-agents">
+      <legend className="field-label">{t("tasks.agents.title")}</legend>
+      <div className="task-agents-row">
+        {roles.map((role) => (
+          <Field key={role} label={roleLabel(role)}>
+            <Select
+              label={roleLabel(role)}
+              value={agents[role] ?? "claude"}
+              options={options}
+              onChange={(v) => onAgents({ ...agents, [role]: v as StepAgent })}
+            />
+          </Field>
+        ))}
+      </div>
+      <span className="field-help">{t("tasks.agents.help")}</span>
+    </fieldset>
   );
 }
 

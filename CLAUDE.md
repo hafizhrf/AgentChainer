@@ -82,6 +82,7 @@ Prerequisites:
 | Turn a raw recording into a committable fixture (fails if anything identifying survives) | `node packages/sidecar/scripts/make-fixture.ts raw.jsonl packages/sidecar/test/fixtures/<name>.jsonl --cwd <recording workspace>` |
 | Plugin/MCP install spike (installs and removes again, in a throwaway project) | `node packages/sidecar/scripts/spike-install.ts --cwd <empty scratch dir>` |
 | Codex app-server spike (S8, M9-02): approvals, resume and the read-only sandbox, on your own Codex login (plan usage) | `node packages/sidecar/scripts/spike-codex.ts --cwd <empty scratch dir> --model <id from model/list> [--effort low] [--record raw.jsonl]` |
+| Antigravity CLI spike (S8, M9-02): headless edits, resume and per-run rules, on your own agy login | `node packages/sidecar/scripts/spike-agy.ts --cwd <empty scratch dir> [--agy <path>] [--model gemini-3.8-flash-low] [--record raw.txt]` |
 | Release asset script tests (collect, SHA256SUMS, latest.json) | `node --test scripts/release-assets.test.mjs` |
 | Launch smoke test (after a debug build) | `node scripts/smoke-launch.mjs target/debug/agentchainer [--seconds N]` |
 | End-to-end tests (X-06; Linux and Windows, after a debug build; Linux needs `tauri-driver` and WebKitWebDriver, Windows an `msedgedriver` in `EDGEWEBDRIVER`; no login, no model calls). On macOS, run `docs/guides/MANUAL_CHECKS.md` by hand; for Linux from a Mac, see the Docker lines in `scripts/e2e/Dockerfile` | `node scripts/e2e/run.mjs --binary target/debug/agentchainer` (Linux under `xvfb-run -a`) |

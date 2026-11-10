@@ -1,6 +1,6 @@
 # Spike S8: Codex and the Antigravity CLI as step backends (M9-02)
 
-**Status:** the Codex half is done (2026-11-10). The agy half waits for the owner to install and sign in to `agy`.
+**Status:** done (2026-11-10): the Codex half, then the agy half once the owner installed `agy`.
 **Related:** [ADR-0012](../adr/0012-multi-agent-backends.md), M9 in the CHECKLIST, THREAT_MODEL T-19, RISKS R-19
 and R-20.
 
@@ -95,15 +95,87 @@ Codex fits ADR-0012 as planned. M9-04 builds the backend on `codex app-server`:
     `turn/completed`;
   - server requests: `item/commandExecution/requestApproval`, `item/fileChange/requestApproval`.
 
+## The agy half
+
+### Question
+
+Can a task step run on the user's own Antigravity CLI (`agy`) headless, writing files but with nothing running unseen,
+and without touching the user's own settings? ADR-0012 planned a per-run allowlist: edits inside the worktree, plus
+the project's gate commands.
+
+### Method
+
+`packages/sidecar/scripts/spike-agy.ts` runs `agy -p … --output-format stream-json` in a scratch git repo:
+- **Setup:** agy 1.5.4, Windows 11, signed in with the owner's Google account, model `gemini-3.8-flash-low` (from
+  `agy models`, which also shows the sign-in works). About 23k tokens a phase.
+- **Per-run settings:** `--settings <json>`, "for this session only, never saved".
+- **The user's own settings file** is never read: the spike only compares its modification time before and after.
+- **Phases:**
+  - **A:** `--mode accept-edits --sandbox`, `toolPermission: request-review`; an edit and a command.
+  - **B:** resume with `--conversation <id>`.
+  - **C:** a per-run `deny: write_file(*)`.
+  - **D:** `toolPermission: proceed-in-sandbox` with a per-run `deny: command(git log)`, asking for `git log`.
+
+Before the final run, smaller runs tried per-run `allow` rules for a command (`command(git)`, `command(git status)`),
+with and without `--sandbox`.
+
+### Results
+
+| Check | Result |
+|---|---|
+| A: the edit under `accept-edits` | ran; `hello.txt` = `hi` |
+| A: `git status --short` under `request-review` | **refused**, as a tool error ("user denied permission… Do not attempt to circumvent"); `result.denied_actions` lists it; exit code 0; stderr explains the soft-deny; the turn ended there |
+| Per-run `allow: command(git)` / `command(git status)` | **ignored**: under `request-review` the command was still refused, with or without `--sandbox` |
+| B: `--conversation <id>` | the same conversation (step numbers continue); `hello.txt` = `hi there` |
+| C: per-run `deny: write_file(*)` | **honored**: the write failed with "Matches user-configured deny rule"; no `ro.txt` |
+| D: per-run `deny: command(git log)` under `proceed-in-sandbox` | **ignored**: `git log` ran |
+| The user's settings file | unchanged (modification time) |
+
+**The stream:**
+- One JSON object per line, keyed by its event: `{"event":"step_update","step_update":{…}}`. The docs show the
+  fields without the wrapper.
+- `init`: the model, the cwd, the tool list and the permission mode.
+- `step_update`: `step_type` is `user_input`, `agent_response` (with `text_delta`), `tool` (with `tool_info`:
+  name, parameters, error) or `system_message`; `state` is `ACTIVE`, `DONE` or `ERROR`.
+- `result`: status, response, duration, turns, `usage` (input, output, thinking, cache-read tokens) and
+  `denied_actions`.
+- **No dollar cost,** as with Codex.
+
+**The tools:**
+- File tools are `write_to_file`, `replace_file_content`, `multi_replace_file_content`, `sed_file` and `notebook_edit`,
+  and `view_file`, `list_dir`, `grep_search` and `find_by_name` for reading.
+- The runs created files only, which `tool_info` reported as `write_file` with a `Path`. That the editing tools report
+  the same way is **(verify)** in M9-05.
+- `init` also lists browser, web search, image, schedule, messaging and subagent tools. Anything that needs a
+  permission is refused headless under `request-review`.
+
+### Decision for M9-05
+
+The per-run allowlist ADR-0012 planned **doesn't hold in agy 1.5.4**. Per-run command rules are ignored either way:
+- `request-review` refuses every command, allowed or not;
+- `proceed-in-sandbox` runs every command in its sandbox, denied or not.
+
+Per-run *file* rules do hold. So an agy step:
+- **Write steps:**
+  - `--mode accept-edits --sandbox` with `toolPermission: request-review`;
+  - agy edits files and **runs no commands**: none can run unseen;
+  - the project's gates are run by AgentChainer after the step, as for every agent;
+  - the prompt says so, since a refused command ends agy's turn.
+- **Read steps** (plans, reviews): the same, plus `deny: write_file(*)`.
+- **Afterwards:** every path agy wrote, from `tool_info`, is checked against the guard and the worktree. A breach
+  fails the step and goes into the evidence.
+- **Resume:** fix rounds resume with `--conversation <id>`.
+- **Settings:** always through `--settings`, never the user's own file.
+- **Sign-in:** `agy models` is the readiness probe. It needs a working login and reads no credentials.
+- **Cost:** tokens × a price table.
+
+Owner decision (2026-11-10), honored: agy may write. It writes files, and the app runs the commands.
+
 ## Still open
 
-- **agy** (the other half):
-  - `agy -p --output-format stream-json`;
-  - a per-run settings path for its allowlist (never the user's own file);
-  - resume with `-c`;
-  - usage fields;
-  - how it reports sign-in.
-
-  Needs `agy` installed and signed in on the dev machine.
-- Whether `acceptForSession` should ever be offered.
+- **For M9-05:**
+  - whether a write outside the workspace is refused headless (the docs say unlisted paths ask, which headless
+    refuses); the after-the-fact path check covers it either way;
+  - and whether a later agy honors per-run command rules. `cli-contract` should re-check that.
+- Whether `acceptForSession` should ever be offered to Codex.
 - Codex's own `--approve-for-me` reviewer stays off.

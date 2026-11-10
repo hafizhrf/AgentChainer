@@ -58,12 +58,14 @@ Team supervisors and the app's own model calls.
      answered, and then goes to the permission profile and the approval dialog as Claude's do. Read steps run in
      Codex's `read-only` sandbox.
    - **agy** asks nothing (owner decision, 2026-11-10: it may still write).
-     - It runs with an allowlist the app writes for that run: edits inside the task's worktree and the project's own
-       gate commands. It goes through a per-run settings path, never the user's own settings file.
-     - Every command it reports is checked against the guard afterwards, and a breach fails the step and is recorded
-       in the evidence.
-     - Read steps run in its read-only sandbox.
-     - If the spike finds no per-run settings path, agy gets read-only steps only until there is one.
+     - **Spike S8 found** (agy 1.5.4) that per-run command rules don't hold: `request-review` refuses every command,
+       allowed or not, and `proceed-in-sandbox` runs every command, denied or not. Per-run file rules do hold.
+     - **So agy writes files but runs no commands:** `--mode accept-edits --sandbox` with
+       `toolPermission: request-review`, through `--settings` (session only), never the user's own settings file.
+       The project's gates are run by AgentChainer, as for every agent.
+     - **Afterwards,** every path it wrote is checked against the guard and the worktree. A breach fails the step and
+       is recorded in the evidence.
+     - **Read steps** also get `deny: write_file(*)`.
 4. **Cost is an estimate.** Tokens × a pinned price table, labeled as an estimate wherever it shows. A step's cap and
    the task's budget count it like Claude's spend.
 5. **Any role on any agent the user has** (owner, 2026-11-10: "gak selalu gitu, bisa diadjust… jadi fleksibel"). No

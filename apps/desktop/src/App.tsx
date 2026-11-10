@@ -58,6 +58,7 @@ import {
   folderName,
   isFresh,
   newTab,
+  orphanChats,
   permissionAnswered,
   permissionAsked,
   type Tab,
@@ -151,6 +152,10 @@ export function App() {
   const [wsDialog, setWsDialog] = useState<WorkspaceDef | "new" | null>(null);
   /** Every live session's fleet status, by session id (M8-02); ended ones stay until cleared or the app restarts. */
   const [fleet, setFleet] = useState<Record<string, FleetItem>>({});
+  /** Chats the runtime still runs with no tab, after a reload (M1-36); re-attached once the settings are in. */
+  const [orphans, setOrphans] = useState<FleetItem[]>([]);
+  /** Resumes in flight, so a second click doesn't start the same session twice (M1-36). */
+  const resuming = useRef(new Set<string>());
   /** Scheduled flows (M8-05), by `cwd|id`, and the one being edited. */
   const [schedules, setSchedules] = useState<Record<string, Schedule>>({});
   const [scheduleTarget, setScheduleTarget] = useState<ScheduleTarget | null>(null);
@@ -414,7 +419,11 @@ export function App() {
     alive.current = true;
     // The fleet as the runtime has it now; changes arrive as `fleet.changed`.
     void request("fleet.list", {}).then(
-      ({ items }) => setFleet((f) => ({ ...f, ...Object.fromEntries(items.map((i) => [i.sessionId, i])) })),
+      ({ items }) => {
+        setFleet((f) => ({ ...f, ...Object.fromEntries(items.map((i) => [i.sessionId, i])) }));
+        // A reload wipes the tabs but not the runtime's sessions: the chats it still runs get their tabs back.
+        setOrphans(orphanChats(items, tabsRef.current));
+      },
       () => undefined,
     );
     return recheck();
@@ -607,6 +616,13 @@ export function App() {
 
   /** Resumes a stored session into a tab: replaces its ended tab, or opens a new one (M1-22). */
   async function resume(sessionId: string, dir: string, title: string, modelAlias = model, known?: string[]) {
+    // Already open: show it (M1-36). Already being resumed: the first click does it.
+    if (tabsRef.current.some((x) => x.sessionId === sessionId && !x.ended)) {
+      setActive(sessionId);
+      return;
+    }
+    if (resuming.current.has(sessionId)) return;
+    resuming.current.add(sessionId);
     const mode = asMode(settings?.defaultMode);
     try {
       const { effort, budgetUsd, showThinking } = sessionOptions(mode);
@@ -651,8 +667,27 @@ export function App() {
       await rememberWorkspace(dir, { id: sessionId, folders });
     } catch (err) {
       setRuntimeNotice(String(err));
+    } finally {
+      resuming.current.delete(sessionId);
     }
   }
+
+  // The chats a reload left without a tab (M1-36), once the settings are in: each is re-attached with its history,
+  // under its stored title, and shown as working if it is.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: runs when orphans arrive; `resume` reads the settings this render has.
+  useEffect(() => {
+    if (!settings || !orphans.length) return;
+    const lost = orphans;
+    setOrphans([]);
+    void (async () => {
+      for (const item of lost) {
+        const stored = await request("session.list", { cwd: item.cwd }).catch(() => ({ sessions: [] }));
+        const title = stored.sessions.find((x) => x.sessionId === item.sessionId)?.title ?? t("app.session.newTitle");
+        await resume(item.sessionId, item.cwd, title);
+        if (item.status === "working") patchTab(item.sessionId, (tab) => ({ ...tab, running: true }));
+      }
+    })();
+  }, [settings, orphans]);
 
   function openStored(s: SessionInfo) {
     const open = tabs.find((x) => x.sessionId === s.sessionId);

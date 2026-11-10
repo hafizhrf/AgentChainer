@@ -216,5 +216,8 @@
   "session.question.next": "Next",
   "session.question.answerAllFirst": "Answer every question first",
   "session.question.submit": "Submit answers",
-  "session.composer.agentTitle": "This chat runs on {{agent}}."
+  "session.composer.agentTitle": "This chat runs on {{agent}}.",
+  "session.preview.offer": "A server is running at {{url}}",
+  "session.preview.open": "Open preview",
+  "session.preview.dismiss": "Dismiss"
 }

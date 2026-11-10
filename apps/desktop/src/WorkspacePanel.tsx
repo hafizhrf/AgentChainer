@@ -14,7 +14,7 @@ import {
   Search,
   X,
 } from "lucide-react";
-import { type KeyboardEvent, type ReactNode, useMemo, useRef, useState } from "react";
+import { type KeyboardEvent, type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import type { Confirm } from "./Dialog.tsx";
 import { FileMenu } from "./FileMenu.tsx";
 import { agentEdits, buildTree, filterTree, folderPaths, visibleRows } from "./files.ts";
@@ -22,6 +22,7 @@ import { GitPanel } from "./GitPanel.tsx";
 import { count } from "./i18n/format.ts";
 import { t } from "./i18n/index.ts";
 import { Rich } from "./i18n/Rich.tsx";
+import { PreviewPane } from "./PreviewPane.tsx";
 import { PANEL_TAB_LABEL, PANEL_TABS, type PanelTab, pickTab, toggleHidden, visibleTabs } from "./panelTabs.ts";
 import { SetupSummary } from "./setup/SetupSummary.tsx";
 import { request } from "./sidecar.ts";
@@ -55,6 +56,7 @@ export function WorkspacePanel({
   onHiddenTabsChange,
   onHidePanel,
   initialTab = "changes",
+  preview,
 }: {
   cwd: string;
   files: WorkspaceFiles | null;
@@ -72,6 +74,8 @@ export function WorkspacePanel({
   onHiddenTabsChange: (hidden: PanelTab[]) => void;
   onHidePanel: () => void;
   initialTab?: PanelTab;
+  /** The app being built (UX-22): its address, the ones the chat printed, and a count that opens the tab. */
+  preview: { url: string | null; detected: readonly string[]; opened: number; onUrlChange: (url: string) => void };
 }) {
   const [view, setView] = useState<PanelTab>(initialTab);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -80,6 +84,19 @@ export function WorkspacePanel({
   // A failed git init or file-menu action (UX-21), shown above the tabs' content.
   const [actionError, setActionError] = useState<string | null>(null);
   const changed = files?.files.filter((f) => f.status) ?? [];
+  // The open tab stays in view when the bar is narrower than its tabs.
+  const tabList = useRef<HTMLDivElement>(null);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `active` is the trigger; the element is read from the DOM.
+  useEffect(() => {
+    tabList.current?.querySelector('[data-state="active"]')?.scrollIntoView({ block: "nearest", inline: "nearest" });
+  }, [active]);
+  // "Open preview" switches to the tab, showing it again if it was hidden.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: only a new request opens the tab.
+  useEffect(() => {
+    if (!preview.opened) return;
+    if (hiddenTabs.includes("preview")) onHiddenTabsChange(hiddenTabs.filter((x) => x !== "preview"));
+    setView("preview");
+  }, [preview.opened]);
 
   async function initGit() {
     try {
@@ -107,6 +124,7 @@ export function WorkspacePanel({
     <Tabs.Root className="workspace-panel" value={active} onValueChange={(v) => setView(v as PanelTab)}>
       <div className="panel-tabbar">
         <Tabs.List
+          ref={tabList}
           className="panel-tabs"
           aria-label={t("panel.workspace.tabsLabel")}
           onContextMenu={(e) => {
@@ -134,7 +152,7 @@ export function WorkspacePanel({
       </div>
       <div className="panel-body">
         {(error || actionError) && <p className="warn">{error ?? actionError}</p>}
-        {files && !files.isGitRepo && (
+        {files && !files.isGitRepo && active !== "preview" && (
           <p className="warn">
             <Rich
               k="panel.workspace.notGit"
@@ -182,6 +200,17 @@ export function WorkspacePanel({
               onSelect={onSelect}
               onRefresh={onRefresh}
               openAction={openAction}
+            />
+          </Tabs.Content>
+        )}
+        {visible.includes("preview") && (
+          // Kept mounted, so the page isn't reloaded when another tab is looked at.
+          <Tabs.Content value="preview" forceMount hidden={active !== "preview"} className="preview-content">
+            <PreviewPane
+              url={preview.url}
+              detected={preview.detected}
+              visible={active === "preview"}
+              onUrlChange={preview.onUrlChange}
             />
           </Tabs.Content>
         )}

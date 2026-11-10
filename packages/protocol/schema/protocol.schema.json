@@ -3425,6 +3425,35 @@
         "additionalProperties": false
       }
     },
+    "preview.probe": {
+      "params": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "url"
+        ],
+        "additionalProperties": false
+      },
+      "result": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "up": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "up"
+        ],
+        "additionalProperties": false
+      }
+    },
     "workspace.image": {
       "params": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",

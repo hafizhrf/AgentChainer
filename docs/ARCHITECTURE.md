@@ -112,6 +112,7 @@ Planned surface (v0.1):
 | request | `permissions.list` / `permissions.add` / `permissions.remove` | The `permissions` lists of `.claude/settings.local.json`, `.claude/settings.json` and the user's own `~/.claude/settings.json` (UX-19, ADR-0013); nothing else in those files leaves the sidecar |
 | request | `workspace.files` | Files under the workspace (tracked + untracked, minus ignored) with git status and branch |
 | request | `workspace.diff` | HEAD vs working tree for one file, with its `-U0` hunks |
+| request | `preview.probe` | Whether a local server answers `{url}` → `{up}`: a TCP connect to `localhost`, `127.0.0.1` or `[::1]` only, nothing sent, for the Preview tab (UX-22, [ADR-0014](adr/0014-local-preview-frame.md)) |
 | request | `workspace.image` | An image in the workspace (PNG, JPEG, GIF, WebP, SVG, ICO) as base64 for the file viewer, up to 10 MB (UX-21). Read-only, inside the workspace like `workspace.diff` |
 | request | `workspace.revert` | Revert a file to HEAD (new files are deleted) or one hunk (`git apply -R`), worktree only |
 | request | `workspace.gitInit` | `git init`, offered when the workspace isn't a repository |

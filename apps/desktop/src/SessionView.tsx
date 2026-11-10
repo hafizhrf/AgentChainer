@@ -1,5 +1,5 @@
 import { type Effort, imageType, type PermissionMode, type PermissionRequest } from "@agentchainer/protocol";
-import { ArrowDown, ClipboardList, Loader2 } from "lucide-react";
+import { ArrowDown, ClipboardList, Globe, Loader2, X } from "lucide-react";
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { Group, Panel, Separator, useDefaultLayout, usePanelRef } from "react-resizable-panels";
 import { type Attachment, Composer } from "./Composer.tsx";
@@ -17,12 +17,14 @@ import { Rich } from "./i18n/Rich.tsx";
 import { MODE_NAMES } from "./options.ts";
 import type { PermissionAnswer } from "./PermissionDialog.tsx";
 import type { PanelTab } from "./panelTabs.ts";
+import { previewUrls } from "./preview.ts";
 import { QuestionCard } from "./QuestionCard.tsx";
 import { SessionHeader, type SessionMode } from "./SessionHeader.tsx";
 import { TodoPanel } from "./TodoPanel.tsx";
 import { TranscriptView } from "./TranscriptView.tsx";
 import { budgetWarning, type Cost, isFresh, type Tab } from "./tabs.ts";
 import { findAgent } from "./transcript.ts";
+import { IconButton } from "./ui/IconButton.tsx";
 import { layoutStorage } from "./ui/layoutStorage.ts";
 import { useWorkspace } from "./useWorkspace.ts";
 
@@ -115,6 +117,20 @@ export function SessionView({
 }) {
   /** The file shown in the diff, relative to the workspace. */
   const [selected, setSelected] = useState<string | null>(null);
+  /** The app being built, in the right panel (UX-22): the address shown, and how often Open preview was asked. */
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [previewOpened, setPreviewOpened] = useState(0);
+  const [dismissed, setDismissed] = useState<string[]>([]);
+  const detected = useMemo(() => previewUrls(tab.items), [tab.items]);
+  // Only the newest address is offered; the pane lists the others.
+  const latest = detected[0];
+  const offer = latest && latest !== previewUrl && !dismissed.includes(latest) ? latest : undefined;
+  function openPreview(url: string) {
+    setPreviewUrl(url);
+    setPreviewOpened((n) => n + 1);
+    setSelected(null);
+    if (!rightOpen) onToggleRight();
+  }
   const [seed, setSeed] = useState<{ text: string } | null>(null);
   const [view, setView] = useState<SessionMode>("chat");
   /** The subagent shown in the right panel's drawer (M4-03). */
@@ -332,6 +348,23 @@ export function SessionView({
                     />
                   )}
                   <div className="chat-dock" hidden={view !== "chat"}>
+                    {/* A server the chat started (UX-22): its page can show in the right panel. */}
+                    {offer && (
+                      <div className="preview-offer" role="status">
+                        <Globe size={13} aria-hidden />
+                        <span className="grow">{t("session.preview.offer", { url: offer })}</span>
+                        <button type="button" className="secondary small" onClick={() => openPreview(offer)}>
+                          {t("session.preview.open")}
+                        </button>
+                        <IconButton
+                          label={t("session.preview.dismiss")}
+                          className="tiny"
+                          onClick={() => setDismissed((d) => [...d, offer])}
+                        >
+                          <X size={12} />
+                        </IconButton>
+                      </div>
+                    )}
                     <Composer
                       tab={tab}
                       active={!hidden && view === "chat"}
@@ -422,6 +455,12 @@ export function SessionView({
                     hiddenTabs={hiddenTabs}
                     onHiddenTabsChange={onHiddenTabsChange}
                     onHidePanel={onToggleRight}
+                    preview={{
+                      url: previewUrl,
+                      detected,
+                      opened: previewOpened,
+                      onUrlChange: setPreviewUrl,
+                    }}
                   />
                 </Suspense>
               </div>

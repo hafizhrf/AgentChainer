@@ -211,5 +211,8 @@
   "session.question.next": "Berikutnya",
   "session.question.answerAllFirst": "Jawab semua pertanyaan dulu",
   "session.question.submit": "Kirim jawaban",
-  "session.composer.agentTitle": "Chat ini berjalan di {{agent}}."
+  "session.composer.agentTitle": "Chat ini berjalan di {{agent}}.",
+  "session.preview.offer": "Ada server berjalan di {{url}}",
+  "session.preview.open": "Buka pratinjau",
+  "session.preview.dismiss": "Tutup"
 }

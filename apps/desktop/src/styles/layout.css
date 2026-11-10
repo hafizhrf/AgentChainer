@@ -436,14 +436,11 @@
   min-height: 100%;
 }
 
-.home-welcome > .welcome-header {
-  align-items: center;
-  text-align: center;
-}
-
 .welcome-header {
   display: flex;
   flex-direction: column;
+  align-items: center;
+  text-align: center;
   gap: var(--space-1);
   margin: var(--space-4) 0 var(--space-2);
 }

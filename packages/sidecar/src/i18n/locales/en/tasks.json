@@ -110,5 +110,9 @@
   "tasks.codex.noThread": "Codex didn't start a thread: {{error}}",
   "tasks.codex.ended": "The Codex session has ended.",
   "tasks.codex.exited": "The Codex app-server exited.",
-  "tasks.codex.exitedMidTurn": "The Codex app-server exited during a turn."
+  "tasks.codex.exitedMidTurn": "The Codex app-server exited during a turn.",
+  "tasks.agy.ended": "The Antigravity CLI session has ended.",
+  "tasks.agy.outsideWorkspace": "agy wrote outside the workspace: {{path}}",
+  "tasks.agy.turnFailed": "The Antigravity CLI's turn failed (exit {{code}}).",
+  "tasks.runner.agyMissing": "This step runs on the Antigravity CLI, but no `agy` was found. Install it, or run the step on Claude."
 }

@@ -29,6 +29,8 @@
 | [M6](#m6--deployment--workflow-canvas-v04) | v0.4 | Deploy adapters, workflow canvas | ◐ Built ([deploy-and-canvas.md](design/deploy-and-canvas.md)): Vercel, Cloudflare Workers, Firebase, Fly.io and Docker adapters, production with typed confirmation and rollback, the workflow canvas; left: live deploys with the owner's logins (E1), canvas Import/Export by hand |
 | [M7](#m7--evals--analytics-v05) | v0.5 | Evals & analytics | ◐ Metrics, the eval benchmark and the CI report check in ([evals.md](design/evals.md)); OpenTelemetry deferred; E1 ticks with the first PR that changes a workflow |
 | [M8](#m8--multi-folder-workspaces--agent-fleet-proposed) | later | Multi-folder workspaces, agent fleet | ◐ All six built: multi-folder workspaces, the fleet view, supervisor and worker sessions, agent profiles, scheduled runs, lessons; M8-07 (resuming a multi-folder chat) fixed in #119 |
+| [M9](#m9--chaining-other-agents-proposed) | later | Chaining other agents: Codex and Antigravity CLI as task-step backends | ☐ Planned ([ADR-0012](adr/0012-multi-agent-backends.md)) |
+| [CP](#community-parity-backlog) | later | Features community tools have that AgentChainer lacks | ☐ Backlog, by priority |
 | [X](#cross-cutting-tracks-ongoing) | all | Security, quality, compatibility, docs, a11y | ☐ Ongoing |
 
 ---
@@ -472,6 +474,17 @@
       - Everything is redacted first: the home folder becomes `~`, and API keys, tokens, bearer headers, passwords
         and emails are masked (`diagnostics.rs` tests).
       - Remaining: export from the app.
+- [ ] **M1-36** Bug: "Error: This session is already open in another tab." Owner report, 2026-11-10.
+  - **Where:** `session.start` refuses a `resume` id the sidecar still holds (`packages/sidecar/src/main.ts`), and
+    `resume()` in `App.tsx` neither looks for an open tab first nor ignores a second click.
+  - **Likely causes:**
+    - a WebView reload (or a dev-server full reload) wipes the tabs while the sidecar keeps every session live;
+    - a double click on Resume while the history loads;
+    - resuming a session a running task step is using.
+  - **Fix:**
+    - The UI focuses an open tab, and ignores a resume already in flight.
+    - The sidecar re-attaches a live plain chat instead of failing, and names the task when a step holds it.
+    - After a reload, the UI re-attaches the live chats it lost.
 
 ### Exit criteria
 
@@ -1261,6 +1274,18 @@ for the desktop shell, start screen and session view to be cleaned up (UX-02, UX
     - the S and L workflows in the editor, dark and light;
     - an interrupted M task's Flow tab, where the two loops' labels no longer overlap and the controls cover no
       step.
+- [ ] **UX-18** A clearer agent graph. Owner feedback, 2026-11-10: "rapihin tampilan graph, jadi agentnya lebih
+      jelas pake model apa, dan kalo show tools jadi banyak banget terlalu lebar".
+  - **Model:**
+    - The main node shows the session's model.
+    - Each subagent shows its model: the one its messages report, else the Agent call's `model`, else "inherits".
+    - The drawer gets a Model row.
+  - **Tools (owner decision: one card per agent):**
+    - an agent's tool calls become one card instead of a row of nodes;
+    - folded: counts by tool ("Read ×12 · Edit ×3"), with chips for errors and waiting;
+    - expanded: up to 8 rows and "+N more", which opens the drawer.
+    - The graph's width then depends on the number of agents only.
+  - Checked in both themes on a long session; the 200-node bench (M4-E2) still passes.
 - [ ] **UX-E1** All M1/M2 screens use the design system, in light and dark themes.
 - [ ] **UX-E2** Usability test participants complete the M1 exit scenarios without help.
 
@@ -1915,9 +1940,153 @@ first.
 
     The settings were restored afterwards.
 - **Not adopted from CAO:**
-  - other providers' CLIs (PRD §7 non-goal);
+  - other providers' CLIs (PRD §7 non-goal at the time; since 2026-11-10 they're task-step backends in
+    [M9](#m9--chaining-other-agents-proposed), [ADR-0012](adr/0012-multi-agent-backends.md));
   - tmux terminal backends (the app has its own terminal and sessions);
   - an HTTP server with a web UI, since the sidecar has no network port (THREAT_MODEL T-05).
+
+---
+
+## M9 — Chaining other agents (proposed)
+
+→ [ADR-0012](adr/0012-multi-agent-backends.md), PRD §7 (narrowed 2026-11-10). Owner request, 2026-11-10: chain Claude
+with the OpenAI Codex CLI and Google's Antigravity CLI (`agy`), in both directions, "biar sesuai nama".
+
+**Owner decisions (2026-11-10):**
+- Chaining starts at workflow steps. Team workers and chats come later.
+- agy may write, but only through an allowlist the app writes per run.
+
+**Rules for every item:**
+- The user's own binaries and logins (ADR-0002).
+- Every write passes the guard.
+- Costs are labeled estimates.
+- Claude stays the default.
+
+- [ ] **M9-01** The decision and its paperwork: ADR-0012, PRD §7, RISKS R-19 (vendor terms) and R-20 (agy writes
+      without asking), THREAT_MODEL T-19.
+  - Before a release ships M9, ask OpenAI and Google in writing whether a third-party app may drive their CLIs
+    headless on a personal account, as M0-22 does for Anthropic.
+- [ ] **M9-02** Spike: Codex `app-server` and agy headless, on a scratch folder with cheap models.
+  - **Owner prerequisites:** Codex signed in (0.157.0 is installed on the dev machine); agy installed and signed in.
+  - **To settle:**
+    - Codex's approval messages and their answers;
+    - resume by thread or conversation id;
+    - the usage fields;
+    - the sandbox flags;
+    - **a per-run settings path or flag for agy's allowlist** (never the user's own settings file);
+    - how each CLI reports its sign-in, without reading credentials.
+  - **Output:**
+    - recordings scrubbed into fixtures, like `make-fixture.ts`;
+    - `cli-contract.ts` entries for every flag used;
+    - a write-up in `docs/spikes/`.
+- [ ] **M9-03** A step backend interface: `StepSession` (id, turn, inject, close, respond, fleet item) in
+      `packages/sidecar/src/backends/`. Claude's `Session` implements it, and `tasks/runner.ts` picks the backend
+      per step. No behavior change.
+- [ ] **M9-04** The Codex backend:
+  - **Process:** `codex app-server` over stdio, found like the Claude CLI.
+  - **Events:** commands become `Bash` and file changes `Edit`/`Write` events.
+  - **Approvals:** each one is checked by the guard first, then the profile and the approval dialog.
+  - **Sandbox:** read steps run in `read-only`.
+  - **Fix rounds** resume the thread.
+  - **Cost:** tokens × a pinned price table.
+  - Fixture replays in tests, no model calls.
+- [ ] **M9-05** The agy backend:
+  - **Process:** `agy -p --output-format stream-json` in the task's worktree.
+  - **Read steps** run in its read-only sandbox.
+  - **Write steps** get a per-run allowlist: edits inside the worktree and the project's gate commands.
+  - **Afterwards:** every reported command is checked against the guard; a breach fails the step and goes into the
+    evidence.
+  - Read-only only if M9-02 finds no per-run settings path.
+- [ ] **M9-06** Workflows name the agent:
+  - **Schema:** `agent: claude | codex | agy` (default `claude`) and an optional `model` per agent step.
+  - **Canvas:** a picker.
+  - **The generator's guide** knows the new fields.
+  - **Rules:** XL's split stays Claude.
+  - **Readiness and Settings:** each CLI's row in the setup check (found, version, signed in) and its path in
+    Settings.
+  - **Evals:** an `agent=` variant for the eval benchmark.
+- [ ] **M9-07** The thread, Flow, Fleet and evidence show which agent and model ran each step.
+- [ ] **M9-08** (later) Team workers on Codex or agy. The supervisor stays Claude.
+- [ ] **M9-09** (later) A chat on Codex or agy.
+
+### Exit criteria
+
+- [ ] **M9-E1** On `fixtures/sample-app`, an M task with Claude planning, Codex implementing and agy reviewing passes
+      its gates. Its evidence names each step's agent and model, with costs marked as estimates.
+
+---
+
+## Community parity (backlog)
+
+Owner request, 2026-11-10: features that community tools for coding agents have and AgentChainer doesn't.
+- **Source:** research of 2026-11-10. Each line names the tool and a source.
+- **Priority:** **P1** (soon), **P2** (later), **P3** (needs a PRD decision first: mobile apps, remote access and
+  hosted services are non-goals today).
+- **AGPL projects** (opcode, Claude Squad, claudecodeui) are cited for ideas only, never for code.
+- **Process:** each item gets a short plan before it's built, and moves to a milestone when it starts.
+
+**P1**
+- [ ] **CP-01** A usage dashboard across sessions: cost and tokens by model, project and period, with charts and
+      export. Today: per-turn history, `/usage`, Metrics. — opcode ([repo](https://github.com/winfunc/opcode)).
+- [ ] **CP-02** An MCP server manager: add any server, import from Claude Desktop, test the connection. Today: catalog
+      items only. — opcode; Vibe Kanban ([MCP settings](https://vibekanban.com/docs/settings/mcp-servers)).
+- [ ] **CP-03** A CLAUDE.md editor with a live preview, and a scan across projects. — opcode.
+- [ ] **CP-04** Worktree setup:
+  - copy chosen gitignored files (`.env`) into a task's worktree;
+  - per-project setup and run scripts.
+
+  Sources: CCManager `.worktreeinclude` ([repo](https://github.com/kbwo/ccmanager)); Conductor `conductor.json`
+  ([docs](https://www.conductor.build/docs/)).
+- [ ] **CP-05** Comments on diff lines, sent to the agent as feedback. — Vibe Kanban
+      ([repo](https://github.com/BloopAI/vibe-kanban)); Warp ([docs](https://docs.warp.dev/agents/cli-agents/overview/)).
+- [ ] **CP-06** Best-of-N: run one task on several agents or models in separate worktrees, then compare the diffs.
+      Pairs with M9.
+  - Sources: Crystal ([repo](https://github.com/stravu/crystal)); Cursor `/best-of-n` (verify).
+- [ ] **CP-07** A pull request's review comments from GitHub sent back to the agent (beyond Fix CI). — Conductor
+      ([changelog](https://www.conductor.build/changelog)).
+- [ ] **CP-08** Start a task from an issue: GitHub first, Linear later. — Conductor; Emdash
+      ([repo](https://github.com/generalaction/emdash)); OpenHands ([repo](https://github.com/OpenHands/OpenHands)).
+- [ ] **CP-09** Restore the open tabs and running work after a crash or restart. — CCManager.
+- [ ] **CP-10** A second opinion: another vendor's agent reviews a diff before merge. Builds on M9.
+  - Sources: PAL `consensus` ([repo](https://github.com/BeehiveInnovations/pal-mcp-server)); codex-plugin-cc's review
+    gate ([repo](https://github.com/openai/codex-plugin-cc)).
+
+**P2**
+- [ ] **CP-11** A kanban board of tasks by state. — Vibe Kanban; Nimbalyst
+      ([features](https://nimbalyst-website.pages.dev/features/)).
+- [ ] **CP-12** A web preview pane for the app being built, with devtools and device sizes. — Vibe Kanban.
+- [ ] **CP-13** Notifications beyond the OS: Slack, or a phone. — Cline ([repo](https://github.com/cline/cline));
+      Happy ([repo](https://github.com/slopus/happy)).
+- [ ] **CP-14** Start or steer a task from Slack. — Cursor ([docs](https://cursor.com/docs/integrations/slack));
+      OpenHands.
+- [ ] **CP-15** Export or share a session as a file or page (no hosted service: export only). — OpenCode `/share`
+      ([docs](https://opencode.ai/docs/share)); Kilo Code ([repo](https://github.com/Kilo-Org/kilocode)).
+- [ ] **CP-16** Status hooks: run the user's own command when a session or task changes state. — CCManager.
+- [ ] **CP-17** A voice prompt (dictation). — Claude Code `/voice`
+      ([docs](https://code.claude.com/docs/ja/voice-dictation)).
+- [ ] **CP-18** Host ACP agents (Agent Client Protocol), as a route to more agents after M9. — Zed
+      ([docs](https://zed.dev/docs/ai/external-agents)); Goose ([repo](https://github.com/block/goose)).
+- [ ] **CP-19** Import agent setup from other tools (MCP servers, skills, rules from Codex, Cursor, Gemini). — agy
+      (verify).
+- [ ] **CP-20** A branching checkpoint timeline: forks and rewinds of one session drawn as a tree, with diffs between
+      points. Today: rewind, fork and the turn timeline. — opcode.
+- [ ] **CP-21** Hand a session over to another agent's CLI, with its context (pairs with M9). — codex-plugin-cc
+      `/codex:transfer`.
+- [ ] **CP-22** A marketplace of agents and modes, beyond the plugins page. — Roo Code
+      ([features](https://roocodeinc.github.io/Roo-Code/features/)); Kilo Code; Zed's ACP Registry.
+- [ ] **CP-23** Semantic codebase indexing for search and context. — Roo Code.
+- [ ] **CP-24** Prompt enhancer and context condensing. — Roo Code.
+- [ ] **CP-25** AI-assisted approvals: a second model reviews a risky request before the person sees it (never
+      replacing the guard). — CCManager (experimental); Codex `--approve-for-me` (verify).
+
+**P3 (needs a PRD decision first)**
+- [ ] **CP-26** Mobile or remote access to the app's sessions (non-goal today). — claudecodeui
+      ([repo](https://github.com/siteboon/claudecodeui), AGPL: ideas only); Happy; Nimbalyst.
+- [ ] **CP-27** Multiplayer sessions that others can watch and steer (no team server today). — Happy.
+- [ ] **CP-28** Remote machines and containers (SSH, Docker, devcontainers) for sessions and tasks. — Emdash;
+      Sculptor ([repo](https://github.com/imbue-ai/sculptor)); OpenHands; CCManager.
+- [ ] **CP-29** Cloud agents with a local-to-cloud hand-off (hosted service: non-goal today). — Cursor; Kilo Code.
+- [ ] **CP-30** Branded distributions of the app for a team. — Goose.
 
 ---
 

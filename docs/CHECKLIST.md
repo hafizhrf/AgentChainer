@@ -2008,6 +2008,19 @@ with the OpenAI Codex CLI and Google's Antigravity CLI (`agy`), in both directio
     - recordings scrubbed into fixtures, like `make-fixture.ts`;
     - `cli-contract.ts` entries for every flag used;
     - a write-up in `docs/spikes/`.
+  Progress (2026-11-10): the Codex half is done, in [S8](spikes/S8-codex-agy.md) with
+  `packages/sidecar/scripts/spike-codex.ts`.
+  - On Codex 0.157.0 (Windows, ChatGPT login, `gpt-5.6-luna` at low effort): every command and file change asked
+    before it ran, and a declined force push was refused.
+  - A thread resumed in a new process.
+  - The read-only sandbox blocked a write.
+  - Found:
+    - the started item carries a file change's paths;
+    - commands come wrapped in PowerShell on Windows, with the unwrapped command beside it;
+    - usage comes as tokens only;
+    - the user's own Codex config (model, hooks, MCP servers) applies, so a backend sets its own model.
+  - The methods to pin go into `cli-contract.ts` with M9-04, where they're used.
+  - Left: the agy half, once `agy` is installed and signed in on the dev machine.
 - [ ] **M9-03** A step backend interface: `StepSession` (id, turn, inject, close, respond, fleet item) in
       `packages/sidecar/src/backends/`. Claude's `Session` implements it, and `tasks/runner.ts` picks the backend
       per step. No behavior change.

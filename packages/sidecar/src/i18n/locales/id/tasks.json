@@ -114,5 +114,6 @@
   "tasks.agy.ended": "Session Antigravity CLI sudah berakhir.",
   "tasks.agy.outsideWorkspace": "agy menulis di luar workspace: {{path}}",
   "tasks.agy.turnFailed": "Giliran Antigravity CLI gagal (exit {{code}}).",
-  "tasks.runner.agyMissing": "Langkah ini berjalan di Antigravity CLI, tetapi `agy` tidak ditemukan. Pasang CLI itu, atau jalankan langkahnya di Claude."
+  "tasks.runner.agyMissing": "Langkah ini berjalan di Antigravity CLI, tetapi `agy` tidak ditemukan. Pasang CLI itu, atau jalankan langkahnya di Claude.",
+  "tasks.service.agentMissing": "Task ini menjalankan sebuah langkah di {{agent}}, yang belum terpasang. Pasang dulu, atau pilih agent lain untuk langkah itu."
 }

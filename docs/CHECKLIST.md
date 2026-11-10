@@ -2127,6 +2127,30 @@ with the OpenAI Codex CLI and Google's Antigravity CLI (`agy`), in both directio
   - **Readiness and Settings:** each CLI's row in the setup check (found, version, signed in) and its path in
     Settings.
   - **Evals:** an `agent=` variant for the eval benchmark.
+  Progress (2026-11-10), part 1: the task's choice.
+  - **Protocol:** `task.start` takes `agents: { plan?, implement?, review? }`, kept on the run, so fix rounds and
+    resumes keep it. `agents.available` reports Codex and agy: installed, version, and signed in by their own status
+    command, exit code only.
+  - **Sidecar:**
+    - `backends/choose.ts` gives a step its role (a write step implements, a read step with a verdict reviews, others
+      plan) and applies the precedence: step, then task, then Claude.
+    - `startTask` refuses a run that names an agent this computer doesn't have, before any branch or step.
+  - **UI:** an **Agents** section on the triage card, with one picker per role the tier has (S: implement; M and L:
+    plan, implement, review).
+    - It offers Claude and every installed agent; one that isn't signed in is shown disabled.
+    - Hidden when only Claude is there.
+  - **Tests:**
+    - `choose.test.ts` (3);
+    - a service test: a run naming a missing Codex doesn't start;
+    - the agy backend's status only ever uses the conversation's id (the bug the app check found).
+  - **Checked in the app (Windows, haiku draft):**
+    - the triage card offered Claude, Codex and the Antigravity CLI;
+    - with agy picked for Implement, the run recorded `agents: { implement: "agy" }`, the step ran under agy's
+      conversation id with no Claude spend, and the task ended Done.
+    - It found a Fleet row stuck at "working" under agy's temporary id, now fixed.
+  - **Left (part 2):** the workspace's defaults per role, the canvas picker, the generator's guide, readiness rows
+    and CLI paths in Settings, and the eval variant.
+
 - [ ] **M9-07** The thread, Flow, Fleet and evidence show which agent and model ran each step.
 - [ ] **M9-08** (later) Team workers on Codex or agy. The supervisor stays Claude.
 - [ ] **M9-09** (later) A chat on Codex or agy.

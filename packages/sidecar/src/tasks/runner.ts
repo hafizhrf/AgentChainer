@@ -13,6 +13,7 @@ import {
   type TaskTag,
 } from "@agentchainer/protocol";
 import { type AgyHost, agyBackend } from "../backends/agy.ts";
+import { agentFor } from "../backends/choose.ts";
 import { type ClaudeHost, claudeBackend } from "../backends/claude.ts";
 import { type CodexHost, codexBackend } from "../backends/codex.ts";
 import type { StepAgent, StepBackend, StepOptions, StepSession } from "../backends/types.ts";
@@ -177,7 +178,8 @@ export function sessionRunner(
   /** The agents steps run on (ADR-0012): Claude, and the user's own Codex or Antigravity CLI when a step names it. */
   const backends: Partial<Record<StepAgent, StepBackend>> = { claude: claudeBackend(host) };
   const backendFor = (step: AgentStep): StepBackend => {
-    const agent = step.agent ?? "claude";
+    // The step's own agent, else the task's for its role, else Claude (ADR-0012 §5).
+    const agent = agentFor(step, run.agents);
     if (agent === "codex" && !backends.codex) {
       const codex = host.codex?.();
       if (!codex) throw new Error(t("tasks.runner.codexMissing"));

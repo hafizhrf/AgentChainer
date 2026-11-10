@@ -125,14 +125,19 @@ class AgySession implements LiveSession {
     );
     this.child = child;
     child.stdin.end();
-    this.touch("working");
+    // A first turn reports its status once agy has named the conversation: the fleet would keep a row for the
+    // temporary id otherwise.
+    if (!first) this.touch("working");
     const seen: AgyEvent[] = [];
     createInterface({ input: child.stderr }).on("line", (line) => log(`agy: ${line}`));
     createInterface({ input: child.stdout }).on("line", (line) => {
       const e = parseLine(line);
       if (!e) return;
       seen.push(e);
-      if (e.kind === "init" && e.conversationId) this.named(e.conversationId);
+      if (e.kind === "init" && e.conversationId) {
+        this.named(e.conversationId);
+        if (first) this.touch("working");
+      }
       if (e.kind === "init" && first) {
         const init = e as { model?: unknown };
         this.emit({

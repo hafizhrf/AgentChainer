@@ -6,7 +6,7 @@ import type { SDKMessage } from "@anthropic-ai/claude-agent-sdk";
 import pkg from "../package.json" with { type: "json" };
 import { agentTemplates } from "./agent-templates.ts";
 import { deleteAgent, listAgents, saveAgent } from "./agents.ts";
-import { agyHost, codexHost } from "./backends/find.ts";
+import { agentClis, agyHost, codexHost } from "./backends/find.ts";
 import type { LiveSession } from "./backends/types.ts";
 import { applyActions, type Cli, listRuns, rollback } from "./bootstrap/apply.ts";
 import { autoApplicable } from "./bootstrap/auto-apply.ts";
@@ -60,6 +60,7 @@ import { listRules, removeRule } from "./permissions.ts";
 import { cliError, installListed, listPluginsFor, parseDetails, uninstallListed, updateListed } from "./plugins.ts";
 import { CHAT_TOOLS, loadProfile, type ProfileOptions, profileOptions, profileSummaries } from "./profiles.ts";
 import { log, notify, RpcFailure, serve } from "./rpc.ts";
+import { runAsync } from "./run-async.ts";
 import { type AgentSdkModule, loadSdk } from "./sdk-loader.ts";
 import { ASK_FIRST, Session } from "./session.ts";
 import { replayEvents, retention, toSessionInfo } from "./stored-sessions.ts";
@@ -121,6 +122,9 @@ import {
 import { loadTask } from "./tasks/store.ts";
 import { sessionWorkers, Team, teamTools, type WorkerBase } from "./team.ts";
 import { fileDiff, gitInit, listFiles, revert } from "./workspace.ts";
+
+/** The other agents' CLIs, as last probed (M9-06). */
+let agentsCache: { at: number; value: Awaited<ReturnType<typeof agentClis>> } | null = null;
 
 /**
  * Live sessions by their agent's session id: one per workspace tab (M1-08), plus task steps and Team workers. A task
@@ -336,6 +340,16 @@ serve(
     },
 
     "system.ping": () => ({ ok: true }),
+
+    // The other agents' CLIs for the task's pickers (M9-06); their status commands take a few seconds, so a minute's cache.
+    "agents.available": async () => {
+      if (!agentsCache || Date.now() - agentsCache.at > 60_000) {
+        const run = (bin: string, args: string[]) =>
+          runAsync(bin, args, { cwd: homedir(), timeoutMs: 20_000 }).then((r) => ({ status: r.status }));
+        agentsCache = { at: Date.now(), value: await agentClis(run, onPath, resolveCli) };
+      }
+      return agentsCache.value;
+    },
 
     "env.check": () => checkEnvironment(),
 
@@ -862,10 +876,16 @@ serve(
 
     "task.cancel": ({ id }) => ({ cancelled: cancelTask(id) }),
 
-    "task.start": async ({ cwd, id, permissionMode, model }) => {
+    "task.start": async ({ cwd, id, permissionMode, model, agents }) => {
       requireFolder(cwd);
       const host = sessionHost(await claude());
-      return startTask(cwd, id, host, { permissionMode, ...(model ? { model } : {}) }, taskUpdated(cwd));
+      return startTask(
+        cwd,
+        id,
+        host,
+        { permissionMode, ...(model ? { model } : {}), ...(agents ? { agents } : {}) },
+        taskUpdated(cwd),
+      );
     },
 
     "task.resume": async ({ cwd, id }) => {

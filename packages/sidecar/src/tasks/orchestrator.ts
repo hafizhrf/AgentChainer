@@ -834,6 +834,8 @@ export function newRun(
   opts: {
     permissionMode: TaskRun["permissionMode"];
     model?: string;
+    /** The agent per role (M9-06). */
+    agents?: TaskRun["agents"];
     base: string | null;
     untrackedAtStart: string[];
     /** A schedule started it (M8-05). */
@@ -849,6 +851,7 @@ export function newRun(
     },
     permissionMode: opts.permissionMode,
     ...(opts.model ? { model: opts.model } : {}),
+    ...(opts.agents && Object.keys(opts.agents).length ? { agents: opts.agents } : {}),
     base: opts.base,
     untrackedAtStart: opts.untrackedAtStart,
     startedAt: now.toISOString(),

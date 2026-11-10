@@ -8,6 +8,7 @@
   "rpc.claude.notFoundSeeGuide": "Claude Code CLI not found. See docs/guides/AUTH_SETUP.md.",
   "rpc.claude.noCliForPlugins": "Claude Code CLI not found, so plugins can't be listed.",
   "rpc.session.notRunning": "This session isn't running. Resume it from the session list.",
+  "rpc.session.notAChat": "Only a chat can do that; this session is a task's step on another agent.",
   "rpc.session.runningAsStep": "This session is running as a step of the task “{{task}}”. Open the task to follow it.",
   "rpc.session.runningAsWorker": "This session is a Team chat's worker. Open it from its Team chat.",
   "rpc.session.closeTabBeforeDelete": "Close this session's tab before you delete it.",

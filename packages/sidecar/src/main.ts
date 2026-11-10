@@ -6,6 +6,8 @@ import type { SDKMessage } from "@anthropic-ai/claude-agent-sdk";
 import pkg from "../package.json" with { type: "json" };
 import { agentTemplates } from "./agent-templates.ts";
 import { deleteAgent, listAgents, saveAgent } from "./agents.ts";
+import { codexHost } from "./backends/find.ts";
+import type { LiveSession } from "./backends/types.ts";
 import { applyActions, type Cli, listRuns, rollback } from "./bootstrap/apply.ts";
 import { autoApplicable } from "./bootstrap/auto-apply.ts";
 import { generate, resolveActionlint } from "./bootstrap/generate.ts";
@@ -15,6 +17,7 @@ import { toolsDir } from "./bootstrap/tools.ts";
 import { catalog } from "./catalog/index.ts";
 import { checkEnvironment, claudeVersion, findClaude } from "./claude.ts";
 import { setDockerImage } from "./deploy/adapters.ts";
+import { resolveCli } from "./deploy/cli.ts";
 import {
   deployPreview,
   deployProduction,
@@ -119,13 +122,25 @@ import { loadTask } from "./tasks/store.ts";
 import { sessionWorkers, Team, teamTools, type WorkerBase } from "./team.ts";
 import { fileDiff, gitInit, listFiles, revert } from "./workspace.ts";
 
-/** Live sessions by SDK session id, one per workspace tab (M1-08). */
-const sessions = new Map<string, Session>();
+/**
+ * Live sessions by their agent's session id: one per workspace tab (M1-08), plus task steps and Team workers. A task
+ * step may run on another agent's CLI (M9, ADR-0012), so the map holds what every agent offers.
+ */
+const sessions = new Map<string, LiveSession>();
 
-function requireSession(sessionId: string): Session {
+function requireSession(sessionId: string): LiveSession {
   const session = sessions.get(sessionId);
   if (!session) {
     throw new RpcFailure(RpcErrorCode.noSession, t("rpc.session.notRunning"));
+  }
+  return session;
+}
+
+/** A chat's session: sending, modes, models and rewind are Claude's (chats stay on Claude, ADR-0012). */
+function requireChat(sessionId: string): Session {
+  const session = requireSession(sessionId);
+  if (!(session instanceof Session)) {
+    throw new RpcFailure(RpcErrorCode.invalidParams, t("rpc.session.notAChat"));
   }
   return session;
 }
@@ -205,6 +220,12 @@ function sessionHost({ sdk, claudePath }: Claude): SessionHost {
     claudePath,
     register: (session) => sessions.set(session.id, session),
     unregister: (id) => sessions.delete(id),
+    // A step that names Codex runs on the user's own `codex` (M9-04), registered like Claude's steps.
+    codex: () =>
+      codexHost(resolveCli, {
+        register: (session) => sessions.set(session.id, session),
+        unregister: (id) => sessions.delete(id),
+      }),
     event: (sessionId, event, task) => notify("agent.event", { sessionId, event, task }),
     permission: (sessionId, request, task) => notify("permission.request", { sessionId, ...request, task }),
     status: (item) => notify("fleet.changed", { item }),
@@ -358,7 +379,7 @@ serve(
           already.task ? t("rpc.session.runningAsStep", { task: already.task }) : t("rpc.session.runningAsWorker"),
         );
       }
-      if (live && already.kind === "attach") {
+      if (live instanceof Session && already.kind === "attach") {
         if (permissionMode) await live.setMode(permissionMode);
         if (model !== undefined) await live.setModel(model);
         if (effort !== undefined) await live.setEffort(effort);
@@ -430,7 +451,7 @@ serve(
 
     "session.send": ({ sessionId, text, images }) => ({
       ok: true,
-      messageId: requireSession(sessionId).send(text, images),
+      messageId: requireChat(sessionId).send(text, images),
     }),
 
     "session.interrupt": async ({ sessionId }) => ({
@@ -440,11 +461,11 @@ serve(
 
     "session.stopAgent": async ({ sessionId, taskId }) => ({
       ok: true,
-      stopped: await requireSession(sessionId).stopAgent(taskId),
+      stopped: await requireChat(sessionId).stopAgent(taskId),
     }),
 
     "session.setMode": async ({ sessionId, mode }) => {
-      await requireSession(sessionId).setMode(mode);
+      await requireChat(sessionId).setMode(mode);
       return { ok: true };
     },
 
@@ -454,16 +475,15 @@ serve(
       return { ok: true };
     },
 
-    "session.rewind": ({ sessionId, messageId, dryRun }) =>
-      requireSession(sessionId).rewind(messageId, dryRun ?? false),
+    "session.rewind": ({ sessionId, messageId, dryRun }) => requireChat(sessionId).rewind(messageId, dryRun ?? false),
 
     "session.setModel": async ({ sessionId, model }) => {
-      await requireSession(sessionId).setModel(model);
+      await requireChat(sessionId).setModel(model);
       return { ok: true };
     },
 
     "session.setEffort": async ({ sessionId, effort }) => {
-      await requireSession(sessionId).setEffort(effort);
+      await requireChat(sessionId).setEffort(effort);
       return { ok: true };
     },
 

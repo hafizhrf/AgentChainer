@@ -42,7 +42,7 @@ describe("the Claude step backend (M9-03)", () => {
       register: (s) => registered.set(s.id, s),
       unregister: (id) => registered.delete(id),
     });
-    const session: StepSession = open(
+    const session: StepSession = await open(
       { cwd: process.cwd(), readOnly: true, maxTurns: 3 },
       {
         emit: () => undefined,

@@ -8,6 +8,7 @@
   "rpc.claude.notFoundSeeGuide": "Claude Code CLI tidak ditemukan. Lihat docs/guides/AUTH_SETUP.md.",
   "rpc.claude.noCliForPlugins": "Claude Code CLI tidak ditemukan, jadi daftar plugin tidak bisa ditampilkan.",
   "rpc.session.notRunning": "Session ini tidak berjalan. Lanjutkan dari daftar session.",
+  "rpc.session.notAChat": "Hanya chat yang bisa melakukan itu; session ini adalah langkah task di agent lain.",
   "rpc.session.runningAsStep": "Session ini sedang berjalan sebagai langkah dari task “{{task}}”. Buka task itu untuk mengikutinya.",
   "rpc.session.runningAsWorker": "Session ini adalah worker dari sebuah chat Team. Buka dari chat Team-nya.",
   "rpc.session.closeTabBeforeDelete": "Tutup tab session ini sebelum Anda menghapusnya.",

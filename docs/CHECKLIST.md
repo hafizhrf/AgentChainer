@@ -2052,6 +2052,38 @@ with the OpenAI Codex CLI and Google's Antigravity CLI (`agy`), in both directio
   - **Fix rounds** resume the thread.
   - **Cost:** tokens × a pinned price table.
   - Fixture replays in tests, no model calls.
+  Progress (2026-11-10): built, and run live; two points left.
+  - **Code:**
+    - `backends/codex.ts` runs `codex app-server` per step.
+    - `backends/codex-events.ts` maps its items to the app's events: a command is `Bash` (unwrapped from
+      PowerShell), a file change is `Write`/`Edit`.
+    - `backends/find.ts` finds the CLI (`AGENTCHAINER_CODEX_PATH`, else PATH).
+    - The live sessions map holds any agent's session; chat-only calls need Claude's (`requireChat`).
+    - Workflow steps take `agent: claude | codex | agy`; the runner opens Codex when a step names it.
+    - `.codex` joins the guard's secret paths.
+  - **Approvals:**
+    - every command and file change asks (policy `untrusted`); the guard checks it first and declines a breach,
+      which the evidence records as a guard block;
+    - Standard and Autonomous accept edits inside the workspace;
+    - anything else is asked in the approval dialog;
+    - read steps run Codex's `read-only` sandbox.
+  - **Model:** the step's model when it's Codex's, else Codex's default from `model/list`; the user's own config may
+    name one their login can't use (S8).
+  - **Tests:**
+    - `codex-events.test.ts` (5);
+    - `codex.test.ts` (3), with a scripted app-server: an edit asked and approved, a force push declined by the guard
+      before anyone is asked, Standard's edits, resume by thread id;
+    - the guard's `.codex` cases.
+  - **Live (Codex 0.157.0, ChatGPT login):** a tier-S task on a copy of `fixtures/sample-app` whose project workflow
+    sets `agent: codex` on its implement step.
+    - Codex's commands asked and were approved, its edit to `src/cart.js` was accepted under Standard, and every gate
+      passed (42–79 s).
+    - A first run found a bug: the runner's callbacks read the session before it was opened. Fixed.
+  - **Left:**
+    - **Cost:** a ChatGPT login is plan usage with no price per token, so a Codex step reports tokens and $0. Its
+      spend isn't counted against the task's dollar budget. **Owner's call:** keep it so, or price tokens for API-key
+      users.
+    - **Drift:** pin the app-server methods it uses in `cli-contract.ts`, and have the weekly drift job check them.
 - [ ] **M9-05** The agy backend (S8):
   - **Process:** `agy -p --output-format stream-json` in the task's worktree.
   - **Settings:** through `--settings` only.

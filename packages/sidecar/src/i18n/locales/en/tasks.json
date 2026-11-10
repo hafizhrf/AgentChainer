@@ -104,5 +104,11 @@
   "tasks.split.noResult": "The split ended without a result.",
   "tasks.generateWorkflow.stopped": "Generating stopped: {{reason}}.",
   "tasks.generateWorkflow.noWorkflow": "The answer had no workflow.",
-  "tasks.generateWorkflow.failedChecks": "The generated workflow didn't pass the checks: {{error}}"
+  "tasks.generateWorkflow.failedChecks": "The generated workflow didn't pass the checks: {{error}}",
+  "tasks.runner.codexMissing": "This step runs on Codex, but no `codex` CLI was found. Install it, or run the step on Claude.",
+  "tasks.runner.agentNotYet": "This step runs on {{agent}}, which this version can't run yet.",
+  "tasks.codex.noThread": "Codex didn't start a thread: {{error}}",
+  "tasks.codex.ended": "The Codex session has ended.",
+  "tasks.codex.exited": "The Codex app-server exited.",
+  "tasks.codex.exitedMidTurn": "The Codex app-server exited during a turn."
 }

@@ -39,7 +39,7 @@
   "evidence.report.security": "## Catatan keamanan",
   "evidence.report.guardBlocked": "Diblokir oleh guard:",
   "evidence.report.guardNothing": "Guard tidak memblokir apa pun.",
-  "evidence.report.approvals": "Persetujuan yang diminta Claude, dari yang paling berisiko:",
+  "evidence.report.approvals": "Persetujuan yang diminta agent, dari yang paling berisiko:",
   "evidence.report.approval": "- {{risk}} · {{tool}} `{{target}}` ({{label}}): {{decision}}",
   "evidence.report.noApprovals": "Tidak ada persetujuan yang diminta.",
   "evidence.report.notListed": "Panggilan yang diizinkan tanpa bertanya oleh pengaturan Anda atau profil izin tidak dicantumkan.",

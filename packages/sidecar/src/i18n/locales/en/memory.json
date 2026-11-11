@@ -1,0 +1,13 @@
+{
+  "memory.files.link": "{{path}} is a link, so AgentChainer won't open it: it could point outside the workspace.",
+  "memory.files.notFile": "It isn't a regular file.",
+  "memory.files.tooLarge": "It's over 2 MB, too large to open here.",
+  "memory.save.changed": "{{path}} changed since you opened it. Reload it to see the new version; copy your edits first if you want to keep them.",
+  "memory.save.homePath": "It mentions a path in a home folder, which only works on one computer.",
+  "memory.save.long": "It has {{lines}} lines. Over {{max}}, it costs context in every session.",
+  "memory.save.noFolder": "That folder doesn't exist.",
+  "memory.save.secret": "It holds what looks like a key or token. CLAUDE.md is committed and sent to Claude in every session: keep keys in your environment and refer to them by name.",
+  "memory.save.title": "Edit {{path}}",
+  "memory.save.tooLarge": "It's over {{kb}} KB. Claude reads all of it in every session: keep it short and link to longer docs instead.",
+  "memory.save.urlPassword": "It has a URL with a password in it. Check it's only a local example before you commit."
+}

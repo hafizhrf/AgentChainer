@@ -97,6 +97,7 @@
   "app.palette.setupPlan": "Workspace settings: Setup plan",
   "app.palette.setupCommands": "Workspace settings: Commands",
   "app.palette.setupAgents": "Workspace settings: Agents",
+  "app.palette.setupMemory": "Workspace settings: CLAUDE.md",
   "app.palette.setupPlugins": "Workspace settings: Plugins",
   "app.palette.setupMcp": "Workspace settings: MCP servers",
   "app.palette.setupPermissions": "Workspace settings: Permissions",
@@ -116,5 +117,6 @@
   "app.palette.exportDiagnostics": "Export diagnostics…",
   "app.palette.gettingStarted": "Getting started guide",
   "app.palette.reportIssue": "Report an issue",
-  "app.palette.usage": "Usage: cost and tokens across sessions"
+  "app.palette.usage": "Usage: cost and tokens across sessions",
+  "app.palette.memory": "CLAUDE.md in every project"
 }

@@ -6,6 +6,7 @@ import {
   agentProblems,
   CriterionCheckSchema,
   imageType,
+  MemoryPathSchema,
   methodSchemas,
   PERMISSION_MODES,
   PermissionRequestSchema,
@@ -132,5 +133,23 @@ describe("imageType (UX-21)", () => {
     assert.equal(imageType("notes.txt"), null);
     assert.equal(imageType("png"), null);
     assert.equal(imageType("dir.png/readme"), null);
+  });
+});
+
+describe("MemoryPathSchema (CP-03)", () => {
+  it("allows only a CLAUDE.md the editor may write, inside the workspace", () => {
+    for (const ok of ["CLAUDE.md", ".claude/CLAUDE.md", "CLAUDE.local.md", "packages/api/CLAUDE.md"]) {
+      assert.ok(MemoryPathSchema.safeParse(ok).success, ok);
+    }
+    for (const bad of [
+      "../CLAUDE.md",
+      "a/../CLAUDE.md",
+      "/etc/CLAUDE.md",
+      "notes.md",
+      "CLAUDE.md.bak",
+      "a\\b/CLAUDE.md",
+    ]) {
+      assert.equal(MemoryPathSchema.safeParse(bad).success, false, bad);
+    }
   });
 });

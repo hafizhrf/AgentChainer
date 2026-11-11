@@ -17,9 +17,12 @@ type Rules = Record<Behavior, string[]>;
 
 export const localSettingsPath = (cwd: string) => path.join(cwd, ".claude", "settings.local.json");
 export const teamSettingsPath = (cwd: string) => path.join(cwd, ".claude", "settings.json");
-/** The CLI's user settings, which every project reads (ADR-0013): `CLAUDE_CONFIG_DIR`, else `~/.claude`. */
+/** The CLI's config folder, which every project reads: `CLAUDE_CONFIG_DIR`, else `~/.claude`. */
+export const claudeConfigDir = (env: NodeJS.ProcessEnv = process.env) =>
+  env.CLAUDE_CONFIG_DIR || path.join(homedir(), ".claude");
+/** The CLI's user settings, which every project reads (ADR-0013). */
 export const userSettingsPath = (env: NodeJS.ProcessEnv = process.env) =>
-  path.join(env.CLAUDE_CONFIG_DIR || path.join(homedir(), ".claude"), "settings.json");
+  path.join(claudeConfigDir(env), "settings.json");
 const settingsPath = (cwd: string, scope: RuleScope) =>
   scope === "user" ? userSettingsPath() : scope === "team" ? teamSettingsPath(cwd) : localSettingsPath(cwd);
 

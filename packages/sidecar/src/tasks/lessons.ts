@@ -15,8 +15,10 @@ import {
 import { z } from "zod";
 import { AC_DIR, ensureIgnored } from "../ac-dir.ts";
 import { applyFileEdits } from "../bootstrap/apply.ts";
+import { HOME_PATH, LONG_CLAUDE_MD, lineCount } from "../claude-md-rules.ts";
 import { t } from "../i18n/index.ts";
 import type { AgentSdkModule } from "../sdk-loader.ts";
+import { readWorkspaceText } from "../workspace-files.ts";
 import { type Evidence, named, SEVERITY_TEXT } from "./evidence.ts";
 import { result } from "./result.ts";
 
@@ -227,13 +229,10 @@ export function claudeMdPath(root: string): string {
     : "CLAUDE.md";
 }
 
-function readClaudeMd(root: string): string {
-  const file = path.join(root, ...claudeMdPath(root).split("/"));
-  return existsSync(file) ? readFileSync(file, "utf8") : "";
-}
+/** Not through a link: a cloned repository can point CLAUDE.md anywhere (T-03). */
+const readClaudeMd = (root: string) => readWorkspaceText(root, claudeMdPath(root));
 
 const HEADING = "## Lessons";
-const HOME_PATH = /(\/Users\/|\/home\/|[A-Z]:\\Users\\)\w/;
 
 /**
  * CLAUDE.md with the lessons added as bullets under `## Lessons` (made at the end when missing). The rest of the file
@@ -264,7 +263,7 @@ export function previewLessons(root: string, taskId: string, ids: string[], from
   }
   const before = readClaudeMd(root);
   const after = withLessons(before, chosen, from);
-  if (after.split("\n").length > 300) throw new Error(t("tasks.lessons.tooLong"));
+  if (lineCount(after) > LONG_CLAUDE_MD) throw new Error(t("tasks.lessons.tooLong"));
   return { path: claudeMdPath(root), before, after };
 }
 

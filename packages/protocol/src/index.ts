@@ -631,6 +631,46 @@ export const McpServerDetailsSchema = McpServerSchema.extend({
 });
 export type McpServerDetails = z.infer<typeof McpServerDetailsSchema>;
 
+/*
+ * CLAUDE.md files (CP-03): the ones Claude loads for a workspace, to read and edit, and a scan across projects. The
+ * user's own `~/.claude/CLAUDE.md` is read-only here (ADR-0013).
+ */
+
+/** A CLAUDE.md the editor may write: the project's, the personal one, or one in a folder. Never through `..`. */
+export const MemoryPathSchema = z
+  .string()
+  .max(500)
+  .regex(/^(?:CLAUDE\.md|\.claude\/CLAUDE\.md|CLAUDE\.local\.md|(?:[^/\\]+\/)+CLAUDE\.md)$/)
+  .refine((p) => !p.split("/").includes(".."));
+export const MemoryFileSchema = z.object({
+  /** Relative to the workspace; for the user's own file, where it is (e.g. `~/.claude/CLAUDE.md`). */
+  path: z.string(),
+  /** `project`: loaded in every session here; `local`: the same, not committed; `folder`: when Claude works there. */
+  kind: z.enum(["project", "local", "folder", "user"]),
+  exists: z.boolean(),
+  /** As an editor counts them; 0 when it doesn't exist. */
+  lines: z.number().int(),
+  bytes: z.number().int(),
+  modifiedAt: z.string().optional(),
+  /** The user's own file only: its absolute path, to open in the person's editor. */
+  absolute: z.string().optional(),
+  /** Why the app won't open it: reached through a link, not a file, or too large. */
+  refused: z.string().optional(),
+});
+export type MemoryFile = z.infer<typeof MemoryFileSchema>;
+export const MemoryProjectSchema = z.object({
+  cwd: z.string(),
+  /** `long`: over 300 lines; `noTest`: doesn't mention the detected test command; `gone`: the folder isn't there. */
+  status: z.enum(["ok", "long", "noTest", "missing", "gone", "refused"]),
+  file: MemoryFileSchema.optional(),
+  /** The detected test command it should mention. */
+  testCommand: z.string().optional(),
+  /** CLAUDE.md files in its folders, and whether it has a personal CLAUDE.local.md. */
+  folders: z.number().int(),
+  local: z.boolean(),
+});
+export type MemoryProject = z.infer<typeof MemoryProjectSchema>;
+
 /** What `bootstrap.apply` did, per action. */
 export const ApplyResultSchema = z.object({
   runId: z.string(),
@@ -2086,6 +2126,35 @@ export const methodSchemas = {
     result: Ok,
   },
 
+  /* CLAUDE.md files (CP-03). */
+  /** The workspace's CLAUDE.md files (project, personal, folders) and the user's own, with their sizes. */
+  "memory.files": { params: WorkspaceRef, result: z.object({ files: z.array(MemoryFileSchema) }) },
+  /** One file's text and its sha256 (null when it doesn't exist yet), to save against. `user` reads the user's own. */
+  "memory.read": {
+    params: z.union([WorkspaceRef.extend({ path: MemoryPathSchema }), WorkspaceRef.extend({ user: z.literal(true) })]),
+    result: z.object({ text: z.string(), sha256: z.string().nullable() }),
+  },
+  /**
+   * Saves a workspace CLAUDE.md as a History run that Roll back undoes. Refused when the file changed since
+   * `baseSha256` (null: it didn't exist), when it holds a key or token, or when it's over 200 KB.
+   */
+  "memory.save": {
+    params: WorkspaceRef.extend({
+      path: MemoryPathSchema,
+      text: z.string().max(400_000),
+      baseSha256: z
+        .string()
+        .regex(/^[0-9a-f]{64}$/)
+        .nullable(),
+    }),
+    result: z.object({ runId: z.string(), sha256: z.string(), warnings: z.array(z.string()) }),
+  },
+  /** Each project's CLAUDE.md, checked like the readiness audit, and the user's own. Reads only; nothing is sent. */
+  "memory.scan": {
+    params: z.object({ workspaces: z.array(z.string().min(1)).max(500) }),
+    result: z.object({ user: MemoryFileSchema, projects: z.array(MemoryProjectSchema) }),
+  },
+
   /* MCP servers (CP-02, ADR-0015): every call goes through the user's own CLI. */
   /**
    * The servers the CLI knows here, each health-checked: checking starts every server. Kept for the app session;
@@ -2674,7 +2743,7 @@ export {
   setPseudo,
   translationProblems,
 } from "./i18n.ts";
-export { hasSecret, redactForLog, redactSecrets, redactValue } from "./redact.ts";
+export { hasKeyShape, hasSecret, redactForLog, redactSecrets, redactValue } from "./redact.ts";
 export {
   literalRef,
   RESULTS,

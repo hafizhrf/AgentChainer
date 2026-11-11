@@ -1,0 +1,13 @@
+{
+  "memory.files.link": "{{path}} adalah link, jadi AgentChainer tidak membukanya: link itu bisa mengarah ke luar workspace.",
+  "memory.files.notFile": "Ini bukan file biasa.",
+  "memory.files.tooLarge": "Ukurannya lebih dari 2 MB, terlalu besar untuk dibuka di sini.",
+  "memory.save.changed": "{{path}} berubah sejak Anda membukanya. Muat ulang untuk melihat versi barunya; salin dulu editan Anda kalau ingin menyimpannya.",
+  "memory.save.homePath": "File ini menyebut path di folder home, yang hanya berlaku di satu komputer.",
+  "memory.save.long": "File ini punya {{lines}} baris. Lebih dari {{max}} baris memakan context di setiap session.",
+  "memory.save.noFolder": "Folder itu tidak ada.",
+  "memory.save.secret": "File ini berisi sesuatu yang tampak seperti key atau token. CLAUDE.md di-commit dan dikirim ke Claude di setiap session: simpan key di environment Anda dan sebut namanya saja.",
+  "memory.save.title": "Edit {{path}}",
+  "memory.save.tooLarge": "Ukurannya lebih dari {{kb}} KB. Claude membaca seluruhnya di setiap session: buat singkat dan tautkan ke dokumen yang lebih panjang.",
+  "memory.save.urlPassword": "Ada URL yang berisi password. Pastikan itu hanya contoh lokal sebelum Anda commit."
+}

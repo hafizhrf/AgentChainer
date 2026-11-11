@@ -163,6 +163,24 @@ the session's live background tasks (M4-07).
 - **`agents.templates`** returns the shipped roles and 4 bundled starters, as data the form fills in from; nothing is
   written until the person saves.
 
+**The CLAUDE.md editor (CP-03, T-03):**
+- **What it writes:** `memory.save` writes only `CLAUDE.md`, `.claude/CLAUDE.md`, `CLAUDE.local.md` or
+  `<folder>/CLAUDE.md` inside the workspace (`MemoryPathSchema`, then `insideRoot`). It never writes through a link,
+  and each save is a History run that Roll back restores byte for byte.
+- **What it refuses:**
+  - a save when the file changed since it was read (its sha256);
+  - a key or token by its own shape (`hasKeyShape`: vendor prefixes, JWTs, private keys);
+  - more than 200 KB.
+
+  Documentation that names a variable (`API_KEY=`) passes. Over 300 lines, a home-folder path and a password in a
+  URL only warn.
+- **The user's own file:** `~/.claude/CLAUDE.md` (or `$CLAUDE_CONFIG_DIR`) is read and shown, never written
+  (ADR-0013). "Open in editor" hands it to the person's editor.
+- **The scan (`memory.scan`):** reads the CLAUDE.md files of the workspaces the app already knows, the same way the
+  readiness audit does. A file reached through a link shows as "can't be read". Nothing is sent anywhere.
+- **Reads that followed links:** the readiness audit and task lessons read CLAUDE.md through `readWorkspaceText` now,
+  so they no longer follow a link out of the workspace.
+
 **Lessons (M8-06):**
 - **What runs:** `task.lessons` makes one model call with no tools and no settings, only on the person's click. It
   sends the finished run's recorded signals, the current CLAUDE.md and the dismissed lessons.

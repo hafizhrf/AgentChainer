@@ -4,6 +4,7 @@ import {
   BarChart3,
   Bot,
   ClipboardList,
+  FileText,
   History as HistoryIcon,
   ListChecks,
   Puzzle,
@@ -15,7 +16,7 @@ import {
   Terminal,
   Workflow,
 } from "lucide-react";
-import { type ReactNode, useCallback, useEffect, useState } from "react";
+import { type ReactNode, useCallback, useEffect, useRef, useState } from "react";
 import type { Confirm } from "../Dialog.tsx";
 import { FolderSwitcher } from "../FolderSwitcher.tsx";
 import { t } from "../i18n/index.ts";
@@ -27,6 +28,7 @@ import { Commands } from "./Commands.tsx";
 import { Deploys } from "./Deploys.tsx";
 import { History } from "./History.tsx";
 import { McpServers } from "./McpServers.tsx";
+import { Memory } from "./Memory.tsx";
 import { Metrics } from "./Metrics.tsx";
 import { gapsOf, Overview } from "./Overview.tsx";
 import { Permissions } from "./Permissions.tsx";
@@ -41,6 +43,7 @@ export type SetupView =
   | "plan"
   | "commands"
   | "agents"
+  | "memory"
   | "plugins"
   | "mcp"
   | "permissions"
@@ -51,7 +54,7 @@ export type SetupView =
 
 /**
  * Workspace settings as a full page (UX-06), laid out like an IDE's project settings: what the workspace is made of at
- * the top, sections on the left (readiness, the setup plan, detected commands, agents, plugins, MCP servers, saved permission
+ * the top, sections on the left (readiness, the setup plan, detected commands, agents, CLAUDE.md, plugins, MCP servers, saved permission
  * rules,
  * the tiers' workflows, deploys, task metrics, past runs), and the section's content on the right. Opens over the session or Home; Back returns there.
  */
@@ -65,6 +68,7 @@ export function SetupPage({
   folders = [],
   onFolderChange,
   workspaces = [],
+  onOpenFile = async () => {},
 }: {
   cwd: string;
   /** Model alias for generators ("" = the CLI's default). */
@@ -78,8 +82,31 @@ export function SetupPage({
   onFolderChange?: (dir: string) => void;
   /** Every workspace the app knows, for "Apply to all workspaces". */
   workspaces?: string[];
+  /** Opens a file in the person's editor (CLAUDE.md, CP-03). */
+  onOpenFile?: (file: string) => Promise<void>;
 }) {
-  const [view, setView] = useState<SetupView>(initialView);
+  const [view, setViewNow] = useState<SetupView>(initialView);
+  // The CLAUDE.md section's unsaved edits: leaving it asks first.
+  const unsaved = useRef(false);
+  const onDirty = useCallback((dirty: boolean) => {
+    unsaved.current = dirty;
+  }, []);
+  /** Runs `go` once unsaved CLAUDE.md edits, if any, are confirmed to be discarded. */
+  const leave = async (go: () => void) => {
+    if (
+      unsaved.current &&
+      !(await confirm({
+        title: t("setup.memory.discardTitle"),
+        body: t("setup.memory.discardLeave"),
+        confirmLabel: t("setup.memory.discard"),
+        danger: true,
+      }))
+    )
+      return;
+    unsaved.current = false;
+    go();
+  };
+  const setView = (next: SetupView) => void leave(() => setViewNow(next));
   const [focus, setFocus] = useState<string | null>(null);
   const [scan, setScan] = useState<Scan | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -126,6 +153,7 @@ export function SetupPage({
     },
     { id: "commands", label: t("setup.page.navCommands"), icon: <Terminal size={16} className="nav-icon" /> },
     { id: "agents", label: t("setup.page.navAgents"), icon: <Bot size={16} className="nav-icon" /> },
+    { id: "memory", label: t("setup.page.navMemory"), icon: <FileText size={16} className="nav-icon" /> },
     {
       id: "plugins",
       label: t("setup.page.navPlugins"),
@@ -149,14 +177,14 @@ export function SetupPage({
   return (
     <div className="setup-page">
       <header className="setup-header">
-        <button type="button" className="ghost small" onClick={onBack}>
+        <button type="button" className="ghost small" onClick={() => void leave(onBack)}>
           <ArrowLeft size={14} />
           {backLabel}
         </button>
         <div className="setup-title">
           <h1>{t("setup.page.title")}</h1>
           {folders.length > 1 && onFolderChange ? (
-            <FolderSwitcher folders={folders} current={cwd} onChange={onFolderChange} />
+            <FolderSwitcher folders={folders} current={cwd} onChange={(dir) => void leave(() => onFolderChange(dir))} />
           ) : (
             <span className="muted" title={cwd}>
               {folderName(cwd)}
@@ -230,6 +258,20 @@ export function SetupPage({
           {view === "plan" && <PlanView bootstrap={bootstrap} focus={focus} onFocus={setFocus} />}
           {scan && view === "commands" && <Commands profile={scan.profile} />}
           {view === "agents" && <Agents cwd={cwd} confirm={confirm} onChanged={() => void bootstrap.load()} />}
+          {view === "memory" && (
+            <Memory
+              cwd={cwd}
+              confirm={confirm}
+              notLoaded={folders.length > 1 && cwd !== folders[0]}
+              onDirty={onDirty}
+              onChanged={() => void bootstrap.load()}
+              onGenerate={() => {
+                setFocus("generate-claude-md");
+                setView("plan");
+              }}
+              onOpenFile={onOpenFile}
+            />
+          )}
           {view === "plugins" && (
             <Plugins cwd={cwd} confirm={confirm} onChanged={() => void bootstrap.load()} onUpdates={setPluginUpdates} />
           )}

@@ -2,8 +2,10 @@ import { existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import type { Finding, WorkspaceProfile } from "@agentchainer/protocol";
 import { AC_DIR, ensureIgnored } from "../ac-dir.ts";
+import { LONG_CLAUDE_MD, lineCount } from "../claude-md-rules.ts";
 import { type MessageKey, t } from "../i18n/index.ts";
 import { git, repoOf } from "../workspace.ts";
+import { readWorkspaceText } from "../workspace-files.ts";
 
 /**
  * Setup audit and readiness report (M2-08/M2-09). Every finding short of `ok` names the fix action the bootstrap
@@ -29,9 +31,6 @@ export const FIXES = {
 } as const satisfies Record<string, MessageKey>;
 export type FixAction = keyof typeof FIXES;
 
-/** CLAUDE.md files over this many lines cost context in every session. */
-const LONG_CLAUDE_MD = 300;
-
 type Check = Omit<Finding, "fix"> & { fix?: FixAction };
 
 export function auditWorkspace(root: string, profile: WorkspaceProfile): Finding[] {
@@ -56,7 +55,8 @@ export function auditWorkspace(root: string, profile: WorkspaceProfile): Finding
 
   // Agent context.
   const claudeMdPath = ["CLAUDE.md", ".claude/CLAUDE.md"].find(exists);
-  const claudeMd = claudeMdPath ? (read(claudeMdPath) ?? "") : null;
+  // Not through a link: a cloned repository can point CLAUDE.md anywhere (T-03).
+  const claudeMd = claudeMdPath ? readWorkspaceText(root, claudeMdPath) : null;
   const agentsMd = exists("AGENTS.md");
   if (claudeMd === null) {
     checks.push({
@@ -68,7 +68,7 @@ export function auditWorkspace(root: string, profile: WorkspaceProfile): Finding
       fix: "generate-claude-md",
     });
   } else {
-    const lines = claudeMd.split("\n").length;
+    const lines = lineCount(claudeMd);
     const testRun = firstRun("test");
     const long = lines > LONG_CLAUDE_MD;
     const noTest = testRun !== undefined && !claudeMd.includes(testRun);

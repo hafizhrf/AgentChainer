@@ -35,7 +35,6 @@
   "shell.options.effortHigh": "High effort",
   "shell.options.effortXhigh": "Xhigh effort",
   "shell.options.effortMax": "Max effort",
-
   "shell.sidebar.label": "Sessions and workspaces",
   "shell.sidebar.brand": "AgentChainer",
   "shell.sidebar.newTitle": "New chat; pick Task in its composer for a task ({{keys}})",
@@ -69,7 +68,6 @@
   "shell.sidebar.settings": "Settings",
   "shell.sidebar.endedTitle": "Ended: open it to resume",
   "shell.sidebar.ended": "ended",
-
   "shell.sessionList.title": "Previous sessions",
   "shell.sessionList.loading": "Loading…",
   "shell.sessionList.empty": "No sessions in this folder yet. Sessions started in the terminal show up here too.",
@@ -94,23 +92,18 @@
   "shell.sessionList.retention": "Claude Code deletes sessions after {{days}} days without activity ({{source}}). To keep them longer, raise <code>{{setting}}</code> in <code>{{file}}</code>.",
   "shell.sessionList.retentionDefault": "default",
   "shell.sessionList.retentionSetIn": "set in your {{source}} settings",
-
   "shell.titleBar.minimize": "Minimize",
   "shell.titleBar.maximize": "Maximize",
   "shell.titleBar.restore": "Restore",
   "shell.titleBar.close": "Close",
-
   "shell.dialog.close": "Close",
   "shell.dialog.cancel": "Cancel",
-
   "shell.modeHelp.label": "What the profiles mean",
   "shell.modeHelp.title": "Permission profiles",
   "shell.modeHelp.thisSession": "· this session",
   "shell.modeHelp.guard": "AgentChainer's guard blocks dangerous commands in every profile.",
-
   "shell.gitInit.notRepo": "This folder isn't a git repository, so you won't be able to review or revert the agent's changes.",
   "shell.gitInit.init": "Initialize git here",
-
   "shell.workspacesCard.title": "Workspaces",
   "shell.workspacesCard.hint": "Several folders in one session, e.g. an app and its API",
   "shell.workspacesCard.new": "New workspace…",
@@ -118,7 +111,6 @@
   "shell.workspacesCard.actions": "{{name}} actions",
   "shell.workspacesCard.edit": "Edit…",
   "shell.workspacesCard.remove": "Remove",
-
   "shell.workspaceDialog.newTitle": "New workspace",
   "shell.workspaceDialog.editTitle": "Edit workspace",
   "shell.workspaceDialog.description": "A named set of folders, e.g. an app and its API: a session works across all of them.",
@@ -133,14 +125,11 @@
   "shell.workspaceDialog.addFolder": "Add a folder…",
   "shell.workspaceDialog.choosePrimary": "Choose the primary folder…",
   "shell.workspaceDialog.help": "Claude can read and change every folder listed here, with the same approvals and guard as in one folder. Only the primary folder's CLAUDE.md, project settings, hooks and skills apply: the CLI doesn't load them from the others (checked on CLI 2.1.314).",
-
   "shell.copyButton.copy": "Copy",
   "shell.copyButton.copied": "Copied",
-
   "shell.editableList.add": "Add",
   "shell.editableList.row": "{{label}} {{n}}",
   "shell.editableList.remove": "Remove {{label}} {{n}}",
-
   "shell.treeRow.outside": "{{path}} (outside the workspace)",
   "shell.treeRow.modified": "modified",
   "shell.treeRow.added": "added",
@@ -148,5 +137,6 @@
   "shell.treeRow.renamed": "renamed",
   "shell.treeRow.untracked": "untracked",
   "shell.treeRow.conflicted": "conflicted",
-  "shell.sidebar.usage": "Usage"
+  "shell.sidebar.usage": "Usage",
+  "shell.sidebar.memory": "CLAUDE.md"
 }

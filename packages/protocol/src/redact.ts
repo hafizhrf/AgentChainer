@@ -36,6 +36,17 @@ export function hasSecret(text: string): boolean {
   return PATTERNS.some(([re, to]) => to !== "[email]" && new RegExp(re.source, re.flags.replace("g", "")).test(text));
 }
 
+/**
+ * Whether `text` holds a key or token by its own shape: a vendor prefix (`sk-ant-`, `ghp_`, `AKIA`…), a JWT or a
+ * private key. Unlike `hasSecret`, a name with a value (`API_KEY=…`), a password in a URL and an email address don't
+ * count, so documentation such as "set `API_KEY=` in .env" passes (CP-03).
+ */
+export function hasKeyShape(text: string): boolean {
+  return PATTERNS.some(
+    ([re, to]) => to.startsWith("[redacted") && new RegExp(re.source, re.flags.replace("g", "")).test(text),
+  );
+}
+
 const SECRET_NAME = /api[_-]?key|token|secret|password|passwd|credential|private[_-]?key/i;
 
 /**

@@ -27,6 +27,8 @@ const OPEN_VIEWS = [
   "permissions",
   "plugins",
   "mcp",
+  "memory",
+  "claude-md",
   "fresh",
 ] as const;
 

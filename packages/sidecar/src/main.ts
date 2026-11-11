@@ -69,11 +69,13 @@ import {
   installPlugin,
   listMarketplaces,
   listPlugins,
+  mcpCli,
   pluginCli,
   removeMcpServer,
   uninstallPlugin,
 } from "./installer.ts";
 import { liveResume } from "./live-resume.ts";
+import { addServer, listServers, removeServer, serverDetails } from "./mcp.ts";
 import { normalize } from "./normalize.ts";
 import { addRule, listRules, removeRule } from "./permissions.ts";
 import { cliError, installListed, listPluginsFor, parseDetails, uninstallListed, updateListed } from "./plugins.ts";
@@ -333,6 +335,13 @@ function pluginsCli(cwd: string) {
   const claude = findClaude();
   if (!claude) throw new RpcFailure(RpcErrorCode.invalidParams, t("rpc.claude.noCliForPlugins"));
   return pluginCli(claude, cwd);
+}
+
+/** The user's CLI for the MCP servers page (CP-02); every call fails clearly when the CLI isn't found. */
+function mcpServersCli(cwd: string) {
+  const claude = findClaude();
+  if (!claude) throw new RpcFailure(RpcErrorCode.invalidParams, t("rpc.claude.noCliForMcp"));
+  return mcpCli(claude, cwd);
 }
 
 function requireFolder(cwd: string): void {
@@ -967,6 +976,26 @@ serve(
       requireFolder(cwd);
       const res = await pluginsCli(cwd).setEnabled(id, scope, enabled);
       if (!res.ok) throw cliError(`claude plugin ${enabled ? "enable" : "disable"}`, res);
+      return { ok: true as const };
+    },
+    "mcp.list": ({ cwd, refresh }) => {
+      requireFolder(cwd);
+      return listServers(cwd, mcpServersCli(cwd), refresh ?? false);
+    },
+
+    "mcp.get": ({ cwd, name }) => {
+      requireFolder(cwd);
+      return serverDetails(cwd, mcpServersCli(cwd), name);
+    },
+
+    "mcp.add": (params) => {
+      requireFolder(params.cwd);
+      return addServer(params.cwd, mcpServersCli(params.cwd), params, catalog.version);
+    },
+
+    "mcp.remove": async ({ cwd, name, scope }) => {
+      requireFolder(cwd);
+      await removeServer(cwd, mcpServersCli(cwd), name, scope);
       return { ok: true as const };
     },
 

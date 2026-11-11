@@ -1,5 +1,11 @@
 import { realpathSync } from "node:fs";
-import type { InstalledPlugin, MarketPlugin, MethodResult, PluginChange } from "@agentchainer/protocol";
+import {
+  type InstalledPlugin,
+  type MarketPlugin,
+  type MethodResult,
+  type PluginChange,
+  redactSecrets,
+} from "@agentchainer/protocol";
 import {
   forgetPlugin,
   type LockItem,
@@ -220,8 +226,9 @@ export function confirmOf(res: CliResult): { command: string; sha256: string } |
   return { command: archive ? t("plugins.confirm.fetches", { command, archive }) : command, sha256 };
 }
 
+/** A CLI call that failed, in the CLI's own words, with anything that looks like a key or token masked. */
 export function cliError(what: string, res: CliResult): Error {
-  const message = str(asObject(res.json)?.message) ?? (res.stderr || res.stdout).trim();
+  const message = redactSecrets(str(asObject(res.json)?.message) ?? (res.stderr || res.stdout).trim());
   return new Error(t("plugins.cli.failed", { command: what, detail: message.slice(0, 400) || `exit ${res.status}` }));
 }
 

@@ -596,6 +596,41 @@ export const PluginChangeSchema = z.discriminatedUnion("status", [
 ]);
 export type PluginChange = z.infer<typeof PluginChangeSchema>;
 
+/*
+ * MCP servers (CP-02, ADR-0015): the ones the user's CLI knows for a workspace, read from its text output. Secret
+ * values never cross: environment variables and headers come as names only.
+ */
+
+/** A server's name as the CLI accepts it for `mcp add`: letters, digits, `-` and `_`, not starting with `-`. */
+export const McpServerNameSchema = z.string().regex(/^[A-Za-z0-9_][\w-]{0,63}$/);
+export const McpTransportSchema = z.enum(["stdio", "http", "sse"]);
+export const McpServerSchema = z.object({
+  name: z.string(),
+  /** The command line or URL the CLI shows, with anything that looks like a key or token masked. */
+  target: z.string(),
+  /** `other`: a transport the add form doesn't offer, e.g. a WebSocket server added with `claude mcp add-json`. */
+  transport: z.enum(["stdio", "http", "sse", "other"]),
+  /** `pending`: a shared `.mcp.json` server nobody approved here yet; Claude doesn't start it. */
+  status: z.enum(["connected", "failed", "needsAuth", "pending", "unknown"]),
+  /** The CLI's own words for the status (why it failed), masked and cut short. */
+  statusText: z.string(),
+  /** Set for servers this page leaves alone: a plugin brings them, or they're the account's claude.ai connectors. */
+  managedBy: z.enum(["plugin", "claudeai"]).optional(),
+  /** The CLI's warnings about its config, e.g. an environment variable that isn't set. */
+  warnings: z.array(z.string()),
+});
+export type McpServer = z.infer<typeof McpServerSchema>;
+export const McpServerDetailsSchema = McpServerSchema.extend({
+  /** Where it's configured; `other` for claude.ai, a plugin, or a config the CLI names otherwise (`scopeText`). */
+  scope: z.enum(["local", "project", "user", "other"]),
+  scopeText: z.string(),
+  /** The names of the environment variables it's given, never their values. */
+  env: z.array(z.string()),
+  /** The names of the headers it sends, never their values. */
+  headers: z.array(z.string()),
+});
+export type McpServerDetails = z.infer<typeof McpServerDetailsSchema>;
+
 /** What `bootstrap.apply` did, per action. */
 export const ApplyResultSchema = z.object({
   runId: z.string(),
@@ -2048,6 +2083,51 @@ export const methodSchemas = {
       scope: PluginInstallScopeSchema,
       enabled: z.boolean(),
     }),
+    result: Ok,
+  },
+
+  /* MCP servers (CP-02, ADR-0015): every call goes through the user's own CLI. */
+  /**
+   * The servers the CLI knows here, each health-checked: checking starts every server. Kept for the app session;
+   * `refresh` asks the CLI again.
+   */
+  "mcp.list": {
+    params: WorkspaceRef.extend({ refresh: z.boolean().optional() }),
+    result: z.object({ servers: z.array(McpServerSchema), checkedAt: z.string() }),
+  },
+  /** One server's config (names only for its variables and headers) and a fresh health check: "Test connection". */
+  "mcp.get": {
+    params: WorkspaceRef.extend({ name: z.string().regex(/^[^\s-][^\r\n]{0,199}$/) }),
+    result: McpServerDetailsSchema,
+  },
+  /**
+   * Adds a server through `claude mcp add`, recorded as a History run; Roll back removes it. Environment variables
+   * and header values are `${NAME}` references the CLI fills in when it starts the server, never values. With
+   * `dryRun`, only checks the request and returns the command it would run.
+   */
+  "mcp.add": {
+    params: WorkspaceRef.extend({
+      name: McpServerNameSchema,
+      scope: PluginInstallScopeSchema,
+      transport: McpTransportSchema,
+      /** stdio: the command line. It's split like a shell would (quotes kept together) but never run by one. */
+      command: z.string().max(4000).optional(),
+      /** HTTP or SSE: the server's URL. */
+      url: z.string().max(2000).optional(),
+      /** stdio: environment variables the server gets from the user's own environment, by name. */
+      env: z.array(z.string().max(100)).max(32).optional(),
+      /** HTTP or SSE: headers whose values reference environment variables, e.g. `Bearer ${GITHUB_TOKEN}`. */
+      headers: z
+        .array(z.object({ name: z.string().max(100), value: z.string().max(500) }))
+        .max(16)
+        .optional(),
+      dryRun: z.boolean().optional(),
+    }),
+    result: z.object({ command: z.array(z.string()), runId: z.string().optional() }),
+  },
+  /** Removes a server through `claude mcp remove`; a History run that added it shows it rolled back. */
+  "mcp.remove": {
+    params: WorkspaceRef.extend({ name: McpServerNameSchema, scope: PluginInstallScopeSchema }),
     result: Ok,
   },
 

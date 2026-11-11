@@ -10,6 +10,7 @@ import {
   RefreshCw,
   Rocket,
   Save,
+  Server,
   ShieldCheck,
   Terminal,
   Workflow,
@@ -25,6 +26,7 @@ import { Agents } from "./Agents.tsx";
 import { Commands } from "./Commands.tsx";
 import { Deploys } from "./Deploys.tsx";
 import { History } from "./History.tsx";
+import { McpServers } from "./McpServers.tsx";
 import { Metrics } from "./Metrics.tsx";
 import { gapsOf, Overview } from "./Overview.tsx";
 import { Permissions } from "./Permissions.tsx";
@@ -40,6 +42,7 @@ export type SetupView =
   | "commands"
   | "agents"
   | "plugins"
+  | "mcp"
   | "permissions"
   | "workflows"
   | "deploy"
@@ -48,7 +51,8 @@ export type SetupView =
 
 /**
  * Workspace settings as a full page (UX-06), laid out like an IDE's project settings: what the workspace is made of at
- * the top, sections on the left (readiness, the setup plan, detected commands, agents, plugins, saved permission rules,
+ * the top, sections on the left (readiness, the setup plan, detected commands, agents, plugins, MCP servers, saved permission
+ * rules,
  * the tiers' workflows, deploys, task metrics, past runs), and the section's content on the right. Opens over the session or Home; Back returns there.
  */
 export function SetupPage({
@@ -128,6 +132,7 @@ export function SetupPage({
       icon: <Puzzle size={16} className="nav-icon" />,
       count: pluginUpdates || null,
     },
+    { id: "mcp", label: t("setup.page.navMcp"), icon: <Server size={16} className="nav-icon" /> },
     { id: "permissions", label: t("setup.page.navPermissions"), icon: <ShieldCheck size={16} className="nav-icon" /> },
     { id: "workflows", label: t("setup.page.navWorkflows"), icon: <Workflow size={16} className="nav-icon" /> },
     { id: "deploy", label: t("setup.page.navDeploy"), icon: <Rocket size={16} className="nav-icon" /> },
@@ -228,6 +233,7 @@ export function SetupPage({
           {view === "plugins" && (
             <Plugins cwd={cwd} confirm={confirm} onChanged={() => void bootstrap.load()} onUpdates={setPluginUpdates} />
           )}
+          {view === "mcp" && <McpServers cwd={cwd} confirm={confirm} onChanged={() => void bootstrap.load()} />}
           {view === "permissions" && <Permissions cwd={cwd} confirm={confirm} workspaces={workspaces} />}
           {view === "workflows" && <Workflows cwd={cwd} confirm={confirm} workspaces={workspaces} />}
           {view === "deploy" && <Deploys cwd={cwd} />}

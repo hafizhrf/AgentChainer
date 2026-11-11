@@ -1,0 +1,15 @@
+{
+  "mcp.add.badEnvName": "\"{{name}}\" isn't an environment variable name: use letters, digits and _, not starting with a digit.",
+  "mcp.add.badHeaderName": "\"{{name}}\" isn't a header name.",
+  "mcp.add.badUrl": "Enter the server's full URL, starting with https://.",
+  "mcp.add.envNeedsStdio": "Environment variables go to a server the CLI starts (stdio). An HTTP or SSE server takes headers instead.",
+  "mcp.add.headerNeedsReference": "The {{name}} header's value must refer to an environment variable, e.g. Bearer ${MY_TOKEN}, so the key itself never passes through AgentChainer. To set a plain value, add the server in your terminal.",
+  "mcp.add.headersNeedUrl": "Headers go to an HTTP or SSE server. A server the CLI starts (stdio) takes environment variables instead.",
+  "mcp.add.httpsOnly": "Use https://. Plain http:// is only allowed to this computer (localhost).",
+  "mcp.add.noCommand": "Enter the command that starts the server.",
+  "mcp.add.secretInCommand": "The command looks like it holds a key or token. Pass it as an environment variable instead: add its name below and set it in your environment.",
+  "mcp.add.secretInUrl": "The URL looks like it holds a key, token or password. Send it in a header that refers to an environment variable instead.",
+  "mcp.add.title": "Add MCP server {{name}}",
+  "mcp.add.unclosedQuote": "A quote in the command isn't closed.",
+  "mcp.get.unreadable": "The CLI's details for {{name}} couldn't be read. Run `claude mcp get {{name}}` in a terminal to see them."
+}

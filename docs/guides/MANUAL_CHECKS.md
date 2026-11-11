@@ -24,6 +24,8 @@ and when a change touches these screens. None of them needs a Claude login or ma
 | 2 | Click `ac-check` under Recent workspaces in the sidebar, then **Workspace settings…** on Home. | Workspace settings opens on Overview for `ac-check`. |
 | 3 | Open **Setup plan**. Leave only **Ignore env and secret files** checked, click **Apply selected (1)**, and confirm. | `/tmp/ac-check/.gitignore` now exists and lists `.env`. |
 | 3b | Open **History**, click **Roll back run**, and confirm. | `.gitignore` is gone again; the run shows as rolled back or disappears. |
+| 3c | Open **MCP servers**, click **Add server…**. Name `check-echo`, Command `node -e "process.stdin.resume()"`, keep "This workspace, just me", click **Next**, then **Add server**. | The dialog showed `claude mcp add --scope local check-echo -- node -e 'process.stdin.resume()'` before it ran. The server is listed; opening it checks it (it fails: it's not a real MCP server). History lists "Add MCP server check-echo". |
+| 3d | Roll back that run in **History**. | `claude mcp list` in `/tmp/ac-check` no longer lists `check-echo`. |
 | 4 | Press ⇧⌘P, type "Workspace settings: Commands", press Enter. | The Commands section opens. |
 | 5 | Open Settings (the gear at the bottom of the sidebar), set Theme to Dark, and click Save. | The app turns dark; `~/Library/Application Support/io.github.hafizhrf.agentchainer/settings.json` says `"theme": "dark"`. Set it back afterwards. |
 

@@ -98,6 +98,7 @@
   "app.palette.setupCommands": "Workspace settings: Commands",
   "app.palette.setupAgents": "Workspace settings: Agents",
   "app.palette.setupPlugins": "Workspace settings: Plugins",
+  "app.palette.setupMcp": "Workspace settings: MCP servers",
   "app.palette.setupPermissions": "Workspace settings: Permissions",
   "app.palette.setupWorkflows": "Workspace settings: Workflows",
   "app.palette.setupDeploy": "Workspace settings: Deploy",

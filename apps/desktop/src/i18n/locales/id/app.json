@@ -97,6 +97,7 @@
   "app.palette.setupCommands": "Pengaturan workspace: Perintah",
   "app.palette.setupAgents": "Pengaturan workspace: Agent",
   "app.palette.setupPlugins": "Pengaturan workspace: Plugin",
+  "app.palette.setupMcp": "Pengaturan workspace: MCP server",
   "app.palette.setupPermissions": "Pengaturan workspace: Izin",
   "app.palette.setupWorkflows": "Pengaturan workspace: Workflow",
   "app.palette.setupDeploy": "Pengaturan workspace: Deploy",

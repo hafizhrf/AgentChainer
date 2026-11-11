@@ -2453,6 +2453,46 @@ Owner request, 2026-11-10: features that community tools for coding agents have 
     was recorded with its model, tokens and ≈$0.088 estimate.
 - [ ] **CP-02** An MCP server manager: add any server, import from Claude Desktop, test the connection. Today: catalog
       items only. — opcode; Vibe Kanban ([MCP settings](https://vibekanban.com/docs/settings/mcp-servers)).
+  - **Plan (2026-11-11):**
+    - **Where:** an **MCP servers** section in Workspace settings, next to Plugins (owner's choice).
+    - **Through the CLI only:** `claude mcp list/get/add/remove`, as a child process with no shell
+      ([ADR-0015](adr/0015-mcp-server-manager.md)).
+    - **Loading:** the list loads when the page opens (owner's choice), and says that checking starts each server.
+    - **No secret values:** environment variables pass as `NAME=${NAME}` references, header values must be
+      references, and `get`'s values are dropped while parsing.
+    - **In the user's terminal:** OAuth sign-in and Claude Desktop's import are shown as commands to run there.
+    - **History:** every add is a run that Roll back undoes.
+  Progress (2026-11-11): built.
+  - **Spike** (2.1.293, throwaway servers in a scratch project, no model calls):
+    - captured `list`'s and `get`'s text for every status;
+    - `${NAME}` references expand in env and header values at local, project and user scope;
+    - `get` prints values unmasked;
+    - `--env` and `--header` take several values, so the name and URL go first.
+  - **Sidecar:**
+    - `mcp.ts`: the text parsers, `addSpec` (refuses key-like commands and URLs, plain header values, remote `http:`)
+      and the per-session listing;
+    - `installer.ts`: `mcpCli` and `mcpAddArgs`;
+    - `apply.ts`: `recordCliChange`, shared with plugin installs;
+    - `mcp.list`, `mcp.get`, `mcp.add` (with `dryRun`) and `mcp.remove`;
+    - the CLI contract adds `mcp list`, `login` and `add-from-claude-desktop`, and `add`'s `--transport`, `--env` and
+      `--header`.
+  - **UI:**
+    - `setup/McpServers.tsx`: list and detail, status as icon and words, a two-step Add dialog that shows the exact
+      command, Remove, and Copy / Open terminal for `claude mcp login` and the Desktop import;
+    - the palette entry, en and id text.
+  - **Tests:** `mcp.test.ts` (16), `mcpCommand.test.ts`, and the contract test, which now reads multi-line arrays.
+  - **Live, real CLI** (stdio JSON-RPC on a scratch project):
+    - a stdio server added with an env reference connected;
+    - a key in the command was refused;
+    - the add was a History run;
+    - remove worked;
+    - at project scope, Roll back removed the server and deleted the `.mcp.json` the add had created.
+  - **In the app** (debug build, selftest view with no synthetic input, one haiku turn each, ≈$0.011 in all): the page
+    listed the owner's servers and four demo ones as connected, failed and waiting for approval, with claude.ai
+    connectors in their own group. Checked in light, dark and Bahasa Indonesia. Still for the owner's click-through:
+    the detail pane, the Add dialog and 900 px (MANUAL_CHECKS 3c–3d).
+  - `cli-contract.ts` passes against 2.1.293. Docs: ADR-0015, THREAT_MODEL T-22, PRIVACY, ARCHITECTURE §4 and
+    MANUAL_CHECKS 3c–3d.
 - [ ] **CP-03** A CLAUDE.md editor with a live preview, and a scan across projects. — opcode.
 - [ ] **CP-04** Worktree setup:
   - copy chosen gitignored files (`.env`) into a task's worktree;

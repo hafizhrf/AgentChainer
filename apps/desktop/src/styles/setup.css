@@ -1068,6 +1068,75 @@ button.chip:hover {
   margin: 0;
 }
 
+/* ---------- MCP servers (CP-02): the CLI's servers, list and detail ---------- */
+
+.mcp-bar {
+  min-height: 44px;
+}
+
+.mcp-status {
+  gap: 4px;
+}
+
+.mcp-target {
+  font-family: var(--font-mono);
+}
+
+.mcp-target-full {
+  overflow-wrap: anywhere;
+}
+
+.mcp-names {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-2);
+}
+
+.mcp-help {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.mcp-help .field-help {
+  margin: 0;
+}
+
+.mcp-command {
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.mcp-command code {
+  overflow-wrap: anywhere;
+}
+
+.mcp-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.mcp-headers {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  border: none;
+}
+
+.mcp-header-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 2fr) auto;
+  gap: var(--space-2);
+  align-items: center;
+}
+
+.mcp-add-header {
+  align-self: flex-start;
+}
+
 .plain-list {
   margin: 0;
   padding-left: var(--space-4);

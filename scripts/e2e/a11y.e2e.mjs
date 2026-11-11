@@ -100,6 +100,10 @@ describe("accessibility (X-12)", () => {
     await (await nav("Plugins")).click();
     await new Promise((r) => setTimeout(r, 1500));
     await audit("plugins");
+    // CP-02: the list asks the CLI, which checks each server; without a CLI the page shows why.
+    await (await nav("MCP servers")).click();
+    await new Promise((r) => setTimeout(r, 1500));
+    await audit("mcp-servers");
     await (await nav("History")).click();
     await audit("history");
   });

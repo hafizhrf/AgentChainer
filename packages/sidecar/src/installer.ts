@@ -87,3 +87,50 @@ export const pluginCli = (claude: string, cwd: string) => ({
 });
 
 export type PluginCli = ReturnType<typeof pluginCli>;
+
+/** A server for `mcp add`, already checked (`mcp.ts` `addSpec`). */
+export type McpAddSpec = {
+  name: string;
+  scope: Scope;
+  transport: "stdio" | "http" | "sse";
+  /** stdio: the program and its arguments. */
+  argv: string[];
+  url: string;
+  /** stdio: `NAME=${NAME}` references. */
+  env: string[];
+  /** HTTP and SSE: `Name: value` lines. */
+  headers: string[];
+};
+
+/**
+ * The `mcp add` arguments. `--env` and `--header` take several values, so each goes where nothing follows it but
+ * another option or `--`: after the name for stdio, after the URL otherwise.
+ */
+export function mcpAddArgs(s: McpAddSpec): string[] {
+  return s.transport === "stdio"
+    ? ["mcp", "add", "--scope", s.scope, s.name, ...s.env.flatMap((e) => ["--env", e]), "--", ...s.argv]
+    : [
+        "mcp",
+        "add",
+        "--scope",
+        s.scope,
+        "--transport",
+        s.transport,
+        s.name,
+        s.url,
+        ...s.headers.flatMap((h) => ["--header", h]),
+      ];
+}
+
+/**
+ * The MCP servers page's calls (CP-02, ADR-0015). Listing health-checks every server, which can take a while; it
+ * never blocks the sidecar.
+ */
+export const mcpCli = (claude: string, cwd: string) => ({
+  list: () => runLong(claude, ["mcp", "list"], cwd, 120_000),
+  get: (name: string) => runLong(claude, ["mcp", "get", name], cwd, 60_000),
+  add: (spec: McpAddSpec) => runLong(claude, mcpAddArgs(spec), cwd, 60_000),
+  remove: (name: string, scope: Scope) => runLong(claude, ["mcp", "remove", "--scope", scope, name], cwd, 60_000),
+});
+
+export type McpCli = ReturnType<typeof mcpCli>;

@@ -5318,6 +5318,345 @@
         "additionalProperties": false
       }
     },
+    "mcp.list": {
+      "params": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "cwd": {
+            "type": "string",
+            "minLength": 1
+          },
+          "refresh": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "cwd"
+        ],
+        "additionalProperties": false
+      },
+      "result": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "servers": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "target": {
+                  "type": "string"
+                },
+                "transport": {
+                  "type": "string",
+                  "enum": [
+                    "stdio",
+                    "http",
+                    "sse",
+                    "other"
+                  ]
+                },
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "connected",
+                    "failed",
+                    "needsAuth",
+                    "pending",
+                    "unknown"
+                  ]
+                },
+                "statusText": {
+                  "type": "string"
+                },
+                "managedBy": {
+                  "type": "string",
+                  "enum": [
+                    "plugin",
+                    "claudeai"
+                  ]
+                },
+                "warnings": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              },
+              "required": [
+                "name",
+                "target",
+                "transport",
+                "status",
+                "statusText",
+                "warnings"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "checkedAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "servers",
+          "checkedAt"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "mcp.get": {
+      "params": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "cwd": {
+            "type": "string",
+            "minLength": 1
+          },
+          "name": {
+            "type": "string",
+            "pattern": "^[^\\s-][^\\r\\n]{0,199}$"
+          }
+        },
+        "required": [
+          "cwd",
+          "name"
+        ],
+        "additionalProperties": false
+      },
+      "result": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "target": {
+            "type": "string"
+          },
+          "transport": {
+            "type": "string",
+            "enum": [
+              "stdio",
+              "http",
+              "sse",
+              "other"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "connected",
+              "failed",
+              "needsAuth",
+              "pending",
+              "unknown"
+            ]
+          },
+          "statusText": {
+            "type": "string"
+          },
+          "managedBy": {
+            "type": "string",
+            "enum": [
+              "plugin",
+              "claudeai"
+            ]
+          },
+          "warnings": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "scope": {
+            "type": "string",
+            "enum": [
+              "local",
+              "project",
+              "user",
+              "other"
+            ]
+          },
+          "scopeText": {
+            "type": "string"
+          },
+          "env": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "headers": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "name",
+          "target",
+          "transport",
+          "status",
+          "statusText",
+          "warnings",
+          "scope",
+          "scopeText",
+          "env",
+          "headers"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "mcp.add": {
+      "params": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "cwd": {
+            "type": "string",
+            "minLength": 1
+          },
+          "name": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_][\\w-]{0,63}$"
+          },
+          "scope": {
+            "type": "string",
+            "enum": [
+              "local",
+              "project",
+              "user"
+            ]
+          },
+          "transport": {
+            "type": "string",
+            "enum": [
+              "stdio",
+              "http",
+              "sse"
+            ]
+          },
+          "command": {
+            "type": "string",
+            "maxLength": 4000
+          },
+          "url": {
+            "type": "string",
+            "maxLength": 2000
+          },
+          "env": {
+            "maxItems": 32,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 100
+            }
+          },
+          "headers": {
+            "maxItems": 16,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "maxLength": 100
+                },
+                "value": {
+                  "type": "string",
+                  "maxLength": 500
+                }
+              },
+              "required": [
+                "name",
+                "value"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "dryRun": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "cwd",
+          "name",
+          "scope",
+          "transport"
+        ],
+        "additionalProperties": false
+      },
+      "result": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "command": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "runId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "command"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "mcp.remove": {
+      "params": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "cwd": {
+            "type": "string",
+            "minLength": 1
+          },
+          "name": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_][\\w-]{0,63}$"
+          },
+          "scope": {
+            "type": "string",
+            "enum": [
+              "local",
+              "project",
+              "user"
+            ]
+          }
+        },
+        "required": [
+          "cwd",
+          "name",
+          "scope"
+        ],
+        "additionalProperties": false
+      },
+      "result": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "const": true
+          }
+        },
+        "required": [
+          "ok"
+        ],
+        "additionalProperties": false
+      }
+    },
     "git.branches": {
       "params": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",

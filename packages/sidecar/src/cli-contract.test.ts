@@ -14,7 +14,8 @@ const entry = (cmd: string) => {
 describe("the CLI contract (X-05)", () => {
   it("covers every plugin and MCP command installer.ts runs, with its flags", () => {
     const source = readFileSync(new URL("./installer.ts", import.meta.url), "utf8");
-    const calls = [...source.matchAll(/\["(plugin|mcp)",([^\]]*)\]/g)];
+    // An array the formatter breaks over lines counts too.
+    const calls = [...source.matchAll(/\[\s*"(plugin|mcp)",([^\]]*)\]/g)];
     assert.ok(calls.length >= 10, `found only ${calls.length} CLI calls in installer.ts`);
     for (const [, top = "", rest = ""] of calls) {
       const literals = [...rest.matchAll(/"([^"]*)"/g)].map((m) => m[1] ?? "");

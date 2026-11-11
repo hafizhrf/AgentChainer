@@ -6,7 +6,7 @@ import {
   type TaskContract,
   type WorkspaceProfile,
 } from "@agentchainer/protocol";
-import type { SDKMessage } from "@anthropic-ai/claude-agent-sdk";
+import type { HookCallback, SDKMessage } from "@anthropic-ai/claude-agent-sdk";
 import { generatorHook } from "../bootstrap/generate.ts";
 import { guarded } from "../bootstrap/workspace-guard.ts";
 import { t } from "../i18n/index.ts";
@@ -17,6 +17,9 @@ import { smokeCommand } from "./gates.ts";
  * Drafting the task contract (M3-02, planner.md §3): a read-only session reads the repository and answers with
  * structured output. It can use Read, Grep and Glob only, the generators' hook keeps it inside the workspace, and the
  * workspace guard reverts anything that changed anyway. The user edits the draft and approves it.
+ *
+ * It can ask first (UX-24): once, through `AskUserQuestion`, when the request leaves open a decision that changes the
+ * work. The questions go to the task page as cards, and the answers come back into the draft and onto the task.
  */
 
 /** Gates the workspace has a command for: the profile's, plus `smoke` when `scripts/smoke.*` exists (M3-08). */
@@ -87,11 +90,44 @@ export function workspaceLines(profile: WorkspaceProfile, gates: GateKind[]): st
   ];
 }
 
+/** A question the drafter asked and the person's answer (UX-24). */
+export type Clarification = { question: string; answer: string };
+
+/**
+ * Puts the drafter's `AskUserQuestion` to the person: the answers by question text, or null when they skipped them
+ * or the draft stopped.
+ */
+export type AskQuestions = (
+  input: Record<string, unknown>,
+  signal?: AbortSignal,
+) => Promise<Record<string, string> | null>;
+
+/** The SDK's tool for asking the person, with choices. */
+const ASK_TOOL = "AskUserQuestion";
+
+/** The person skipped the questions, or the draft stopped waiting. */
+const SKIPPED =
+  "The person skipped these questions. Draft with what you have, and list what's still open in openQuestions.";
+/** Drafting asks one round of questions (owner's choice, UX-24). */
+const ASKED_ONCE = "You've asked once already: draft now, and list what's still open in openQuestions.";
+
+/** Added to the guide when drafting can ask (UX-24). */
+const ASK_GUIDE = `
+
+Ask before you draft. When the request leaves open a decision that changes the work and the repository doesn't answer
+it (anything you would otherwise put in openQuestions), ask the person about it first, in one AskUserQuestion call: at
+most 4 questions, each with 2 to 4 short options; the person can also type an answer of their own. Don't ask what the
+request, the repository or the settled answers already say, and don't ask for permission to read. Then draft with
+their answers: openQuestions keeps only what's still open after they answered. When nothing is open, draft straight
+away.`;
+
 /** What else drafting reads (UX-13): the chat a task came from, and, when redrafting, the contract and the reply. */
 export type DraftExtra = {
   context?: string;
   current?: TaskContract;
   feedback?: string;
+  /** What the person already answered to the drafter's questions (UX-24): a redraft doesn't ask again. */
+  settled?: Clarification[];
   /** A multi-folder workspace's other folders (M8-01), which drafting reads and names areas in. */
   folders?: { name: string; path: string }[];
 };
@@ -115,6 +151,13 @@ export function draftPrompt(
         ]
       : []),
     ...(extra.feedback ? ["", `The person's reply: ${extra.feedback}`, "Draft the contract again, following it."] : []),
+    ...(extra.settled?.length
+      ? [
+          "",
+          "Already settled with the person (don't ask these again):",
+          ...extra.settled.map((c) => `- ${c.question} → ${c.answer}`),
+        ]
+      : []),
     ...(extra.folders?.length
       ? [
           "",
@@ -199,7 +242,17 @@ export type DraftOptions = {
   extra?: DraftExtra;
   /** Each SDK message, so drafting can be shown as it reads the project (UX-13). */
   onMessage?: (m: SDKMessage) => void;
+  /** Lets drafting ask the person first (UX-24); without it, drafting can't ask. */
+  ask?: AskQuestions;
 };
+
+/** The generators' hook, letting `AskUserQuestion` through when drafting can ask. */
+function draftHook(root: string, folders: string[], canAsk: boolean): HookCallback {
+  const hook = generatorHook(root, [], folders);
+  if (!canAsk) return hook;
+  return async (input, toolUseId, options) =>
+    input.hook_event_name === "PreToolUse" && input.tool_name === ASK_TOOL ? {} : hook(input, toolUseId, options);
+}
 
 /** Drafts the contract. The cost is returned with the result or the error, so a failed draft is still accounted. */
 export async function draftContract(
@@ -209,10 +262,13 @@ export async function draftContract(
   request: string,
   profile: WorkspaceProfile,
   opts: DraftOptions = {},
-): Promise<{ contract: TaskContract | null; error?: string; costUsd: number }> {
+): Promise<{ contract: TaskContract | null; error?: string; costUsd: number; clarifications: Clarification[] }> {
   const gates = availableGates(profile, root);
   const folders = opts.extra?.folders?.map((f) => f.path) ?? [];
   let costUsd = 0;
+  const ask = opts.ask;
+  let asked = false;
+  const clarifications: Clarification[] = [];
   const { result } = await guarded(root, async () => {
     const q = sdk.query({
       prompt: draftPrompt(request, profile, gates, opts.extra),
@@ -220,18 +276,27 @@ export async function draftContract(
         cwd: root,
         pathToClaudeCodeExecutable: claudePath,
         ...(opts.model ? { model: opts.model } : {}),
-        tools: ["Read", "Grep", "Glob"],
+        tools: ["Read", "Grep", "Glob", ...(ask ? [ASK_TOOL] : [])],
         // Isolated from the user's and the project's settings: no hooks, plugins or MCP servers run here.
         settingSources: [],
         persistSession: false,
         maxTurns: 30,
         maxBudgetUsd: opts.maxBudgetUsd ?? 0.5,
-        systemPrompt: { type: "preset", preset: "claude_code", append: GUIDE },
+        systemPrompt: { type: "preset", preset: "claude_code", append: ask ? GUIDE + ASK_GUIDE : GUIDE },
         outputFormat: { type: "json_schema", schema: DRAFT_JSON_SCHEMA },
-        hooks: { PreToolUse: [{ hooks: [generatorHook(root, [], folders)] }] },
+        hooks: { PreToolUse: [{ hooks: [draftHook(root, folders, Boolean(ask))] }] },
         ...(folders.length ? { additionalDirectories: folders } : {}),
-        // The hook above already decided; anything that reaches here is allowed.
-        canUseTool: async (_tool, input) => ({ behavior: "allow", updatedInput: input }),
+        // The hook above already decided; anything that reaches here is allowed, except a question, which waits for
+        // the person's answers (once).
+        canUseTool: async (tool, input, { signal }) => {
+          if (tool !== ASK_TOOL || !ask) return { behavior: "allow", updatedInput: input };
+          if (asked) return { behavior: "deny", message: ASKED_ONCE };
+          asked = true;
+          const answers = await ask(input, signal);
+          if (!answers) return { behavior: "deny", message: SKIPPED };
+          for (const [question, answer] of Object.entries(answers)) clarifications.push({ question, answer });
+          return { behavior: "allow", updatedInput: { ...input, answers } };
+        },
         ...(opts.abortController ? { abortController: opts.abortController } : {}),
       },
     });
@@ -245,5 +310,5 @@ export async function draftContract(
     }
     return { contract: null, error: t("tasks.contract.noResult") };
   });
-  return { ...result, costUsd };
+  return { ...result, costUsd, clarifications };
 }

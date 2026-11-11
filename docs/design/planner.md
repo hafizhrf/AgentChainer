@@ -97,7 +97,7 @@ Stored as `contract.json` (schema in `packages/protocol`, zod):
 | `outOfScope` | string[] | What the task explicitly won't touch |
 | `risks` | string[] | What could go wrong; feeds triage and the report |
 | `affectedAreas` | string[] | Workspace paths or globs Claude expects to touch (from reading the repo) |
-| `openQuestions` | string[] | What the request leaves undecided. The user settles them by editing the contract |
+| `openQuestions` | string[] | What the request leaves undecided after the drafter asked (UX-24). The user settles them by editing the contract |
 | `approvedAt` | | Set when the user approves; the contract is read-only after that, except through "Revise". There's no `approvedBy`: the approver is always the local user, and no identity is stored (ADR-0002) |
 
 **Drafting:**
@@ -105,6 +105,8 @@ Stored as `contract.json` (schema in `packages/protocol`, zod):
   generators use for structured output.
 - The model is the user's default model (§15).
 - If the request is too vague for criteria, the draft lists `openQuestions`, and the form shows them first.
+- Before drafting, the drafter may ask the person once with `AskUserQuestion` (UX-24). Their answers go into the
+  draft and stay on the task (`clarifications`), so a redraft doesn't ask again.
 - The output is normalized before anyone sees it: criteria are numbered, a check that names a gate the profile has
   no command for becomes `manual`, and areas outside the workspace are dropped.
 

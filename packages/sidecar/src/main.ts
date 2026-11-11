@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { existsSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
@@ -87,6 +88,7 @@ import { runAsync } from "./run-async.ts";
 import { type AgentSdkModule, loadSdk } from "./sdk-loader.ts";
 import { ASK_FIRST, Session } from "./session.ts";
 import { replayEvents, retention, toSessionInfo } from "./stored-sessions.ts";
+import { DraftQuestions } from "./tasks/draft-questions.ts";
 import { generateWorkflow } from "./tasks/generate-workflow.ts";
 import { applyLessons, dismissLessons, previewLessons, storedLessons, suggestLessons } from "./tasks/lessons.ts";
 import { computeMetrics, loadAllTasks } from "./tasks/metrics.ts";
@@ -111,6 +113,7 @@ import {
   cleanupTask,
   continueTask,
   createTaskPr,
+  type DraftListener,
   deleteTaskSafe,
   draftTask,
   dropFlow,
@@ -445,12 +448,36 @@ const scheduler = new Scheduler({
  * Drafting's messages as agent events tagged with the task's "draft" step (UX-13), so its thread shows what drafting
  * reads. Each drafting is its own session id: a redraft starts a new block.
  */
-function draftEvents(cwd: string, id: string) {
-  const sessionId = `draft-${id}-${Date.now()}`;
+function draftEvents(cwd: string, id: string): DraftListener {
+  // A UUID like any session's: the question card's answer comes back through `permission.respond`, which takes one.
+  const sessionId = randomUUID();
   const task = { id, cwd, stepId: "draft", label: t("rpc.task.draftingContract"), role: "planner" };
-  return (m: SDKMessage) => {
-    for (const event of normalize(m)) notify("agent.event", { sessionId, event, task });
+  return {
+    onMessage: (m: SDKMessage) => {
+      for (const event of normalize(m)) notify("agent.event", { sessionId, event, task });
+    },
+    // Its questions go to the task page as the cards a step's questions use (UX-24).
+    ask: (input, signal) => draftQuestions.ask(sessionId, task, input, signal),
   };
+}
+
+/** The drafters' questions waiting for the person's answers (UX-24); `permission.respond` answers them. */
+const draftQuestions = new DraftQuestions((request) => notify("permission.request", request));
+
+/**
+ * Drafts, then tells the UI how the task stands, however the draft ended: a question card a stopped draft left on
+ * the task page goes away with it (UX-24).
+ */
+async function drafted(cwd: string, id: string, draft: Promise<Task>): Promise<Task> {
+  try {
+    return await draft;
+  } finally {
+    try {
+      taskUpdated(cwd)(present(loadTask(cwd, id)));
+    } catch {
+      // The task is gone: nothing to show.
+    }
+  }
 }
 
 function rejectIfOpen(sessionId: string): void {
@@ -713,6 +740,8 @@ serve(
     },
 
     "permission.respond": ({ sessionId, requestId, ...answer }) => {
+      // A drafter's question (UX-24) isn't a session's.
+      if (draftQuestions.respond(requestId, answer.allow, answer.updatedInput)) return { ok: true };
       if (!requireSession(sessionId).respond(requestId, answer)) {
         throw new RpcFailure(RpcErrorCode.noPendingPermission, t("rpc.permission.noPending", { requestId }));
       }
@@ -1134,7 +1163,7 @@ serve(
 
     "task.draft": async ({ cwd, id, model }) => {
       requireFolder(cwd);
-      return draftTask(cwd, id, await claude(), model, draftEvents(cwd, id));
+      return drafted(cwd, id, draftTask(cwd, id, await claude(), model, draftEvents(cwd, id)));
     },
 
     "task.proposeFlow": async ({ cwd, id, model }) => {
@@ -1159,7 +1188,7 @@ serve(
 
     "task.redraft": async ({ cwd, id, model, feedback }) => {
       requireFolder(cwd);
-      return draftTask(cwd, id, await claude(), model, draftEvents(cwd, id), feedback);
+      return drafted(cwd, id, draftTask(cwd, id, await claude(), model, draftEvents(cwd, id), feedback));
     },
 
     "task.retriage": async ({ cwd, id, contract }) => {

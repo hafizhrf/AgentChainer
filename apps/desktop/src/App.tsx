@@ -289,9 +289,13 @@ export function App() {
           setSettingsOpen(true);
         }
         if (cfg.open === "new-session") setNewSession(true);
-        if (cfg.open === "task-changes") {
+        if (cfg.open === "task-changes" || cfg.open === "task-contract") {
           const latest = (await request("task.list", { cwd: cfg.cwd })).tasks[0];
           if (latest) openTask(cfg.cwd, latest.id);
+          // The page follows its thread to the end; the contract card is brought back into view once it's settled.
+          if (cfg.open === "task-contract") {
+            setTimeout(() => document.querySelector(".contract-card")?.scrollIntoView({ block: "start" }), 4000);
+          }
         }
         const first = tabsRef.current[0];
         if (cfg.open === "terminal" && first) toggleTerminal(first.sessionId);

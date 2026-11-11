@@ -112,6 +112,7 @@
   "tasks.contract.title": "Kontrak",
   "tasks.contract.objective": "Tujuan",
   "tasks.contract.acceptanceCriteria": "Kriteria penerimaan",
+  "tasks.contract.settled": "Sudah disepakati dengan Anda",
   "tasks.contract.affectedAreas": "Area terdampak",
   "tasks.contract.constraints": "Batasan",
   "tasks.contract.outOfScope": "Di luar cakupan",

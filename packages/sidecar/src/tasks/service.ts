@@ -8,6 +8,7 @@ import {
   type FeedbackRound,
   type FileDiff,
   MAX_CI_FIXES,
+  MAX_CLARIFICATIONS,
   type MergeGate,
   type MessageRef,
   type PermissionMode,
@@ -52,7 +53,7 @@ import { log, RpcFailure } from "../rpc.ts";
 import { runAsync } from "../run-async.ts";
 import type { AgentSdkModule } from "../sdk-loader.ts";
 import { fileDiffAgainst, git, listFiles, repoOf } from "../workspace.ts";
-import { availableGates, draftContract, normalizeContract } from "./contract.ts";
+import { type AskQuestions, availableGates, draftContract, normalizeContract } from "./contract.ts";
 import {
   buildEvidence,
   type Evidence,
@@ -157,7 +158,8 @@ export function newTask(root: string, request: string, context?: string, folders
 }
 
 /** Drafting's messages, so the thread shows what it reads (UX-13). */
-export type DraftListener = (m: SDKMessage) => void;
+/** Drafting's messages for the thread (UX-13), and its questions to the person (UX-24). */
+export type DraftListener = { onMessage?: (m: SDKMessage) => void; ask?: AskQuestions };
 
 async function triage(
   root: string,
@@ -203,6 +205,7 @@ export async function draftTask(
   if (feedback !== undefined && !task.contract) throw invalid(t("tasks.service.draftFirst"));
   return cancellable(id, async (controller) => {
     const profile = detectWorkspace(root);
+    const settled = task.clarifications ?? [];
     const draft = await draftContract(claude.sdk, claude.claudePath, root, task.request, profile, {
       ...(model ? { model } : {}),
       abortController: controller,
@@ -210,13 +213,24 @@ export async function draftTask(
         ...(task.chatContext ? { context: task.chatContext } : {}),
         ...(feedback !== undefined && task.contract ? { current: task.contract, feedback } : {}),
         ...(task.folders?.length ? { folders: task.folders.map(({ name, path }) => ({ name, path })) } : {}),
+        ...(settled.length ? { settled: settled.map(({ question, answer }) => ({ question, answer })) } : {}),
       },
-      ...(listen ? { onMessage: listen } : {}),
+      ...(listen?.onMessage ? { onMessage: listen.onMessage } : {}),
+      ...(listen?.ask ? { ask: listen.ask } : {}),
     });
+    // The person's answers stay with the task, even when the draft that asked failed: they said them (UX-24).
+    const at = new Date().toISOString();
+    const answered = draft.clarifications.map((c) => ({
+      question: c.question.slice(0, 1000),
+      answer: c.answer.slice(0, 2000),
+      at,
+    }));
+    const clarifications = [...settled, ...answered].slice(-MAX_CLARIFICATIONS);
     const drafted: Task = {
       ...task,
       availableGates: availableGates(profile, root),
       costUsd: task.costUsd + draft.costUsd,
+      ...(clarifications.length ? { clarifications } : {}),
       updatedAt: new Date().toISOString(),
     };
     if (!draft.contract) {

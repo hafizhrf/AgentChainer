@@ -149,6 +149,47 @@ describe("task flow", () => {
     );
   });
 
+  it("keeps the person's answers to the drafter's questions, and tells a redraft about them (UX-24)", async () => {
+    const root = copyFixture("sample-app");
+    const task = newTask(root, "Add discounts");
+    const prompts: string[] = [];
+    const question = { questions: [{ question: "Which discounts?", header: "Discounts", options: [] }] };
+    const sdk = {
+      query: ({ prompt, options }: { prompt: string; options: Record<string, unknown> }) => {
+        const classify = options.model === "haiku";
+        if (!classify) prompts.push(prompt);
+        const canUseTool = options.canUseTool as (
+          tool: string,
+          input: unknown,
+          o: { signal: AbortSignal },
+        ) => Promise<unknown>;
+        return (async function* () {
+          if (!classify) await canUseTool("AskUserQuestion", question, { signal: new AbortController().signal });
+          yield {
+            type: "result",
+            subtype: "success",
+            total_cost_usd: classify ? 0.002 : 0.1,
+            result: "",
+            structured_output: classify ? { tier: "S", rationale: "Small.", confidence: "high" } : DRAFT,
+          };
+        })();
+      },
+    } as unknown as AgentSdkModule;
+    const claude = { sdk, claudePath: "claude" };
+    const drafted = await draftTask(root, task.id, claude, undefined, {
+      ask: async () => ({ "Which discounts?": "Percent off" }),
+    });
+    assert.deepEqual(
+      drafted.clarifications?.map(({ question, answer }) => [question, answer]),
+      [["Which discounts?", "Percent off"]],
+    );
+    assert.deepEqual(loadTask(root, task.id).clarifications, drafted.clarifications);
+    // A redraft is told what's settled; a question it asks anyway and the person skips adds nothing.
+    const again = await draftTask(root, task.id, claude, undefined, { ask: async () => null }, "Also fixed amounts");
+    assert.match(prompts[1] ?? "", /Already settled with the person[^\n]*\n- Which discounts\? → Percent off/);
+    assert.equal(again.clarifications?.length, 1);
+  });
+
   it("re-triages an edited draft and saves it normalized", async () => {
     const root = copyFixture("sample-app");
     const task = newTask(root, "Fix total()");

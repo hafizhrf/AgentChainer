@@ -175,6 +175,110 @@ describe("drafting", () => {
     assert.match(prompt, /The person's reply: Leave applyDiscount alone/);
   });
 
+  /** A drafter that calls the hook and canUseTool for each tool call it's given, then answers with a contract. */
+  function asking(calls: { tool: string; input: Record<string, unknown> }[]) {
+    const seen: {
+      options: Record<string, unknown>;
+      hook: unknown[];
+      permission: { behavior: string; message?: string; updatedInput?: Record<string, unknown> }[];
+    } = { options: {}, hook: [], permission: [] };
+    const sdk = {
+      query: ({ options }: { options: Record<string, unknown> }) => {
+        seen.options = options;
+        const hooks = options.hooks as { PreToolUse: { hooks: ((...a: unknown[]) => Promise<unknown>)[] }[] };
+        const hook = hooks.PreToolUse[0]?.hooks[0];
+        const canUseTool = options.canUseTool as (
+          tool: string,
+          input: Record<string, unknown>,
+          o: { signal: AbortSignal },
+        ) => Promise<(typeof seen.permission)[number]>;
+        return (async function* () {
+          for (const c of calls) {
+            seen.hook.push(
+              await hook?.({ hook_event_name: "PreToolUse", tool_name: c.tool, tool_input: c.input, cwd: "/w" }, "t", {
+                signal: new AbortController().signal,
+              }),
+            );
+            seen.permission.push(await canUseTool(c.tool, c.input, { signal: new AbortController().signal }));
+          }
+          yield {
+            type: "result",
+            subtype: "success",
+            total_cost_usd: 0.03,
+            result: "",
+            structured_output: { objective: "Discounts.", openQuestions: [] },
+          };
+        })();
+      },
+    } as unknown as AgentSdkModule;
+    return { sdk, seen };
+  }
+
+  const question = {
+    questions: [
+      {
+        question: "Which discounts?",
+        header: "Discounts",
+        options: [{ label: "Percent off" }, { label: "Fixed amount" }],
+        multiSelect: false,
+      },
+    ],
+  };
+
+  it("asks the person once, puts their answers into the tool's input, and returns them (UX-24)", async () => {
+    const root = copyFixture("sample-app");
+    const { sdk, seen } = asking([
+      { tool: "AskUserQuestion", input: question },
+      { tool: "AskUserQuestion", input: question },
+    ]);
+    const asked: unknown[] = [];
+    const r = await draftContract(sdk, "claude", root, "Add discounts", detectWorkspace(root), {
+      ask: async (input) => {
+        asked.push(input);
+        return { "Which discounts?": "Percent off" };
+      },
+    });
+    assert.deepEqual(seen.options.tools, ["Read", "Grep", "Glob", "AskUserQuestion"]);
+    assert.match(String((seen.options.systemPrompt as { append: string }).append), /Ask before you draft/);
+    // The hook lets the question through; the first is put to the person, the second refused.
+    assert.deepEqual(seen.hook, [{}, {}]);
+    assert.deepEqual(seen.permission[0], {
+      behavior: "allow",
+      updatedInput: { ...question, answers: { "Which discounts?": "Percent off" } },
+    });
+    assert.equal(seen.permission[1]?.behavior, "deny");
+    assert.match(seen.permission[1]?.message ?? "", /asked once already/);
+    assert.equal(asked.length, 1);
+    assert.deepEqual(r.clarifications, [{ question: "Which discounts?", answer: "Percent off" }]);
+    assert.equal(r.contract?.objective, "Discounts.");
+  });
+
+  it("drafts with what it has when the person skips, and can't ask at all without a way to", async () => {
+    const root = copyFixture("sample-app");
+    const skipped = asking([{ tool: "AskUserQuestion", input: question }]);
+    const r = await draftContract(skipped.sdk, "claude", root, "Add discounts", detectWorkspace(root), {
+      ask: async () => null,
+    });
+    assert.equal(skipped.seen.permission[0]?.behavior, "deny");
+    assert.match(skipped.seen.permission[0]?.message ?? "", /skipped these questions/);
+    assert.deepEqual(r.clarifications, []);
+
+    const unable = asking([{ tool: "AskUserQuestion", input: question }]);
+    await draftContract(unable.sdk, "claude", root, "Add discounts", detectWorkspace(root));
+    assert.deepEqual(unable.seen.options.tools, ["Read", "Grep", "Glob"]);
+    assert.doesNotMatch(String((unable.seen.options.systemPrompt as { append: string }).append), /AskUserQuestion/);
+    const denied = unable.seen.hook[0] as { hookSpecificOutput?: { permissionDecision?: string } };
+    assert.equal(denied.hookSpecificOutput?.permissionDecision, "deny");
+  });
+
+  it("tells a redraft what the person already settled, so it doesn't ask again", () => {
+    const root = copyFixture("sample-app");
+    const p = draftPrompt("Add discounts", detectWorkspace(root), ["test"], {
+      settled: [{ question: "Which discounts?", answer: "Percent off" }],
+    });
+    assert.match(p, /Already settled with the person \(don't ask these again\):\n- Which discounts\? → Percent off/);
+  });
+
   it("drafts from the request alone when there's nothing else", () => {
     const root = copyFixture("sample-app");
     const p = draftPrompt("Fix total", detectWorkspace(root), ["test"]);

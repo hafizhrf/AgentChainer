@@ -90,6 +90,7 @@ import {
   stateLabel,
   withStepEvent,
 } from "./run.ts";
+import { Settled } from "./Settled.tsx";
 import { agentLabel, costText } from "./stepAgent.ts";
 import { TaskChanges } from "./TaskChanges.tsx";
 import {
@@ -608,6 +609,7 @@ export function TaskPage({
                 <ContractCard
                   request={task.request}
                   contract={edited}
+                  settled={task.clarifications}
                   gates={task.availableGates}
                   editing={editing}
                   onEdit={setEditing}
@@ -1018,6 +1020,7 @@ function DraftBlock({ items, live, cwd }: { items: Item[]; live: boolean; cwd: s
 function ContractCard({
   request,
   contract,
+  settled,
   gates,
   editing,
   onEdit,
@@ -1025,6 +1028,8 @@ function ContractCard({
 }: {
   request: string;
   contract: TaskContract;
+  /** What the person answered to the drafter's questions (UX-24). */
+  settled: Task["clarifications"];
   gates: Task["availableGates"];
   editing: boolean;
   onEdit: (on: boolean) => void;
@@ -1063,6 +1068,7 @@ function ContractCard({
               </li>
             ))}
           </ul>
+          <Settled items={settled} as="heading" />
           {lists
             .filter(([, items]) => items.length > 0)
             .map(([label, items]) => (
@@ -1598,6 +1604,7 @@ function ContractView({ task, contract, triage }: { task: Task; contract: TaskCo
               ))}
             </ul>
           </div>
+          <Settled items={task.clarifications} as="field" />
           <dl className="task-facts">
             {contract.affectedAreas.length > 0 && (
               <div className="task-fact">

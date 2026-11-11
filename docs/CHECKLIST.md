@@ -1504,8 +1504,43 @@ for the desktop shell, start screen and session view to be cleaned up (UX-02, UX
     person settles them by editing the contract.
   - **Wanted:** the drafter asks first, with choices, the way `AskUserQuestion` works in a chat (an option or an
     "Other" answer). The answers go into the draft, and only questions that are still open stay in the contract.
-  - **To plan:** whether the draft becomes a short session that can ask, or a two-step draft (questions, then the
-    contract from the answers); how a question card shows on the task page; a cap on rounds and cost.
+  - **Plan (2026-11-11, owner's choices):** one round of at most 4 questions; always on, with no setting; the answers
+    kept on the task and shown on the contract card; open questions stay a list.
+  - **Built (2026-11-11):**
+    - **Asking:** `draftContract` takes an `ask`.
+      - `AskUserQuestion` joins the drafter's tools, and the generators' hook lets it through.
+      - The first question waits for the person; Skip or a stopped draft drafts with what it has; a second ask is
+        refused.
+      - The guide tells it to ask about anything it would otherwise list as an open question, and nothing the
+        request, the repository or the settled answers already say.
+    - **The card:** the sidecar's `DraftQuestions` sends the question as a `permission.request` tagged with the
+      task's draft step, so the task page shows its usual question card. `permission.respond` answers it.
+      - A draft's session id is now a UUID: `permission.respond` takes only one, and the old `draft-<id>-<time>` id
+        was refused (found in the live check).
+      - When a draft ends, however it ends, a `task.updated` clears a card it left.
+    - **Kept:** the answers go on the task (`clarifications`, at most 20) and show on the contract card and the
+      approved contract as "Settled with you". A redraft is told them, so it doesn't ask again.
+    - **Tests:**
+      - `contract.test.ts`: tools and hook with and without asking; answers into the tool's input; Skip; one round;
+        the settled answers in a redraft's prompt;
+      - `draft-questions.test.ts` (3): answer, Skip, an empty answer, a stopped draft, someone else's id;
+      - `service.test.ts`: answers saved and given to a redraft;
+      - `protocol.test.ts`: the clarifications' limits.
+    - **Live over JSON-RPC** (`live-task.ts --draft-only`, haiku on a sample-app copy, ≈$0.007 a draft; the script's
+      client answers each question with its first option):
+      - **"Add discounts to the cart.":** the first prompt didn't ask; haiku listed two open questions instead. With
+        the guide sharpened, it asked "What kind of cart discount should this add?" (cart-level percent, per-item
+        percent, coupon codes). The answer came back through `permission.respond`, and the contract was drafted
+        for a cart-level percent with no open questions. The task kept the answer.
+      - **The fixture's usual request ("total() ignores the quantity…"):** it asked one question, rightly: the
+        fixture's README says not to fix that bug, which the request asks for.
+    - **In the app:**
+      - **How it ran:** a debug build, the new selftest view `task-contract` (the latest task's page, scrolled to
+        its contract), no synthetic input, ≈$0.005.
+      - **What showed:** a kept live draft whose drafter asked 3 questions. The contract card listed them under
+        "Settled with you" in light, dark and Bahasa Indonesia.
+      - **Also checked:** the task's Agents pickers show UX-23's tidier legend.
+    - **For the owner's click-through:** answering a card on the task page while it drafts (MANUAL_CHECKS 3t).
 - [ ] **UX-E1** All M1/M2 screens use the design system, in light and dark themes.
 - [ ] **UX-E2** Usability test participants complete the M1 exit scenarios without help.
 

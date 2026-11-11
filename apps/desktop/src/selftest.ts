@@ -13,7 +13,8 @@ import type { Tab } from "./tabs.ts";
  */
 /**
  * Views a screenshot run can open: Home, Settings, a session's terminal or right-panel tab, the first changed file's
- * diff, a section of Workspace settings, a new session with nothing sent yet, or the workspace's latest task's page.
+ * diff, a section of Workspace settings, a new session with nothing sent yet, or the workspace's latest task's page
+ * (at its end, or scrolled to its contract card).
  */
 const OPEN_VIEWS = [
   "home",
@@ -33,6 +34,7 @@ const OPEN_VIEWS = [
   "worktrees",
   "claude-md",
   "task-changes",
+  "task-contract",
   "fresh",
 ] as const;
 

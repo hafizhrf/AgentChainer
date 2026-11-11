@@ -230,7 +230,7 @@ export function fileDiff(cwd: string, rel: string): FileDiff {
   const repo = repoOf(cwd);
   const entry = repo ? statusUnder(cwd, repo).get(rel) : undefined;
   const headPath = entry?.origPath ?? rel;
-  const original = repo ? showHead(cwd, headPath) : null;
+  const original = repo ? showAt(cwd, "HEAD", headPath) : null;
   const modified = existsSync(abs) && statSync(abs).isFile() ? readFileSync(abs) : null;
 
   const tooLarge = (original?.length ?? 0) > MAX_DIFF_BYTES || (modified?.length ?? 0) > MAX_DIFF_BYTES;
@@ -257,6 +257,40 @@ export function fileDiff(cwd: string, rel: string): FileDiff {
   };
 }
 
+/**
+ * One file at a commit vs the working tree (CP-05 part 2): a task's change against its base, whatever was committed
+ * on its branch since. Its status comes from the two sides; it has no hunks, as a task's diff offers no revert.
+ */
+export function fileDiffAgainst(cwd: string, rel: string, ref: string): FileDiff {
+  // The task's record gives the commit: never anything git could read as an option or a range.
+  if (!/^[0-9a-f]{7,64}$/.test(ref)) throw new RpcFailure(RpcErrorCode.invalidParams, t("git.workspace.badBase"));
+  const abs = insideWorkspace(cwd, rel);
+  const original = repoOf(cwd) ? showAt(cwd, ref, rel) : null;
+  const modified = existsSync(abs) && statSync(abs).isFile() ? readFileSync(abs) : null;
+  const tooLarge = (original?.length ?? 0) > MAX_DIFF_BYTES || (modified?.length ?? 0) > MAX_DIFF_BYTES;
+  const binary = isBinary(original) || isBinary(modified);
+  const text = !tooLarge && !binary;
+  const status =
+    original === null
+      ? modified === null
+        ? undefined
+        : "added"
+      : modified === null
+        ? "deleted"
+        : original.equals(modified)
+          ? undefined
+          : "modified";
+  return {
+    path: rel,
+    ...(status ? { status } : {}),
+    original: text && original !== null ? original.toString("utf8") : null,
+    modified: text && modified !== null ? modified.toString("utf8") : null,
+    binary,
+    tooLarge,
+    hunks: [],
+  };
+}
+
 /** Images over this aren't sent to the viewer: base64 over the IPC channel grows them by a third. */
 export const MAX_IMAGE_BYTES = 10_000_000;
 
@@ -273,9 +307,9 @@ export function workspaceImage(cwd: string, rel: string, max = MAX_IMAGE_BYTES):
   return { mediaType, bytes, data: readFileSync(abs).toString("base64"), tooLarge: false };
 }
 
-/** The file's content at HEAD, or null when it isn't in HEAD (new file, or a repo without commits). */
-function showHead(cwd: string, rel: string): Buffer | null {
-  const r = spawnSync(gitBinary(), [...READ, "show", `HEAD:./${rel.split(path.sep).join("/")}`], {
+/** The file's content at `ref`, or null when it isn't there (a new file, or a repo without commits). */
+function showAt(cwd: string, ref: string, rel: string): Buffer | null {
+  const r = spawnSync(gitBinary(), [...READ, "show", `${ref}:./${rel.split(path.sep).join("/")}`], {
     cwd,
     timeout: 30_000,
     maxBuffer: 64 * 1024 * 1024,

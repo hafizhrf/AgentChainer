@@ -435,6 +435,22 @@ describe("evidence", () => {
     assert.match(md, /- From the contract: Callers may double-count/);
     assert.match(md, /- Check by hand: the page looks right/);
   });
+
+  it("lists each Fix as commented round with its comments, files and outcome (CP-05)", () => {
+    const feedback = [
+      { at: "2026-11-11T01:00:00.000Z", comments: 1, files: ["src/cart.js"], state: "done" as const },
+      {
+        at: "2026-11-11T02:00:00.000Z",
+        comments: 3,
+        files: ["src/cart.js", "api:README.md"],
+        state: "failed" as const,
+      },
+    ];
+    const md = renderEvidence(evidence(task({ feedback })));
+    assert.match(md, /## Fix as commented\n\n- Round 1: 1 comment on `src\/cart\.js`: done\./);
+    assert.match(md, /- Round 2: 3 comments on `src\/cart\.js`, `api:README\.md`: failed\./);
+    assert.doesNotMatch(renderEvidence(evidence()), /Fix as commented/);
+  });
 });
 
 /** Every ref a report can have, which a report written before X-13 part 2b lacks. */

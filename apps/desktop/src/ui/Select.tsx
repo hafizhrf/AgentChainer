@@ -32,7 +32,11 @@ export function Select({
       onValueChange={(v) => onChange(v === EMPTY ? "" : v)}
       {...(disabled ? { disabled } : {})}
     >
-      <RadixSelect.Trigger className={`select-trigger${compact ? " compact" : ""}`} aria-label={label} title={label}>
+      <RadixSelect.Trigger
+        className={`select-trigger${compact ? " compact" : ""}`}
+        aria-label={label}
+        title={current?.label}
+      >
         <RadixSelect.Value>{current?.label ?? value}</RadixSelect.Value>
         <RadixSelect.Icon>
           <ChevronDown size={14} />

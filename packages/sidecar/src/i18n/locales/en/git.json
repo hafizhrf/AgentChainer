@@ -19,6 +19,7 @@
   "git.workspace.outsidePath": "Path must be inside the workspace: {{path}}",
   "git.workspace.notImage": "Not an image the viewer shows: {{path}}",
   "git.workspace.noFile": "No such file in the workspace: {{path}}",
+  "git.workspace.badBase": "The task's base isn't a commit the app can read.",
   "git.revert.noRepo": "Reverting needs a git repository.",
   "git.revert.noChanges": "{{path}} has no changes to revert.",
   "git.revert.hunkGone": "That change no longer exists. Refresh the diff.",

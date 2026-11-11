@@ -16,7 +16,7 @@ type Picked = { side: DiffComment["side"]; start: number; end: number };
  * HEAD vs working tree for one file in a read-only Monaco diff (M1-27), with revert per file or per hunk through
  * git, each after a confirmation. Re-reads the file whenever `version` changes (the workspace listing refreshed).
  * Lines picked in either side can be commented on (CP-05); the chat's comments, on every file, go into its message
- * together.
+ * together. A task's diff (CP-05 part 2) loads its own sides (`load`: the task's base vs now) and has no revert.
  */
 export default function DiffView({
   cwd,
@@ -29,6 +29,8 @@ export default function DiffView({
   onComment,
   onRemoveComment,
   onSendComments,
+  load,
+  canRevert = true,
 }: {
   cwd: string;
   path: string;
@@ -42,6 +44,10 @@ export default function DiffView({
   onRemoveComment?: (id: string) => void;
   /** Puts every comment into the chat's message. */
   onSendComments?: () => void;
+  /** Where the two sides come from, instead of HEAD vs the working tree in `cwd` (a task's base vs now). */
+  load?: () => Promise<FileDiff>;
+  /** Whether Revert file and per-hunk revert are offered. */
+  canRevert?: boolean;
 }) {
   const [diff, setDiff] = useState<FileDiff | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -55,11 +61,15 @@ export default function DiffView({
     new: monaco.editor.IEditorDecorationsCollection;
   } | null>(null);
   const mine = useMemo(() => comments.filter((c) => c.path === path), [comments, path]);
+  // Read through a ref: a caller's new `load` each render isn't a reason to read the file again.
+  const loader = useRef(load);
+  loader.current = load;
+  const read = () => loader.current?.() ?? request("workspace.diff", { cwd, path });
 
-  // biome-ignore lint/correctness/useExhaustiveDependencies: `version` is the refresh trigger.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `version` is the refresh trigger; `read` follows cwd and path.
   useEffect(() => {
     let current = true;
-    request("workspace.diff", { cwd, path })
+    read()
       .then((d) => {
         if (!current) return;
         setDiff(d);
@@ -209,7 +219,7 @@ export default function DiffView({
   async function run(action: () => Promise<unknown>) {
     try {
       await action();
-      setDiff(await request("workspace.diff", { cwd, path }));
+      setDiff(await read());
     } catch (err) {
       setError(String(err));
     }
@@ -233,7 +243,7 @@ export default function DiffView({
           <ExternalLink size={14} />
           {t("panel.diff.openInEditor")}
         </button>
-        {diff?.status && (
+        {canRevert && diff?.status && (
           <button type="button" className="ghost small" onClick={() => void revertFile()}>
             <Undo2 size={14} />
             {t("panel.diff.revertFile")}
@@ -328,7 +338,7 @@ export default function DiffView({
       {diff?.binary && <p className="muted">{t("panel.diff.binary")}</p>}
       {diff?.tooLarge && <p className="muted">{t("panel.diff.tooLarge")}</p>}
       {unchanged && <p className="muted">{t("panel.diff.unchanged")}</p>}
-      {diff && diff.hunks.length > 1 && (
+      {canRevert && diff && diff.hunks.length > 1 && (
         <ul className="hunks">
           {diff.hunks.map((h, i) => (
             <li key={h.header}>

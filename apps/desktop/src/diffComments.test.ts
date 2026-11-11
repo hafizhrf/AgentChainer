@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { appendToDraft, type DiffComment, feedbackMessage, fenceFor, isStale } from "./diffComments.ts";
+import { appendToDraft, type DiffComment, feedbackMessage, isStale, toFeedback } from "./diffComments.ts";
 
 const c = (over: Partial<DiffComment>): DiffComment => ({
   id: "1",
@@ -40,8 +40,6 @@ test("puts the comments in one message, by file, old lines first, then top to bo
 });
 
 test("fences a quote that has backticks of its own, and a file with no extension plainly", () => {
-  assert.equal(fenceFor("no ticks"), "```");
-  assert.equal(fenceFor("```js\nx\n```"), "````");
   const m = feedbackMessage([c({ path: "Makefile", quote: "````" })], labels);
   assert.match(m, /\n`````\n````\n`````\n/);
 });
@@ -56,4 +54,11 @@ test("adds to a draft a blank line after it, or fills an empty one", () => {
   assert.equal(appendToDraft("", "x"), "x");
   assert.equal(appendToDraft("  \n", "x"), "x");
   assert.equal(appendToDraft("Please also:\n\n", "x"), "Please also:\n\nx");
+});
+
+test("sends a task's comments without their ids, naming another folder's file by its folder (CP-05 part 2)", () => {
+  assert.deepEqual(toFeedback([c({ text: " Why? " }), c({ id: "2", dir: "api", path: "x.ts", side: "old" })]), [
+    { path: "src/cart.js", side: "new", start: 3, end: 4, quote: "a\nb", text: "Why?" },
+    { path: "x.ts", folder: "api", side: "old", start: 3, end: 4, quote: "a\nb", text: "Why?" },
+  ]);
 });

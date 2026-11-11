@@ -14,6 +14,8 @@
 //   [--cwd <checkout>]: runs in an existing checkout instead of a fixture copy (left in place); for M5's live checks
 //   [--fix-ci]: with --pr, breaks a test on the PR's branch, waits for CI to fail, runs one Fix CI round and waits for
 //   CI on the fix (M5-03); the worktree is kept for the round
+//   [--feedback "<comment>"]: after the run, comments on the first changed line of the first changed file and runs one
+//   Fix as commented round (CP-05 part 2), then checks the round's record and the evidence line
 //   [--pr]: after a Done (or accepted) run, opens a draft PR through the user's own `gh` (task.createPr, M5-02). Only
 //   with --cwd on a throwaway repository you own: it pushes a branch and opens a real pull request
 //   cost: a few cents with haiku for an S task; an M or L task's review runs on Opus (≈$0.2–3).
@@ -39,6 +41,7 @@ const { values } = parseArgs({
     cwd: { type: "string" },
     pr: { type: "boolean", default: false },
     "fix-ci": { type: "boolean", default: false },
+    feedback: { type: "string" },
   },
 });
 if (values.pr && !values.cwd) throw new Error("--pr needs --cwd: a checkout of a throwaway repository you own.");
@@ -98,9 +101,9 @@ async function fixCiRound(task: Task) {
       .map((l) => `    ${l}`)
       .join("\n")}`,
   );
-  const ended = client.ended(task.id);
+  // Listened for once the round started: the run before still says it ended a moment after it did.
   await request("task.fixCi", { cwd, id: task.id, link: check.link });
-  const round = await ended;
+  const round = await client.ended(task.id);
   // The push and the round's record come right after the run's end.
   let after = round;
   for (let i = 0; i < 20 && (after.pr?.fixes?.length ?? 0) < 1; i++) {
@@ -112,6 +115,52 @@ async function fixCiRound(task: Task) {
   console.log(`  pushed ${after.pr.headSha.slice(0, 7)}; waiting for CI on it…`);
   const green = await waitForChecks(task.id, (c) => c.every((x) => x.bucket !== "pending"));
   console.log(`  CI after the fix: ${green.checks.map((c) => `${c.name} ${c.bucket}`).join(", ")}`);
+}
+
+/**
+ * CP-05 part 2 live: a comment on the first line the task changed in its first changed file, through the same calls
+ * the Changes card makes (task.changes, task.fileDiff), then one Fix as commented round and its record.
+ */
+async function feedbackRound(task: Task, text: string): Promise<Task> {
+  const { files } = await request("task.changes", { cwd, id: task.id });
+  console.log(
+    `\nchanges: ${files.map((f) => `${f.path} (${f.status} +${f.added ?? "?"} -${f.removed ?? "?"})`).join(", ")}`,
+  );
+  const file = files.find((f) => f.status !== "deleted");
+  if (!file) {
+    console.log("Fix as commented: no changed file to comment on");
+    return task;
+  }
+  const where = { path: file.path, ...(file.folder ? { folder: file.folder } : {}) };
+  const before = await request("task.fileDiff", { cwd, id: task.id, ...where });
+  const now = (before.modified ?? "").split("\n");
+  const base = (before.original ?? "").split("\n");
+  const line = Math.max(
+    0,
+    now.findIndex((l, i) => l !== base[i]),
+  );
+  console.log(`Fix as commented: ${file.path} line ${line + 1} (${before.status}) "${now[line]?.trim()}": ${text}`);
+  // Listened for once the round started: the run before still says it ended a moment after it did.
+  await request("task.feedback", {
+    cwd,
+    id: task.id,
+    comments: [{ ...where, side: "new", start: line + 1, end: line + 1, quote: now[line] ?? "", text }],
+  });
+  let after = await client.ended(task.id);
+  // The round's record comes once its sessions are closed, a moment after the run's end.
+  for (let i = 0; i < 40 && !after.run?.feedback?.length; i++) {
+    await new Promise((r) => setTimeout(r, 500));
+    after = await request("task.get", { cwd, id: task.id });
+  }
+  console.log(`  round: ${after.state} · ${after.run?.outcome} · ${JSON.stringify(after.run?.feedback)}`);
+  for (const s of after.run?.steps.slice(-2) ?? []) {
+    console.log(`  ${s.id.padEnd(18)} ${s.status.padEnd(9)} $${s.costUsd.toFixed(4)}  ${s.note ?? ""}`);
+  }
+  const changed = await request("task.fileDiff", { cwd, id: task.id, ...where });
+  console.log(
+    `  ${file.path} ${changed.modified === before.modified ? "✗ unchanged by the round" : "✓ changed by the round"}`,
+  );
+  return after;
 }
 
 try {
@@ -196,6 +245,9 @@ try {
     final = await request("task.acceptRisk", { cwd, id: created.id, reason: values.accept });
     console.log(`\naccepted: ${final.state} (${final.run?.acceptance?.reason})`);
   }
+  if (values.feedback && final.worktree && final.state !== "running" && final.state !== "interrupted") {
+    final = await feedbackRound(final, values.feedback);
+  }
   // M3-09, M3-E2: the report exists, and its gate runs are exactly the recorded ones.
   const evidence = await request("task.evidence", { cwd, id: created.id });
   const stored = JSON.parse(readFileSync(evidence.path.replace(/\.md$/, ".json"), "utf8"));
@@ -205,6 +257,10 @@ try {
   console.log(`\nevidence: ${evidence.path}`);
   console.log(`  gate runs in the report ${same ? "✓ match the recorded runs" : "✗ differ from the recorded runs"}`);
   console.log(`  sections: ${[...evidence.markdown.matchAll(/^## (.+)$/gm)].map((m) => m[1]).join(" · ")}`);
+  if (values.feedback) {
+    const rounds = evidence.markdown.split("\n").filter((l) => /^- Round \d+:/.test(l));
+    console.log(`  Fix as commented in the report: ${rounds.length ? rounds.join(" | ") : "✗ missing"}`);
+  }
   if (values["print-evidence"]) console.log(`\n${evidence.markdown}`);
   // M5-02: the PR through the user's own gh, after the same preview the dialog shows.
   if (values.pr && (final.state === "done" || final.state === "accepted")) {
@@ -226,7 +282,9 @@ try {
         `  [${(sub.parent?.index ?? 0) + 1}] ${sub.state}: ${sub.run?.outcome ?? ""} (≈$${(sub.run?.costUsd ?? 0).toFixed(3)})`,
       );
     }
-    if (!values["fix-ci"]) await request("task.cleanup", { cwd, id: created.id, deleteBranches: false });
+    // --keep leaves the worktree too, to look at the task in the app.
+    if (!values["fix-ci"] && !values.keep)
+      await request("task.cleanup", { cwd, id: created.id, deleteBranches: false });
     console.log(`after Clean up:\n${execSync("git worktree list", { cwd, encoding: "utf8" })}`);
   }
   console.log(`\ngit status:\n${execSync("git status --short", { cwd, encoding: "utf8" })}`);

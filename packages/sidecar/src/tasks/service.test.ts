@@ -30,12 +30,14 @@ import {
   approveSubtasks,
   approveTask,
   cancelTask,
+  changesOf,
   ciLog,
   cleanupTask,
   createTaskPr,
   deleteTaskSafe,
   draftTask,
   dropFlow,
+  feedbackTask,
   fixCiTask,
   mergeGates,
   mergePrTask,
@@ -50,11 +52,13 @@ import {
   readyBranch,
   retriageTask,
   reviseTask,
+  settleFeedback,
   shortTitle,
   splitTask,
   startTask,
   taskBranch,
   taskEvidence,
+  taskFileDiff,
   taskWorkflow,
 } from "./service.ts";
 import { listTasks, loadTask, saveTask, writeTaskFile } from "./store.ts";
@@ -734,6 +738,88 @@ describe("pull requests (M5-02)", () => {
     await assert.rejects(
       fixCiTask(root, id, job, host, gh, () => undefined),
       /had its 3 Fix CI rounds/,
+    );
+  });
+
+  it("lists a task's changes and diffs a file against its base, even after its branch committed (CP-05)", async () => {
+    const { root, gh } = world();
+    const { id, wt } = doneWithChange(root);
+    const before = readFileSync(join(wt.path, "src", "cart.js"), "utf8");
+    writeFileSync(join(wt.path, "src", "cart.js"), `${before}// cents\n`);
+    // Create PR commits the worktree: HEAD moves past the task's base.
+    await createTaskPr(root, id, { title: "Add coupons", draft: true }, gh);
+    writeFileSync(join(wt.path, "src", "cart.js"), `${before}// cents, rounded\n`);
+    assert.deepEqual(
+      changesOf(root, id).map((f) => [f.path, f.status, f.dir]),
+      [
+        ["coupon.js", "new", wt.path],
+        ["src/cart.js", "modified", wt.path],
+      ],
+    );
+    const diff = taskFileDiff(root, id, { path: "src/cart.js" });
+    assert.deepEqual([diff.status, diff.original, diff.modified], ["modified", before, `${before}// cents, rounded\n`]);
+    assert.deepEqual(diff.hunks, []);
+    const added = taskFileDiff(root, id, { path: "coupon.js" });
+    assert.deepEqual([added.status, added.original], ["added", null]);
+    assert.throws(() => taskFileDiff(root, id, { path: "package.json" }), /isn't among the task's changes/);
+    assert.throws(() => taskFileDiff(root, id, { path: "../outside.txt" }), /isn't among the task's changes/);
+    // A tampered base (a cloned repository can carry task records) never reaches git as an option.
+    const file = join(root, ".agentchainer", "tasks", id, "task.json");
+    const target = join(mkdtempSync(join(tmpdir(), "ac-out-")), "written");
+    const raw = JSON.parse(readFileSync(file, "utf8"));
+    writeFileSync(file, JSON.stringify({ ...raw, run: { ...raw.run, base: `--output=${target}` } }));
+    assert.throws(() => changesOf(root, id), /can't be read|unreadable/i);
+    assert.throws(() => taskFileDiff(root, id, { path: "src/cart.js" }), /can't be read|unreadable/i);
+    assert.equal(existsSync(target), false);
+  });
+
+  it("starts Fix as commented only on a finished, unmerged task, on files it changed (CP-05)", () => {
+    const root = world().root;
+    const { id } = doneWithChange(root);
+    const host = {} as Parameters<typeof feedbackTask>[3];
+    const comment = { path: "coupon.js", side: "new" as const, start: 1, end: 1, quote: "x", text: "Rename it." };
+    const start = (comments = [comment]) => feedbackTask(root, id, { comments }, host, () => undefined);
+    assert.throws(
+      () => start([{ ...comment, path: "README.md" }]),
+      /aren't among the task's changes anymore: README\.md/,
+    );
+    const t = loadTask(root, id);
+    saveTask(root, { ...t, state: "draft" });
+    assert.throws(() => start(), /works on a run that ended/);
+    saveTask(root, { ...t, mergedInto: { branch: "main", at: "2026-11-11T00:00:00.000Z" } });
+    assert.throws(() => start(), /merged already/);
+    saveTask(root, { ...t, subtasks: ["2026-11-11-0a1b2c3d"] });
+    assert.throws(() => start(), /XL tasks and their sub-tasks/);
+    saveTask(root, { ...t, worktree: t.worktree ? { ...t.worktree, removed: true } : undefined });
+    assert.throws(() => start(), /worktree is gone/);
+  });
+
+  it("after a round, commits and pushes to an open PR only when it ended Done, and records every round (CP-05)", async () => {
+    const { root, bare, gh } = world();
+    const { id, wt } = doneWithChange(root);
+    // Without a PR, the round's edits stay in the worktree.
+    writeFileSync(join(wt.path, "coupon.js"), "export const coupon = 2;\n");
+    const round = { at: "2026-11-11T00:00:00.000Z", comments: 2, files: ["coupon.js"] };
+    const local = await settleFeedback(root, id, "done", round);
+    assert.deepEqual(local.run?.feedback, [{ ...round, state: "done" }]);
+    assert.match(git(wt.path, "status", "--porcelain"), /coupon\.js/);
+
+    const withPr = await createTaskPr(root, id, { title: "Add coupons", draft: true }, gh);
+    writeFileSync(join(wt.path, "coupon.js"), "export const coupon = 3;\n");
+    const failed = await settleFeedback(root, id, "failed", round);
+    assert.equal(
+      git(bare, "show", `${wt.branch}:coupon.js`),
+      "export const coupon = 2;\n",
+      "a failed round pushes nothing",
+    );
+    assert.equal(failed.pr?.headSha, withPr.pr?.headSha);
+    const pushed = await settleFeedback(root, id, "done", round);
+    assert.equal(git(bare, "show", `${wt.branch}:coupon.js`), "export const coupon = 3;\n");
+    assert.equal(git(bare, "log", "-1", "--format=%s", wt.branch).trim(), "Address review comments");
+    assert.equal(pushed.pr?.headSha, git(bare, "rev-parse", wt.branch).trim());
+    assert.deepEqual(
+      pushed.run?.feedback?.map((f) => f.state),
+      ["done", "failed", "done"],
     );
   });
 

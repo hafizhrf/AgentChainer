@@ -16,6 +16,7 @@ import { after, before, describe, it } from "node:test";
 import {
   createFolder,
   fileDiff,
+  fileDiffAgainst,
   gitBinary,
   gitInit,
   insideWorkspace,
@@ -262,5 +263,29 @@ describe("a new folder for a new session (UX-23)", () => {
     writeFileSync(join(parent, "file.txt"), "x");
     assert.throws(() => createFolder(join(parent, "file.txt"), "x", false), /isn't a folder/);
     assert.throws(() => createFolder(join(parent, "missing"), "x", false), /isn't a folder/);
+  });
+});
+
+describe("fileDiffAgainst (CP-05)", () => {
+  it("diffs a commit against the working tree, whatever was committed since", () => {
+    const dir = makeRepo();
+    const base = git(dir, "rev-parse", "HEAD").trim();
+    writeFileSync(join(dir, "a.txt"), "one\nTWO\nthree\n");
+    rmSync(join(dir, "sub", "b.txt"));
+    git(dir, "add", "-A");
+    git(dir, "commit", "-q", "-m", "later");
+    const changed = fileDiffAgainst(dir, "a.txt", base);
+    assert.deepEqual(
+      [changed.status, changed.original, changed.modified],
+      ["modified", "one\ntwo\nthree\n", "one\nTWO\nthree\n"],
+    );
+    assert.deepEqual(changed.hunks, []);
+    const gone = fileDiffAgainst(dir, "sub/b.txt", base);
+    assert.deepEqual([gone.status, gone.original, gone.modified], ["deleted", "bee\n", null]);
+    assert.equal(fileDiffAgainst(dir, ".gitignore", base).status, undefined, "unchanged");
+    assert.throws(() => fileDiffAgainst(dir, "../x", base), /inside the workspace/);
+    for (const bad of ["HEAD", "--output=x", "main~1", ""]) {
+      assert.throws(() => fileDiffAgainst(dir, "a.txt", bad), /isn't a commit/, bad);
+    }
   });
 });

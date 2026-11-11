@@ -1494,6 +1494,18 @@ for the desktop shell, start screen and session view to be cleaned up (UX-02, UX
     - **Bug fixed, "pilihan model gak realtime":** the app kept one model list for every agent. A Codex or agy chat
       filled Claude's pickers (New session, Settings, tasks) with its own models. Lists are now kept per agent, under a
       new storage key, so the mixed list is dropped.
+  - **Follow-up fix (with CP-05 part 2's PR):** the task's Agents pickers (Plan, Implement, Review) looked cramped
+    (owner, 2026-11-11, with a screenshot: "ini masih kurang rapih").
+    - The legend now has its own space and no inset, and is set apart from the role labels.
+    - A select's tooltip shows its value, not its label; the tooltip used to repeat "Plan" over the help text.
+- [ ] **UX-24** Clarifying questions while drafting a task, as plan mode asks them. Owner, 2026-11-11: "kok kalo bkin
+      task, agent gak nanya kaya mode planing ya".
+  - **Today:** the draft is one structured answer. The drafter can only list `openQuestions` in the contract, and the
+    person settles them by editing the contract.
+  - **Wanted:** the drafter asks first, with choices, the way `AskUserQuestion` works in a chat (an option or an
+    "Other" answer). The answers go into the draft, and only questions that are still open stay in the contract.
+  - **To plan:** whether the draft becomes a short session that can ask, or a two-step draft (questions, then the
+    contract from the answers); how a question card shows on the task page; a cap on rounds and cost.
 - [ ] **UX-E1** All M1/M2 screens use the design system, in light and dark themes.
 - [ ] **UX-E2** Usability test participants complete the M1 exit scenarios without help.
 
@@ -2678,7 +2690,62 @@ Owner request, 2026-11-10: features that community tools for coding agents have 
     - **In the app** (debug build, selftest diff view, no synthetic input): the comment bar sits above the hunks and
       the diff renders under it. Adding comments and the message need the owner's click-through (MANUAL_CHECKS
       3l–3m).
-  - [ ] **Part 2** (tasks), as planned above.
+  - [x] **Part 2** (tasks, 2026-11-11):
+    - **Changes card:** on a task page with a live worktree and a finished run.
+      - It lists the task's files against its base (`task.changes`, the evidence's list), with status and +/− lines.
+      - A file opens `DiffView` inline, base vs now (`task.fileDiff`). Its sides still read right after Create PR, a
+        Fix CI round or any commit on the branch. There's no revert.
+      - Lines take comments as in a chat, kept per task while the app runs.
+    - **Fix as commented (N)…:**
+      - **The dialog:** lists the comments and takes an optional note. It says who runs it (the implementer), the
+        budget left, and whether the result is pushed to the open PR or stays in the worktree.
+      - **The round:** `task.feedback` runs `orchestrator.fixComments`, which shares `round()` with Fix CI. A
+        `comments-fix` step runs on the write step's role in a new session, with the contract, the diff and the
+        comments (each quote in its own fence), then the gates once.
+      - **On Done:** with an open PR, the change is committed ("Address review comments") and pushed, never forced.
+      - **Record:** every round goes into `run.feedback` and a "Fix as commented" section of the evidence.
+      - **Refused for:** running, merged, XL and sub-tasks, and files no longer among the changes.
+      - **Ready for CP-07:** comments carry a `source`; a GitHub reviewer's are fenced as data.
+    - **Found while building, fixed:**
+      - **Unescaped fences:** Fix CI's diff and log sat in fences their text could close. Both now use fences longer
+        than any backticks in them (`fenced` in `packages/protocol`, shared with the chat's comments).
+      - **Git option injection:** a task record's base reached `git diff` as an option. In a test, a tampered
+        `task.json` base of `--output=<file>` wrote that file. A cloned repository can carry task records, so every
+        branch, base and PR ref a task records is now a `GitNameSchema` (no leading `-`, no spaces), and such a task
+        doesn't load. `task.fileDiff` also takes only a commit SHA (T-13a).
+      - **Composer during a round:** it can now steer a Fix CI round too, which has a `message`.
+      - **Merged PRs:** Fix CI refuses a PR that's already merged.
+    - **Owner reports fixed alongside** (2026-11-11, "kadang suka ngeblink ngeblink gitu card chat nya di task"):
+      - **The jump:** the thread scrolled to its end on every `task.updated`, because it followed the contract object,
+        which is new on each update. It now follows the contract's text.
+      - **The fold:** the running step folded shut between one step's end and the next one's start. It now stays open
+        until the next step runs.
+    - **Tests:**
+      - `fileDiffAgainst`: base vs now after a commit, deleted, unchanged, a bad ref;
+      - service: changes and file diff after Create PR, the tampered base writing nothing, every refusal, and the
+        round's commit, push and record with and without a PR;
+      - orchestrator: the prompt's comments, quotes, fences and note; failing gates; a stopped session; a reviewer's
+        comments fenced;
+      - evidence lines;
+      - protocol: `GitNameSchema`, comment limits, fences;
+      - `toFeedback`.
+    - **Live over JSON-RPC** (`live-task.ts --tier S --feedback "…"`, haiku on a sample-app copy, ≈$0.02):
+      - the S run ended Done;
+      - `task.changes` listed `src/cart.js`, and a comment on its changed line ran one round (`comments-fix` done,
+        $0.0045), then the gates passed (Done);
+      - the file changed, `run.feedback` recorded the round, and the evidence said "Round 1: 1 comment on
+        `src/cart.js`: done."
+      - **Repeated twice,** once with `--keep` for the app. The script now listens for the round's end only after
+        `task.feedback` answers: the run before announces its end again once its sessions close, and a listener set
+        earlier took that for the round's end. The app was right: `settleRun` waited, and an update trace showed no
+        state but "running" during the round.
+    - **In the app** (debug build, the new selftest view `task-changes`, no synthetic input, three haiku turns,
+      ≈$0.006): the Changes card on that kept task in light, dark and Bahasa Indonesia, listing `src/cart.js` +4 −1
+      under Result.
+    - **For the owner's click-through:** the inline diff, comments and the dialog (MANUAL_CHECKS 3p–3r).
+    - **Follow-ups:**
+      - a multi-folder task's other folders aren't committed or pushed after a round (as with Fix CI);
+      - XL tasks.
 - [ ] **CP-06** Best-of-N: run one task on several agents or models in separate worktrees, then compare the diffs.
       Pairs with M9.
   - Sources: Crystal ([repo](https://github.com/stravu/crystal)); Cursor `/best-of-n` (verify).

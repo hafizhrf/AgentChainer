@@ -16,6 +16,7 @@
   "deploy.service.alreadyRunning": "A {{label}} deploy is already running in this workspace.",
   "deploy.service.cliMissing": "The {{cli}} CLI isn't installed.",
   "deploy.service.noPreviews": "{{label}} has no previews; deploy to production instead.",
+  "deploy.service.bestOf": "Deploy a Best-of-N variant once it's kept, from its task.",
   "deploy.service.notSetUp": "This workspace isn't set up for {{label}}.",
   "deploy.plan.noCommits": "The workspace has no commits yet.",
   "deploy.plan.detached": "The workspace isn't on a branch (detached HEAD). Check out the branch to deploy.",

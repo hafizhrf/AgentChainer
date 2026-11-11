@@ -188,3 +188,72 @@ describe("the session runner's records", () => {
     assert.ok(events.includes("implement:tool.completed"), "events still reach the UI, tagged");
   });
 });
+
+describe("a variant's implementer model (CP-06)", () => {
+  it("runs the write step on the variant's model, and every other step on its role's or the run's", async () => {
+    const root = realpathSync(mkdtempSync(join(tmpdir(), "ac-models-")));
+    const models: (string | undefined)[] = [];
+    const sdk = {
+      query: ({ prompt, options }: { prompt: AsyncIterable<unknown>; options: { model?: string } }) => {
+        models.push(options.model);
+        const messages = (async function* () {
+          for await (const _ of prompt) {
+            yield {
+              type: "result",
+              subtype: "success",
+              is_error: false,
+              result: "{}",
+              structured_output: { verdict: "approve", findings: [], criteria: [] },
+              total_cost_usd: 0.01,
+              duration_ms: 1,
+              num_turns: 1,
+            };
+          }
+        })();
+        return Object.assign(messages, { close: () => undefined, interrupt: async () => undefined });
+      },
+    } as unknown as AgentSdkModule;
+    const library = LibrarySchema.parse(shipped);
+    const workflow = library.workflows.M;
+    if (!workflow) throw new Error("no M workflow");
+    const task = {
+      id: "2026-11-11-0000abcd",
+      run: newRun(
+        workflow,
+        {
+          permissionMode: "default",
+          model: "sonnet",
+          models: { implement: "haiku" },
+          base: null,
+          untrackedAtStart: [],
+        },
+        new Date(),
+      ),
+    } as Task;
+    const runner = sessionRunner(
+      root,
+      task,
+      library,
+      {
+        sdk,
+        claudePath: "claude",
+        register: () => undefined,
+        unregister: () => undefined,
+        event: () => undefined,
+        permission: () => undefined,
+      },
+      { approval: () => undefined, guardBlock: () => undefined },
+    );
+    const steps = workflow.steps.filter((s) => !("gates" in s) && !("parallel" in s));
+    const byRole = (role: string) => steps.find((s) => "role" in s && s.role === role);
+    for (const role of ["architect", "implementer", "independent-reviewer"]) {
+      const step = byRole(role);
+      if (!step || "gates" in step || "parallel" in step) throw new Error(`no ${role} step`);
+      await runner.start(step, "Go.", 1, { id: task.id, stepId: step.id, label: step.label });
+    }
+    await runner.close();
+    rmSync(root, { recursive: true, force: true });
+    // The planner follows the run, the implementer the variant, and the reviewer keeps its own model (opus).
+    assert.deepEqual(models, ["sonnet", "haiku", "opus"]);
+  });
+});

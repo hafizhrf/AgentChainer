@@ -436,6 +436,27 @@ describe("evidence", () => {
     assert.match(md, /- Check by hand: the page looks right/);
   });
 
+  it("lists every Best-of-N variant and marks the one kept (CP-06)", () => {
+    const variant = (index: number, agent: "claude" | "codex", model?: string) => ({
+      index,
+      taskId: `2026-11-11-0000000${index}`,
+      agent,
+      ...(model ? { model } : {}),
+      state: "done" as const,
+      costUsd: 0.02 * index,
+      estimate: agent !== "claude",
+      gates: { passed: ["test"], failed: index === 1 ? ["lint"] : [], notRun: [] },
+      files: index,
+      added: 3,
+      removed: 1,
+      guardBlocks: 0,
+    });
+    const bestOf = { chosen: 2, compared: [variant(1, "claude", "haiku"), variant(2, "codex")] };
+    const md = renderEvidence(evidence(task({ bestOf })));
+    assert.match(md, /## Best of N\n\n- Variant 1 \(Claude haiku\): Done; gates 1 passed, 1 failed; 1 file changed/);
+    assert.match(md, /- \*\*Variant 2 \(Codex\), kept:\*\* Done; gates 1 passed, 0 failed; 2 files changed \(\+3 −1\)/);
+  });
+
   it("lists each Fix as commented round with its comments, files and outcome (CP-05)", () => {
     const feedback = [
       { at: "2026-11-11T01:00:00.000Z", comments: 1, files: ["src/cart.js"], state: "done" as const },

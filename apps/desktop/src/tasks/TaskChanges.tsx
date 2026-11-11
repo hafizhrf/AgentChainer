@@ -31,6 +31,7 @@ const STATUS = {
 /** Why the person can't fix this task as commented, or null when they can. */
 function readOnlyReason(task: Task): string | null {
   if (task.parent || task.subtasks?.length) return t("tasks.changes.readOnlyXl");
+  if (task.variantOf || task.variants?.length) return t("tasks.changes.readOnlyVariant");
   if (task.mergedInto || task.pr?.merged) return t("tasks.changes.readOnlyMerged");
   if (!FIXABLE.has(task.state)) return t("tasks.changes.readOnlyState");
   return null;

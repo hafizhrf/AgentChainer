@@ -344,6 +344,23 @@ table (state, tier, outcome, cost, a link to each report) and any failed merge.
   and deterministic.
 - Write steps keep the user's settings, so Claude can still use it inside a step like any tool.
 
+### 8.1 Best-of-N (CP-06)
+
+- **What:** an approved S, M or L task with a budget runs on 2–3 implementers at once (owner's choices,
+  2026-11-11): only the implementer differs (an agent and its model); plan and review stay the task's, so the
+  variants are judged alike.
+- **Records:** each variant is a task of its own (`variantOf`), with a copy of the contract and triage, so it has its
+  own worktree, run, files and the task's budget. The task lists them (`variants`) while it compares; the list hides
+  them; the task gets no run of its own meanwhile.
+- **Model:** a variant's implementer model is `run.models.implement`; every other step keeps its role's or the
+  run's model (the reviewer stays on opus).
+- **Keeping one:** the task takes the variant's worktree, run and run files (`plan.md`, `review.json`, `summary.md`,
+  `workflow.json`), the comparison goes on the run (`run.bestOf`) and into the report's "Best of N", and every other
+  variant is removed with its worktree and branch. Every variant's cost stays with the task. Discard removes them all.
+  Keeping is idempotent and ordered so a crash can't lose the kept worktree.
+- **Refused in v1:** XL tasks and sub-tasks, multi-folder tasks, a workflow whose write step names its own agent, a
+  task with a live worktree or an open PR.
+
 ## 9. Evidence report (M3-09) and "Done" (M3-10)
 
 `tasks/evidence.ts` builds `evidence.json` and renders `evidence.md`, both in the task folder, when a run ends and

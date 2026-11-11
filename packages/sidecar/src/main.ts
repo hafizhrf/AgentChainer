@@ -120,6 +120,7 @@ import {
   evidenceOf,
   feedbackTask,
   fixCiTask,
+  keepVariant,
   listTasksLive,
   mergeGates,
   mergePrTask,
@@ -136,15 +137,18 @@ import {
   reviewPrTask,
   reviseTask,
   runningTask,
+  runVariants,
   schedulable,
   settleRun,
   shippedLibrary,
   shutdownRuns,
   splitTask,
   startTask,
+  stopVariants,
   taskEvidence,
   taskFileDiff,
   taskWorkflow,
+  variantSummaries,
   workflowsOf,
   writeEvidence,
 } from "./tasks/service.ts";
@@ -1206,7 +1210,41 @@ serve(
       return reviseTask(cwd, id);
     },
 
-    "task.cancel": ({ id }) => ({ cancelled: cancelTask(id) }),
+    "task.cancel": ({ cwd, id }) => {
+      const cancelled = cancelTask(id);
+      // A task comparing Best-of-N variants stops them all (CP-06).
+      let variants = false;
+      try {
+        variants = stopVariants(cwd, id);
+      } catch {
+        // Not a task with variants, or not in this folder.
+      }
+      return { cancelled: cancelled || variants };
+    },
+
+    "task.runVariants": async ({ cwd, id, permissionMode, model, agents, variants }) => {
+      requireFolder(cwd);
+      const host = sessionHost(await claude());
+      return runVariants(
+        cwd,
+        id,
+        host,
+        { permissionMode, ...(model ? { model } : {}), ...(agents ? { agents } : {}), variants },
+        taskUpdated(cwd),
+      );
+    },
+
+    "task.variants": ({ cwd, id }) => {
+      requireFolder(cwd);
+      return { variants: variantSummaries(cwd, id) };
+    },
+
+    "task.keepVariant": async ({ cwd, id, variant }) => {
+      requireFolder(cwd);
+      const kept = await keepVariant(cwd, id, variant);
+      taskUpdated(cwd)(kept);
+      return kept;
+    },
 
     "task.start": async ({ cwd, id, permissionMode, model, agents }) => {
       requireFolder(cwd);

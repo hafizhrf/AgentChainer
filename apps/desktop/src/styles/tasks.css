@@ -2028,3 +2028,59 @@ fieldset.schedule-days > legend {
 .settled-item > dd {
   margin: 2px 0 0;
 }
+
+/* ---------- Best-of-N (CP-06) ---------- */
+
+.best-of-rows {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: 0 0 var(--space-3);
+  padding: 0;
+  border: 0;
+}
+
+.best-of-legend {
+  margin-bottom: var(--space-2);
+  padding: 0;
+}
+
+.best-of-row {
+  display: grid;
+  grid-template-columns: 5.5rem minmax(0, 1fr) minmax(0, 1fr) auto;
+  gap: var(--space-2);
+  align-items: center;
+}
+
+.best-of-n {
+  color: var(--muted);
+  font-size: var(--text-sm);
+}
+
+.variants-scroll {
+  overflow-x: auto;
+}
+
+.variants-table th,
+.variants-table td {
+  vertical-align: top;
+  text-align: left;
+}
+
+.variant-agent {
+  display: block;
+  font-weight: 600;
+}
+
+.variant-outcome {
+  display: block;
+  margin-top: var(--space-1);
+  font-size: var(--text-xs);
+}
+
+.variant-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1);
+}

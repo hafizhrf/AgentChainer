@@ -34,7 +34,9 @@ export function loadAllTasks(root: string): Task[] {
       // not a valid task
     }
   }
-  return out;
+  // A Best-of-N's variants count with their task once one is kept (CP-06): their cost goes to it then.
+  const listed = new Set(out.flatMap((t) => t.variants ?? []));
+  return out.filter((t) => !(t.variantOf && listed.has(t.id)));
 }
 
 /** Done, or its PR was merged with every gate green. */

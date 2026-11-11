@@ -45,6 +45,8 @@ const { values } = parseArgs({
     "fix-ci": { type: "boolean", default: false },
     feedback: { type: "string" },
     "draft-only": { type: "boolean", default: false },
+    "best-of": { type: "string" },
+    "compare-only": { type: "boolean", default: false },
   },
 });
 if (values.pr && !values.cwd) throw new Error("--pr needs --cwd: a checkout of a throwaway repository you own.");
@@ -70,7 +72,7 @@ client.onPermission = (p) => {
 };
 client.onUpdate((t) => {
   const step = t.run?.steps.at(-1);
-  const prefix = t.parent ? `    [${t.parent.index + 1}] ` : "  · ";
+  const prefix = t.variantOf ? `    [v${t.variantOf.index}] ` : t.parent ? `    [${t.parent.index + 1}] ` : "  · ";
   const line = step ? `${step.label}: ${step.status}${step.note ? ` (${step.note})` : ""}` : t.state;
   if (line !== lastStep.get(t.id)) console.log(`${prefix}${line}`);
   lastStep.set(t.id, line);
@@ -177,6 +179,74 @@ async function feedbackRound(task: Task, text: string): Promise<Task> {
   return after;
 }
 
+/**
+ * CP-06 live: the approved task on 2–3 implementers at once (`claude:haiku,agy,codex:<model>`), then the comparison.
+ * It keeps the variant that ended Done at the lowest cost (or discards all when none did), and checks the kept
+ * worktree, the others' worktrees and branches gone, the list, the report's "Best of N", and that it merges.
+ */
+async function bestOfRun(id: string, spec: string) {
+  const variants = spec
+    .split(",")
+    .filter(Boolean)
+    .map((v) => {
+      const [agent, model] = v.split(":");
+      return { agent: agent as "claude" | "codex" | "agy", ...(model ? { model } : {}) };
+    });
+  const t0 = Date.now();
+  const lead = await request("task.runVariants", {
+    cwd,
+    id,
+    permissionMode: "acceptEdits",
+    model: values.model,
+    variants,
+  });
+  console.log(`\nBest of ${lead.variants?.length}: ${spec}`);
+  if (values["stop-after"]) {
+    setTimeout(() => {
+      console.log("  ✋ stop all");
+      void request("task.cancel", { cwd, id }).then((r) => console.log(`  cancel → ${JSON.stringify(r)}`));
+    }, Number(values["stop-after"]) * 1000);
+  }
+  for (;;) {
+    const { variants: now } = await request("task.variants", { cwd, id });
+    if (now.every((v) => v.state !== "running")) break;
+    await new Promise((r) => setTimeout(r, 2000));
+  }
+  const { variants: compared } = await request("task.variants", { cwd, id });
+  console.log(`ended in ${((Date.now() - t0) / 1000).toFixed(0)} s:`);
+  for (const v of compared) {
+    const gates = `gates ok ${v.gates.passed.join(",") || "-"} fail ${v.gates.failed.join(",") || "-"}`;
+    const cost = `$${v.costUsd.toFixed(4)}${v.estimate ? " est" : ""}`;
+    const time = v.durationMs === undefined ? "-" : `${Math.round(v.durationMs / 1000)} s`;
+    console.log(
+      `  [${v.index}] ${v.agent}${v.model ? ` ${v.model}` : ""}: ${v.state} · ${gates} · review ${v.review?.verdict ?? "-"} · ${v.files} files +${v.added} -${v.removed} · ${cost} · ${time}`,
+    );
+  }
+  const worktrees = () => execSync("git worktree list", { cwd, encoding: "utf8" });
+  console.log(`worktrees while comparing:\n${worktrees()}`);
+  // Left comparing, to look at in the app (with --keep).
+  if (values["compare-only"]) return;
+  const pick = compared.filter((v) => v.state === "done").sort((a, b) => a.costUsd - b.costUsd)[0];
+  if (!pick) {
+    const discarded = await request("task.keepVariant", { cwd, id, variant: null });
+    console.log(`no variant ended Done: discarded all → ${discarded.state}, $${discarded.costUsd.toFixed(4)} in all`);
+    console.log(`worktrees after discarding:\n${worktrees()}`);
+    return;
+  }
+  const kept = await request("task.keepVariant", { cwd, id, variant: pick.taskId });
+  console.log(
+    `\nkept [${pick.index}] ${pick.agent}: ${kept.state}, worktree ${kept.worktree?.path} (${kept.worktree?.branch}), $${kept.costUsd.toFixed(4)} in all`,
+  );
+  console.log(`worktrees after keeping:\n${worktrees()}`);
+  console.log(`branches:\n${execSync("git branch --list 'agentchainer/*'", { cwd, encoding: "utf8" })}`);
+  const listed = await request("task.list", { cwd });
+  console.log(`  tasks listed: ${listed.tasks.map((t) => t.id).join(", ")}`);
+  const evidence = await request("task.evidence", { cwd, id });
+  const section = evidence.markdown.split("\n").filter((l) => /^## Best of N|^- (\*\*)?Variant/.test(l));
+  console.log(`  report: ${section.length ? section.join(" | ") : "✗ no Best of N section"}`);
+  console.log(`  merge → ${JSON.stringify(await request("task.mergeResult", { cwd, id }))}`);
+}
+
 try {
   await request("system.hello", { protocolVersion: 2 });
   const created = await request("task.create", { cwd, request: values.request });
@@ -202,6 +272,12 @@ try {
     ...(tier !== drafted.triage.proposed ? { reason: "live test" } : {}),
     budgetUsd: drafted.triage.budgetUsd,
   });
+  if (values["best-of"]) {
+    await bestOfRun(created.id, values["best-of"]);
+    await client.close();
+    if (!values.keep && !values.cwd) removeFixtureCopies();
+    process.exit(0);
+  }
   if (tier === "XL") {
     const split = await request("task.split", { cwd, id: created.id, model: values.model });
     console.log(`split ($${split.costUsd.toFixed(3)} so far):`);

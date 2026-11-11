@@ -2802,6 +2802,66 @@ Owner request, 2026-11-10: features that community tools for coding agents have 
 - [ ] **CP-06** Best-of-N: run one task on several agents or models in separate worktrees, then compare the diffs.
       Pairs with M9.
   - Sources: Crystal ([repo](https://github.com/stravu/crystal)); Cursor `/best-of-n` (verify).
+  - **Plan (2026-11-11, owner's choices):**
+    - only the implementer differs; plan and review stay the task's, so variants are judged alike;
+    - the task adopts the variant kept, and the others are removed;
+    - each variant has the task's budget, with the total shown first;
+    - at most 3.
+  - **Built (2026-11-11):**
+    - **Run on several…** next to Run opens a dialog with 2–3 rows, each an agent (only those installed and signed
+      in) and a model. It says the total budget (N × the task's), that setup runs per worktree, that
+      `.worktreeinclude` files reach each agent's CLI, and that in M and L each variant plans on its own.
+    - **`task.runVariants`:**
+      - Every check runs before anything changes. Refused: XL and sub-tasks, no budget, multi-folder, a workflow
+        whose write step names an agent, a live worktree or open PR, a missing agent, no repo.
+      - Each variant is then its own task (`variantOf`): a ready copy of the contract and triage, whose cost starts
+        at 0. Its title names its agent, so Fleet rows and approval cards say which variant they are.
+      - Each starts through `beginRun`, the body `startTask` now shares, with `agents.implement` and
+        `run.models.implement`; the runner gives only the write step that model.
+    - **Comparing:**
+      - The task lists the variants (`variants`) and gets no run of its own. Every action but Keep and Discard is
+        refused on it and on its variants (`requireOwnTask`).
+      - The list and metrics hide linked variants, and overlaps skip them. The task shows as running while one runs.
+      - **`task.variants`:** state, gates, review verdict, changes, cost (estimate marked), time.
+      - **VariantsCard:** one column per variant, with Open and Keep this one; Stop all, Resume all, Discard all.
+      - **A variant's page:** "Variant 2 · Codex", a back link, its changes read-only, Run app kept, and no
+        Result, Deploy or Lessons.
+    - **`task.keepVariant`:**
+      - Idempotent, in an order a crash can't make lose the kept worktree.
+      - The task takes the variant's worktree, run (with `bestOf`) and run files; a tier-S variant's missing
+        review removes the task's old one.
+      - Each other variant leaves with its cost, then is removed with its worktree and branch, only by what its own
+        id names and only when the link holds both ways; a worktree another task holds is never removed.
+      - The report gets "Best of N". `taskBranch` keeps a recorded branch, so the adopted one survives Clean up.
+    - **Also:** `task.cancel` on the task stops its variants; deploys refuse variants; a Codex step's history
+      loads with its agent.
+    - **Tests:**
+      - service (6): summaries and the list; keep (worktree, run, files, cost, the others' worktrees and branches
+        gone, the report, merge, Clean up then Run again's branch, keeping twice); discard; a tampered record; every
+        refusal and guard; starting copies on their own implementer;
+      - runner: the implement model only on the write step, the reviewer on opus;
+      - evidence; protocol (model names, 2–3 variants); `bestOf.test.ts` (3).
+    - **Live over JSON-RPC** (`live-task.ts --tier S --best-of claude:haiku,agy,codex`, sample-app copy):
+      - **Running:** three variants at once, each in its own worktree, all Done in 48 s, all gates passed.
+      - **Cost:** Claude haiku $0.0098, agy ≈$0.08 and Codex ≈$0.25 (estimates, on the owner's plans).
+      - **Keeping:** the cheapest Done (Claude) was kept. The task took its worktree and branch. The other two
+        worktrees and branches were gone from `git worktree list` and `git branch`.
+      - **After:** the list showed the task alone, the report had "Best of N" with the kept variant marked, and
+        Merge into main succeeded.
+    - **In the app:**
+      - **Setup:** a debug build, a second live run left comparing (`--best-of claude:haiku,agy --compare-only
+        --keep`), and the new selftest view `task-variants` (scrolled within the thread only), with no synthetic
+        input.
+      - **What the card showed:** both variants Done, 1 gate passed, no review (tier S), 1 file +1 −1, ≈$0.0057 vs
+        ≈$0.0787 (estimate), 14 s vs 44 s, with Open, Keep this one and Discard all. Checked in light, dark and Bahasa
+        Indonesia.
+      - **Fixed after looking:** an Indonesian plural that read "Semua 1 lulus", and Open and Keep sat at different
+        heights.
+    - **For the owner's click-through:** the dialog, running and keeping in the app (MANUAL_CHECKS 3u–3v).
+    - **Follow-ups:**
+      - the lead's badge says Ready while it compares (the list says running);
+      - in M and L a shared plan for every variant;
+      - multi-folder and XL tasks.
 - [ ] **CP-07** A pull request's review comments from GitHub sent back to the agent (beyond Fix CI). — Conductor
       ([changelog](https://www.conductor.build/changelog)).
 - [ ] **CP-08** Start a task from an issue: GitHub first, Linear later. — Conductor; Emdash

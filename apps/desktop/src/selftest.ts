@@ -35,6 +35,7 @@ const OPEN_VIEWS = [
   "claude-md",
   "task-changes",
   "task-contract",
+  "task-variants",
   "fresh",
 ] as const;
 

@@ -1086,6 +1086,41 @@ export const TaskFileChangeSchema = z.object({
 });
 export type TaskFileChange = z.infer<typeof TaskFileChangeSchema>;
 
+/** How many variants one Best-of-N runs (CP-06, owner's choice). */
+export const MAX_VARIANTS = 3;
+
+/**
+ * A model as a variant names it (CP-06): Claude's aliases and ids, Codex's and agy's own. It reaches agy's command
+ * line, so never anything that reads as an option or holds spaces.
+ */
+export const ModelNameSchema = z.string().regex(/^[A-Za-z0-9][A-Za-z0-9._:/[\]-]{0,99}$/, "Not a model name");
+
+/**
+ * One variant of a Best-of-N run as the comparison shows it (CP-06): who implemented it, how it ended, its gates,
+ * the review's verdict (none for tier S), what it changed, and what it cost.
+ */
+export const VariantSummarySchema = z.object({
+  index: z.number().int().min(1),
+  taskId: TaskIdSchema,
+  agent: StepAgentSchema,
+  model: ModelNameSchema.optional(),
+  state: z.enum(TASK_STATES),
+  outcome: z.string().optional(),
+  outcomeRef: MessageRefSchema.optional(),
+  costUsd: z.number(),
+  /** Codex's and agy's cost is estimated from their tokens (M9-07). */
+  estimate: z.boolean(),
+  durationMs: z.number().int().optional(),
+  /** The last round of gates: which kinds passed and failed, and which had no command. */
+  gates: z.object({ passed: z.array(z.string()), failed: z.array(z.string()), notRun: z.array(z.string()) }),
+  review: z.object({ verdict: z.enum(["approve", "changes-requested"]), mustFix: z.number().int() }).optional(),
+  files: z.number().int(),
+  added: z.number().int(),
+  removed: z.number().int(),
+  guardBlocks: z.number().int(),
+});
+export type VariantSummary = z.infer<typeof VariantSummarySchema>;
+
 export const TaskRunSchema = z.object({
   /**
    * The workflow it runs; `source: "project"` when the project's file replaced the app's (M6-04), `"task"` when the
@@ -1129,6 +1164,12 @@ export const TaskRunSchema = z.object({
   trigger: z.literal("schedule").optional(),
   /** "Fix as commented" rounds on the finished run (CP-05), oldest first. */
   feedback: z.array(FeedbackRoundSchema).optional(),
+  /** A model per role over `model` (CP-06): a Best-of-N variant's implementer. */
+  models: z.object({ implement: ModelNameSchema.optional() }).optional(),
+  /** Set on a run kept from a Best-of-N (CP-06): which variant it was, and how every variant did. */
+  bestOf: z
+    .object({ chosen: z.number().int().min(1), compared: z.array(VariantSummarySchema).max(MAX_VARIANTS) })
+    .optional(),
 });
 export type TaskRun = z.infer<typeof TaskRunSchema>;
 
@@ -1378,6 +1419,17 @@ export const TaskSchema = z.object({
   folder: z.object({ name: z.string(), path: z.string() }).optional(),
   /** An XL task's sub-tasks, in the split's order. */
   subtasks: z.array(TaskIdSchema).optional(),
+  /** A Best-of-N's variants while the task compares them (CP-06); cleared once one is kept or all are discarded. */
+  variants: z.array(TaskIdSchema).max(MAX_VARIANTS).optional(),
+  /** Set on a Best-of-N variant (CP-06): its task, its place, and the implementer it runs on. */
+  variantOf: z
+    .object({
+      id: TaskIdSchema,
+      index: z.number().int().min(1).max(MAX_VARIANTS),
+      agent: StepAgentSchema,
+      model: ModelNameSchema.optional(),
+    })
+    .optional(),
   /** Where the user merged the task's branch. */
   mergedInto: z.object({ branch: GitNameSchema, at: z.string() }).optional(),
   /** The pull request made from the task's branch (M5-02). */
@@ -1578,6 +1630,7 @@ export const TaskSummarySchema = TaskSchema.pick({
   createdAt: true,
   updatedAt: true,
   costUsd: true,
+  variants: true,
 }).extend({ tier: TierSchema.nullable() });
 export type TaskSummary = z.infer<typeof TaskSummarySchema>;
 
@@ -2434,6 +2487,29 @@ export const methodSchemas = {
     }),
     result: TaskSchema,
   },
+  /**
+   * Best-of-N (CP-06): the approved task runs on 2–3 implementers at once, each a variant with its own worktree and
+   * the task's budget. `model` and `agents` are the plan and review picks, the same for every variant.
+   */
+  "task.runVariants": {
+    params: TaskRef.extend({
+      permissionMode: PermissionModeSchema.exclude(["plan"]),
+      model: z.string().optional(),
+      agents: AgentRolesSchema.optional(),
+      variants: z
+        .array(z.object({ agent: StepAgentSchema, model: ModelNameSchema.optional() }))
+        .min(2)
+        .max(MAX_VARIANTS),
+    }),
+    result: TaskSchema,
+  },
+  /** How each of the task's variants did, for the comparison (CP-06). */
+  "task.variants": { params: TaskRef, result: z.object({ variants: z.array(VariantSummarySchema) }) },
+  /**
+   * Keeps one variant (CP-06): the task takes its worktree, run and files, and the others are removed with their
+   * worktrees and branches. `null` discards every variant. Their cost stays with the task.
+   */
+  "task.keepVariant": { params: TaskRef.extend({ variant: TaskIdSchema.nullable() }), result: TaskSchema },
   /**
    * AI writes the task's own flow from its contract (UX-14): the tier's workflow, changed only where the task calls for
    * it, checked like a project's. A draft S, M or L task only; the person drops it or approves it with the contract.

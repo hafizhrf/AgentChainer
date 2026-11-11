@@ -28,6 +28,7 @@ import {
   FileText,
   GitMerge,
   GitPullRequest,
+  Layers,
   ListTree,
   Loader2,
   MinusCircle,
@@ -60,6 +61,8 @@ import { EmptyState } from "../ui/Section.tsx";
 import { Select } from "../ui/Select.tsx";
 import { type AgentClis, AgentPickers, type AgentRole } from "./AgentPickers.tsx";
 import { ApprovalCard } from "./ApprovalCard.tsx";
+import { BestOfDialog } from "./BestOfDialog.tsx";
+import { AGENT_NAMES } from "./bestOf.ts";
 import { CreatePrDialog } from "./CreatePr.tsx";
 import { DeployCard } from "./DeployCard.tsx";
 import { FlowPanel } from "./FlowPanel.tsx";
@@ -107,6 +110,7 @@ import {
   TIERS,
   tidyContract,
 } from "./taskForm.ts";
+import { VariantsCard } from "./VariantsCard.tsx";
 
 type Busy =
   | "draft"
@@ -204,6 +208,8 @@ export function TaskPage({
   /** The other agents' CLIs on this computer, for the pickers; null until they've been checked. */
   const [clis, setClis] = useState<AgentClis | null>(null);
   const [runMode, setRunMode] = useState<Exclude<PermissionMode, "plan">>(mode === "plan" ? "default" : mode);
+  /** The Best-of-N dialog (CP-06). */
+  const [bestOf, setBestOf] = useState(false);
   /** The budget per tier this workspace's tasks start from (its own, then the app's); a tier left out is built-in. */
   const [tierBudgets, setTierBudgets] = useState<TaskDefaults["budgetUsd"]>({});
   useEffect(() => {
@@ -299,7 +305,7 @@ export function TaskPage({
   }, [cwd, parentId]);
 
   /** This task and its sub-tasks: the approvals the thread shows as cards. */
-  const ownIds = [task?.id ?? "", ...(task?.subtasks ?? [])].join(",");
+  const ownIds = [task?.id ?? "", ...(task?.subtasks ?? []), ...(task?.variants ?? [])].join(",");
   useEffect(() => {
     if (task) onChange?.(task, busy !== null, ownIds.split(",").filter(Boolean));
   }, [task, busy, onChange, ownIds]);
@@ -508,12 +514,31 @@ export function TaskPage({
               {t("tasks.page.backToXl")}
             </button>
           )}
+          {task.variantOf && (
+            <button
+              type="button"
+              className="ghost small"
+              onClick={() => task.variantOf && void open(task.variantOf.id)}
+              disabled={busy !== null}
+            >
+              <ArrowLeft size={14} />
+              {t("tasks.page.backToTask")}
+            </button>
+          )}
           <ClipboardList size={16} aria-hidden />
           <div className="task-thread-title">
             <h1 title={task.request}>
               {task.parent
                 ? t("tasks.page.subtaskTitle", { n: task.parent.index + 1, title: task.title ?? task.request })
-                : (task.title ?? task.request)}
+                : task.variantOf
+                  ? t("tasks.page.variantTitle", {
+                      n: task.variantOf.index,
+                      agent: task.variantOf.model
+                        ? `${AGENT_NAMES[task.variantOf.agent]} · ${task.variantOf.model}`
+                        : AGENT_NAMES[task.variantOf.agent],
+                      title: task.request,
+                    })
+                  : (task.title ?? task.request)}
             </h1>
             <span className="muted" title={cwd}>
               {t("tasks.page.spent", {
@@ -709,7 +734,18 @@ export function TaskPage({
               />
             )}
 
-            {task.worktree && !task.parent && task.state !== "running" && (
+            {task.variants?.length ? (
+              <VariantsCard
+                task={task}
+                cwd={cwd}
+                confirm={confirm}
+                onOpen={(id) => void open(id)}
+                onChanged={(t) => show(t)}
+                onError={setError}
+              />
+            ) : null}
+
+            {task.worktree && !task.parent && !task.variantOf && task.state !== "running" && (
               <ResultCard task={task} cwd={cwd} confirm={confirm} onChanged={(t) => show(t)} onError={setError} />
             )}
 
@@ -736,6 +772,7 @@ export function TaskPage({
             {task.worktree &&
               !task.worktree.removed &&
               !task.parent &&
+              !task.variantOf &&
               (task.state === "done" || task.state === "accepted") && (
                 <DeployCard task={task} cwd={cwd} onChanged={() => void open(task.id)} />
               )}
@@ -764,9 +801,11 @@ export function TaskPage({
               />
             )}
             {/* Lessons for CLAUDE.md from the run's records (M8-06): only on request, each one approved. */}
-            {task.run && task.state !== "draft" && task.state !== "ready" && task.state !== "running" && (
-              <LessonsCard task={task} cwd={cwd} />
-            )}
+            {task.run &&
+              !task.variantOf &&
+              task.state !== "draft" &&
+              task.state !== "ready" &&
+              task.state !== "running" && <LessonsCard task={task} cwd={cwd} />}
             {waiting.map((a) =>
               a.toolName === "AskUserQuestion" ? (
                 <QuestionCard key={a.requestId} request={a} onAnswer={(r) => onAnswerApproval(a, r)} />
@@ -827,6 +866,23 @@ export function TaskPage({
                   <Square size={14} />
                   {t("tasks.page.stop")}
                 </button>
+              </>
+            ) : task.variants?.length || task.variantOf ? (
+              <>
+                <span className="muted">
+                  {task.variantOf ? t("tasks.page.variantFooter") : t("tasks.page.comparingFooter")}
+                </span>
+                <span className="grow" />
+                {task.variantOf && task.state === "interrupted" && (
+                  <button
+                    type="button"
+                    disabled={busy !== null}
+                    onClick={() => void step("resume", task.id, () => request("task.resume", { cwd, id: task.id }))}
+                  >
+                    <Play size={14} />
+                    {t("tasks.page.resume")}
+                  </button>
+                )}
               </>
             ) : (
               <>
@@ -903,6 +959,19 @@ export function TaskPage({
                       onRunMode={setRunMode}
                       onRun={() => void runTask(task.id)}
                     />
+                    {/* Best-of-N (CP-06): the same task on 2–3 implementers at once. */}
+                    {task.contract?.approvedAt && !task.parent && task.triage && task.triage.chosen !== "XL" && (
+                      <button
+                        type="button"
+                        className="secondary"
+                        disabled={busy !== null}
+                        title={t("tasks.bestOf.hint")}
+                        onClick={() => setBestOf(true)}
+                      >
+                        <Layers size={14} />
+                        {t("tasks.bestOf.open")}
+                      </button>
+                    )}
                     {/* An approved task of its own can run on a schedule (M8-05); an XL run needs its split approved. */}
                     {onSchedule && task.contract?.approvedAt && !task.parent && task.triage?.chosen !== "XL" && (
                       <button
@@ -959,6 +1028,21 @@ export function TaskPage({
             />
           )}
         </aside>
+      )}
+
+      {bestOf && (
+        <BestOfDialog
+          open={bestOf}
+          task={task}
+          cwd={cwd}
+          clis={clis}
+          agents={agents}
+          model={modelAlias}
+          runMode={runMode}
+          onOpenChange={setBestOf}
+          onStarted={(t) => show(t)}
+          onError={setError}
+        />
       )}
 
       <Modal
@@ -1703,7 +1787,8 @@ function RunView({
     const sessionId = entry.sessionId;
     if (next && sessionId && !items[sessionId] && entry.status !== "running") {
       try {
-        onLoaded(sessionId, fromHistory((await request("session.history", { cwd, sessionId })).events));
+        const agent = entry.agent && entry.agent !== "claude" ? { agent: entry.agent } : {};
+        onLoaded(sessionId, fromHistory((await request("session.history", { cwd, sessionId, ...agent })).events));
       } catch {
         onLoaded(sessionId, []);
       }

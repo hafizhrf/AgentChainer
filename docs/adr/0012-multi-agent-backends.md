@@ -92,6 +92,9 @@ Team supervisors and the app's own model calls.
      - A workflow or default that names a missing one stops the run before it starts.
      - The message says which agent is missing, and offers to run that step on Claude instead.
    - **YAML:** `agent: claude | codex | agy` (default `claude`), and an optional `model`.
+   - **Best-of-N (CP-06):** a variant's implementer (an agent and its model) replaces the task's implementer choice
+     for that variant only; plan and review keep the task's choice. A workflow whose write step names its own agent
+     can't run as Best-of-N.
    - **Stays Claude:** the split step of XL and the app's own calls.
    - **Evals:** a shipped workflow that names another agent needs a new eval report (M7-03), with an `agent=`
      variant.

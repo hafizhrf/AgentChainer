@@ -201,6 +201,8 @@ export async function deployPreview(
     throw invalid(t("deploy.service.noPreviews", { label: adapter.label }));
   }
   const task = loadTask(root, taskId);
+  // A Best-of-N variant deploys once it's kept, from its task (CP-06).
+  if (task.variantOf || task.variants?.length) throw invalid(t("deploy.service.bestOf"));
   const wt = task.worktree;
   const code = wt && !wt.removed && existsSync(wt.path) ? codeRootIn(root, wt.path) : root;
   const target = await targetOf(adapter, root, clis);

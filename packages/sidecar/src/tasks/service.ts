@@ -9,6 +9,7 @@ import {
   type FileDiff,
   MAX_CI_FIXES,
   MAX_CLARIFICATIONS,
+  MAX_VARIANTS,
   type MergeGate,
   type MessageRef,
   type PermissionMode,
@@ -17,6 +18,7 @@ import {
   resultEnglish,
   resultRef,
   resultText,
+  type StepAgent,
   type Task,
   type TaskContract,
   type TaskFileChange,
@@ -25,6 +27,7 @@ import {
   type TaskSummary,
   type Tier,
   type Triage,
+  type VariantSummary,
 } from "@agentchainer/protocol";
 import type { SDKMessage } from "@anthropic-ai/claude-agent-sdk";
 import { stringify as stringifyYaml } from "yaml";
@@ -86,7 +89,17 @@ const AGENT_NAME = { claude: "Claude", codex: "Codex", agy: "the Antigravity CLI
 
 import { semgrepScan, trivyScan } from "./scanners.ts";
 import { proposeSplit } from "./split.ts";
-import { createTask, deleteTask, listTasks, loadTask, readTaskFile, saveTask, writeTaskFile } from "./store.ts";
+import {
+  copyRunFiles,
+  createTask,
+  deleteTask,
+  everyTask,
+  listTasks,
+  loadTask,
+  readTaskFile,
+  saveTask,
+  writeTaskFile,
+} from "./store.ts";
 import { classify, classifyPrompt, DEFAULT_BUDGET_USD, signals, triageRecord } from "./triage.ts";
 import {
   addWorktree,
@@ -322,6 +335,7 @@ export function approveTask(
 export function reviseTask(root: string, id: string, now = new Date()): Task {
   const task = loadTask(root, id);
   if (runs.has(id)) throw invalid(t("tasks.service.runningStopFirst"));
+  requireOwnTask(task);
   if (task.state === "draft" || !task.contract) return task;
   const { approvedAt: _approved, ...contract } = task.contract;
   // A new contract makes the last run's results meaningless.
@@ -506,7 +520,14 @@ export function present(task: Task): Task {
 }
 
 export function listTasksLive(root: string): TaskSummary[] {
-  return listTasks(root).map((t) => (t.state === "running" && !runs.has(t.id) ? { ...t, state: "interrupted" } : t));
+  return listTasks(root).map((t) =>
+    t.state === "running" && !runs.has(t.id)
+      ? { ...t, state: "interrupted" }
+      : // A task comparing Best-of-N variants is running while any of them runs (CP-06).
+        t.variants?.some((v) => runs.has(v))
+        ? { ...t, state: "running" }
+        : t,
+  );
 }
 
 /**
@@ -517,10 +538,16 @@ export function deleteTaskSafe(root: string, id: string): void {
   if (runs.has(id)) throw invalid(t("tasks.service.runningStopFirst"));
   const task = loadTask(root, id);
   if (task.parent) throw invalid(t("tasks.service.subtaskDelete"));
+  if (linkedVariant(root, task)) throw invalid(t("tasks.service.variantDelete"));
+  const variants = variantsOf(root, task);
+  if (variants.some((v) => runs.has(v.id))) throw invalid(t("tasks.service.variantsRunning"));
+  for (const v of variants) removeVariant(root, task, v, false);
   const children = (task.subtasks ?? []).map((c) => loadTask(root, c));
   if (children.some((c) => runs.has(c.id))) throw invalid(t("tasks.service.subtaskRunning"));
   for (const t of [...children, task]) {
-    if (t.worktree && !t.worktree.removed) removeWorktree(t.folder?.path ?? root, t.worktree.path);
+    // A worktree another task now holds (a kept Best-of-N variant's) stays with it.
+    if (t.worktree && !t.worktree.removed && !worktreeHeldByOther(root, t.worktree.path, t.id))
+      removeWorktree(t.folder?.path ?? root, t.worktree.path);
     removeFolderWorktrees(t);
     if (t !== task) deleteTask(root, t.id);
   }
@@ -549,6 +576,7 @@ export function schedulable(root: string, id: string): Task {
   }
   if (task.triage.chosen === "XL") throw invalid(t("tasks.service.scheduleXl"));
   if (task.parent) throw invalid(t("tasks.service.scheduleSubtask"));
+  requireOwnTask(task);
   if (task.state === "interrupted") throw invalid(t("tasks.service.scheduleInterrupted"));
   return task;
 }
@@ -670,12 +698,14 @@ export function taskBranch(root: string, task: Task): { task: Task; fresh: boole
   if (!head) return { task, fresh: false };
   const base = wt?.base ?? head;
   const dir = worktreePath(root, task.id);
-  addWorktree(root, dir, branchOf(task.id), base);
+  // The branch the task has, which a kept Best-of-N variant's isn't named after (CP-06), else its own.
+  const branch = wt?.branch ?? branchOf(task.id);
+  addWorktree(root, dir, branch, base);
   // The branch checked out now is where the work goes back to: a PR's base (M5-02).
   const from = wt?.from ?? (git(["symbolic-ref", "--short", "-q", "HEAD"], root).stdout.trim() || undefined);
   const worktree = {
     path: dir,
-    branch: branchOf(task.id),
+    branch,
     base,
     ...(from ? { from } : {}),
     untracked: untracked(codeRootIn(root, dir)),
@@ -735,10 +765,37 @@ export function startTask(
   }
   if (task.triage.chosen === "XL") return startXl(root, task, host, opts, notify, now);
   if (task.parent) requireOwnRun(task);
+  requireOwnTask(task);
+  return beginRun(root, task, host, opts, notify, now);
+}
+
+/** How a run starts: the permission mode, the run's model and the agent per role, and a variant's own model. */
+type RunOptions = {
+  permissionMode: PermissionMode;
+  model?: string;
+  scheduled?: boolean;
+  agents?: AgentRoles;
+  /** A model per role over `model` (CP-06): a Best-of-N variant's implementer. */
+  models?: TaskRun["models"];
+};
+
+/**
+ * Starts a run of a task its caller checked: the tier's workflow (or the task's own flow), the agents it needs, the
+ * task's worktree, and the orchestrator in the background (`startTask`, and each Best-of-N variant).
+ */
+function beginRun(
+  root: string,
+  task: Task,
+  host: SessionHost,
+  opts: RunOptions,
+  notify: (task: Task) => void,
+  now: Date,
+): Task {
+  const tier = task.triage?.chosen ?? "S";
   const eff = workflowsOf(root);
   const own = flowOf(task);
-  const workflow = own ?? eff.library.workflows[task.triage.chosen];
-  if (!workflow) throw invalid(t("tasks.service.noWorkflow", { tier: task.triage.chosen }));
+  const workflow = own ?? (tier === "XL" ? undefined : eff.library.workflows[tier]);
+  if (!workflow) throw invalid(t("tasks.service.noWorkflow", { tier }));
   // The task's choice per role over the workspace's defaults (M9-06): step > task > workspace > Claude.
   const chosen = { ...readDefaults(root), ...opts.agents };
   opts = Object.keys(chosen).length ? { ...opts, agents: chosen } : opts;
@@ -814,6 +871,300 @@ export function stopRun(id: string): boolean {
 /** The sidecar is shutting down: runs still going stay `running` on disk and read back as interrupted. */
 export function shutdownRuns(): void {
   shuttingDown = true;
+}
+
+/* ---------- Best-of-N: one task on several implementers, then keep one (CP-06) ---------- */
+
+/**
+ * A task acts on its own (CP-06): not while it compares Best-of-N variants, and not as one of them. A variant runs,
+ * resumes and stops; everything else waits until the person keeps one.
+ */
+function requireOwnTask(task: Task): void {
+  if (task.variants?.length) throw invalid(t("tasks.service.comparing"));
+  if (task.variantOf) throw invalid(t("tasks.service.isVariant"));
+}
+
+/** Whether `task` is a variant its task still lists: it then goes only with its task, or when one is kept. */
+function linkedVariant(root: string, task: Task): boolean {
+  if (!task.variantOf) return false;
+  try {
+    return loadTask(root, task.variantOf.id).variants?.includes(task.id) ?? false;
+  } catch {
+    return false;
+  }
+}
+
+/** A task's variants that are still there, each as it stands now. */
+function variantsOf(root: string, task: Task): Task[] {
+  return (task.variants ?? []).flatMap((id) => {
+    try {
+      const v = present(loadTask(root, id));
+      return v.variantOf?.id === task.id ? [v] : [];
+    } catch {
+      return [];
+    }
+  });
+}
+
+/** Whether another task's record names this worktree: then it's that task's, and it stays (a kept variant's). */
+function worktreeHeldByOther(root: string, dir: string, id: string): boolean {
+  return everyTask(root).some((o) => o.id !== id && o.worktree && !o.worktree.removed && o.worktree.path === dir);
+}
+
+/**
+ * Removes one variant: its worktree and, when asked, its branch, then its record. Only what the variant's own id
+ * names is removed, and only when the link holds both ways: a tampered record can't point the removal elsewhere.
+ */
+function removeVariant(root: string, lead: Task, v: Task, deleteBranches: boolean): void {
+  if (v.variantOf?.id !== lead.id || !lead.variants?.includes(v.id)) return;
+  const wt = v.worktree;
+  if (wt && wt.path === worktreePath(root, v.id) && wt.branch === branchOf(v.id)) {
+    if (!wt.removed && !worktreeHeldByOther(root, wt.path, v.id)) removeWorktree(root, wt.path);
+    if (deleteBranches) deleteBranch(root, wt.branch);
+  }
+  deleteTask(root, v.id);
+}
+
+/** The agent a workflow's write step names itself, if any: then Best-of-N can't vary the implementer. */
+function pinnedImplementer(workflow: Workflow): StepAgent | null {
+  for (const s of workflow.steps) {
+    const steps = "parallel" in s ? s.parallel : "gates" in s ? [] : [s];
+    for (const step of steps) if (step.access === "write" && step.agent) return step.agent;
+  }
+  return null;
+}
+
+/**
+ * Best-of-N (CP-06): the approved task runs on 2–3 implementers at once. Each variant is a task of its own (its own
+ * worktree, run and files) with a copy of the contract and triage, so its budget is the task's. Plan and review stay
+ * the task's choice for every variant; only the implementer and its model differ. Everything is checked before
+ * anything starts; a variant that can't start is saved failed and the others go on.
+ */
+export function runVariants(
+  root: string,
+  id: string,
+  host: SessionHost,
+  opts: {
+    permissionMode: PermissionMode;
+    model?: string;
+    agents?: AgentRoles;
+    variants: { agent: StepAgent; model?: string }[];
+  },
+  notify: (task: Task) => void,
+  now = new Date(),
+): Task {
+  const lead = present(loadTask(root, id));
+  if (runs.has(id)) throw invalid(t("tasks.service.alreadyRunning"));
+  if (!STARTABLE.has(lead.state) || !lead.contract?.approvedAt || !lead.triage) {
+    throw invalid(t("tasks.service.approveFirst"));
+  }
+  if (lead.triage.chosen === "XL" || lead.parent || lead.subtasks?.length) throw invalid(t("tasks.service.bestOfXl"));
+  requireOwnTask(lead);
+  if (opts.variants.length < 2 || opts.variants.length > MAX_VARIANTS) {
+    throw invalid(t("tasks.service.bestOfCount", { max: MAX_VARIANTS }));
+  }
+  if ((lead.worktree && !lead.worktree.removed) || (lead.pr && !lead.pr.merged)) {
+    throw invalid(t("tasks.service.bestOfHasWorktree"));
+  }
+  requireRepoWithCommit(root);
+  if (lead.triage.budgetUsd === null) throw invalid(t("tasks.service.bestOfNoBudget"));
+  if (lead.folders?.length) throw invalid(t("tasks.service.bestOfFolders"));
+  const eff = workflowsOf(root);
+  const workflow = flowOf(lead) ?? eff.library.workflows[lead.triage.chosen];
+  if (!workflow) throw invalid(t("tasks.service.noWorkflow", { tier: lead.triage.chosen }));
+  const pinned = pinnedImplementer(workflow);
+  if (pinned) throw invalid(t("tasks.service.bestOfPinned", { agent: AGENT_NAME[pinned] }));
+  const shared = { ...readDefaults(root), ...opts.agents };
+  for (const v of opts.variants) {
+    for (const agent of agentsNeeded(workflow, { ...shared, implement: v.agent })) {
+      const found = agent === "codex" ? host.codex?.() : agent === "agy" ? host.agy?.() : null;
+      if (!found) throw invalid(t("tasks.service.agentMissing", { agent: AGENT_NAME[agent] }));
+    }
+  }
+
+  // The variants, each a ready copy of the approved task; listed on the task before any starts.
+  const title = lead.title ?? lead.request.replace(/\s+/g, " ").trim().slice(0, 60);
+  const variants = opts.variants.map((v, i) => {
+    const made = createTask(root, lead.request, lead.availableGates, now);
+    const variant: Task = {
+      ...made,
+      title: `${title} · ${AGENT_NAME[v.agent]}${v.model ? ` ${v.model}` : ""}`,
+      contract: lead.contract,
+      triage: lead.triage,
+      ...(lead.flow ? { flow: lead.flow } : {}),
+      state: "ready",
+      variantOf: { id: lead.id, index: i + 1, agent: v.agent, ...(v.model ? { model: v.model } : {}) },
+    };
+    saveTask(root, variant);
+    return { variant, choice: v };
+  });
+  const comparing: Task = { ...lead, variants: variants.map((v) => v.variant.id), updatedAt: now.toISOString() };
+  saveTask(root, comparing);
+  for (const { variant, choice } of variants) {
+    try {
+      beginRun(
+        root,
+        variant,
+        host,
+        {
+          permissionMode: opts.permissionMode,
+          ...(opts.model ? { model: opts.model } : {}),
+          agents: { ...shared, implement: choice.agent },
+          ...(choice.model ? { models: { implement: choice.model } } : {}),
+        },
+        notify,
+        now,
+      );
+    } catch (err) {
+      const failed: Task = {
+        ...loadTask(root, variant.id),
+        state: "failed",
+        updatedAt: now.toISOString(),
+      };
+      saveTask(root, failed);
+      log(`variant ${variant.id} didn't start: ${err instanceof Error ? err.message : String(err)}`);
+      notify(failed);
+    }
+  }
+  notify(comparing);
+  return comparing;
+}
+
+/** Stops every variant of a task that's running (CP-06): Stop all. */
+export function stopVariants(root: string, id: string): boolean {
+  let stopped = false;
+  for (const v of variantsOf(root, loadTask(root, id))) stopped = stopRun(v.id) || stopped;
+  return stopped;
+}
+
+/** The last round of a run's gates: the kinds that passed and failed, named with their package. */
+function lastGates(run: TaskRun | null | undefined): { passed: string[]; failed: string[]; notRun: string[] } {
+  const gates = run?.gates ?? [];
+  const last = Math.max(-1, ...gates.map((g) => g.round));
+  const round = gates.filter((g) => g.round === last);
+  const name = (g: (typeof gates)[number]) => (g.package === "." ? g.kind : `${g.kind} (${g.package})`);
+  return {
+    passed: round.filter((g) => g.exitCode === 0 && !g.timedOut).map(name),
+    failed: round.filter((g) => g.exitCode !== 0 || g.timedOut).map(name),
+    notRun: [...(run?.notRun ?? [])],
+  };
+}
+
+/** One variant as the comparison shows it (CP-06). */
+function variantSummary(root: string, v: Task): VariantSummary {
+  const run = v.run;
+  const of = v.variantOf ?? { index: 0, agent: "claude" as const };
+  const changes = changesWithBase(root, v);
+  const review = storedReview(root, v.id);
+  const ended = run?.endedAt ? Date.parse(run.endedAt) - Date.parse(run.startedAt) : undefined;
+  return {
+    index: of.index,
+    taskId: v.id,
+    agent: of.agent,
+    ...("model" in of && of.model ? { model: of.model } : {}),
+    state: v.state,
+    ...(run?.outcome ? { outcome: run.outcome } : {}),
+    ...(run?.outcomeRef ? { outcomeRef: run.outcomeRef } : {}),
+    costUsd: v.costUsd,
+    estimate: run?.steps.some((s) => s.costKind) ?? false,
+    ...(ended !== undefined && Number.isFinite(ended) ? { durationMs: Math.max(0, ended) } : {}),
+    gates: lastGates(run),
+    ...(review && review.verdict !== "unreadable"
+      ? { review: { verdict: review.verdict, mustFix: review.mustFix } }
+      : {}),
+    files: changes.length,
+    added: changes.reduce((n, c) => n + (c.added ?? 0), 0),
+    removed: changes.reduce((n, c) => n + (c.removed ?? 0), 0),
+    guardBlocks: run?.guardBlocks.length ?? 0,
+  };
+}
+
+/** How each of a task's variants did (`task.variants`). */
+export function variantSummaries(root: string, id: string): VariantSummary[] {
+  return variantsOf(root, loadTask(root, id))
+    .map((v) => variantSummary(root, v))
+    .sort((a, b) => a.index - b.index);
+}
+
+/** States a variant's run can be kept from: it ended, one way or another (an interrupted one can only be resumed). */
+const KEEPABLE = new Set<Task["state"]>(["done", "accepted", "failed", "unverified", "cancelled"]);
+
+/**
+ * Keeps one variant (CP-06), or none (`keep` null): the task takes the kept variant's worktree, run and run files,
+ * with the comparison on the run; every other variant is removed with its worktree and branch. Each variant's cost
+ * stays with the task. Idempotent, in an order a crash can't make lose work:
+ * 1. the task adopts the kept variant (once: the kept one then leaves its list);
+ * 2. the kept variant's record goes, its worktree now the task's;
+ * 3. each other variant leaves the list with its cost, then is removed;
+ * 4. the report is written for the run the task now has.
+ */
+export async function keepVariant(root: string, id: string, keep: string | null, now = new Date()): Promise<Task> {
+  let lead = loadTask(root, id);
+  const listed = lead.variants ?? [];
+  const adopted = keep !== null && !listed.includes(keep) && lead.worktree?.path === worktreePath(root, keep);
+  if (!listed.length && !adopted) throw invalid(t("tasks.service.notComparing"));
+  if (keep !== null && !listed.includes(keep) && !adopted) throw invalid(t("tasks.service.notAVariant"));
+  if (listed.some((v) => runs.has(v))) throw invalid(t("tasks.service.variantsRunning"));
+  // On Windows a folder a live process runs in can't be removed: each run's end is settled first.
+  for (const v of listed) await settleRun(v);
+  const variants = variantsOf(root, lead);
+
+  if (keep !== null && !adopted) {
+    const winner = variants.find((v) => v.id === keep);
+    if (!winner?.run?.endedAt || !KEEPABLE.has(winner.state) || !winner.worktree || winner.worktree.removed) {
+      throw invalid(t("tasks.service.variantNotEnded"));
+    }
+    const compared = variants.map((v) => variantSummary(root, v)).sort((a, b) => a.index - b.index);
+    copyRunFiles(root, winner.id, lead.id);
+    const { pr: _pr, mergedInto: _merged, ...rest } = lead;
+    lead = {
+      ...rest,
+      ...withPastRun(lead),
+      worktree: winner.worktree,
+      run: { ...winner.run, bestOf: { chosen: winner.variantOf?.index ?? 1, compared } },
+      state: winner.state,
+      costUsd: lead.costUsd + winner.costUsd,
+      variants: listed.filter((v) => v !== winner.id),
+      updatedAt: now.toISOString(),
+    };
+    saveTask(root, lead);
+  }
+  // The kept variant's record goes; its worktree is the task's now, so nothing else is removed with it.
+  if (keep !== null) {
+    try {
+      const kept = loadTask(root, keep);
+      if (kept.variantOf?.id === lead.id) deleteTask(root, keep);
+    } catch {
+      // Gone already.
+    }
+  }
+  for (const v of variants) {
+    if (v.id === keep) continue;
+    const remaining = (lead.variants ?? []).filter((x) => x !== v.id);
+    const before = lead;
+    lead = {
+      ...lead,
+      costUsd: lead.costUsd + v.costUsd,
+      ...(remaining.length ? { variants: remaining } : {}),
+      updatedAt: now.toISOString(),
+    };
+    if (!remaining.length) delete lead.variants;
+    saveTask(root, lead);
+    removeVariant(root, before, v, true);
+  }
+  if (lead.variants?.length) {
+    // Variants whose records are gone already.
+    delete lead.variants;
+    saveTask(root, lead);
+  }
+  if (keep !== null && lead.run) {
+    try {
+      writeEvidence(root, lead, now);
+    } catch {
+      // The report can be built again on request (task.evidence).
+    }
+  }
+  return present(lead);
 }
 
 /* ---------- XL: split, sub-tasks in worktrees, merge (M3-07) ---------- */
@@ -1069,6 +1420,7 @@ export function mergeResult(
 ): { merged: boolean; conflicts: string[]; into: string } {
   const task = present(loadTask(root, id));
   if (!task.worktree || task.parent) throw invalid(t("tasks.service.noOwnBranch"));
+  requireOwnTask(task);
   if (runs.has(id)) throw invalid(t("tasks.service.runningStopFirst"));
   if (task.state !== "done" && task.state !== "accepted") {
     throw invalid(t("tasks.service.mergeNotFinished"));
@@ -1137,7 +1489,8 @@ export function overlapsOf(root: string, id: string): { taskId: string; title: s
     .filter((s) => s.id !== id)
     .flatMap((s) => {
       const other = loadTask(root, s.id);
-      if (other.parent) return [];
+      // Sub-tasks and Best-of-N variants change the same files by design (CP-06).
+      if (other.parent || other.variantOf) return [];
       const files = [...(changed(other) ?? [])].filter((f) => mine.has(f)).sort();
       return files.length ? [{ taskId: other.id, title: other.contract?.objective || other.request, files }] : [];
     });
@@ -1151,6 +1504,7 @@ export function cleanupTask(root: string, id: string, deleteBranches: boolean): 
   const task = loadTask(root, id);
   if (task.parent) throw invalid(t("tasks.service.subtaskWorktree"));
   if (runs.has(id)) throw invalid(t("tasks.service.runningStopFirst"));
+  requireOwnTask(task);
   for (const t of [...subtasksOf(root, task), task]) {
     const wt = t.worktree;
     if (!wt) continue;
@@ -1183,6 +1537,7 @@ function shippable(root: string, id: string): Task & { worktree: NonNullable<Tas
   const task = present(loadTask(root, id));
   if (task.parent) throw invalid(t("tasks.service.subtaskBranch"));
   if (runs.has(id)) throw invalid(t("tasks.service.runningStopFirst"));
+  requireOwnTask(task);
   if (task.state !== "done" && task.state !== "accepted") {
     throw invalid(t("tasks.service.prNotFinished"));
   }
@@ -1597,6 +1952,7 @@ export function feedbackTask(
 ): Task {
   const task = present(loadTask(root, id));
   if (task.parent || task.subtasks?.length) throw invalid(t("tasks.service.feedbackXl"));
+  requireOwnTask(task);
   if (runs.has(id)) throw invalid(t("tasks.service.runningStopFirst"));
   if (!task.run || !FEEDBACK_FROM.has(task.state)) throw invalid(t("tasks.service.feedbackNotFinished"));
   const wt = task.worktree;
@@ -1936,6 +2292,7 @@ export async function mergePrTask(
 export function acceptRisk(root: string, id: string, reason: string, now = new Date()): Task {
   const task = present(loadTask(root, id));
   if (runs.has(id)) throw invalid(t("tasks.service.runningStopFirst"));
+  requireOwnTask(task);
   if ((task.state !== "failed" && task.state !== "unverified") || !task.run) {
     throw invalid(t("tasks.service.acceptWhich"));
   }

@@ -14,7 +14,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { after, describe, it } from "node:test";
 import { fileURLToPath } from "node:url";
-import { RpcErrorCode, resultEnglish, resultText, setLanguage } from "@agentchainer/protocol";
+import { RpcErrorCode, resultEnglish, resultText, setLanguage, type Task } from "@agentchainer/protocol";
 import { writeDefaults } from "../backends/defaults.ts";
 import { copyFixture, removeFixtureCopies } from "../detect/fixture-copy.ts";
 import type { Gh, GhResult } from "../github.ts";
@@ -39,6 +39,7 @@ import {
   dropFlow,
   feedbackTask,
   fixCiTask,
+  keepVariant,
   mergeGates,
   mergePrTask,
   mergeResult,
@@ -52,16 +53,20 @@ import {
   readyBranch,
   retriageTask,
   reviseTask,
+  runningTask,
+  runVariants,
   settleFeedback,
   shortTitle,
   splitTask,
   startTask,
+  stopVariants,
   taskBranch,
   taskEvidence,
   taskFileDiff,
   taskWorkflow,
+  variantSummaries,
 } from "./service.ts";
-import { listTasks, loadTask, saveTask, writeTaskFile } from "./store.ts";
+import { createTask, listTasks, loadTask, readTaskFile, saveTask, writeTaskFile } from "./store.ts";
 import { addWorktree, branchOf, worktreePath } from "./worktree.ts";
 
 const DRAFT = {
@@ -1265,5 +1270,196 @@ describe("a multi-folder task's pull requests (M8-01)", () => {
     assert.ok(mainPr.body.includes("## The task's other pull requests"), mainPr.body);
     assert.ok(mainPr.body.includes(`- \`${t.folders?.[0]?.name}\`: ${apiPr.url}`), "the main PR links the other");
     assert.ok(apiPr.body.includes(`main PR: ${mainPr.url}`), "the other PR links back");
+  });
+});
+
+describe("Best-of-N (CP-06)", () => {
+  after(removeFixtureCopies);
+  const git = (cwd: string, ...args: string[]) =>
+    execFileSync("git", ["-c", "user.name=t", "-c", "user.email=t@example.invalid", ...args], {
+      cwd,
+      encoding: "utf8",
+    });
+  const S = LibrarySchema.parse(shipped).workflows.S;
+
+  /** An approved tier-S task with a budget, ready to run. */
+  function ready(root: string): Task {
+    const a = approvedXl(newTask(root, "Coupons"));
+    if (!a.triage) throw new Error("no triage");
+    const task: Task = { ...a, triage: { ...a.triage, chosen: "S", proposed: "S", budgetUsd: 1 } };
+    saveTask(root, task);
+    return task;
+  }
+
+  /** A variant of `lead` that ran on `agent` and ended `state`, with a file of its own in its worktree. */
+  function variant(root: string, lead: Task, index: number, agent: "claude" | "codex" | "agy"): Task {
+    if (!S) throw new Error("no S workflow");
+    const made = createTask(root, lead.request, lead.availableGates);
+    const { task } = taskBranch(root, {
+      ...made,
+      contract: lead.contract,
+      triage: lead.triage,
+      state: "ready",
+      variantOf: { id: lead.id, index, agent },
+    });
+    const wt = task.worktree;
+    if (!wt) throw new Error("no worktree");
+    writeFileSync(join(wt.path, `by-${agent}.js`), `export const by = "${agent}";\n`);
+    const opts = { permissionMode: "default" as const, base: wt.base, untrackedAtStart: wt.untracked };
+    const run = {
+      ...newRun(S, { ...opts, agents: { implement: agent } }, new Date()),
+      endedAt: new Date().toISOString(),
+      costUsd: 0.1 * index,
+    };
+    const v: Task = { ...task, state: "done", run, costUsd: 0.1 * index };
+    saveTask(root, v);
+    writeTaskFile(root, v.id, "summary.md", `## Changes\n- by-${agent}.js: by ${agent}\n`);
+    return v;
+  }
+
+  /** A task comparing two finished variants, Claude's and Codex's. */
+  function comparing(root: string) {
+    const lead = ready(root);
+    const a = variant(root, lead, 1, "claude");
+    const b = variant(root, lead, 2, "codex");
+    const withVariants: Task = { ...lead, variants: [a.id, b.id] };
+    saveTask(root, withVariants);
+    return { lead: withVariants, a, b };
+  }
+
+  const near = (x: number, y: number) => assert.ok(Math.abs(x - y) < 1e-9, `${x} ≈ ${y}`);
+
+  it("hides a comparing task's variants from the list, and sums each one up", () => {
+    const root = copyFixture("sample-app");
+    const { lead, a, b } = comparing(root);
+    const listed = listTasks(root);
+    assert.deepEqual(
+      listed.map((t) => [t.id, t.variants]),
+      [[lead.id, [a.id, b.id]]],
+    );
+    const [one, two] = variantSummaries(root, lead.id);
+    assert.deepEqual([one?.index, one?.agent, one?.state, one?.files, one?.added], [1, "claude", "done", 1, 1]);
+    assert.deepEqual([two?.index, two?.agent], [2, "codex"]);
+    near(two?.costUsd ?? 0, 0.2);
+    assert.equal(overlapsOf(root, a.id).length, 0, "variants don't warn about each other");
+  });
+
+  it("keeps one: the task takes its worktree, run and files, and the others go with their branches", async () => {
+    const root = copyFixture("sample-app");
+    git(root, "config", "user.name", "t");
+    git(root, "config", "user.email", "t@example.invalid");
+    const { lead, a, b } = comparing(root);
+    // A review from an earlier run of the task: the kept variant (tier S) has none, so it must go.
+    writeTaskFile(root, lead.id, "review.json", "{}");
+    const kept = await keepVariant(root, lead.id, b.id);
+    assert.deepEqual([kept.worktree?.path, kept.worktree?.branch], [b.worktree?.path, branchOf(b.id)]);
+    assert.equal(kept.state, "done");
+    assert.deepEqual(
+      [kept.run?.bestOf?.chosen, kept.run?.bestOf?.compared.map((c) => c.agent)],
+      [2, ["claude", "codex"]],
+    );
+    assert.equal(kept.variants, undefined);
+    near(kept.costUsd, lead.costUsd + 0.3);
+    assert.match(readTaskFile(root, lead.id, "summary.md") ?? "", /by codex/);
+    assert.equal(readTaskFile(root, lead.id, "review.json"), null);
+    assert.ok(existsSync(join(b.worktree?.path ?? "", "by-codex.js")), "the kept worktree stays");
+    assert.equal(existsSync(a.worktree?.path ?? ""), false, "the other is removed");
+    const branches = git(root, "branch", "--list");
+    assert.doesNotMatch(branches, new RegExp(a.id));
+    assert.match(branches, new RegExp(b.id));
+    assert.throws(() => loadTask(root, a.id));
+    assert.throws(() => loadTask(root, b.id));
+    assert.match(taskEvidence(root, lead.id).markdown, /## Best of N[\s\S]*Variant 2 \(Codex\), kept/);
+    // Keeping again finishes nothing more, and counts nothing twice.
+    near((await keepVariant(root, lead.id, b.id)).costUsd, kept.costUsd);
+    // It merges like any task, and its branch outlives Clean up: Run again's worktree is on it.
+    assert.equal(mergeResult(root, lead.id).merged, true);
+    cleanupTask(root, lead.id, false);
+    assert.equal(existsSync(b.worktree?.path ?? ""), false);
+    assert.equal(taskBranch(root, loadTask(root, lead.id)).task.worktree?.branch, branchOf(b.id));
+  });
+
+  it("discards every variant, and their cost stays with the task", async () => {
+    const root = copyFixture("sample-app");
+    const { lead, a, b } = comparing(root);
+    const kept = await keepVariant(root, lead.id, null);
+    assert.deepEqual([kept.variants, kept.state, kept.worktree], [undefined, "ready", undefined]);
+    near(kept.costUsd, lead.costUsd + 0.3);
+    for (const v of [a, b]) {
+      assert.equal(existsSync(v.worktree?.path ?? ""), false);
+      assert.throws(() => loadTask(root, v.id));
+    }
+  });
+
+  it("removes only what a variant's own id names: a tampered record can't point elsewhere", async () => {
+    const root = copyFixture("sample-app");
+    const { lead, a, b } = comparing(root);
+    const elsewhere = mkdtempSync(join(tmpdir(), "ac-elsewhere-"));
+    writeFileSync(join(elsewhere, "keep.txt"), "x");
+    if (a.worktree) saveTask(root, { ...a, worktree: { ...a.worktree, path: elsewhere } });
+    await keepVariant(root, lead.id, b.id);
+    assert.ok(existsSync(join(elsewhere, "keep.txt")));
+  });
+
+  it("refuses what it can't compare, and keeps a comparing task and its variants to themselves", () => {
+    const root = copyFixture("sample-app");
+    const host = {} as Parameters<typeof runVariants>[2];
+    const two = [{ agent: "claude" as const }, { agent: "claude" as const, model: "haiku" }];
+    const start = (id: string, variants: { agent: "claude" | "codex" | "agy"; model?: string }[] = two) =>
+      runVariants(root, id, host, { permissionMode: "default", variants }, () => undefined);
+    assert.throws(() => start(newTask(root, "x").id), /Approve the contract/);
+    const unbudgeted = ready(root);
+    if (unbudgeted.triage) saveTask(root, { ...unbudgeted, triage: { ...unbudgeted.triage, budgetUsd: null } });
+    assert.throws(() => start(unbudgeted.id), /Set a budget first/);
+    const one = ready(root);
+    assert.throws(() => start(one.id, [{ agent: "claude" }]), /2 to 3 variants/);
+    assert.throws(() => start(one.id, [{ agent: "codex" }, { agent: "claude" }]), /Codex, which isn't installed/);
+    const branched = taskBranch(root, ready(root)).task;
+    saveTask(root, branched);
+    assert.throws(() => start(branched.id), /already has a worktree/);
+    const { lead, a } = comparing(root);
+    assert.throws(() => start(lead.id), /comparing Best-of-N variants/);
+    assert.throws(() => startTask(root, lead.id, host, { permissionMode: "default" }, () => undefined), /comparing/);
+    assert.throws(() => reviseTask(root, lead.id), /comparing/);
+    assert.throws(() => mergeResult(root, a.id), /Best-of-N variant/);
+    assert.throws(() => cleanupTask(root, a.id, false), /Best-of-N variant/);
+    assert.throws(() => deleteTaskSafe(root, a.id), /discard it from its task/);
+  });
+
+  it("starts each variant as a ready copy of the task, on its own implementer", async () => {
+    const root = copyFixture("sample-app");
+    const lead = ready(root);
+    const host = {} as Parameters<typeof runVariants>[2];
+    const started = runVariants(
+      root,
+      lead.id,
+      host,
+      { permissionMode: "default", variants: [{ agent: "claude" }, { agent: "claude", model: "haiku" }] },
+      () => undefined,
+    );
+    const ids = started.variants ?? [];
+    assert.equal(ids.length, 2);
+    // Stopped at once: this checks what was made, not a model's work.
+    stopVariants(root, lead.id);
+    for (let i = 0; i < 200 && ids.some((id) => runningTask(id)); i++) await new Promise((r) => setTimeout(r, 50));
+    const [one, two] = ids.map((id) => loadTask(root, id));
+    assert.deepEqual(
+      [one?.variantOf, two?.variantOf],
+      [
+        { id: lead.id, index: 1, agent: "claude" },
+        { id: lead.id, index: 2, agent: "claude", model: "haiku" },
+      ],
+    );
+    assert.equal(one?.contract?.approvedAt, lead.contract?.approvedAt);
+    assert.equal(one?.triage?.budgetUsd, 1);
+    assert.equal(one?.costUsd, 0, "a variant's cost starts at nothing");
+    assert.match(two?.title ?? "", /· Claude haiku$/);
+    assert.deepEqual(two?.run?.models, { implement: "haiku" });
+    assert.equal(two?.run?.agents?.implement, "claude");
+    assert.notEqual(one?.worktree?.path, two?.worktree?.path);
+    assert.deepEqual(
+      listTasks(root).map((t) => t.id),
+      [lead.id],
+    );
   });
 });

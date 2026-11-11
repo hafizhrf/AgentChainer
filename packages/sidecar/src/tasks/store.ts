@@ -115,29 +115,44 @@ export function loadTask(root: string, id: string): Task {
   return { ...meta.data, contract: contract.data, triage: triage.data };
 }
 
-/** This workspace's tasks, newest first, without XL sub-tasks. Folders that aren't valid tasks are skipped. */
-export function listTasks(root: string): TaskSummary[] {
+/** Every task record in the workspace, sub-tasks and variants included; folders that aren't valid tasks are skipped. */
+export function everyTask(root: string): Task[] {
   const dir = tasksRoot(root);
   if (!existsSync(dir)) return [];
-  const tasks: TaskSummary[] = [];
+  const all: Task[] = [];
   for (const id of readdirSync(dir)) {
     if (!TaskIdSchema.safeParse(id).success) continue;
     try {
-      const t = loadTask(root, id);
-      // An XL task's sub-tasks show on its page, not in the list.
-      if (t.parent) continue;
-      tasks.push({
-        id: t.id,
-        request: t.request,
-        state: t.state,
-        createdAt: t.createdAt,
-        updatedAt: t.updatedAt,
-        costUsd: t.costUsd,
-        tier: t.triage?.chosen ?? null,
-      });
+      all.push(loadTask(root, id));
     } catch {
       // not a valid task: leave it out
     }
+  }
+  return all;
+}
+
+/**
+ * This workspace's tasks, newest first, without XL sub-tasks or the variants a Best-of-N compares (CP-06): those show
+ * on their task's page. A variant whose task doesn't list it is shown, so it can be found and deleted. Folders that
+ * aren't valid tasks are skipped.
+ */
+export function listTasks(root: string): TaskSummary[] {
+  const all = new Map(everyTask(root).map((t) => [t.id, t]));
+  const tasks: TaskSummary[] = [];
+  for (const t of all.values()) {
+    // An XL task's sub-tasks show on its page, not in the list.
+    if (t.parent) continue;
+    if (t.variantOf && all.get(t.variantOf.id)?.variants?.includes(t.id)) continue;
+    tasks.push({
+      id: t.id,
+      request: t.request,
+      state: t.state,
+      createdAt: t.createdAt,
+      updatedAt: t.updatedAt,
+      costUsd: t.costUsd,
+      ...(t.variants?.length ? { variants: t.variants } : {}),
+      tier: t.triage?.chosen ?? null,
+    });
   }
   return tasks.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 }
@@ -171,6 +186,25 @@ export function writeTaskFile(root: string, id: string, name: string, text: stri
   const dir = taskDir(root, id);
   requireRealDir(root, dir);
   writeFileSync(path.join(dir, name), text);
+}
+
+/** The files a run leaves for the next steps and rounds (CP-06): what a task takes from the variant it keeps. */
+const RUN_FILES = ["plan.md", "review.json", "summary.md", "workflow.json"];
+
+/**
+ * Gives task `to` the run files of task `from` (CP-06): each is replaced, or removed when `from` has none, so a
+ * tier-S variant (no review) leaves no review of an earlier run behind.
+ */
+export function copyRunFiles(root: string, from: string, to: string): void {
+  for (const name of RUN_FILES) {
+    const text = readTaskFile(root, from, name);
+    if (text !== null) writeTaskFile(root, to, name, text);
+    else {
+      const dir = taskDir(root, to);
+      requireRealDir(root, dir);
+      rmSync(path.join(dir, name), { force: true });
+    }
+  }
 }
 
 export function deleteTask(root: string, id: string): void {

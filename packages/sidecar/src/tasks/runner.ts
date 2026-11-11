@@ -13,7 +13,7 @@ import {
   type TaskTag,
 } from "@agentchainer/protocol";
 import { type AgyHost, agyBackend } from "../backends/agy.ts";
-import { agentFor } from "../backends/choose.ts";
+import { agentFor, roleOf } from "../backends/choose.ts";
 import { type ClaudeHost, claudeBackend } from "../backends/claude.ts";
 import { type CodexHost, codexBackend } from "../backends/codex.ts";
 import type { StepAgent, StepBackend, StepOptions, StepSession } from "../backends/types.ts";
@@ -206,7 +206,10 @@ export function sessionRunner(
   const openSession = async (step: AgentStep, budgetUsd: number, resume?: string): Promise<StepSession> => {
     const role = library.roles[step.role];
     if (!role) throw new Error(`No role ${step.role} in the library.`);
-    const model = role.model !== "inherit" ? role.model : run.model;
+    // A Best-of-N variant's implementer has its own model (CP-06); every other step keeps its role's or the run's.
+    const model =
+      (roleOf(step) === "implement" ? run.models?.implement : undefined) ??
+      (role.model !== "inherit" ? role.model : run.model);
     const options: StepOptions = {
       cwd: root,
       // The other folders' worktrees, so a step reaches them and the guard allows them (M8-01).

@@ -148,6 +148,8 @@ export type Evidence = {
   pr?: Task["pr"];
   /** "Fix as commented" rounds on the run (CP-05). */
   feedback?: TaskRun["feedback"];
+  /** The Best-of-N this run was kept from (CP-06): every variant, and which one it is. */
+  bestOf?: TaskRun["bestOf"];
   /** The task's deploys (M6). */
   deploys?: DeployRecord[];
 };
@@ -359,6 +361,7 @@ export function buildEvidence({
     },
     ...(task.pr ? { pr: task.pr } : {}),
     ...(run?.feedback?.length ? { feedback: run.feedback } : {}),
+    ...(run?.bestOf ? { bestOf: run.bestOf } : {}),
     ...(deploys?.length ? { deploys } : {}),
   };
 }
@@ -635,6 +638,24 @@ export function renderEvidence(e: Evidence, render: (ref: MessageRef) => string 
         pr.merged.accepted
           ? r("evidence.pr.mergedAccepted", { ...merged, reason: pr.merged.accepted })
           : r("evidence.pr.merged", merged),
+      );
+    }
+  }
+  if (e.bestOf) {
+    add("", r("evidence.bestOf.heading"), "");
+    for (const v of e.bestOf.compared) {
+      add(
+        r(v.index === e.bestOf.chosen ? "evidence.bestOf.kept" : "evidence.bestOf.variant", {
+          n: v.index,
+          agent: v.model ? `${AGENT_NAMES[v.agent]} ${v.model}` : AGENT_NAMES[v.agent],
+          state: named(STATE_TEXT, v.state),
+          passed: v.gates.passed.length,
+          failed: v.gates.failed.length,
+          count: v.files,
+          added: v.added,
+          removed: v.removed,
+          cost: usd(v.costUsd),
+        }),
       );
     }
   }

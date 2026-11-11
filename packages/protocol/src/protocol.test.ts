@@ -10,6 +10,7 @@ import {
   imageType,
   MAX_CLARIFICATIONS,
   MemoryPathSchema,
+  ModelNameSchema,
   methodSchemas,
   PERMISSION_MODES,
   PermissionRequestSchema,
@@ -189,5 +190,25 @@ describe("a task's answers to its drafter's questions (UX-24)", () => {
     assert.ok(shape.safeParse(undefined).success);
     assert.equal(shape.safeParse(Array(MAX_CLARIFICATIONS + 1).fill(one)).success, false);
     assert.equal(shape.safeParse([{ ...one, answer: "x".repeat(2001) }]).success, false);
+  });
+});
+
+describe("Best-of-N's variants (CP-06)", () => {
+  it("takes model names as agents give them, never one that reads as an option", () => {
+    for (const ok of ["haiku", "claude-sonnet-5-5[1m]", "gpt-5.1-codex", "gemini-3.8-flash-low", "us.anthropic/x:1"]) {
+      assert.ok(ModelNameSchema.safeParse(ok).success, ok);
+    }
+    for (const bad of ["", "--model", "a b", "-x", "x".repeat(101)]) {
+      assert.equal(ModelNameSchema.safeParse(bad).success, false, JSON.stringify(bad));
+    }
+  });
+
+  it("runs 2 or 3 variants", () => {
+    const params = methodSchemas["task.runVariants"].params;
+    const ref = { cwd: "/w", id: "2026-11-11-0a1b2c3d", permissionMode: "default" };
+    const v = { agent: "claude" };
+    assert.equal(params.safeParse({ ...ref, variants: [v] }).success, false);
+    assert.ok(params.safeParse({ ...ref, variants: [v, { agent: "codex", model: "gpt-5.1-codex" }] }).success);
+    assert.equal(params.safeParse({ ...ref, variants: [v, v, v, v] }).success, false);
   });
 });

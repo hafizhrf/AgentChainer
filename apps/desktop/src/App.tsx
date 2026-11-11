@@ -289,13 +289,20 @@ export function App() {
           setSettingsOpen(true);
         }
         if (cfg.open === "new-session") setNewSession(true);
-        if (cfg.open === "task-changes" || cfg.open === "task-contract") {
+        if (cfg.open === "task-changes" || cfg.open === "task-contract" || cfg.open === "task-variants") {
           const latest = (await request("task.list", { cwd: cfg.cwd })).tasks[0];
           if (latest) openTask(cfg.cwd, latest.id);
-          // The page follows its thread to the end; the contract card is brought back into view once it's settled.
-          if (cfg.open === "task-contract") {
-            setTimeout(() => document.querySelector(".contract-card")?.scrollIntoView({ block: "start" }), 4000);
-          }
+          // The page follows its thread to the end; a card is brought back into view once it's settled.
+          const card =
+            cfg.open === "task-contract" ? ".contract-card" : cfg.open === "task-variants" ? ".variants-card" : null;
+          // Only the thread scrolls: scrollIntoView would move the whole window's layout too.
+          const show = () => {
+            const el = card ? document.querySelector(card) : null;
+            const thread = el?.closest(".task-thread-scroll");
+            if (el && thread)
+              thread.scrollTop += el.getBoundingClientRect().top - thread.getBoundingClientRect().top - 16;
+          };
+          if (card) setTimeout(show, 4000);
         }
         const first = tabsRef.current[0];
         if (cfg.open === "terminal" && first) toggleTerminal(first.sessionId);

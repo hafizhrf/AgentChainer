@@ -16,6 +16,7 @@
   "deploy.service.alreadyRunning": "Deploy {{label}} sudah berjalan di workspace ini.",
   "deploy.service.cliMissing": "CLI {{cli}} belum terpasang.",
   "deploy.service.noPreviews": "{{label}} tidak memiliki pratinjau; deploy ke production saja.",
+  "deploy.service.bestOf": "Deploy varian Best-of-N setelah dipertahankan, dari task-nya.",
   "deploy.service.notSetUp": "Workspace ini belum disiapkan untuk {{label}}.",
   "deploy.plan.noCommits": "Workspace ini belum memiliki commit.",
   "deploy.plan.detached": "Workspace tidak sedang di branch mana pun (detached HEAD). Checkout branch yang akan di-deploy.",

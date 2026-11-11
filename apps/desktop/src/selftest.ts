@@ -18,6 +18,8 @@ import type { Tab } from "./tabs.ts";
 const OPEN_VIEWS = [
   "home",
   "settings",
+  "settings-agents",
+  "new-session",
   "terminal",
   "files",
   "git",

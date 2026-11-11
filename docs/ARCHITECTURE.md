@@ -116,6 +116,7 @@ Planned surface (v0.1):
 | request | `workspace.image` | An image in the workspace (PNG, JPEG, GIF, WebP, SVG, ICO) as base64 for the file viewer, up to 10 MB (UX-21). Read-only, inside the workspace like `workspace.diff` |
 | request | `workspace.revert` | Revert a file to HEAD (new files are deleted) or one hunk (`git apply -R`), worktree only |
 | request | `workspace.gitInit` | `git init`, offered when the workspace isn't a repository |
+| request | `workspace.create` | New session's New folder… (UX-23): makes `name` inside `parent` (which must be a folder), and `git init` in it when asked. A taken name, a name with a path in it, or a missing parent is refused; nothing is overwritten |
 | request | `git.branches` / `git.switch` / `git.stage` / `git.unstage` / `git.commit` / `git.push` | Git panel (M1-30). `git.branches` includes remote-only branches and a merge in progress; `git.switch` with `track` checks out a remote branch. Push is never forced and runs with `GIT_TERMINAL_PROMPT=0` |
 | request | `git.fetch` / `git.pull` | `fetch --all --prune`, and `pull --ff-only` (a diverged branch fails with a message, never an automatic merge). Both with `GIT_TERMINAL_PROMPT=0` |
 | request | `git.merge` / `git.abortMerge` | Merge a branch into the current one; conflicts come back as files and leave the merge in progress |

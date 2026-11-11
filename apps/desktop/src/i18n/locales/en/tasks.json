@@ -429,7 +429,7 @@
   "tasks.agents.review": "Review",
   "tasks.agents.claude": "Claude",
   "tasks.agents.codex": "Codex",
-  "tasks.agents.agy": "Antigravity CLI (agy)",
+  "tasks.agents.agy": "Antigravity",
   "tasks.agents.notSignedIn": "{{agent}} (not signed in)",
   "tasks.defaults.appDefault": "App default ({{value}})",
   "tasks.defaults.builtIn": "Built-in ({{value}})",

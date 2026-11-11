@@ -1270,7 +1270,6 @@ for the desktop shell, start screen and session view to be cleaned up (UX-02, UX
   - The title bar shows the same path (`BrandMark.tsx`, UX-15) in `currentColor`, which is also the monochrome
     version. The macOS About dialog uses the app icon.
   - Checked: the 128 px and 32 px PNGs read as the check on its tile.
-
 ### Exit criteria
 
 - [x] **UX-17** A tidy workflow canvas. Owner feedback, 2026-11-03, with a screenshot of a task's Flow tab: "tampilannya
@@ -1449,7 +1448,52 @@ for the desktop shell, start screen and session view to be cleaned up (UX-02, UX
     - dark and light; the owner's settings restored.
   - **Left:** the task card's offer after a task (tasks run gates, not dev servers, so there's nothing to find yet),
     and CP-12's device sizes and devtools.
+- [x] **UX-23** A tidier New session dialog and Settings. Owner request, 2026-11-11: "new session buat lebih rapih
+      dong, gak bisa create folder, dll, terus buat tampilan setting lebih rapih, aku mau keterangan agent harness apa
+      aja yang udah diinstall lebih jelas, jangan teks doang". Built 2026-11-11:
+  - **New session:**
+    - **Where:**
+      - the chosen folder as a card (name and path, or "No folder yet");
+      - under it, Recent folders (recent folders and named workspaces only), Browse…, **New folder…** and Type a path.
+    - **New folder…:** an inline form with the parent folder (Change… through the native picker), a name, and
+      "Initialize a git repository" (on). It calls the new `workspace.create`, which refuses a taken name, a name with
+      a path in it and a parent that isn't a folder, and never overwrites.
+    - **How it works:** the agent as option cards, each with "Ready" or "Sign in from your terminal first"; model,
+      permission profile and agent profile as before.
+  - **Settings:**
+    - **Layout:** pages beside a list (General, Sessions, Tasks, Agents, Limits and tools, About) instead of one long
+      form, in a wider dialog of fixed height. Below 720 px the list becomes a row of tabs.
+    - **Agents:** a card per harness (Claude Code, Codex CLI, Antigravity CLI), each with:
+      - status badges as icons and words: Installed · version, Not installed, Signed in · method, Not signed in,
+        Needs a newer version;
+      - what it's used for, and where it runs from;
+      - the next step as a command with Copy: install, `claude update`, `claude auth login` or `codex login`, or
+        running `agy` once. The person runs these in their own terminal (ADR-0002);
+      - "Use a different binary…", which holds the path settings that were in Tools before;
+      - Check again, which re-runs the readiness check and `agents.available`.
+  - **Tests:**
+    - `agentInfo.test.ts` (3): statuses, next steps, install commands;
+    - `workspace.test.ts`: `createFolder` with and without git, and its refusals.
+  - **In the app** (debug build, selftest views with no synthetic input, five haiku turns, about $0.01): New session
+    with the folder card, its actions and the agent cards. Settings showed General, and Agents in light, dark and
+    Bahasa Indonesia, with this computer's Claude Code 2.1.322 (claude.ai subscription), Codex 0.153.4 and
+    Antigravity 1.5.5, all signed in.
+  - **Owner's follow-ups, same day:**
+    - **Names:** "Antigravity", not "Antigravity CLI (agy)", and Codex without "CLI".
+    - **Agent marks are the real logos:**
+      - Claude's and Codex's from LobeHub Icons (MIT);
+      - Antigravity's from Google's press kit (antigravity.google/press);
+      - recorded in `NOTICE` with the trademark owners, shown only to name the tools.
 
+      OpenAI's own brand page couldn't be fetched (403), and Simple Icons no longer carries OpenAI or Antigravity.
+    - **Tidier layout:**
+      - a different binary's path sits under its summary at full width;
+      - the agent cards are compact, show a check on the chosen one, and show a status only when one isn't signed in;
+      - Recent folders takes its own row, with Browse…, New folder… and Type a path… under it;
+      - more room between the groups.
+    - **Bug fixed, "pilihan model gak realtime":** the app kept one model list for every agent. A Codex or agy chat
+      filled Claude's pickers (New session, Settings, tasks) with its own models. Lists are now kept per agent, under a
+      new storage key, so the mixed list is dropped.
 - [ ] **UX-E1** All M1/M2 screens use the design system, in light and dark themes.
 - [ ] **UX-E2** Usability test participants complete the M1 exit scenarios without help.
 

@@ -1983,6 +1983,14 @@ export const methodSchemas = {
   "workspace.revert": { params: WorkspacePath.extend({ hunk: z.number().int().min(0).optional() }), result: Ok },
   /** Offered when the workspace isn't a git repository (M1-06). */
   "workspace.gitInit": { params: WorkspaceRef, result: Ok },
+  /**
+   * A new, empty folder `name` inside `parent` for a new session (UX-23), with a git repository when `git`. Refuses a
+   * name that's taken: nothing is reused or overwritten.
+   */
+  "workspace.create": {
+    params: z.object({ parent: z.string().min(1), name: z.string().min(1).max(120), git: z.boolean() }),
+    result: z.object({ path: z.string() }),
+  },
 
   /** Detects stacks and commands and audits the agent setup (M2-06…M2-09). Read-only. */
   "workspace.scan": {

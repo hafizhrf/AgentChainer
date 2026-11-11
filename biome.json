@@ -20,7 +20,8 @@
       "!**/test/snapshots",
       "!packages/sidecar/test/evals/report.json",
       "!fixtures",
-      "!**/dist"
+      "!**/dist",
+      "!apps/desktop/src/assets/agents"
     ]
   },
   "formatter": {

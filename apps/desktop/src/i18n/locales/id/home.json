@@ -125,9 +125,9 @@
   "home.newSession.workspaceHint": "Workspace · {{count}} folder",
   "home.newSession.agent": "Agent",
   "home.newSession.codexHelp": "Codex CLI milikmu sendiri, login olehmu. Edit dan perintahnya lewat guard dan persetujuanmu, seperti Claude. Tanpa mode rencana dan tanpa rewind.",
-  "home.newSession.codexModel": "Default Codex (pilih lainnya di chat)",
+  "home.newSession.codexModel": "Default Codex",
   "home.newSession.agyHelp": "Antigravity CLI milik Anda sendiri, login oleh Anda. agy mengedit file tetapi tidak menjalankan perintah, dan tidak pernah bertanya dulu: Standar mengedit, Rencana hanya membaca. Pesan yang dikirim saat agy bekerja menunggu giliran berikutnya. Chat ini tidak bisa dibuka lagi setelah aplikasi dimulai ulang.",
-  "home.newSession.agyModel": "Model pertama di daftar agy",
+  "home.newSession.agyModel": "Model pertama Antigravity",
   "home.settings.pages": "Halaman pengaturan",
   "home.settings.pageGeneral": "Umum",
   "home.settings.pageSessions": "Session",
@@ -179,5 +179,6 @@
   "home.newSession.newFolderGit": "Inisialisasi repository git",
   "home.newSession.newFolderGitHint": "(task dan panel Perubahan membutuhkannya)",
   "home.newSession.newFolderCreate": "Buat folder",
-  "home.newSession.agentSignIn": "Masuk dari terminal Anda dulu"
+  "home.newSession.agentSignIn": "Masuk dari terminal Anda dulu",
+  "home.newSession.modelInChat": "Pilih model lain di chat, setelah dimulai."
 }

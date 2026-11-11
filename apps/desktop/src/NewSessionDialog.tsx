@@ -275,7 +275,7 @@ export function NewSessionDialog({
             </fieldset>
           )}
           <div className="field-row">
-            <Field label={t("home.view.model")}>
+            <Field label={t("home.view.model")} help={onCodex || onAgy ? t("home.newSession.modelInChat") : undefined}>
               {onCodex || onAgy ? (
                 <Select
                   label={t("home.view.model")}

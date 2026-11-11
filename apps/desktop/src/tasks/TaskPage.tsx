@@ -1982,9 +1982,9 @@ function SubtasksCard({
   useEffect(() => {
     if (task.state !== "ready") return;
     let live = true;
-    request("workspace.scan", { cwd }).then(
-      ({ profile }) =>
-        live && setSetup(profile.packages.find((p) => p.commands.install)?.commands.install?.run ?? null),
+    // What each new worktree runs first: the project's allowed setup script, else each package's install (CP-04).
+    request("worktree.config", { cwd }).then(
+      (c) => live && setSetup(c.setup && c.setupAllowed ? c.setup : (c.detected.install ?? null)),
       () => undefined,
     );
     request("workspace.files", { cwd }).then(

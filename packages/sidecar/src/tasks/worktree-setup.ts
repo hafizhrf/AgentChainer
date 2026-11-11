@@ -17,7 +17,7 @@ import path from "node:path";
 import { hasKeyShape, RpcErrorCode } from "@agentchainer/protocol";
 import { z } from "zod";
 import { applyFileEdits } from "../bootstrap/apply.ts";
-import { installCommand } from "../bootstrap/plan.ts";
+import { type InstallStep, installSteps } from "../bootstrap/plan.ts";
 import { detectWorkspace } from "../detect/detect.ts";
 import { t } from "../i18n/index.ts";
 import { RpcFailure } from "../rpc.ts";
@@ -210,11 +210,10 @@ export function setupCommand(
   source: string,
   code: string,
   env = process.env,
-): { command?: string; scriptNotAllowed?: boolean } {
+): { steps: InstallStep[]; scriptNotAllowed?: boolean } {
   const script = readConfig(source).config.setup?.trim();
-  const detected = installCommand(detectWorkspace(code));
-  if (script && isAllowed(source, "setup", script, env)) return { command: script };
-  return { ...(detected ? { command: detected } : {}), ...(script ? { scriptNotAllowed: true } : {}) };
+  if (script && isAllowed(source, "setup", script, env)) return { steps: [{ command: script, dir: "." }] };
+  return { steps: installSteps(detectWorkspace(code)), ...(script ? { scriptNotAllowed: true } : {}) };
 }
 
 /** What starts the app: the project's run script, else the detected dev command. */

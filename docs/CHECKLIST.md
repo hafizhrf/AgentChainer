@@ -2602,8 +2602,39 @@ Owner request, 2026-11-10: features that community tools for coding agents have 
     Worktrees section in light, dark and Bahasa Indonesia, with the include list and its live preview. On the app's
     own approvals, the repository's scripts showed "Not allowed on this computer yet" with **Allow…**.
   - **Still for the owner's click-through:** Run app with Preview, and the two fixes (MANUAL_CHECKS 3h–3k).
+  - **Follow-up fix (with CP-05's PR):**
+    - **The bug:** the detected install ran the first package's command at the worktree's root. A repository whose
+      only package is in `web/` failed its setup, and one without a root package installed only its first package.
+    - **The fix:** `installSteps` runs the root's install alone, or else each package's in its own folder, in order,
+      stopping at the first failure. The note reads e.g. `npm install (web); uv sync (api)`, and the XL card shows the
+      same through `worktree.config`.
+    - **Tests:** cover those cases, plus a real worktree whose package is in `web/`.
 - [ ] **CP-05** Comments on diff lines, sent to the agent as feedback. — Vibe Kanban
       ([repo](https://github.com/BloopAI/vibe-kanban)); Warp ([docs](https://docs.warp.dev/agents/cli-agents/overview/)).
+  - **Plan (2026-11-11):** in two parts (owner's choice).
+    - **Part 1, chats:** comments on lines of a chat's diff (the right panel's Changes). They're appended to the chat's
+      message, to edit before sending (owner's choice).
+    - **Part 2, tasks:** a diff of the task's changes against its base, and a "fix as commented" round on a finished
+      task. It's built like Fix CI's round (`orchestrator.fixCi`), with the comments instead of a CI log, so CP-07
+      (GitHub review comments) can reuse it.
+  - [x] **Part 1** (2026-11-11):
+    - **Picking lines:** click a line in either side of `DiffView`, or select several. The bar says "Lines 12–14 ·
+      Comment…". A form takes the comment: ⌘/Ctrl+Enter adds it, and Esc cancels without stopping the turn.
+    - **This file's comments:** marked on their lines (whole-line decoration and a gutter bar), and listed under the
+      editor with "Changed since" when the quoted lines changed.
+    - **Add to message:**
+      - comments on every file are kept per chat, and the Changes tab says how many are waiting;
+      - **Add N comments to message** appends one block: a header, then per comment the path and lines, the quoted
+        lines in a fence longer than any backticks in them, and the comment;
+      - the composer's `seed` can now append instead of replace, and the person edits, then sends. A running turn
+        queues the message as before.
+    - **Multi-folder chats:** a comment on another folder's file names its full path.
+    - **Tests:** `diffComments.test.ts` (4): the message's order and format, fences, stale lines, appending to a
+      draft.
+    - **In the app** (debug build, selftest diff view, no synthetic input): the comment bar sits above the hunks and
+      the diff renders under it. Adding comments and the message need the owner's click-through (MANUAL_CHECKS
+      3l–3m).
+  - [ ] **Part 2** (tasks), as planned above.
 - [ ] **CP-06** Best-of-N: run one task on several agents or models in separate worktrees, then compare the diffs.
       Pairs with M9.
   - Sources: Crystal ([repo](https://github.com/stravu/crystal)); Cursor `/best-of-n` (verify).

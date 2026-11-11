@@ -6,6 +6,7 @@ import { type Attachment, Composer } from "./Composer.tsx";
 import type { AppCommand } from "./commands.ts";
 import { latestTodos } from "./commands.ts";
 import type { Confirm } from "./Dialog.tsx";
+import { type DiffComment, feedbackMessage } from "./diffComments.ts";
 import { FolderSwitcher } from "./FolderSwitcher.tsx";
 import { joinPath } from "./files.ts";
 import { AgentDrawer } from "./graph/AgentDrawer.tsx";
@@ -131,7 +132,24 @@ export function SessionView({
     setSelected(null);
     if (!rightOpen) onToggleRight();
   }
-  const [seed, setSeed] = useState<{ text: string } | null>(null);
+  const [seed, setSeed] = useState<{ text: string; append?: boolean } | null>(null);
+  // Comments on the diff's lines (CP-05), on any file, until they go into the message.
+  const [comments, setComments] = useState<DiffComment[]>([]);
+  const sendComments = () => {
+    if (!comments.length) return;
+    const text = feedbackMessage(comments, {
+      header: t("panel.diff.feedbackHeader"),
+      where: (c) => {
+        const where = c.dir && c.dir !== tab.cwd ? joinPath(c.dir, c.path) : c.path;
+        const count = c.end - c.start + 1;
+        return c.side === "old"
+          ? t("panel.diff.feedbackOld", { path: where, start: c.start, end: c.end, count })
+          : t("panel.diff.feedbackNew", { path: where, start: c.start, end: c.end, count });
+      },
+    });
+    setSeed({ text, append: true });
+    setComments([]);
+  };
   const [view, setView] = useState<SessionMode>("chat");
   /** The subagent shown in the right panel's drawer (M4-03). */
   const [agentId, setAgentId] = useState<string | null>(null);
@@ -461,6 +479,8 @@ export function SessionView({
                       opened: previewOpened,
                       onUrlChange: setPreviewUrl,
                     }}
+                    comments={comments.length}
+                    onSendComments={sendComments}
                   />
                 </Suspense>
               </div>
@@ -496,6 +516,15 @@ export function SessionView({
                       confirm={confirm}
                       onClose={() => setSelected(null)}
                       onOpenInEditor={(line) => onOpenFile(joinPath(panelDir, selected), line)}
+                      comments={comments.filter((c) => (c.dir ?? tab.cwd) === panelDir)}
+                      onComment={(c) =>
+                        setComments((all) => [
+                          ...all,
+                          { ...c, id: crypto.randomUUID(), ...(panelDir !== tab.cwd ? { dir: panelDir } : {}) },
+                        ])
+                      }
+                      onRemoveComment={(id) => setComments((all) => all.filter((c) => c.id !== id))}
+                      onSendComments={sendComments}
                     />
                   )}
                 </Suspense>

@@ -30,7 +30,7 @@ import type { ChatSession, LiveSession } from "./backends/types.ts";
 import { applyActions, type Cli, listRuns, rollback } from "./bootstrap/apply.ts";
 import { autoApplicable } from "./bootstrap/auto-apply.ts";
 import { generate, resolveActionlint } from "./bootstrap/generate.ts";
-import { buildPlan, planEnv } from "./bootstrap/plan.ts";
+import { buildPlan, describeSteps, installSteps, planEnv } from "./bootstrap/plan.ts";
 import { proposals } from "./bootstrap/proposals.ts";
 import { onPath, toolsDir } from "./bootstrap/tools.ts";
 import { catalog } from "./catalog/index.ts";
@@ -993,7 +993,7 @@ serve(
       const profile = detectWorkspace(cwd);
       const saved = readWorkspaceText(cwd, INCLUDE_FILE);
       const listed = includedFiles(cwd, include ?? saved);
-      const install = profile.packages.find((p) => p.commands.install)?.commands.install?.run;
+      const install = describeSteps(installSteps(profile)) || undefined;
       const dev = profile.packages.find((p) => p.commands.dev)?.commands.dev?.run;
       return {
         include: { text: saved, exists: existsSync(join(cwd, INCLUDE_FILE)) },

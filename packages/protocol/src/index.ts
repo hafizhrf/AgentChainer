@@ -1513,6 +1513,23 @@ export const DeployPlanSchema = z.object({
 });
 export type DeployPlan = z.infer<typeof DeployPlanSchema>;
 
+/**
+ * An independent review's verdict (M3-06): the reviewer's structured output, or the JSON in its answer (Codex, agy).
+ * The task page shows it as a summary in the review step (M9-05).
+ */
+export const ReviewSchema = z.object({
+  verdict: z.enum(["approve", "changes-requested"]),
+  findings: z.array(
+    z.object({
+      severity: z.enum(["must-fix", "should-fix", "note"]),
+      file: z.string().optional(),
+      text: z.string(),
+    }),
+  ),
+  criteria: z.array(z.object({ id: z.string(), met: z.enum(["yes", "no", "unclear"]), why: z.string() })),
+});
+export type Review = z.infer<typeof ReviewSchema>;
+
 /** How many Fix CI rounds a PR gets (design §6). */
 export const MAX_CI_FIXES = 3;
 

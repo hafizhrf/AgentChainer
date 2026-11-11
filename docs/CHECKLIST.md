@@ -2313,6 +2313,24 @@ with the OpenAI Codex CLI and Google's Antigravity CLI (`agy`), in both directio
     - tier M with Claude planning and implementing and **agy reviewing**: its structured verdict ("approve") was read
       and the task passed (77 s, ≈$0.014 for Claude's steps).
   - The readiness row (`agy models`) comes with M9-06's rows for every CLI.
+  - **Follow-up fix (2026-11-11):** an agy reviewer's step looked broken in the task page (owner, with a screenshot:
+    "ini agy jadi reviewer kok responsenya gini ya").
+    - **Raw JSON:** the step showed the reviewer's verdict as the JSON it handed in.
+      - The review step now shows it as a summary: the verdict, each acceptance criterion by its text with Met, Not
+        met or Unclear and why, and the findings by severity.
+      - The summary reads Claude's `StructuredOutput` call and Codex's or agy's JSON answer alike (`reviewIn`);
+        `ReviewSchema` moved to `packages/protocol` for that.
+    - **A `finish` card spinning forever:** recorded from agy 1.5.5 with `--json-schema`, agy hands in its answer
+      through a `finish` step. It starts as a tool and ends as a step of its own kind (`step_type: "finish"`), so its
+      card never ended.
+      - It isn't shown now: it does nothing to the workspace, and the answer is already in the text.
+      - When agy's process ends, any tool step it never said ended is closed (`openTools`).
+    - **`read_file`:** agy 1.5.5 names its read tool `read_file` (1.5.4: `view_file`). It's shown as Read again.
+    - **Tests:**
+      - `agy-events.test.ts`: the finish step and an open tool, from 1.5.5's shapes, plus `read_file`;
+      - `review.test.ts` (3): agy's JSON, Claude's `StructuredOutput`, and an answer that isn't a review.
+    - **Replayed** the real 1.5.5 recording through the mapping: a Read start and end, then the answer, with no
+      `finish` card and nothing left open.
 
 - [x] **M9-06** Choosing agents, flexibly (ADR-0012 §5). Done in #151, #152, #153 and the eval PR:
   - **Schema:** `agent: claude | codex | agy` (default `claude`) and an optional `model` per agent step.

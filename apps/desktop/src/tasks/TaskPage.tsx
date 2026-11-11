@@ -37,7 +37,7 @@ import {
   Square,
   X,
 } from "lucide-react";
-import { Fragment, useCallback, useEffect, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { type Confirm, Modal } from "../Dialog.tsx";
 import { approxUsd, dateTime, seconds as secondsText } from "../i18n/format.ts";
 import { t } from "../i18n/index.ts";
@@ -67,7 +67,9 @@ import { LessonsCard } from "./LessonsCard.tsx";
 import { MergeGates } from "./MergeGates.tsx";
 import { PrChecks } from "./PrChecks.tsx";
 import { ProjectWorkflowNote } from "./ProjectWorkflowNote.tsx";
+import { ReviewSummary } from "./ReviewSummary.tsx";
 import { RunApp } from "./RunApp.tsx";
+import { reviewIn } from "./review.ts";
 import {
   canAcceptRisk,
   canContinue,
@@ -1779,7 +1781,7 @@ function RunView({
                     {localized(entry.note, entry.noteRef) ?? t("tasks.run.working")}
                   </p>
                 ) : sessionItems?.length ? (
-                  <TranscriptView cwd={cwd} items={sessionItems} />
+                  <StepTranscript cwd={cwd} items={sessionItems} criteria={task.contract?.acceptanceCriteria ?? []} />
                 ) : (
                   <p className="muted task-step-empty">
                     {entry.status === "running" ? t("tasks.run.waiting") : t("tasks.run.noTranscript")}
@@ -1826,6 +1828,26 @@ function RunView({
 }
 
 /** `before`: the gates that failed before the task, marked in later rounds. */
+/** A step's transcript; a reviewer's verdict shows as a summary instead of the JSON it handed in (M9-05). */
+function StepTranscript({
+  cwd,
+  items,
+  criteria,
+}: {
+  cwd: string;
+  items: Item[];
+  criteria: readonly AcceptanceCriterion[];
+}) {
+  const found = useMemo(() => reviewIn(items), [items]);
+  const shown = useMemo(() => (found ? items.filter((i) => i !== found.item) : items), [items, found]);
+  return (
+    <>
+      {found && <ReviewSummary review={found.review} criteria={criteria} />}
+      <TranscriptView cwd={cwd} items={shown} />
+    </>
+  );
+}
+
 function GateList({ runs, before }: { runs: GateRun[]; before?: ReadonlySet<string> }) {
   if (!runs.length) return <p className="muted task-step-empty">{t("tasks.gateList.empty")}</p>;
   return (

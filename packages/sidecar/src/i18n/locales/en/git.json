@@ -22,5 +22,8 @@
   "git.revert.noRepo": "Reverting needs a git repository.",
   "git.revert.noChanges": "{{path}} has no changes to revert.",
   "git.revert.hunkGone": "That change no longer exists. Refresh the diff.",
-  "git.files.symlink": "{{path}} is a symbolic link, so AgentChainer won't write through it."
+  "git.files.symlink": "{{path}} is a symbolic link, so AgentChainer won't write through it.",
+  "git.create.badName": "Give the folder a name without / or \\.",
+  "git.create.exists": "There's already something named {{name}} there.",
+  "git.create.noParent": "That place isn't a folder: {{path}}"
 }

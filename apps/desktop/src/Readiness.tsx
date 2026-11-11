@@ -182,7 +182,7 @@ function shortVersion(version: string | null): string {
   return version?.split(" ")[0] ?? "";
 }
 
-function authLabel(env: EnvCheck): string {
+export function authLabel(env: EnvCheck): string {
   const a = env.auth;
   if (!a) return t("home.readiness.authUnknown");
   if (a.method === "claude.ai") return t("home.readiness.authSubscription");

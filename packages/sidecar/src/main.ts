@@ -157,7 +157,7 @@ import { sessionWorkers, Team, teamTools, type WorkerBase } from "./team.ts";
 import { codexAccountUsage } from "./usage/codex-account.ts";
 import { readRuns } from "./usage/ledger.ts";
 import { allTasks, type UsageSources, usageFile, usageReport } from "./usage/report.ts";
-import { fileDiff, gitInit, listFiles, revert, workspaceImage } from "./workspace.ts";
+import { createFolder, fileDiff, gitInit, listFiles, revert, workspaceImage } from "./workspace.ts";
 import { readWorkspaceText } from "./workspace-files.ts";
 
 /** The other agents' CLIs, as last probed (M9-06). */
@@ -853,6 +853,8 @@ serve(
       revert(cwd, path, hunk);
       return { ok: true };
     },
+
+    "workspace.create": ({ parent, name, git }) => ({ path: createFolder(parent, name, git) }),
 
     "workspace.gitInit": ({ cwd }) => {
       gitInit(cwd);

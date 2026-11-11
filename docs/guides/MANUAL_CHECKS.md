@@ -35,6 +35,8 @@ and when a change touches these screens. None of them needs a Claude login or ma
 | 3k | Look at the sidebar under New, and at a workflow in the editor. | Fleet, Usage and CLAUDE.md sit close together. The editor's "Valid" line has room on the left and says "a tier-M run". |
 | 3l | In a chat in `/tmp/ac-check`, change `src/cart.js` and `README.md` (or ask Claude to). In the right panel's Changes, open `src/cart.js`, click a changed line, **Comment…**, type a note, ⌘↵. Do the same in `README.md`. | Each commented line is marked. The Changes tab says 2 comments are waiting. |
 | 3m | Type something in the composer, then click **Add 2 comments to message**. | The composer holds a "Feedback on the changes" block with both files' lines, quotes and notes, after what you typed. Enter sends it, and the comments are cleared from the diff. |
+| 3n | Click **New** in the sidebar, then **New folder…**. Keep the parent, type `ac-new`, keep "Initialize a git repository", click **Create folder**. | The folder card shows `ac-new`; the folder exists with a `.git` folder. Creating `ac-new` again says the name is taken. |
+| 3o | Open Settings → **Agents**. | Claude Code shows Installed · version and Signed in · method; Codex and Antigravity show their own status, or Not installed with an install command. Check again refreshes them. |
 | 4 | Press ⇧⌘P, type "Workspace settings: Commands", press Enter. | The Commands section opens. |
 | 5 | Open Settings (the gear at the bottom of the sidebar), set Theme to Dark, and click Save. | The app turns dark; `~/Library/Application Support/io.github.hafizhrf.agentchainer/settings.json` says `"theme": "dark"`. Set it back afterwards. |
 

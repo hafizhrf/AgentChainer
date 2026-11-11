@@ -253,6 +253,232 @@
   gap: var(--space-5);
 }
 
+/* Settings as pages beside their list (UX-23): the list stays, the page scrolls. */
+.dialog:has(.settings-tabs) {
+  width: min(920px, calc(100vw - 32px));
+  height: min(700px, calc(100vh - 48px));
+}
+
+.dialog:has(.settings-tabs) .dialog-body {
+  flex: 1;
+  overflow: hidden;
+  padding: 0;
+}
+
+.settings.settings-tabs {
+  display: grid;
+  grid-template-columns: 200px minmax(0, 1fr);
+  gap: 0;
+  height: 100%;
+  min-height: 0;
+  border-top: 1px solid var(--border);
+}
+
+.settings-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--space-3) var(--space-2);
+  border-right: 1px solid var(--border);
+  background: var(--surface-2);
+}
+
+.settings-nav-item {
+  justify-content: flex-start;
+  gap: var(--space-2);
+  min-height: 34px;
+  padding: 0 var(--space-3);
+  border: none;
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--muted);
+  font-weight: 500;
+}
+
+.settings-nav-item:hover {
+  color: var(--fg);
+  background: var(--surface-3);
+}
+
+.settings-nav-item[data-state="active"] {
+  color: var(--fg);
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+}
+
+.settings-page {
+  min-height: 0;
+  overflow-y: auto;
+  padding: var(--space-4) var(--space-5) var(--space-5);
+}
+
+.settings-page[hidden] {
+  display: none;
+}
+
+@media (max-width: 720px) {
+  .settings.settings-tabs {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr);
+  }
+
+  .settings-nav {
+    flex-direction: row;
+    overflow-x: auto;
+    border-right: none;
+    border-bottom: 1px solid var(--border);
+  }
+}
+
+/* Settings → Agents: a card per agent harness. */
+.agent-cards {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.agent-cards-head {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+}
+
+.agent-cards-head .field-help {
+  flex: 1;
+  margin: 0;
+}
+
+.agent-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+}
+
+.agent-card.missing {
+  background: var(--surface-2);
+}
+
+.agent-card-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.agent-mark {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  color: #fff;
+  font-weight: 700;
+}
+
+.agent-mark.agent-claude {
+  background: #b5654a;
+}
+
+.agent-mark.agent-codex {
+  background: #3d6e9c;
+}
+
+.agent-mark.agent-agy {
+  background: #7a5bb5;
+}
+
+.agent-card.missing .agent-mark {
+  opacity: 0.55;
+}
+
+.agent-card-title {
+  display: flex;
+  flex-direction: column;
+}
+
+.agent-card-title h4 {
+  margin: 0;
+  font-size: var(--text-md);
+}
+
+.agent-card-title .muted {
+  font-size: var(--text-sm);
+}
+
+.agent-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}
+
+.agent-pill {
+  gap: 4px;
+}
+
+.agent-card-facts {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: var(--space-1) var(--space-4);
+  margin: 0;
+  font-size: var(--text-sm);
+}
+
+.agent-card-facts dt {
+  color: var(--muted);
+}
+
+.agent-card-facts dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.agent-next {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-1);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius);
+  background: var(--surface-2);
+  font-size: var(--text-sm);
+}
+
+.agent-next p {
+  margin: 0;
+}
+
+.agent-command {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.agent-command code {
+  overflow-wrap: anywhere;
+}
+
+.agent-path summary {
+  color: var(--muted);
+  font-size: var(--text-sm);
+  cursor: pointer;
+}
+
+.agent-path[open] {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.agent-path input {
+  font-family: var(--font-mono);
+}
+
 .settings-section {
   display: flex;
   flex-direction: column;

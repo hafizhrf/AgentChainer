@@ -1,5 +1,5 @@
 import { spawnSync } from "node:child_process";
-import { existsSync, readdirSync, readFileSync, rmSync, statSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync } from "node:fs";
 import path from "node:path";
 import type { FileDiff, FileStatus, Hunk, WorkspaceFile, WorkspaceFiles, WorkspaceImage } from "@agentchainer/protocol";
 import { imageType, RpcErrorCode } from "@agentchainer/protocol";
@@ -351,6 +351,30 @@ export function revert(cwd: string, rel: string, hunk?: number): void {
 }
 
 /** Offered when the workspace isn't a git repository yet (M1-06). */
+/**
+ * A new, empty project folder (UX-23): `name` inside `parent`, which must already be a folder, and optionally a git
+ * repository in it (tasks need one). It never reuses or overwrites anything: a name that's taken is refused.
+ */
+export function createFolder(parent: string, name: string, initGit: boolean): string {
+  const bad = (key: "git.create.badName" | "git.create.exists" | "git.create.noParent", params = {}) =>
+    new RpcFailure(RpcErrorCode.invalidParams, t(key, params));
+  const clean = name.trim();
+  if (!clean || clean === "." || clean === ".." || /[\\/]/.test(clean) || clean.length > 120)
+    throw bad("git.create.badName");
+  let st: ReturnType<typeof statSync>;
+  try {
+    st = statSync(parent);
+  } catch {
+    throw bad("git.create.noParent", { path: parent });
+  }
+  if (!st.isDirectory()) throw bad("git.create.noParent", { path: parent });
+  const dir = path.join(parent, clean);
+  if (existsSync(dir)) throw bad("git.create.exists", { name: clean });
+  mkdirSync(dir);
+  if (initGit) gitInit(dir);
+  return dir;
+}
+
 export function gitInit(cwd: string): void {
   if (!existsSync(cwd)) throw new Error(t("git.repo.folderNotFound", { path: cwd }));
   if (repoOf(cwd)) throw new RpcFailure(RpcErrorCode.invalidParams, t("git.repo.alreadyARepo"));

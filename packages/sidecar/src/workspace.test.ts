@@ -14,6 +14,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { after, before, describe, it } from "node:test";
 import {
+  createFolder,
   fileDiff,
   gitBinary,
   gitInit,
@@ -236,5 +237,30 @@ describe("the git the sidecar runs (security review 2026-11-04)", () => {
     // Nothing on these PATHs has git.exe, so the bare name comes back; a relative entry like "." is never searched.
     assert.equal(gitBinary({ PATH: ".;src;C:\\nowhere", PATHEXT: ".EXE" }, "win32"), "git");
     assert.equal(gitBinary({ PATH: "/usr/bin" }, "darwin"), "git");
+  });
+});
+
+describe("a new folder for a new session (UX-23)", () => {
+  const parent = realpathSync(mkdtempSync(join(tmpdir(), "ac-new-")));
+  after(() => rmSync(parent, { recursive: true, force: true }));
+
+  it("makes an empty folder, with a git repository when asked", () => {
+    const plain = createFolder(parent, "plain", false);
+    assert.equal(plain, join(parent, "plain"));
+    assert.ok(statSync(plain).isDirectory());
+    const repo = createFolder(parent, " my app ", true);
+    assert.equal(repo, join(parent, "my app"));
+    assert.ok(statSync(join(repo, ".git")).isDirectory());
+  });
+
+  it("refuses a taken name, a name with a path in it, and a parent that isn't a folder", () => {
+    createFolder(parent, "taken", false);
+    assert.throws(() => createFolder(parent, "taken", false), /already something named taken/);
+    for (const name of ["", "..", ".", "a/b", "a\\b", "x".repeat(121)]) {
+      assert.throws(() => createFolder(parent, name, false), /without \/ or/, name);
+    }
+    writeFileSync(join(parent, "file.txt"), "x");
+    assert.throws(() => createFolder(join(parent, "file.txt"), "x", false), /isn't a folder/);
+    assert.throws(() => createFolder(join(parent, "missing"), "x", false), /isn't a folder/);
   });
 });

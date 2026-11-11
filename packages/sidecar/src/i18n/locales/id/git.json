@@ -22,5 +22,8 @@
   "git.revert.noRepo": "Mengembalikan perubahan memerlukan repositori git.",
   "git.revert.noChanges": "{{path}} tidak memiliki perubahan untuk dikembalikan.",
   "git.revert.hunkGone": "Perubahan itu sudah tidak ada. Muat ulang diff.",
-  "git.files.symlink": "{{path}} adalah symbolic link, jadi AgentChainer tidak akan menulis melaluinya."
+  "git.files.symlink": "{{path}} adalah symbolic link, jadi AgentChainer tidak akan menulis melaluinya.",
+  "git.create.badName": "Beri nama folder tanpa / atau \\.",
+  "git.create.exists": "Sudah ada sesuatu bernama {{name}} di sana.",
+  "git.create.noParent": "Lokasi itu bukan folder: {{path}}"
 }

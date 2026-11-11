@@ -427,7 +427,7 @@
   "tasks.agents.review": "Tinjauan",
   "tasks.agents.claude": "Claude",
   "tasks.agents.codex": "Codex",
-  "tasks.agents.agy": "Antigravity CLI (agy)",
+  "tasks.agents.agy": "Antigravity",
   "tasks.agents.notSignedIn": "{{agent}} (belum masuk)",
   "tasks.defaults.appDefault": "Default aplikasi ({{value}})",
   "tasks.defaults.builtIn": "Bawaan ({{value}})",

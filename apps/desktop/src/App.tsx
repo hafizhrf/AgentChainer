@@ -38,7 +38,7 @@ import { agentModes, fitMode, MODE_NAMES, modelChoices, rememberModels, THEMES }
 import { type PermissionAnswer, PermissionDialog } from "./PermissionDialog.tsx";
 import { PANEL_TAB_LABEL, PANEL_TABS, type PanelTab, parseHidden, serializeHidden, toggleHidden } from "./panelTabs.ts";
 import { SessionView } from "./SessionView.tsx";
-import { SettingsDialog } from "./SettingsDialog.tsx";
+import { SettingsDialog, type SettingsPage } from "./SettingsDialog.tsx";
 import { FLEET, MEMORY, Sidebar, USAGE } from "./Sidebar.tsx";
 import { notify as notifyOs, scheduledRunEnded } from "./schedules.ts";
 import { quitApp, readSelftestConfig, runSelftest, type SelftestConfig } from "./selftest.ts";
@@ -155,6 +155,8 @@ export function App() {
   const [wsDialog, setWsDialog] = useState<WorkspaceDef | "new" | null>(null);
   /** The New session dialog (UX-20): New, Ctrl+N, the palette and the home page open it. */
   const [newSession, setNewSession] = useState(false);
+  // The page Settings opens on: General, unless a screenshot run asks for another (UX-23).
+  const [settingsPage, setSettingsPage] = useState<SettingsPage | undefined>(undefined);
   /** The agent a new chat runs on (M9-09). */
   const [newAgent, setNewAgent] = useState<StepAgent>("claude");
   /** Every live session's fleet status, by session id (M8-02); ended ones stay until cleared or the app restarts. */
@@ -282,6 +284,11 @@ export function App() {
         if (cfg.open === "home") setActive(null);
         if (cfg.open === "claude-md") setActive(MEMORY);
         if (cfg.open === "settings") setSettingsOpen(true);
+        if (cfg.open === "settings-agents") {
+          setSettingsPage("agents");
+          setSettingsOpen(true);
+        }
+        if (cfg.open === "new-session") setNewSession(true);
         const first = tabsRef.current[0];
         if (cfg.open === "terminal" && first) toggleTerminal(first.sessionId);
         if (cfg.open === "files" || cfg.open === "git") setPanelTab(cfg.open);
@@ -1653,6 +1660,10 @@ export function App() {
           <SettingsDialog
             settings={settings}
             hello={hello}
+            env={env}
+            checking={checking}
+            {...(settingsPage ? { initialPage: settingsPage } : {})}
+            onRecheck={() => void recheck()}
             appVersion={appVersion}
             onSave={onSaveSettings}
             onExportDiagnostics={exportDiagnostics}

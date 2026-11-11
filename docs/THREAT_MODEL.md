@@ -164,6 +164,12 @@ the session's live background tasks (M4-07).
 - **`agents.templates`** returns the shipped roles and 4 bundled starters, as data the form fills in from; nothing is
   written until the person saves.
 
+**New folder for a new session (UX-23):** `workspace.create` makes one folder, only on the person's click in New
+session. It goes where they picked: the parent must already be a folder, and the name can't hold a path or be `.`
+or `..`. A taken name is refused, so nothing is overwritten. `git init` runs in the new folder when asked. Settings →
+Agents only shows each CLI's status and the commands to install or sign in, for the person to run in their own
+terminal (ADR-0002).
+
 **The CLAUDE.md editor (CP-03, T-03):**
 - **What it writes:** `memory.save` writes only `CLAUDE.md`, `.claude/CLAUDE.md`, `CLAUDE.local.md` or
   `<folder>/CLAUDE.md` inside the workspace (`MemoryPathSchema`, then `insideRoot`). It never writes through a link,

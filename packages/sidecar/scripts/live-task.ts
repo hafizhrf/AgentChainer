@@ -16,6 +16,8 @@
 //   CI on the fix (M5-03); the worktree is kept for the round
 //   [--feedback "<comment>"]: after the run, comments on the first changed line of the first changed file and runs one
 //   Fix as commented round (CP-05 part 2), then checks the round's record and the evidence line
+//   [--draft-only]: drafts and stops; prints what the drafter asked (answered with each first option), the answers
+//   the task kept and the open questions (UX-24)
 //   [--pr]: after a Done (or accepted) run, opens a draft PR through the user's own `gh` (task.createPr, M5-02). Only
 //   with --cwd on a throwaway repository you own: it pushes a branch and opens a real pull request
 //   cost: a few cents with haiku for an S task; an M or L task's review runs on Opus (≈$0.2–3).
@@ -42,6 +44,7 @@ const { values } = parseArgs({
     pr: { type: "boolean", default: false },
     "fix-ci": { type: "boolean", default: false },
     feedback: { type: "string" },
+    "draft-only": { type: "boolean", default: false },
   },
 });
 if (values.pr && !values.cwd) throw new Error("--pr needs --cwd: a checkout of a throwaway repository you own.");
@@ -52,8 +55,19 @@ const client = new SidecarClient();
 const request = client.request.bind(client);
 const lastStep = new Map<string, string>();
 
-client.onPermission = (p) =>
-  console.log(`  approve ${p.toolName} ${JSON.stringify(p.input).slice(0, 100)} (${p.task?.label ?? "?"})`);
+client.onPermission = (p) => {
+  if (p.toolName !== "AskUserQuestion") {
+    console.log(`  approve ${p.toolName} ${JSON.stringify(p.input).slice(0, 100)} (${p.task?.label ?? "?"})`);
+    return;
+  }
+  // UX-24: the drafter's (or a step's) questions; the client answers each with its first option.
+  const questions = (p.input.questions ?? []) as { question: string; options?: { label: string }[] }[];
+  console.log(`  asked (${p.task?.stepId ?? "?"}):`);
+  for (const q of questions) {
+    const labels = (q.options ?? []).map((o) => o.label).join(" | ");
+    console.log(`    ? ${q.question}  [${labels}] → ${q.options?.[0]?.label}`);
+  }
+};
 client.onUpdate((t) => {
   const step = t.run?.steps.at(-1);
   const prefix = t.parent ? `    [${t.parent.index + 1}] ` : "  · ";
@@ -167,6 +181,16 @@ try {
   await request("system.hello", { protocolVersion: 2 });
   const created = await request("task.create", { cwd, request: values.request });
   const drafted = await request("task.draft", { cwd, id: created.id, model: values.model });
+  if (values["draft-only"]) {
+    // UX-24: what the drafter asked, what the task kept, and what's still open.
+    console.log(`\ndrafted ($${drafted.costUsd.toFixed(3)}): ${drafted.contract?.objective}`);
+    console.log(`  settled: ${JSON.stringify(drafted.clarifications?.map((c) => [c.question, c.answer]) ?? [])}`);
+    console.log(`  open questions: ${JSON.stringify(drafted.contract?.openQuestions ?? [])}`);
+    for (const c of drafted.contract?.acceptanceCriteria ?? []) console.log(`  - ${c.text} (${c.check})`);
+    await client.close();
+    if (!values.keep && !values.cwd) removeFixtureCopies();
+    process.exit(0);
+  }
   if (!drafted.contract || !drafted.triage) throw new Error("no contract");
   const tier = (values.tier ?? drafted.triage.proposed) as "S" | "M" | "L" | "XL";
   console.log(`drafted ($${drafted.costUsd.toFixed(3)}); proposed ${drafted.triage.proposed}, running as ${tier}`);

@@ -1041,6 +1041,9 @@ export type TaskDefaultsView = z.infer<typeof TaskDefaultsViewSchema>;
  */
 export const GitNameSchema = z.string().regex(/^[^-\s][^\s]*$/, "Not a git branch or commit name");
 
+/** How many of the drafter's questions and the person's answers a task keeps (UX-24). */
+export const MAX_CLARIFICATIONS = 20;
+
 /** How many comments one "Fix as commented" round takes (CP-05). */
 export const MAX_FEEDBACK_COMMENTS = 50;
 
@@ -1340,6 +1343,14 @@ export const TaskSchema = z.object({
   flow: z.object({ yaml: z.string().max(65_536), summary: z.string(), hash: z.string(), at: z.string() }).optional(),
   /** The chat a task was made from (UX-13, "Make this a task"): its last messages, which drafting reads. */
   chatContext: z.string().max(12_000).optional(),
+  /**
+   * What the drafter asked before drafting and the person answered (UX-24): shown on the contract card, and read by a
+   * redraft so it doesn't ask again.
+   */
+  clarifications: z
+    .array(z.object({ question: z.string().max(1000), answer: z.string().max(2000), at: z.string() }))
+    .max(MAX_CLARIFICATIONS)
+    .optional(),
   state: z.enum(TASK_STATES),
   createdAt: z.string(),
   updatedAt: z.string(),

@@ -8,11 +8,13 @@ import {
   FeedbackCommentSchema,
   GitNameSchema,
   imageType,
+  MAX_CLARIFICATIONS,
   MemoryPathSchema,
   methodSchemas,
   PERMISSION_MODES,
   PermissionRequestSchema,
   TaskIdSchema,
+  TaskSchema,
 } from "./index.ts";
 import { schemaFileText } from "./schema-export.ts";
 
@@ -176,5 +178,16 @@ describe("a task's git names and comments (CP-05)", () => {
     assert.equal(params.safeParse({ ...ref, comments: [] }).success, false);
     assert.equal(params.safeParse({ ...ref, comments: Array(51).fill(c) }).success, false);
     assert.ok(params.safeParse({ ...ref, comments: Array(50).fill(c), note: "Also a test." }).success);
+  });
+});
+
+describe("a task's answers to its drafter's questions (UX-24)", () => {
+  it("keeps up to 20, each question and answer bounded", () => {
+    const shape = TaskSchema.shape.clarifications;
+    const one = { question: "Which discounts?", answer: "Percent off", at: "2026-11-11T00:00:00.000Z" };
+    assert.ok(shape.safeParse([one]).success);
+    assert.ok(shape.safeParse(undefined).success);
+    assert.equal(shape.safeParse(Array(MAX_CLARIFICATIONS + 1).fill(one)).success, false);
+    assert.equal(shape.safeParse([{ ...one, answer: "x".repeat(2001) }]).success, false);
   });
 });

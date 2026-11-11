@@ -1,20 +1,26 @@
 import { type ChildProcessWithoutNullStreams, spawn } from "node:child_process";
 import { createInterface } from "node:readline";
 import { fileURLToPath } from "node:url";
-import type { MethodName, Methods, Task } from "@agentchainer/protocol";
+import type { MethodName, Methods, PermissionRequest, Task } from "@agentchainer/protocol";
 
 type Reply = { result?: unknown; error?: { message: string } };
-type PermissionRequest = {
-  sessionId: string;
-  requestId: string;
-  toolName: string;
-  input: unknown;
-  task?: { label?: string };
-};
+
+/** An `AskUserQuestion` input with each question answered by its first option. */
+export function firstChoices(input: Record<string, unknown>): Record<string, unknown> {
+  const questions = Array.isArray(input.questions) ? (input.questions as Record<string, unknown>[]) : [];
+  const answers = Object.fromEntries(
+    questions.map((q) => {
+      const options = Array.isArray(q.options) ? (q.options as { label?: unknown }[]) : [];
+      return [String(q.question ?? ""), String(options[0]?.label ?? "")];
+    }),
+  );
+  return { ...input, answers };
+}
 
 /**
  * A sidecar driven over JSON-RPC, for the maintainer scripts that run tasks with real model calls (`live-task.ts`,
- * `benchmark.ts`). Every tool approval is answered yes, so use it only on a throwaway copy of a fixture.
+ * `benchmark.ts`). Every tool approval is answered yes, and every question with its first options, so use it only on
+ * a throwaway copy of a fixture.
  */
 export class SidecarClient {
   private readonly child: ChildProcessWithoutNullStreams;
@@ -38,7 +44,14 @@ export class SidecarClient {
       if (m.method === "permission.request") {
         const p: PermissionRequest = m.params;
         this.onPermission(p);
-        void this.request("permission.respond", { sessionId: p.sessionId, requestId: p.requestId, allow: true });
+        // A question gets each question's first option, as a person picking the first choice would (UX-24).
+        const answered = p.toolName === "AskUserQuestion" ? { updatedInput: firstChoices(p.input) } : {};
+        void this.request("permission.respond", {
+          sessionId: p.sessionId,
+          requestId: p.requestId,
+          allow: true,
+          ...answered,
+        });
       }
       if (m.method === "task.updated") for (const f of this.updates) f(m.params.task);
     });

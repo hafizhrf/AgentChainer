@@ -175,10 +175,27 @@ A task is a tab like a chat. The sidebar lists both, each with its status. The r
   - the same budget, turns and structured output as `draftContract` today.
 
   Its events stream into the thread with the task tag, so the person sees what it read.
+  - **As built:** drafting is still `draftContract`'s one-off query, not a `Session`. Its events are tagged the same
+    way.
+- **Asking first (UX-24, as built):**
+  - **When it asks:** drafting can ask the person once, through `AskUserQuestion` (at most 4 questions, 2–4 options
+    each, plus the person's own answer), when the request leaves open a decision that changes the work and the
+    repository doesn't answer it.
+  - **How the question travels:** it reaches the task page as the question card a step's questions use. It's a
+    `permission.request` tagged with the task's draft step, waiting in the sidecar's `DraftQuestions`.
+  - **Answer, Skip, stop:**
+    - an answer goes back through `permission.respond`;
+    - Skip, or stopping the draft, drafts with what it has;
+    - a second ask in the same draft is refused.
+  - **Where answers go:** they're kept on the task (`clarifications`) and shown on the contract card as "Settled
+    with you". A redraft is told them, so it doesn't ask again.
+  - **What stays open:** `openQuestions` holds only what's still open after the person answered.
 - **Contract card:**
   - It shows the objective, criteria with their check, constraints, out of scope, risks and areas.
   - It's edited in place. A field turns into an input on click; there's no separate form.
   - The contract's open questions show as question cards. Their answers go into the next redraft.
+    - **As built:** they stay a list the person edits (owner's choice, UX-24). The questions come before the draft
+      instead.
 - **Triage card:** the proposed tier with its signals, the budget, and a tier override that asks why.
 - **Refining:** a reply in the composer while the task is a draft calls a new `task.redraft {id, feedback}`. It
   re-drafts with the feedback and the current contract, then triages again.

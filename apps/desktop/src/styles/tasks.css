@@ -2006,3 +2006,25 @@ fieldset.schedule-days > legend {
   margin: 2px 0 0;
   overflow-wrap: anywhere;
 }
+
+/* ---------- What the drafter asked and the person answered (UX-24) ---------- */
+
+.settled-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: 0;
+}
+
+.settled-item {
+  padding-left: var(--space-3);
+  border-left: 2px solid var(--border-strong);
+}
+
+.settled-item > dt {
+  font-size: var(--text-sm);
+}
+
+.settled-item > dd {
+  margin: 2px 0 0;
+}

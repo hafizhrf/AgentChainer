@@ -113,6 +113,7 @@
   "tasks.contract.title": "Contract",
   "tasks.contract.objective": "Objective",
   "tasks.contract.acceptanceCriteria": "Acceptance criteria",
+  "tasks.contract.settled": "Settled with you",
   "tasks.contract.affectedAreas": "Affected areas",
   "tasks.contract.constraints": "Constraints",
   "tasks.contract.outOfScope": "Out of scope",

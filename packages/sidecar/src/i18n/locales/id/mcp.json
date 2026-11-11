@@ -1,0 +1,15 @@
+{
+  "mcp.add.badEnvName": "\"{{name}}\" bukan nama environment variable: gunakan huruf, angka, dan _, dan jangan diawali angka.",
+  "mcp.add.badHeaderName": "\"{{name}}\" bukan nama header.",
+  "mcp.add.badUrl": "Masukkan URL lengkap server, diawali https://.",
+  "mcp.add.envNeedsStdio": "Environment variable diberikan ke server yang dijalankan CLI (stdio). Server HTTP atau SSE memakai header.",
+  "mcp.add.headerNeedsReference": "Nilai header {{name}} harus merujuk ke environment variable, misalnya Bearer ${MY_TOKEN}, supaya key-nya sendiri tidak pernah melewati AgentChainer. Untuk nilai biasa, tambahkan server dari terminal Anda.",
+  "mcp.add.headersNeedUrl": "Header dikirim ke server HTTP atau SSE. Server yang dijalankan CLI (stdio) memakai environment variable.",
+  "mcp.add.httpsOnly": "Gunakan https://. http:// biasa hanya diizinkan ke komputer ini (localhost).",
+  "mcp.add.noCommand": "Masukkan perintah yang menjalankan server.",
+  "mcp.add.secretInCommand": "Perintah ini tampaknya berisi key atau token. Berikan sebagai environment variable: tambahkan namanya di bawah dan set di environment Anda.",
+  "mcp.add.secretInUrl": "URL ini tampaknya berisi key, token, atau password. Kirim lewat header yang merujuk ke environment variable.",
+  "mcp.add.title": "Tambah MCP server {{name}}",
+  "mcp.add.unclosedQuote": "Ada tanda kutip di perintah yang belum ditutup.",
+  "mcp.get.unreadable": "Detail CLI untuk {{name}} tidak bisa dibaca. Jalankan `claude mcp get {{name}}` di terminal untuk melihatnya."
+}

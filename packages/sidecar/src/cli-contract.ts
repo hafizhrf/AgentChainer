@@ -9,9 +9,20 @@ export type ContractEntry = { command: string[]; flags: string[]; why: string };
 
 export const CLI_CONTRACT: ContractEntry[] = [
   { command: ["auth", "status"], flags: ["--json"], why: "Readiness: whether the user is signed in" },
-  { command: ["mcp", "add"], flags: ["--scope"], why: "setup: register an MCP server" },
-  { command: ["mcp", "get"], flags: [], why: "setup: check an MCP server" },
-  { command: ["mcp", "remove"], flags: ["--scope"], why: "rollback: remove an MCP server" },
+  {
+    command: ["mcp", "add"],
+    flags: ["--scope", "--transport", "--env", "--header"],
+    why: "setup and the MCP servers page: register an MCP server",
+  },
+  { command: ["mcp", "get"], flags: [], why: "setup and the MCP servers page: check an MCP server" },
+  { command: ["mcp", "list"], flags: [], why: "the MCP servers page: list and health-check servers" },
+  { command: ["mcp", "remove"], flags: ["--scope"], why: "rollback and the MCP servers page: remove an MCP server" },
+  { command: ["mcp", "login"], flags: [], why: "the MCP servers page shows it, to run in the user's own terminal" },
+  {
+    command: ["mcp", "add-from-claude-desktop"],
+    flags: ["--scope"],
+    why: "the MCP servers page shows it, to run in the user's own terminal",
+  },
   { command: ["plugin", "list"], flags: ["--json", "--available"], why: "setup and the Plugins page: list plugins" },
   { command: ["plugin", "marketplace", "list"], flags: ["--json"], why: "setup and the Plugins page: marketplaces" },
   { command: ["plugin", "details"], flags: [], why: "the Plugins page: what a plugin brings" },

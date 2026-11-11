@@ -288,7 +288,11 @@ export function App() {
           setShowFirstChange(true);
         }
         if (
-          (cfg.open === "setup" || cfg.open === "plan" || cfg.open === "permissions" || cfg.open === "plugins") &&
+          (cfg.open === "setup" ||
+            cfg.open === "plan" ||
+            cfg.open === "permissions" ||
+            cfg.open === "plugins" ||
+            cfg.open === "mcp") &&
           first
         )
           setSetup({
@@ -1269,6 +1273,7 @@ export function App() {
         ["commands", t("app.palette.setupCommands")],
         ["agents", t("app.palette.setupAgents")],
         ["plugins", t("app.palette.setupPlugins")],
+        ["mcp", t("app.palette.setupMcp")],
         ["permissions", t("app.palette.setupPermissions")],
         ["workflows", t("app.palette.setupWorkflows")],
         ["deploy", t("app.palette.setupDeploy")],

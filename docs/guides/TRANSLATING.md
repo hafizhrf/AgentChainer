@@ -10,7 +10,7 @@ and the same keys. `pnpm test` fails when one is missing, extra, empty, or chang
 |---|---|---|
 | `apps/desktop/src/i18n/locales/<language>/` | The UI. `menu.json` and `native.json` are also read by the Rust core (the macOS menu, its errors). | Indonesian in its own chunk |
 | `packages/protocol/src/locales/<language>.json` | Text the UI and the sidecar share: approval reasons, agent and folder problems, cadences | Bundled |
-| `packages/sidecar/src/i18n/locales/<language>/` | The sidecar's errors, setup findings, plan reasons, apply and rollback messages, deploy and plugin messages | Bundled |
+| `packages/sidecar/src/i18n/locales/<language>/` | The sidecar's errors, setup findings, plan reasons, apply and rollback messages, deploy, plugin and MCP server messages | Bundled |
 
 The catalog's own prose (items, profiles, workflows) is translated in its YAML, next to the English, in an
 `i18n.<code>` block ([CATALOG.md §3](../CATALOG.md#3-item-schema)). A new language adds its block to every shipped

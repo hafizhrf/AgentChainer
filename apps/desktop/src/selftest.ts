@@ -26,6 +26,7 @@ const OPEN_VIEWS = [
   "plan",
   "permissions",
   "plugins",
+  "mcp",
   "fresh",
 ] as const;
 

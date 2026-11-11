@@ -402,14 +402,15 @@ const settingsFor = (scope: "project" | "local") =>
   scope === "local" ? ".claude/settings.local.json" : ".claude/settings.json";
 
 /**
- * Records a plugin installed from the Plugins page (UX-10) as a one-action run, so History lists it and Roll back
- * uninstalls it, like a setup step. `install` makes the change through the CLI; it returns null when nothing was
- * installed (the CLI wants a command confirmed first), and then no run is left behind.
+ * Records a change the CLI makes outside the setup plan as a one-action run, so History lists it and Roll back undoes
+ * it like a setup step: a plugin from the Plugins page (UX-10), an MCP server from the MCP servers page (CP-02).
+ * `change` makes it through the CLI and says how to undo it; it returns null when nothing changed (the CLI wants a
+ * command confirmed first), and then no run is left behind. The files in `watch` are restored on Roll back.
  */
-export async function recordPluginInstall(
+export async function recordCliChange(
   root: string,
-  action: { id: string; title: string; scope: "project" | "local" | "user" },
-  install: () => Promise<{ pluginId: string; lock: LockItem; warnings: string[] } | null>,
+  action: { id: string; title: string; watch: string[] },
+  change: () => Promise<{ undo: Undo; lock?: LockItem; warnings: string[] } | null>,
   catalogVersion: string,
   now = new Date(),
 ): Promise<string | null> {
@@ -431,12 +432,10 @@ export async function recordPluginInstall(
     rmSync(runDir, { recursive: true, force: true });
     removeIfEmpty(root);
   };
-  // A user-scope install (every project, UX-19) changes the CLI's user settings, not this workspace's files: the run
-  // keeps no file to restore, and Roll back uninstalls it through the CLI.
-  if (action.scope !== "user") tracker.watch(rec.files, settingsFor(action.scope));
-  let done: Awaited<ReturnType<typeof install>>;
+  for (const file of action.watch) tracker.watch(rec.files, file);
+  let done: Awaited<ReturnType<typeof change>>;
   try {
-    done = await install();
+    done = await change();
   } catch (err) {
     dropRun();
     throw err;
@@ -446,11 +445,36 @@ export async function recordPluginInstall(
     return null;
   }
   tracker.settle(rec.files);
-  rec.undo.push({ type: "plugin", pluginId: done.pluginId, scope: action.scope });
+  rec.undo.push(done.undo);
   rec.warnings = done.warnings;
-  rec.lock = done.lock;
+  if (done.lock) rec.lock = done.lock;
   finishRun(root, runDir, tracker, run);
   return runId;
+}
+
+/** A plugin installed from the Plugins page (UX-10), recorded by `recordCliChange`; Roll back uninstalls it. */
+export function recordPluginInstall(
+  root: string,
+  action: { id: string; title: string; scope: "project" | "local" | "user" },
+  install: () => Promise<{ pluginId: string; lock: LockItem; warnings: string[] } | null>,
+  catalogVersion: string,
+  now = new Date(),
+): Promise<string | null> {
+  const { scope } = action;
+  return recordCliChange(
+    root,
+    // A user-scope install (every project, UX-19) changes the CLI's user settings, not this workspace's files: the run
+    // keeps no file to restore, and Roll back uninstalls it through the CLI.
+    { id: action.id, title: action.title, watch: scope === "user" ? [] : [settingsFor(scope)] },
+    async () => {
+      const done = await install();
+      return (
+        done && { undo: { type: "plugin", pluginId: done.pluginId, scope }, lock: done.lock, warnings: done.warnings }
+      );
+    },
+    catalogVersion,
+    now,
+  );
 }
 
 /** The plugin id a lockfile entry installed, if it's a plugin. */
@@ -459,35 +483,31 @@ export function lockPluginId(entry: LockItem): string | null {
   return src.type === "marketplace" || src.type === "listed" ? `${src.plugin}@${src.marketplace}` : null;
 }
 
-/**
- * After the Plugins page uninstalls a plugin: its lockfile entries go, and the runs that installed it at that scope
- * show it as rolled back, so a later Roll back doesn't try to uninstall it again.
- */
-export function forgetPlugin(root: string, pluginId: string, scope: string): void {
-  editPluginLocks(root, pluginId, () => null);
+/** Whether an applied action of a run would undo something `match` picks out. */
+const undoes = (a: ActionRecord, match: (u: Undo) => boolean) => a.status === "applied" && a.undo.some(match);
+
+/** After a page removed something a run added: those runs show it as rolled back, so Roll back doesn't try again. */
+function forgetUndone(root: string, match: (u: Undo) => boolean): void {
   for (const run of listRuns(root)) {
     let changed = false;
     for (const a of run.actions) {
-      if (a.status !== "applied") continue;
-      if (a.undo.some((u) => u.type === "plugin" && u.pluginId === pluginId && u.scope === scope)) {
-        a.status = "rolled-back";
-        changed = true;
-      }
+      if (!undoes(a, match)) continue;
+      a.status = "rolled-back";
+      changed = true;
     }
     if (changed) writeFileSync(abs(root, `${BACKUPS}/${run.runId}/run.json`), `${JSON.stringify(run, null, 2)}\n`);
   }
 }
 
 /**
- * Before the Plugins page uninstalls a plugin: the latest run that installed it at that scope. When the files that
- * install changed (its settings file) are still as it left them, the returned function puts them back as they were
- * before it, once the CLI has uninstalled; otherwise null, and the CLI's own edit stays.
+ * Before a page removes something a run added: when the files that run changed are still as it left them, the
+ * returned function puts them back as they were before it, once the CLI has removed it; otherwise null, and the CLI's
+ * own edit stays.
  */
-export function pluginInstallFiles(root: string, pluginId: string, scope: string): (() => void) | null {
+function filesBeforeAdd(root: string, match: (u: Undo) => boolean): (() => void) | null {
   for (const run of listRuns(root)) {
     for (const a of run.actions) {
-      if (a.status !== "applied") continue;
-      if (!a.undo.some((u) => u.type === "plugin" && u.pluginId === pluginId && u.scope === scope)) continue;
+      if (!undoes(a, match)) continue;
       if (changedSince(root, a.files).length) return null;
       const runDir = abs(root, `${BACKUPS}/${run.runId}`);
       return () => {
@@ -497,6 +517,29 @@ export function pluginInstallFiles(root: string, pluginId: string, scope: string
   }
   return null;
 }
+
+const isPlugin = (pluginId: string, scope: string) => (u: Undo) =>
+  u.type === "plugin" && u.pluginId === pluginId && u.scope === scope;
+const isMcp = (name: string, scope: string) => (u: Undo) => u.type === "mcp" && u.name === name && u.scope === scope;
+
+/**
+ * After the Plugins page uninstalls a plugin: its lockfile entries go, and the runs that installed it at that scope
+ * show it as rolled back, so a later Roll back doesn't try to uninstall it again.
+ */
+export function forgetPlugin(root: string, pluginId: string, scope: string): void {
+  editPluginLocks(root, pluginId, () => null);
+  forgetUndone(root, isPlugin(pluginId, scope));
+}
+
+/** Before the Plugins page uninstalls a plugin: its settings file as it was before the latest install, if unchanged. */
+export const pluginInstallFiles = (root: string, pluginId: string, scope: string) =>
+  filesBeforeAdd(root, isPlugin(pluginId, scope));
+
+/** After the MCP servers page removed a server (CP-02): the runs that added it at that scope show it rolled back. */
+export const forgetMcp = (root: string, name: string, scope: string) => forgetUndone(root, isMcp(name, scope));
+
+/** Before the MCP servers page removes a server: `.mcp.json` as it was before the latest add, if unchanged. */
+export const mcpAddFiles = (root: string, name: string, scope: string) => filesBeforeAdd(root, isMcp(name, scope));
 
 /** After an update from the Plugins page: the lockfile records the version now installed. */
 export function setPluginVersion(root: string, pluginId: string, version: string): void {

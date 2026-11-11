@@ -700,7 +700,9 @@
   border: none;
 }
 
+/* A fieldset's legend sits outside its flex gap, so it gets its own space below. */
 .agent-choice legend {
+  margin-bottom: var(--space-2);
   padding: 0;
 }
 

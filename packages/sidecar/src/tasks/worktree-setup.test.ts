@@ -6,6 +6,8 @@ import { join } from "node:path";
 import { after, describe, it } from "node:test";
 import { listRuns, rollback } from "../bootstrap/apply.ts";
 import { fakeCli } from "../bootstrap/fake-cli.ts";
+import { describeSteps, installSteps } from "../bootstrap/plan.ts";
+import { detectWorkspace } from "../detect/detect.ts";
 import { addWorktree, branchOf, commitAll, headOf, worktreePath } from "./worktree.ts";
 import {
   allowScript,
@@ -134,9 +136,12 @@ describe("setup and run scripts", () => {
     const env = trust();
     const pkg = JSON.stringify({ name: "x", scripts: { dev: "vite" } });
     const root = repo({ "package.json": pkg, ".agentchainer/worktree.json": scripts("node -e 0") });
-    assert.deepEqual(setupCommand(root, root, env), { command: "npm install", scriptNotAllowed: true });
+    assert.deepEqual(setupCommand(root, root, env), {
+      steps: [{ command: "npm install", dir: "." }],
+      scriptNotAllowed: true,
+    });
     allowScript(root, "setup", "node -e 0", env);
-    assert.deepEqual(setupCommand(root, root, env), { command: "node -e 0" });
+    assert.deepEqual(setupCommand(root, root, env), { steps: [{ command: "node -e 0", dir: "." }] });
     write(root, ".agentchainer/worktree.json", scripts("node -e 1"));
     assert.equal(setupCommand(root, root, env).scriptNotAllowed, true);
     // Without a trust file (tests, scripts), nothing is ever allowed or kept.
@@ -216,5 +221,38 @@ describe("a new worktree's setup, end to end", () => {
       if (before === undefined) delete process.env.AGENTCHAINER_TRUST_FILE;
       else process.env.AGENTCHAINER_TRUST_FILE = before;
     }
+  });
+});
+
+describe("installing in each package's own folder", () => {
+  const pkg = JSON.stringify({ name: "x", scripts: { test: "node --test" } });
+
+  it("runs the root's install alone, else each package's in its folder", () => {
+    const steps = (files: Record<string, string>) => installSteps(detectWorkspace(repo(files)));
+    assert.deepEqual(steps({ "package.json": pkg, "web/package.json": pkg }), [{ command: "npm install", dir: "." }]);
+    assert.deepEqual(steps({ "web/package.json": pkg }), [{ command: "npm install", dir: "web" }]);
+    // A web app and a Python API side by side: each installs in its own folder.
+    assert.deepEqual(
+      steps({ "web/package.json": pkg, "api/pyproject.toml": "[project]\nname = 'api'\n", "api/uv.lock": "" }),
+      [
+        { command: "uv sync", dir: "api" },
+        { command: "npm install", dir: "web" },
+      ],
+    );
+    assert.deepEqual(steps({ "README.md": "x" }), []);
+    assert.equal(
+      describeSteps([
+        { command: "npm install", dir: "web" },
+        { command: "uv sync", dir: "api" },
+      ]),
+      "npm install (web); uv sync (api)",
+    );
+  });
+
+  it("sets up a worktree whose only package is in a folder, there", async () => {
+    const root = repo({ "web/package.json": JSON.stringify({ name: "web", private: true }) });
+    const r = await setupWorktree(worktree(root), new AbortController().signal);
+    assert.equal(r?.command, "npm install (web)");
+    assert.equal(r?.exitCode, 0, r?.tail);
   });
 });

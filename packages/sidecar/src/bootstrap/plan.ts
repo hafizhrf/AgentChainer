@@ -384,6 +384,27 @@ export function installCommand(profile: WorkspaceProfile): string | undefined {
   return profile.packages.find((p) => p.commands.install)?.commands.install?.run;
 }
 
+/** One install command and the package folder it runs in ("." for the root). */
+export type InstallStep = { command: string; dir: string };
+
+/**
+ * What installs a workspace's dependencies, each in its own package's folder: the root package's install alone when
+ * it has one (a monorepo's root install covers its workspaces), else every package's own. Gates run per package the
+ * same way (`tasks/gates.ts`).
+ */
+export function installSteps(profile: WorkspaceProfile): InstallStep[] {
+  const root = profile.packages.find((p) => p.path === ".")?.commands.install?.run;
+  if (root) return [{ command: root, dir: "." }];
+  return profile.packages.flatMap((p) => {
+    const run = p.commands.install?.run;
+    return run ? [{ command: run, dir: p.path }] : [];
+  });
+}
+
+/** Install steps as one line to show: `npm install (web); uv sync (api)`. */
+export const describeSteps = (steps: InstallStep[]) =>
+  steps.map((s) => (s.dir === "." ? s.command : `${s.command} (${s.dir})`)).join("; ");
+
 /** In words, for items whose changes aren't known before downloading (a pinned git folder copied into the project). */
 function notePreview(item: Item): string {
   const src = item.source;

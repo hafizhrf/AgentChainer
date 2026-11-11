@@ -57,6 +57,8 @@ export function WorkspacePanel({
   onHidePanel,
   initialTab = "changes",
   preview,
+  comments = 0,
+  onSendComments,
 }: {
   cwd: string;
   files: WorkspaceFiles | null;
@@ -76,6 +78,9 @@ export function WorkspacePanel({
   initialTab?: PanelTab;
   /** The app being built (UX-22): its address, the ones the chat printed, and a count that opens the tab. */
   preview: { url: string | null; detected: readonly string[]; opened: number; onUrlChange: (url: string) => void };
+  /** Comments waiting on the diff's lines (CP-05), and how to put them into the chat's message. */
+  comments?: number;
+  onSendComments?: () => void;
 }) {
   const [view, setView] = useState<PanelTab>(initialTab);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -168,6 +173,14 @@ export function WorkspacePanel({
         )}
         {visible.includes("changes") && (
           <Tabs.Content value="changes">
+            {comments > 0 && onSendComments && (
+              <p className="banner diff-comments-pending" role="status">
+                <span className="grow">{t("panel.changes.commentsWaiting", { count: comments })}</span>
+                <button type="button" className="secondary small" onClick={onSendComments}>
+                  {t("panel.changes.addToMessage")}
+                </button>
+              </p>
+            )}
             <ChangesView
               files={changed}
               items={items}

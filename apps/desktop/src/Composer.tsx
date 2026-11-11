@@ -13,6 +13,7 @@ import {
   sentMessages,
   slashMenu,
 } from "./commands.ts";
+import { appendToDraft } from "./diffComments.ts";
 import { fuzzyFilter, tokenAt } from "./fuzzy.ts";
 import { t } from "./i18n/index.ts";
 import { ModeHelp } from "./ModeHelp.tsx";
@@ -61,8 +62,11 @@ export function Composer({
   active: boolean;
   /** Workspace-relative file paths for `@` mentions. */
   files: string[];
-  /** Text to put in the composer (a starter prompt); a new object each time it's used. */
-  seed: { text: string } | null;
+  /**
+   * Text to put in the composer, a new object each time it's used: a starter prompt replaces the draft; diff comments
+   * (CP-05) are appended to it.
+   */
+  seed: { text: string; append?: boolean } | null;
   onSend: (text: string, images: Attachment[]) => void;
   /** Makes a task of the text (UX-13); without it (the Tasks preview off), the composer is chat only. */
   onTask?: (text: string) => void;
@@ -105,10 +109,14 @@ export function Composer({
   const sent = useMemo(() => sentMessages(tab.items), [tab.items]);
   const canAutonomous = tab.budgetUsd !== null;
 
+  // The draft as last rendered, for a seed that adds to it.
+  const draftNow = useRef(draft);
+  draftNow.current = draft;
   useEffect(() => {
     if (!seed) return;
-    setDraft(seed.text);
-    setCursor(seed.text.length);
+    const next = seed.append ? appendToDraft(draftNow.current, seed.text) : seed.text;
+    setDraft(next);
+    setCursor(next.length);
     area.current?.focus();
   }, [seed]);
 

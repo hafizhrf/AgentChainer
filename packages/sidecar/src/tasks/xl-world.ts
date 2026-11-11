@@ -1,5 +1,7 @@
 import { existsSync } from "node:fs";
+import path from "node:path";
 import type { Task } from "@agentchainer/protocol";
+import { describeSteps } from "../bootstrap/plan.ts";
 import { runGuarded } from "../bootstrap/verify.ts";
 import { detectWorkspace } from "../detect/detect.ts";
 import { resolveGates, runGates } from "./gates.ts";
@@ -30,19 +32,26 @@ const SETUP_TIMEOUT_MS = 900_000;
 export async function setupWorktree(code: string, signal: AbortSignal): Promise<SetupRun | null> {
   const source = mainCheckoutOf(code);
   const copy = source ? copyIncluded(source, code) : { copied: [], capped: false };
-  const { command, scriptNotAllowed } = setupCommand(source ?? code, code);
+  const { steps, scriptNotAllowed } = setupCommand(source ?? code, code);
   const extra = {
     ...(copy.copied.length ? { copied: copy.copied } : {}),
     ...(copy.capped ? { copyCapped: true } : {}),
     ...(scriptNotAllowed ? { scriptNotAllowed: true } : {}),
   };
-  if (!command) {
+  if (!steps.length) {
     return Object.keys(extra).length
       ? { command: "", exitCode: 0, timedOut: false, durationMs: 0, tail: "", ...extra }
       : null;
   }
-  const r = await runGuarded(code, command, code, SETUP_TIMEOUT_MS, {}, signal);
-  return { command, exitCode: r.exitCode, timedOut: r.timedOut, durationMs: r.ms, tail: r.tail, ...extra };
+  // Each package's install in its own folder, in order; the first that fails stops the rest.
+  let run = { exitCode: 0 as number | null, timedOut: false, durationMs: 0, tail: "" };
+  for (const step of steps) {
+    const cwd = step.dir === "." ? code : path.join(code, ...step.dir.split("/"));
+    const r = await runGuarded(code, step.command, cwd, SETUP_TIMEOUT_MS, {}, signal);
+    run = { exitCode: r.exitCode, timedOut: r.timedOut, durationMs: run.durationMs + r.ms, tail: r.tail };
+    if (r.exitCode !== 0 || r.timedOut) break;
+  }
+  return { command: describeSteps(steps), ...run, ...extra };
 }
 
 /**

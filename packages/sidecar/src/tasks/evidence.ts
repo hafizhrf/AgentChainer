@@ -146,6 +146,8 @@ export type Evidence = {
   };
   /** The task's pull request (M5): its review, its Fix CI rounds and how a person merged it. */
   pr?: Task["pr"];
+  /** "Fix as commented" rounds on the run (CP-05). */
+  feedback?: TaskRun["feedback"];
   /** The task's deploys (M6). */
   deploys?: DeployRecord[];
 };
@@ -356,6 +358,7 @@ export function buildEvidence({
       totalUsd: task.costUsd,
     },
     ...(task.pr ? { pr: task.pr } : {}),
+    ...(run?.feedback?.length ? { feedback: run.feedback } : {}),
     ...(deploys?.length ? { deploys } : {}),
   };
 }
@@ -632,6 +635,19 @@ export function renderEvidence(e: Evidence, render: (ref: MessageRef) => string 
         pr.merged.accepted
           ? r("evidence.pr.mergedAccepted", { ...merged, reason: pr.merged.accepted })
           : r("evidence.pr.merged", merged),
+      );
+    }
+  }
+  if (e.feedback?.length) {
+    add("", r("evidence.feedback.heading"), "");
+    for (const [i, f] of e.feedback.entries()) {
+      add(
+        r("evidence.feedback.round", {
+          n: i + 1,
+          count: f.comments,
+          files: f.files.map((x) => `\`${x}\``).join(", "),
+          state: named(STEP_TEXT, f.state),
+        }),
       );
     }
   }

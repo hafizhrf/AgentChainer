@@ -4,6 +4,9 @@ import { existsSync } from "node:fs";
 import path from "node:path";
 import {
   type AgentRoles,
+  type FeedbackComment,
+  type FeedbackRound,
+  type FileDiff,
   MAX_CI_FIXES,
   type MergeGate,
   type MessageRef,
@@ -15,6 +18,7 @@ import {
   resultText,
   type Task,
   type TaskContract,
+  type TaskFileChange,
   type TaskFolder,
   type TaskRun,
   type TaskSummary,
@@ -47,7 +51,7 @@ import { t } from "../i18n/index.ts";
 import { log, RpcFailure } from "../rpc.ts";
 import { runAsync } from "../run-async.ts";
 import type { AgentSdkModule } from "../sdk-loader.ts";
-import { git, listFiles, repoOf } from "../workspace.ts";
+import { fileDiffAgainst, git, listFiles, repoOf } from "../workspace.ts";
 import { availableGates, draftContract, normalizeContract } from "./contract.ts";
 import {
   buildEvidence,
@@ -1460,6 +1464,7 @@ export async function fixCiTask(
 ): Promise<Task> {
   const task = shippable(root, id);
   const { pr, gh: run } = withPr(root, id, gh);
+  if (pr.merged) throw invalid(t("tasks.service.prMerged"));
   const fixes = pr.fixes ?? [];
   if (fixes.length >= MAX_CI_FIXES) {
     throw invalid(t("tasks.service.fixCiCap", { max: MAX_CI_FIXES }));
@@ -1476,6 +1481,7 @@ export async function fixCiTask(
   const round = {
     run: () => orchestrator.fixCi({ check: check.name, log }),
     cancel: () => orchestrator.cancel(),
+    message: (text: string) => orchestrator.message(text),
     get current() {
       return orchestrator.current;
     },
@@ -1515,6 +1521,140 @@ export async function fixCiTask(
     notify(present(next));
   });
   return running;
+}
+
+/* ---------- A task's diff, and Fix as commented (CP-05 part 2) ---------- */
+
+type Change = TaskFileChange & { base: string | null };
+
+/** A file's name across a task's folders: `folder:path` for one in another folder, as the evidence names it. */
+const changeKey = (f: { path: string; folder?: string | undefined }) => (f.folder ? `${f.folder}:${f.path}` : f.path);
+
+/**
+ * The files a task changed since its base, in each of its code folders: its own (its worktree while it exists) and
+ * its other folders' worktrees (M8-01), each with the folder it's in and the commit it's measured from.
+ */
+function changesWithBase(root: string, task: Task): Change[] {
+  const run = task.run;
+  if (!run) return [];
+  const code = codeRootOf(root, task);
+  const own = fileStats(code, run.base, task.worktree?.untracked ?? run.untrackedAtStart).map((f) => ({
+    ...f,
+    ...(task.folder ? { folder: task.folder.name } : {}),
+    dir: code,
+    base: run.base,
+  }));
+  const others = folderDirs(task).flatMap(({ name, dir, folder }) => {
+    const wt = folder.worktree;
+    return wt ? fileStats(dir, wt.base, wt.untracked).map((f) => ({ ...f, folder: name, dir, base: wt.base })) : [];
+  });
+  return [...own, ...others];
+}
+
+/** What `task.changes` lists: the same files as the task's evidence. */
+export function changesOf(root: string, id: string): TaskFileChange[] {
+  return changesWithBase(root, present(loadTask(root, id))).map(({ base: _base, ...f }) => f);
+}
+
+/** One of the task's changed files at its base and now, whatever its branch committed since. */
+export function taskFileDiff(root: string, id: string, file: { path: string; folder?: string | undefined }): FileDiff {
+  const key = changeKey(file);
+  const change = changesWithBase(root, present(loadTask(root, id))).find((c) => changeKey(c) === key);
+  if (!change) throw invalid(t("tasks.service.notAChange", { path: key }));
+  return fileDiffAgainst(change.dir, change.path, change.base ?? "");
+}
+
+/** The states a run ended in, one way or another, that a "Fix as commented" round can follow. */
+const FEEDBACK_FROM = new Set<Task["state"]>(["done", "accepted", "failed", "unverified", "cancelled"]);
+
+/**
+ * Starts a "Fix as commented" round on a finished task (CP-05 part 2), with the person's comments on lines of its
+ * diff. Built like Fix CI's: it runs in the background like a run; when it ends Done on a task with an open PR, what it
+ * changed is committed and pushed (never forced), and otherwise it stays in the worktree for Merge or Create PR. Every
+ * round is recorded in the run, whatever its outcome.
+ */
+export function feedbackTask(
+  root: string,
+  id: string,
+  input: { comments: FeedbackComment[]; note?: string | undefined },
+  host: SessionHost,
+  notify: (task: Task) => void,
+  now = new Date(),
+): Task {
+  const task = present(loadTask(root, id));
+  if (task.parent || task.subtasks?.length) throw invalid(t("tasks.service.feedbackXl"));
+  if (runs.has(id)) throw invalid(t("tasks.service.runningStopFirst"));
+  if (!task.run || !FEEDBACK_FROM.has(task.state)) throw invalid(t("tasks.service.feedbackNotFinished"));
+  const wt = task.worktree;
+  if (!wt || wt.removed || !existsSync(wt.path)) throw invalid(t("tasks.service.feedbackNoWorktree"));
+  if (task.mergedInto || task.pr?.merged) throw invalid(t("tasks.service.feedbackMerged"));
+  const changed = new Set(changesWithBase(root, task).map(changeKey));
+  const files = [...new Set(input.comments.map(changeKey))];
+  const gone = files.filter((f) => !changed.has(f));
+  if (gone.length) throw invalid(t("tasks.service.feedbackNotChanged", { files: gone.join(", ") }));
+
+  const running: Task = { ...task, state: "running", updatedAt: now.toISOString() };
+  saveTask(root, running);
+  notify(running);
+  const orchestrator = orchestratorFor(root, running, host, notify);
+  const note = input.note?.trim();
+  const round = {
+    run: () => orchestrator.fixComments({ comments: input.comments, ...(note ? { note } : {}), source: "person" }),
+    cancel: () => orchestrator.cancel(),
+    message: (text: string) => orchestrator.message(text),
+    get current() {
+      return orchestrator.current;
+    },
+  };
+  const record = { at: now.toISOString(), comments: input.comments.length, files };
+  void track(root, id, round, notify)
+    .then(async (ended) => notify(await settleFeedback(root, id, ended.state, record)))
+    .catch((err: unknown) => log(`feedback round ${id}: ${err instanceof Error ? err.message : String(err)}`));
+  return running;
+}
+
+/**
+ * After a "Fix as commented" round: when it ended Done on a task with an open PR, commits and pushes what it changed
+ * (never forced), as Fix CI does; then records the round in the run, whatever its outcome.
+ */
+export async function settleFeedback(
+  root: string,
+  id: string,
+  ended: Task["state"],
+  round: Omit<FeedbackRound, "state">,
+): Promise<Task> {
+  let state: FeedbackRound["state"] = ended === "done" ? "done" : ended === "cancelled" ? "cancelled" : "failed";
+  let outcome: { text: string; ref: MessageRef } | null = null;
+  const latest = present(loadTask(root, id));
+  const pr = latest.pr && !latest.pr.merged ? latest.pr : null;
+  if (state === "done" && pr && latest.worktree) {
+    try {
+      commitResult(root, latest, "Address review comments");
+      await pushBranch(root, latest.worktree.branch, ghCredentialConfig(root) ?? []);
+    } catch (err) {
+      state = "failed";
+      outcome = result("run.outcome.pushFailed", { error: err instanceof Error ? err.message : String(err) });
+    }
+  }
+  const head =
+    pr && state === "done" && latest.worktree ? git(["rev-parse", latest.worktree.branch], root).stdout.trim() : "";
+  const next: Task = {
+    ...latest,
+    ...(outcome ? { state: "failed" as const } : {}),
+    ...(latest.run
+      ? {
+          run: {
+            ...latest.run,
+            ...(outcome ? { outcome: outcome.text, outcomeRef: outcome.ref } : {}),
+            feedback: [...(latest.run.feedback ?? []), { ...round, state }],
+          },
+        }
+      : {}),
+    ...(head && latest.pr ? { pr: { ...latest.pr, headSha: head } } : {}),
+    updatedAt: new Date().toISOString(),
+  };
+  saveTask(root, next);
+  return present(next);
 }
 
 /* ---------- Merge gates and the human merge (M5-04, M5-05) ---------- */

@@ -5,6 +5,8 @@ import {
   AgentEventSchema,
   agentProblems,
   CriterionCheckSchema,
+  FeedbackCommentSchema,
+  GitNameSchema,
   imageType,
   MemoryPathSchema,
   methodSchemas,
@@ -151,5 +153,28 @@ describe("MemoryPathSchema (CP-03)", () => {
     ]) {
       assert.equal(MemoryPathSchema.safeParse(bad).success, false, bad);
     }
+  });
+});
+
+describe("a task's git names and comments (CP-05)", () => {
+  it("never takes a branch or commit git could read as an option", () => {
+    for (const ok of ["main", "agentchainer/2026-11-11-0a1b2c3d", "feature/x-1", "3f2a9c0d", "release@v1"]) {
+      assert.ok(GitNameSchema.safeParse(ok).success, ok);
+    }
+    for (const bad of ["", "--output=/tmp/x", "-c", "a b", "main\n--force", "\tmain"]) {
+      assert.equal(GitNameSchema.safeParse(bad).success, false, JSON.stringify(bad));
+    }
+  });
+
+  it("takes a comment with lines from 1 and words in it, and no more than 50 a round", () => {
+    const c = { path: "src/a.ts", side: "new", start: 1, end: 2, quote: "x", text: " Why? " };
+    assert.equal(FeedbackCommentSchema.parse(c).text, "Why?");
+    assert.equal(FeedbackCommentSchema.safeParse({ ...c, text: "   " }).success, false);
+    assert.equal(FeedbackCommentSchema.safeParse({ ...c, start: 0 }).success, false);
+    const params = methodSchemas["task.feedback"].params;
+    const ref = { cwd: "/w", id: "2026-11-11-0a1b2c3d" };
+    assert.equal(params.safeParse({ ...ref, comments: [] }).success, false);
+    assert.equal(params.safeParse({ ...ref, comments: Array(51).fill(c) }).success, false);
+    assert.ok(params.safeParse({ ...ref, comments: Array(50).fill(c), note: "Also a test." }).success);
   });
 });

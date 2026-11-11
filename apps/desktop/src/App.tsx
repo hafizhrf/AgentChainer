@@ -289,6 +289,10 @@ export function App() {
           setSettingsOpen(true);
         }
         if (cfg.open === "new-session") setNewSession(true);
+        if (cfg.open === "task-changes") {
+          const latest = (await request("task.list", { cwd: cfg.cwd })).tasks[0];
+          if (latest) openTask(cfg.cwd, latest.id);
+        }
         const first = tabsRef.current[0];
         if (cfg.open === "terminal" && first) toggleTerminal(first.sessionId);
         if (cfg.open === "files" || cfg.open === "git") setPanelTab(cfg.open);
@@ -1580,8 +1584,8 @@ export function App() {
                             ...(scheduled.run?.model ? { model: scheduled.run.model } : {}),
                           })
                         }
-                        onOpenFile={(file) =>
-                          invoke("open_in_editor", { file, line: null, editor: settings?.editor ?? "system" })
+                        onOpenFile={(file, line) =>
+                          invoke("open_in_editor", { file, line: line ?? null, editor: settings?.editor ?? "system" })
                         }
                       />
                     ))}

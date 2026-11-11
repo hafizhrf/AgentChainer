@@ -1,3 +1,5 @@
+import { type FeedbackComment, fenced, fenceLanguage } from "@agentchainer/protocol";
+
 /**
  * Comments on a diff's lines (CP-05): the person picks lines in the diff of a chat's changes, writes what's wrong,
  * and the comments go into the chat's message as one piece of feedback. `new` lines are the file as it is now;
@@ -16,18 +18,6 @@ export type DiffComment = {
   text: string;
 };
 
-/** A fence longer than any run of backticks in `text`, so a quote can't close it early. */
-export function fenceFor(text: string): string {
-  const longest = Math.max(0, ...[...text.matchAll(/`+/g)].map((m) => m[0].length));
-  return "`".repeat(Math.max(3, longest + 1));
-}
-
-/** The info string for a path's fence: its extension, when it has one. */
-const languageOf = (path: string) => {
-  const name = path.split("/").at(-1) ?? path;
-  return name.includes(".") && !name.startsWith(".") ? (name.split(".").at(-1)?.toLowerCase() ?? "") : "";
-};
-
 /**
  * The comments as one message: a header, then for each, where it is, the quoted lines and the comment. Files keep
  * the order they were first commented in; within a file, lines go top to bottom.
@@ -43,10 +33,25 @@ export function feedbackMessage(
       .sort((a, b) => (a.side === b.side ? a.start - b.start : a.side === "old" ? -1 : 1)),
   );
   const parts = ordered.map((c) => {
-    const fence = fenceFor(c.quote);
-    return `${labels.where(c)}\n${fence}${languageOf(c.path)}\n${c.quote}\n${fence}\n${c.text.trim()}`;
+    return `${labels.where(c)}\n${fenced(c.quote, fenceLanguage(c.path))}\n${c.text.trim()}`;
   });
   return [labels.header, ...parts].join("\n\n");
+}
+
+/**
+ * A task's comments as `task.feedback` takes them (CP-05 part 2): on a task's diff, `dir` holds the name of the other
+ * folder a file is in.
+ */
+export function toFeedback(comments: readonly DiffComment[]): FeedbackComment[] {
+  return comments.map((c) => ({
+    path: c.path,
+    ...(c.dir ? { folder: c.dir } : {}),
+    side: c.side,
+    start: c.start,
+    end: c.end,
+    quote: c.quote,
+    text: c.text.trim(),
+  }));
 }
 
 /** Whether the lines a comment quotes read differently now (the file changed since). */

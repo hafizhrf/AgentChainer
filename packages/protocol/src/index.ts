@@ -345,7 +345,10 @@ export const HunkSchema = z.object({
 });
 export type Hunk = z.infer<typeof HunkSchema>;
 
-/** HEAD vs working tree. Contents are null when absent on that side, binary, or too large to diff. */
+/**
+ * HEAD (or a task's base, CP-05) vs working tree. Contents are null when absent on that side, binary, or too large to
+ * diff.
+ */
 export const FileDiffSchema = z.object({
   path: z.string(),
   status: FileStatusSchema.optional(),
@@ -1031,6 +1034,55 @@ export const TaskDefaultsViewSchema = z.object({
 });
 export type TaskDefaultsView = z.infer<typeof TaskDefaultsViewSchema>;
 
+/**
+ * A branch or commit a task's records name, which reaches git's command line: never one git could read as an option,
+ * nor one with spaces or control characters. Git refuses such names itself, so a real one always passes; a tampered
+ * `task.json` (a cloned repository can carry one) doesn't load.
+ */
+export const GitNameSchema = z.string().regex(/^[^-\s][^\s]*$/, "Not a git branch or commit name");
+
+/** How many comments one "Fix as commented" round takes (CP-05). */
+export const MAX_FEEDBACK_COMMENTS = 50;
+
+/**
+ * A comment on lines of a task's diff (CP-05 part 2): `new` lines are the file as it is now, `old` ones lines the task
+ * removed, numbered as they were at its base. `folder` names another folder of a multi-folder task (M8-01).
+ */
+export const FeedbackCommentSchema = z.object({
+  path: z.string().min(1).max(1000),
+  folder: z.string().min(1).max(200).optional(),
+  side: z.enum(["new", "old"]),
+  start: z.number().int().min(1),
+  end: z.number().int().min(1),
+  /** The lines as they were when the comment was made. */
+  quote: z.string().max(8000),
+  text: z.string().trim().min(1).max(4000),
+});
+export type FeedbackComment = z.infer<typeof FeedbackCommentSchema>;
+
+/** One "Fix as commented" round on a finished run (CP-05): how many comments, on which files, and how it ended. */
+export const FeedbackRoundSchema = z.object({
+  at: z.string(),
+  comments: z.number().int(),
+  /** The files commented on, `folder:path` for another folder's. */
+  files: z.array(z.string()),
+  state: z.enum(["done", "failed", "cancelled"]),
+});
+export type FeedbackRound = z.infer<typeof FeedbackRoundSchema>;
+
+/** A file a task changed since its base (CP-05), in its own worktree or another folder's (`folder`). */
+export const TaskFileChangeSchema = z.object({
+  path: z.string(),
+  folder: z.string().optional(),
+  /** The code folder `path` is in, absolute: the worktree's while it exists. */
+  dir: z.string(),
+  status: z.enum(["new", "modified", "deleted"]),
+  /** null for binary files. */
+  added: z.number().int().nullable(),
+  removed: z.number().int().nullable(),
+});
+export type TaskFileChange = z.infer<typeof TaskFileChangeSchema>;
+
 export const TaskRunSchema = z.object({
   /**
    * The workflow it runs; `source: "project"` when the project's file replaced the app's (M6-04), `"task"` when the
@@ -1048,7 +1100,7 @@ export const TaskRunSchema = z.object({
   /** The agent per role the person chose at Run (M9-06); fix rounds and resumes keep it. */
   agents: AgentRolesSchema.optional(),
   /** What the task's changes are measured from: a snapshot of the tree at the start, or null outside git. */
-  base: z.string().nullable(),
+  base: GitNameSchema.nullable(),
   /** Files already untracked at the start: not the task's changes. */
   untrackedAtStart: z.array(z.string()),
   startedAt: z.string(),
@@ -1072,6 +1124,8 @@ export const TaskRunSchema = z.object({
   outcomeRef: MessageRefSchema.optional(),
   /** A schedule started it (M8-05), not a person. */
   trigger: z.literal("schedule").optional(),
+  /** "Fix as commented" rounds on the finished run (CP-05), oldest first. */
+  feedback: z.array(FeedbackRoundSchema).optional(),
 });
 export type TaskRun = z.infer<typeof TaskRunSchema>;
 
@@ -1254,9 +1308,9 @@ export type MetricsSummary = z.infer<typeof MetricsSummarySchema>;
  */
 export const TaskWorktreeSchema = z.object({
   path: z.string(),
-  branch: z.string(),
-  base: z.string(),
-  from: z.string().optional(),
+  branch: GitNameSchema,
+  base: GitNameSchema,
+  from: GitNameSchema.optional(),
   untracked: z.array(z.string()),
   removed: z.boolean().optional(),
 });
@@ -1271,7 +1325,7 @@ export const TaskFolderSchema = z.object({
   path: z.string(),
   worktree: TaskWorktreeSchema.optional(),
   /** The draft PR made from this folder's branch in its own repository, with the task's main PR (M8-01). */
-  pr: z.object({ number: z.number().int(), url: z.string(), base: z.string(), head: z.string() }).optional(),
+  pr: z.object({ number: z.number().int(), url: z.string(), base: GitNameSchema, head: GitNameSchema }).optional(),
 });
 export type TaskFolder = z.infer<typeof TaskFolderSchema>;
 
@@ -1314,14 +1368,14 @@ export const TaskSchema = z.object({
   /** An XL task's sub-tasks, in the split's order. */
   subtasks: z.array(TaskIdSchema).optional(),
   /** Where the user merged the task's branch. */
-  mergedInto: z.object({ branch: z.string(), at: z.string() }).optional(),
+  mergedInto: z.object({ branch: GitNameSchema, at: z.string() }).optional(),
   /** The pull request made from the task's branch (M5-02). */
   pr: z
     .object({
       number: z.number().int(),
       url: z.string(),
-      base: z.string(),
-      head: z.string(),
+      base: GitNameSchema,
+      head: GitNameSchema,
       /** The commit the PR's branch pointed at when it was pushed. */
       headSha: z.string(),
       draft: z.boolean(),
@@ -2483,6 +2537,32 @@ export const methodSchemas = {
    */
   "task.fixCi": { params: TaskRef.extend({ link: z.string().min(1) }), result: TaskSchema },
   /**
+   * The files a task changed since its base (CP-05 part 2): its worktree's and its other folders' worktrees', with
+   * line counts. The same list as its evidence's.
+   */
+  "task.changes": { params: TaskRef, result: z.object({ files: z.array(TaskFileChangeSchema) }) },
+  /**
+   * One of the task's changed files at the task's base and now (CP-05 part 2), whatever was committed on its branch
+   * since. Only a path `task.changes` lists; no hunks, as a task's diff has no per-hunk revert.
+   */
+  "task.fileDiff": {
+    params: TaskRef.extend({ path: z.string().min(1), folder: z.string().optional() }),
+    result: FileDiffSchema,
+  },
+  /**
+   * A "Fix as commented" round on a finished task (CP-05 part 2), built like Fix CI's: the write step's agent gets the
+   * contract, the diff and the person's comments in a new session, then the gates run once. When it ends Done on a
+   * task with an open PR, the change is committed and pushed (never forced); otherwise it stays in the worktree.
+   * Runs in the background like a run.
+   */
+  "task.feedback": {
+    params: TaskRef.extend({
+      comments: z.array(FeedbackCommentSchema).min(1).max(MAX_FEEDBACK_COMMENTS),
+      note: z.string().max(4000).optional(),
+    }),
+    result: TaskSchema,
+  },
+  /**
    * The merge gates of the task's PR (M5-04), worked out now: the run, the review of the current head, gitleaks, semgrep
    * and trivy when installed (offline only), and CI. Also the merge methods the repository allows.
    */
@@ -2783,6 +2863,7 @@ export {
   type Risk,
   type RiskLevel,
 } from "./approval.ts";
+export { fenced, fenceFor, fenceLanguage } from "./fence.ts";
 export { folderKey, folderProblems } from "./folders.ts";
 export {
   asLanguage,

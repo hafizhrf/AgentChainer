@@ -89,6 +89,7 @@ import {
   withStepEvent,
 } from "./run.ts";
 import { agentLabel, costText } from "./stepAgent.ts";
+import { TaskChanges } from "./TaskChanges.tsx";
 import {
   approveBlocker,
   budgetText,
@@ -122,6 +123,9 @@ const RUN_MODES: Exclude<PermissionMode, "plan">[] = ["default", "acceptEdits", 
 
 const errorText = (err: unknown) => (err instanceof Error ? err.message : String(err));
 const usd = (n: number) => approxUsd(n, n < 0.1 ? 4 : 2);
+
+/** The states a task's Changes card shows in: a run that ended, or one cut off (CP-05). */
+const CHANGES_SHOWN = new Set<Task["state"]>(["done", "accepted", "failed", "unverified", "cancelled", "interrupted"]);
 
 /** A task's spend, marked when a step on Codex or agy put an estimate in it (M9-07). */
 function taskCost(task: Task): string {
@@ -172,7 +176,7 @@ export function TaskPage({
   autoDraft: boolean;
   confirm: Confirm;
   /** Opens a file (an absolute path) in the editor from settings. */
-  onOpenFile: (file: string) => Promise<unknown>;
+  onOpenFile: (file: string, line?: number) => Promise<unknown>;
   onClose: () => void;
   /** The shown task as it changes, for its tab in the sidebar; `ids` are the tasks whose approvals it shows. */
   onChange?: (task: Task, busy: boolean, ids: string[]) => void;
@@ -468,10 +472,13 @@ export function TaskPage({
   const drafting = busy === "draft";
   const lastDraft = [...thread].reverse().find((e) => e.kind === "draft");
   const bottom = useRef<HTMLDivElement>(null);
-  // biome-ignore lint/correctness/useExhaustiveDependencies: follow the thread as it grows.
+  // A contract that arrives or is redrafted, by its text: each `task.updated` brings a new object, and following
+  // that pulled the thread down on every update of a run, even while the person read a step above.
+  const contractText = task?.contract ? JSON.stringify(task.contract) : "";
+  // biome-ignore lint/correctness/useExhaustiveDependencies: follow the thread as it grows, not each task update.
   useEffect(() => {
     bottom.current?.scrollIntoView({ block: "end" });
-  }, [thread.length, task?.state, task?.contract, drafting]);
+  }, [thread.length, task?.state, contractText, drafting]);
 
   if (!task) {
     return (
@@ -700,6 +707,22 @@ export function TaskPage({
 
             {task.worktree && !task.parent && task.state !== "running" && (
               <ResultCard task={task} cwd={cwd} confirm={confirm} onChanged={(t) => show(t)} onError={setError} />
+            )}
+
+            {task.worktree && !task.worktree.removed && task.run && CHANGES_SHOWN.has(task.state) && (
+              <TaskChanges
+                key={task.id}
+                task={task}
+                cwd={cwd}
+                confirm={confirm}
+                onChanged={(t) => show(t)}
+                onError={setError}
+                onOpenFile={(file, line) =>
+                  void onOpenFile(file, line).catch((err: unknown) =>
+                    setError(t("tasks.page.openReportFailed", { error: errorText(err) })),
+                  )
+                }
+              />
             )}
 
             {task.worktree && !task.worktree.removed && !task.parent && task.state !== "running" && (
@@ -1642,6 +1665,7 @@ function RunView({
 }) {
   const run = task.run;
   const [open, setOpen] = useState<string | null>(null);
+  const lastRunning = useRef<string | null>(null);
   const [, tick] = useState(0);
   // biome-ignore lint/correctness/useExhaustiveDependencies: opens the step picked on the Flow tab, each time it's picked.
   useEffect(() => {
@@ -1657,7 +1681,11 @@ function RunView({
   if (!run) return null;
   const { label, tone } = stateLabel(task.state);
   const running = run.steps.find((s) => s.status === "running");
-  const shown = open ?? running?.id ?? null;
+  // Between one step's end and the next one's start nothing runs: the last one stays open until then, so the
+  // thread doesn't fold and unfold.
+  if (running) lastRunning.current = running.id;
+  else if (task.state !== "running") lastRunning.current = null;
+  const shown = open ?? running?.id ?? lastRunning.current;
   const before = failedBefore(task);
 
   async function toggle(entry: StepRun, keepOpen = false) {
@@ -1852,7 +1880,7 @@ function EvidenceCard({
 }: {
   task: Task;
   cwd: string;
-  onOpenFile: (file: string) => Promise<unknown>;
+  onOpenFile: (file: string, line?: number) => Promise<unknown>;
 }) {
   const [report, setReport] = useState<{ markdown: string; path: string } | null>(null);
   const [error, setError] = useState<string | null>(null);

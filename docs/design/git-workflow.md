@@ -147,6 +147,15 @@ Each one takes the task, never a path or a `gh` argument from the UI.
   - when it ends Done, the service commits and pushes; a push that fails ends the round failed and says why;
   - each round is recorded on the PR (`pr.fixes`) and in the run's timeline and evidence;
   - only GitHub Actions checks have a log the app reads (`jobOf`); other CI gets a link to its page.
+- **Fix as commented (CP-05 part 2)** is the same round with the person's comments instead of a log:
+  - a task's **Changes** card lists its files against its base (`task.changes`); a file opens a diff of the base and
+    now (`task.fileDiff`), whose lines take comments;
+  - **Fix as commented** runs a `comments-fix` step on the write step's role, with the contract, the diff and the
+    comments, then the gates once (`orchestrator.fixComments`, sharing `round()` with Fix CI);
+  - when it ends Done on a task with an open PR, the service commits ("Address review comments") and pushes, never
+    forced; without a PR the edits stay in the worktree for Merge or Create PR;
+  - each round is recorded in the run (`run.feedback`) and its evidence. CP-07 will send a PR's review comments from
+    GitHub through the same round, fenced as data.
 - **Limits:**
   - at most 3 rounds per PR;
   - every round counts against the task's budget cap (T-11);

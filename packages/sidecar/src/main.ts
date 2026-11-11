@@ -106,6 +106,7 @@ import {
   approveTask,
   type Claude,
   cancelTask,
+  changesOf,
   ciLog,
   cleanupTask,
   continueTask,
@@ -114,6 +115,7 @@ import {
   draftTask,
   dropFlow,
   evidenceOf,
+  feedbackTask,
   fixCiTask,
   listTasksLive,
   mergeGates,
@@ -138,6 +140,7 @@ import {
   splitTask,
   startTask,
   taskEvidence,
+  taskFileDiff,
   taskWorkflow,
   workflowsOf,
   writeEvidence,
@@ -1294,6 +1297,22 @@ serve(
       requireFolder(cwd);
       await settleRun(id);
       return fixCiTask(cwd, id, link, sessionHost(await claude()), systemGh(), taskUpdated(cwd));
+    },
+
+    "task.changes": ({ cwd, id }) => {
+      requireFolder(cwd);
+      return { files: changesOf(cwd, id) };
+    },
+
+    "task.fileDiff": ({ cwd, id, path, folder }) => {
+      requireFolder(cwd);
+      return taskFileDiff(cwd, id, { path, folder });
+    },
+
+    "task.feedback": async ({ cwd, id, comments, note }) => {
+      requireFolder(cwd);
+      await settleRun(id);
+      return feedbackTask(cwd, id, { comments, note }, sessionHost(await claude()), taskUpdated(cwd));
     },
 
     "task.mergeGates": async ({ cwd, id }) => {

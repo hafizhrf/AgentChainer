@@ -163,8 +163,11 @@ fn run_once(
     inner: &Arc<Inner>,
     login_env: &HashMap<String, String>,
 ) -> Result<(String, bool, Vec<String>), String> {
-    let (mut cmd, label) = command(&inner.app)?;
+    let (mut cmd, label, own) = command(&inner.app)?;
+    // The login shell's environment carries whatever the app was started with; the app's own folders come last, so
+    // an inherited `AGENTCHAINER_*` value can't point the sidecar elsewhere (e.g. its script approvals, CP-04).
     cmd.envs(login_env)
+        .envs(own)
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
@@ -253,8 +256,11 @@ fn run_once(
     Ok((status.to_string(), status.success(), tail))
 }
 
-/// The command for the sidecar this build should run, plus a label for error messages.
-fn command(app: &AppHandle) -> Result<(Command, String), String> {
+/// The app's own folders for the sidecar, as environment variables set after the login shell's.
+type OwnEnv = Vec<(&'static str, PathBuf)>;
+
+/// The command for the sidecar this build should run, a label for error messages, and the app's own folders.
+fn command(app: &AppHandle) -> Result<(Command, String, OwnEnv), String> {
     // The override is for trying a packaged sidecar in a debug build; release builds always run their own (X-02).
     let packaged = crate::dev_only(
         std::env::var_os("AGENTCHAINER_SIDECAR_BIN"),
@@ -275,22 +281,26 @@ fn command(app: &AppHandle) -> Result<(Command, String), String> {
     let tools_dir = data_dir.join("tools");
     // The usage page's record of Codex and agy runs (CP-01) lives here in dev builds too.
     let usage_dir = data_dir.join("usage");
+    // Which worktree setup and run scripts the person allowed (CP-04): kept here, never in a repository.
+    let trust_file = data_dir.join("trusted-scripts.json");
+
+    let mut own: OwnEnv = vec![
+        ("AGENTCHAINER_TOOLS_DIR", tools_dir),
+        ("AGENTCHAINER_USAGE_DIR", usage_dir),
+        ("AGENTCHAINER_TRUST_FILE", trust_file),
+    ];
 
     let Some(bin) = packaged else {
         let mut cmd = Command::new("node");
-        cmd.arg(SIDECAR_ENTRY)
-            .env("AGENTCHAINER_TOOLS_DIR", &tools_dir)
-            .env("AGENTCHAINER_USAGE_DIR", &usage_dir);
-        return Ok((cmd, format!("node {SIDECAR_ENTRY}")));
+        cmd.arg(SIDECAR_ENTRY);
+        return Ok((cmd, format!("node {SIDECAR_ENTRY}"), own));
     };
 
     let mut cmd = Command::new(&bin);
-    cmd.env("AGENTCHAINER_DATA_DIR", data_dir)
-        .env("AGENTCHAINER_TOOLS_DIR", &tools_dir)
-        .env("AGENTCHAINER_USAGE_DIR", &usage_dir)
-        // Let the SDK download honour HTTP(S)_PROXY / NO_PROXY like other tools on the machine.
-        .env("NODE_USE_ENV_PROXY", "1");
-    Ok((cmd, bin.display().to_string()))
+    // Let the SDK download honour HTTP(S)_PROXY / NO_PROXY like other tools on the machine.
+    cmd.env("NODE_USE_ENV_PROXY", "1");
+    own.push(("AGENTCHAINER_DATA_DIR", data_dir));
+    Ok((cmd, bin.display().to_string(), own))
 }
 
 /// Tauri copies `externalBin` next to the app's main executable, without the target-triple suffix.

@@ -24,7 +24,7 @@
   "workflows.editor.resetToApps": "Kembalikan ke bawaan aplikasi",
   "workflows.editor.save": "Simpan",
   "workflows.editor.checking": "Memeriksa…",
-  "workflows.editor.valid": "Valid: run {{tier}} dapat memakainya apa adanya.",
+  "workflows.editor.valid": "Valid: run tier {{tier}} dapat memakainya apa adanya.",
   "workflows.editor.yamlError": "YAML: {{error}}",
   "workflows.editor.describeLabel": "Jelaskan alur yang Anda inginkan",
   "workflows.editor.describeHelp": "Claude menulis ulang workflow ini dari deskripsi Anda, mulai dari isi editor. Hasilnya diperiksa sama seperti workflow yang Anda tulis sendiri; tidak ada yang disimpan sampai Anda mempertahankannya lalu menekan Simpan.",

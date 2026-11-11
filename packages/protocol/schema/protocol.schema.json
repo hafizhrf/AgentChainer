@@ -5318,6 +5318,205 @@
         "additionalProperties": false
       }
     },
+    "worktree.config": {
+      "params": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "cwd": {
+            "type": "string",
+            "minLength": 1
+          },
+          "include": {
+            "type": "string",
+            "maxLength": 20000
+          }
+        },
+        "required": [
+          "cwd"
+        ],
+        "additionalProperties": false
+      },
+      "result": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "include": {
+            "type": "object",
+            "properties": {
+              "text": {
+                "type": "string"
+              },
+              "exists": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "text",
+              "exists"
+            ],
+            "additionalProperties": false
+          },
+          "files": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "path": {
+                  "type": "string"
+                },
+                "bytes": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                }
+              },
+              "required": [
+                "path",
+                "bytes"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "bytes": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "capped": {
+            "type": "boolean"
+          },
+          "setup": {
+            "type": "string"
+          },
+          "run": {
+            "type": "string"
+          },
+          "setupAllowed": {
+            "type": "boolean"
+          },
+          "runAllowed": {
+            "type": "boolean"
+          },
+          "detected": {
+            "type": "object",
+            "properties": {
+              "install": {
+                "type": "string"
+              },
+              "dev": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false
+          },
+          "problem": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "include",
+          "files",
+          "bytes",
+          "capped",
+          "setupAllowed",
+          "runAllowed",
+          "detected"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "worktree.save": {
+      "params": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "cwd": {
+            "type": "string",
+            "minLength": 1
+          },
+          "include": {
+            "type": "string",
+            "maxLength": 20000
+          },
+          "setup": {
+            "type": "string",
+            "maxLength": 2000
+          },
+          "run": {
+            "type": "string",
+            "maxLength": 2000
+          }
+        },
+        "required": [
+          "cwd",
+          "include",
+          "setup",
+          "run"
+        ],
+        "additionalProperties": false
+      },
+      "result": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "runId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "runId"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "worktree.allow": {
+      "params": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "cwd": {
+            "type": "string",
+            "minLength": 1
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "setup",
+              "run"
+            ]
+          },
+          "command": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2000
+          }
+        },
+        "required": [
+          "cwd",
+          "kind",
+          "command"
+        ],
+        "additionalProperties": false
+      },
+      "result": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "const": true
+          }
+        },
+        "required": [
+          "ok"
+        ],
+        "additionalProperties": false
+      }
+    },
     "memory.files": {
       "params": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -26615,6 +26814,52 @@
         },
         "required": [
           "ok"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "task.runCommand": {
+      "params": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "cwd": {
+            "type": "string",
+            "minLength": 1
+          },
+          "id": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}-[0-9a-f]{8}$"
+          }
+        },
+        "required": [
+          "cwd",
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "result": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "command": {
+            "type": "string"
+          },
+          "dir": {
+            "type": "string"
+          },
+          "script": {
+            "type": "boolean"
+          },
+          "allowed": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "command",
+          "dir",
+          "script",
+          "allowed"
         ],
         "additionalProperties": false
       }

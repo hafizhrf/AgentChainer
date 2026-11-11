@@ -2552,6 +2552,56 @@ Owner request, 2026-11-10: features that community tools for coding agents have 
 
   Sources: CCManager `.worktreeinclude` ([repo](https://github.com/kbwo/ccmanager)); Conductor `conductor.json`
   ([docs](https://www.conductor.build/docs/)).
+  - **Plan (2026-11-11):**
+    - **Copies:** a project's `.worktreeinclude` copies matching gitignored files into each task's worktree. It's
+      Claude Code's format: gitignore syntax, and only ignored files, so a copy is never committed. With no file,
+      nothing is copied (owner's choice).
+    - **Scripts:** setup and run live in `.agentchainer/worktree.json`, committed, so a team shares them. Each script
+      runs only once the person allowed that exact text on this computer (owner's choice).
+    - **Run app:** a button on a finished task starts the run script in a terminal in its worktree, with the Preview
+      (owner's choice).
+  Progress (2026-11-11): built.
+  - **Sidecar:** `tasks/worktree-setup.ts`.
+    - **Copying:** `includedFiles` intersects `git ls-files --others --ignored --exclude-from` with
+      `git check-ignore`. `copyIncluded` copies regular files only, never through a link and never over a file
+      already there, and checks they're ignored in the worktree too. It stops at 200 files or 20 MB.
+    - **Scripts:** `setupCommand` and `runCommand` handle them. Approvals are a sha256 per workspace and kind, kept in
+      `AGENTCHAINER_TRUST_FILE` (`<app data>/trusted-scripts.json`, set by the Rust core), never in the repository.
+    - **`setupWorktree`** copies, then runs the allowed script or the detected install command. It finds the main
+      checkout from the worktree's path, so S/M/L, multi-folder and XL all get it with no change to their callers.
+      The "Task branch" note says what was copied, and when a script isn't allowed yet.
+    - **New methods:** `worktree.config`, `worktree.save` (one History run; it allows what it saved),
+      `worktree.allow` and `task.runCommand`.
+  - **UI:**
+    - Workspace settings → Worktrees:
+      - the include file, with "Use suggested" and a live list of what it would copy;
+      - setup and run inputs showing the detected commands;
+      - "Allowed on this computer", or an Allow button that shows the script first.
+    - Run app on the task page: `TerminalPanel` types the command and reports output, and the addresses it prints
+      open in an inline Preview or the browser.
+  - **Tests:** `worktree-setup.test.ts` (10) on real repositories and worktrees:
+    - only ignored and matching files are copied, and a commit takes none of them;
+    - links are skipped and existing files kept;
+    - the caps hold;
+    - scripts run only once allowed, and need allowing again when they change;
+    - save is one History run that Roll back undoes;
+    - the run script wins over the dev command.
+  - **Live** (the owner's CLI, two tier-S runs with haiku, about $0.03):
+    - the "Task branch" step read "copied 1 ignored file from the workspace (.env); `node -e …` exited 0";
+    - the task's commit held only `src/cart.js`, and `.env` was not in the branch;
+    - `worktree.save` refused a script holding a token and allowed the ones it saved;
+    - `task.runCommand` returned the run script and the worktree's folder.
+  - **Also:** the sidebar's Fleet, Usage and CLAUDE.md are 2 px apart; the workflow editor's Valid line has padding
+    and reads "a tier-M run" (owner, 2026-11-11). ARCHITECTURE no longer says the guard blocks `.env` reads, which it
+    never did.
+  - **Found in the in-app check:** the login shell's environment was applied after the app's own `AGENTCHAINER_*`
+    folders, so a value inherited from where the app was started won. A wrapped sidecar logged the trust file a
+    parent environment had set. The core now sets its own folders last (`sidecar.rs`).
+    - **Re-check:** the wrapped sidecar got the app data folder's file.
+  - **In the app** (debug build, selftest views with no synthetic input, four haiku turns, about $0.008): the
+    Worktrees section in light, dark and Bahasa Indonesia, with the include list and its live preview. On the app's
+    own approvals, the repository's scripts showed "Not allowed on this computer yet" with **Allow…**.
+  - **Still for the owner's click-through:** Run app with Preview, and the two fixes (MANUAL_CHECKS 3h–3k).
 - [ ] **CP-05** Comments on diff lines, sent to the agent as feedback. — Vibe Kanban
       ([repo](https://github.com/BloopAI/vibe-kanban)); Warp ([docs](https://docs.warp.dev/agents/cli-agents/overview/)).
 - [ ] **CP-06** Best-of-N: run one task on several agents or models in separate worktrees, then compare the diffs.

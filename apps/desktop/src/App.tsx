@@ -295,7 +295,8 @@ export function App() {
             cfg.open === "permissions" ||
             cfg.open === "plugins" ||
             cfg.open === "mcp" ||
-            cfg.open === "memory") &&
+            cfg.open === "memory" ||
+            cfg.open === "worktrees") &&
           first
         )
           setSetup({
@@ -1281,6 +1282,7 @@ export function App() {
         ["overview", t("app.palette.setupOverview")],
         ["plan", t("app.palette.setupPlan")],
         ["commands", t("app.palette.setupCommands")],
+        ["worktrees", t("app.palette.setupWorktrees")],
         ["agents", t("app.palette.setupAgents")],
         ["memory", t("app.palette.setupMemory")],
         ["plugins", t("app.palette.setupPlugins")],

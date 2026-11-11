@@ -1,0 +1,9 @@
+{
+  "worktree.config.invalid": ".agentchainer/worktree.json isn't valid, so its scripts are ignored: {{error}}",
+  "worktree.run.none": "There's nothing to run: add a run script in Workspace settings → Worktrees, or a dev script to the project.",
+  "worktree.run.noWorktree": "This task has no worktree to run the app from.",
+  "worktree.save.oneLine": "Keep a script on one line; chain commands with &&.",
+  "worktree.save.secret": "That looks like a key or token. These files are committed with the repository: refer to the key by its environment variable instead.",
+  "worktree.save.title": "Edit worktree setup",
+  "worktree.save.tooLong": "A script can be at most {{max}} characters."
+}

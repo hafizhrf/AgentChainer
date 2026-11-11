@@ -45,5 +45,11 @@
   "xl.note.gitMergeFailed": "git merge gagal: {{output}}",
   "xl.note.gitMergeExited": "git merge gagal: exit code {{status}}",
   "xl.setup.exited": "`{{command}}` keluar dengan exit code {{code}} dalam {{seconds}} dtk",
-  "xl.setup.timedOut": "`{{command}}` kehabisan waktu setelah {{seconds}} dtk"
+  "xl.setup.timedOut": "`{{command}}` kehabisan waktu setelah {{seconds}} dtk",
+  "xl.setup.copied_one": "{{count}} file ter-ignore disalin dari workspace ({{files}})",
+  "xl.setup.copied_other": "{{count}} file ter-ignore disalin dari workspace ({{files}})",
+  "xl.setup.copyCapped": "penyalinan berhenti di 200 file atau 20 MB: persempit .worktreeinclude",
+  "xl.setup.scriptNotAllowed": "skrip setup proyek belum diizinkan di komputer ini, jadi perintah install yang terdeteksi yang dijalankan (izinkan di Pengaturan workspace → Worktree)",
+  "xl.setup.then": "{{first}}; {{rest}}",
+  "xl.setup.nothing": "tidak ada yang perlu disiapkan"
 }

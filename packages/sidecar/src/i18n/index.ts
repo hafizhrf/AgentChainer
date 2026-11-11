@@ -10,6 +10,7 @@ import memory from "./locales/en/memory.json" with { type: "json" };
 import plugins from "./locales/en/plugins.json" with { type: "json" };
 import rpc from "./locales/en/rpc.json" with { type: "json" };
 import tasks from "./locales/en/tasks.json" with { type: "json" };
+import worktree from "./locales/en/worktree.json" with { type: "json" };
 import agentsId from "./locales/id/agents.json" with { type: "json" };
 import bootstrapId from "./locales/id/bootstrap.json" with { type: "json" };
 import deployId from "./locales/id/deploy.json" with { type: "json" };
@@ -20,6 +21,7 @@ import memoryId from "./locales/id/memory.json" with { type: "json" };
 import pluginsId from "./locales/id/plugins.json" with { type: "json" };
 import rpcId from "./locales/id/rpc.json" with { type: "json" };
 import tasksId from "./locales/id/tasks.json" with { type: "json" };
+import worktreeId from "./locales/id/worktree.json" with { type: "json" };
 
 /**
  * The sidecar's text that reaches a person (X-13, ADR-0011): errors, setup findings, plan reasons, apply and rollback
@@ -27,7 +29,7 @@ import tasksId from "./locales/id/tasks.json" with { type: "json" };
  * languages are bundled, so `setLanguage` in `main.ts` applies at once. Text Claude reads (prompts, guard reasons) and
  * text written into a repository stay English and out of these catalogs.
  */
-export const CATALOGS = { rpc, detect, bootstrap, git, deploy, plugins, mcp, memory, tasks, agents };
+export const CATALOGS = { rpc, detect, bootstrap, git, deploy, plugins, mcp, memory, tasks, agents, worktree };
 export const INDONESIAN = {
   rpc: rpcId,
   detect: detectId,
@@ -39,6 +41,7 @@ export const INDONESIAN = {
   memory: memoryId,
   tasks: tasksId,
   agents: agentsId,
+  worktree: worktreeId,
 };
 
 const english = Object.assign({}, ...Object.values(CATALOGS)) as typeof rpc &
@@ -50,7 +53,8 @@ const english = Object.assign({}, ...Object.values(CATALOGS)) as typeof rpc &
   typeof mcp &
   typeof memory &
   typeof tasks &
-  typeof agents;
+  typeof agents &
+  typeof worktree;
 const sidecar = catalog(english, { id: () => Object.assign({}, ...Object.values(INDONESIAN)) });
 
 export type MessageKey = KeyOf<typeof english>;

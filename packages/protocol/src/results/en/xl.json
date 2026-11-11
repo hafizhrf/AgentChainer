@@ -46,5 +46,11 @@
   "xl.note.gitMergeFailed": "git merge failed: {{output}}",
   "xl.note.gitMergeExited": "git merge failed: exit {{status}}",
   "xl.setup.exited": "`{{command}}` exited {{code}} in {{seconds}} s",
-  "xl.setup.timedOut": "`{{command}}` timed out in {{seconds}} s"
+  "xl.setup.timedOut": "`{{command}}` timed out in {{seconds}} s",
+  "xl.setup.copied_one": "copied {{count}} ignored file from the workspace ({{files}})",
+  "xl.setup.copied_other": "copied {{count}} ignored files from the workspace ({{files}})",
+  "xl.setup.copyCapped": "stopped copying at 200 files or 20 MB: narrow .worktreeinclude",
+  "xl.setup.scriptNotAllowed": "the project's setup script isn't allowed on this computer yet, so the detected install command ran instead (allow it in Workspace settings → Worktrees)",
+  "xl.setup.then": "{{first}}; {{rest}}",
+  "xl.setup.nothing": "nothing to set up"
 }

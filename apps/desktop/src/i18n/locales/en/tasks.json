@@ -9,7 +9,6 @@
   "tasks.state.ready": "Ready",
   "tasks.state.draft": "Draft",
   "tasks.state.new": "New",
-
   "tasks.blocker.running": "The task is running.",
   "tasks.blocker.interrupted": "Resume the interrupted run, or revise the task.",
   "tasks.blocker.approveFirst": "Approve the contract and the tier first.",
@@ -20,7 +19,6 @@
   "tasks.blocker.parentRunning": "Its XL task is running: sub-tasks run from there.",
   "tasks.blocker.runFromParent": "Sub-tasks run from their XL task.",
   "tasks.blocker.childDone": "Done, and merged with the XL task's next Continue.",
-
   "tasks.form.tierHelpS": "One agent, then the project's checks.",
   "tasks.form.tierHelpM": "Plan, implement, checks, then a review.",
   "tasks.form.tierHelpL": "Specialist planning, implement, checks, then an independent review.",
@@ -53,7 +51,6 @@
   "tasks.form.noBudget": "no budget",
   "tasks.form.budget": "${{amount}}",
   "tasks.form.budgetPerSubtask": "${{amount}} per sub-task",
-
   "tasks.page.stoppedNothingChanged": "Stopped. Nothing was changed.",
   "tasks.page.stopTitle": "Stop the run?",
   "tasks.page.stopBody": "The running step stops now. Files it already changed stay as they are; git and rewind still work.",
@@ -109,12 +106,10 @@
   "tasks.page.acceptBody": "The task ends as <strong>Accepted with risk</strong>, not Done. Your reason goes into the evidence report. Nothing in the working tree changes.",
   "tasks.page.acceptReason": "Why is it acceptable?",
   "tasks.page.acceptReasonPlaceholder": "e.g. The failing test is a known bug, tracked separately.",
-
   "tasks.draftBlock.drafting": "Drafting the contract (read-only)",
   "tasks.draftBlock.drafted": "Drafted the contract",
   "tasks.draftBlock.toolCalls_one": "{{count}} tool call",
   "tasks.draftBlock.toolCalls_other": "{{count}} tool calls",
-
   "tasks.contract.title": "Contract",
   "tasks.contract.objective": "Objective",
   "tasks.contract.acceptanceCriteria": "Acceptance criteria",
@@ -126,14 +121,12 @@
   "tasks.contract.tier": "Tier",
   "tasks.contract.tierValue": "{{tier}}: {{help}}",
   "tasks.contract.budget": "Budget",
-
   "tasks.contractCard.draft": "draft",
   "tasks.contractCard.doneEditing": "Done editing",
   "tasks.contractCard.edit": "Edit",
   "tasks.contractCard.noObjective": "No objective yet.",
   "tasks.contractCard.doneWhen": "Done when",
   "tasks.contractCard.hint": "Reply below to change it, or edit it here.",
-
   "tasks.facts.title": "Task",
   "tasks.facts.state": "State",
   "tasks.facts.afterDrafting": "after drafting",
@@ -141,7 +134,6 @@
   "tasks.facts.branch": "Branch",
   "tasks.facts.worktreeRemoved": "(worktree removed)",
   "tasks.facts.savedIn": "Saved in",
-
   "tasks.composer.replyHint": "Enter redrafts the contract with your reply",
   "tasks.composer.replyLabel": "Reply to the contract",
   "tasks.composer.messageLabel": "Message the running step",
@@ -149,9 +141,7 @@
   "tasks.composer.replyPlaceholder": "Reply to change the contract, e.g. “leave applyDiscount alone” or “add a test for an empty cart”",
   "tasks.composer.sendReply": "Send the reply",
   "tasks.composer.sendMessage": "Send to the running step",
-
   "tasks.quote.request": "Request",
-
   "tasks.contractForm.subtitle": "Drafted by Claude. Edit anything before you approve.",
   "tasks.contractForm.settleQuestions": "Settle them by editing the contract, then remove them.",
   "tasks.contractForm.openQuestion": "Open question",
@@ -166,7 +156,6 @@
   "tasks.contractForm.outOfScopeHelp": "Related work this task won't do.",
   "tasks.contractForm.risksHelp": "What could go wrong. Feeds triage and the report.",
   "tasks.contractForm.none": "None.",
-
   "tasks.triage.title": "Triage",
   "tasks.triage.proposedTier": "Proposed tier",
   "tasks.triage.stale": "The contract changed since this triage. Run triage again to update the proposal.",
@@ -186,7 +175,6 @@
   "tasks.triage.noBudgetHelp": "No spend cap: the task runs until it's done or you stop it. Read-only steps keep their own small limits.",
   "tasks.triage.budgetHelp": "The task stops when it's spent.",
   "tasks.triage.noBudget": "No budget",
-
   "tasks.contractView.approved": "Approved {{date}}",
   "tasks.contractView.hide": "Hide",
   "tasks.contractView.show": "Show",
@@ -195,12 +183,10 @@
   "tasks.contractView.readyRun": "Run it from the footer: each step is a Claude session you can watch here, and the app runs the gates itself.",
   "tasks.contractView.savedIn": "The task is saved in <code>{{path}}</code>.",
   "tasks.contractView.overridden": "Proposed {{tier}}; changed because: {{reason}}",
-
   "tasks.step.running": "Running",
   "tasks.step.done": "Done",
   "tasks.step.failed": "Failed",
   "tasks.step.stopped": "Stopped",
-
   "tasks.run.title": "Run",
   "tasks.run.costXl": "{{mode}} · {{cost}} across its sub-tasks",
   "tasks.run.costNoBudget": "{{mode}} · {{cost}} · no budget",
@@ -225,7 +211,6 @@
   "tasks.run.beforeTask": "Before the task",
   "tasks.run.round": "Round {{n}}",
   "tasks.run.notRun": "Not run, no command detected: {{gates}}. They don't count as passed.",
-
   "tasks.gateList.empty": "No gates to run.",
   "tasks.gateList.passed": "Passed",
   "tasks.gateList.failed": "Failed",
@@ -236,7 +221,6 @@
   "tasks.gateList.formatted": "Formatted: {{files}}",
   "tasks.gateList.reverted": "Reverted changes to: {{files}}",
   "tasks.gateList.noOutput": "(no output)",
-
   "tasks.evidence.title": "Evidence",
   "tasks.evidence.subtitle": "From the run's records; Claude's own statements are labeled as such.",
   "tasks.evidence.copy": "Copy the report as markdown",
@@ -245,9 +229,7 @@
   "tasks.evidence.building": "Building the report…",
   "tasks.evidence.hide": "Hide the report",
   "tasks.evidence.show": "Show the report",
-
   "tasks.runButton.profile": "Permission profile for the run's write steps",
-
   "tasks.subtasks.title": "Sub-tasks",
   "tasks.subtasks.subtitle": "In dependency order, two at once, each in its own worktree.",
   "tasks.subtasks.splitAgain": "Split again",
@@ -259,9 +241,7 @@
   "tasks.subtasks.setupFirst": "Each worktree runs <code>{{command}}</code> first.",
   "tasks.subtasks.loading": "Loading…",
   "tasks.subtasks.after": "after {{numbers}}",
-
   "tasks.overlaps.alsoChanges": "<task>{{title}}</task> also changes {{files}}. Merging both may conflict.",
-
   "tasks.result.mergeNotFinished": "Merge once the run is Done, or accept its risk first.",
   "tasks.result.mergeDirty": "Commit or stash your changes first.",
   "tasks.result.removeTitle": "Remove the task's worktree?",
@@ -288,7 +268,6 @@
   "tasks.result.cleanUp": "Clean up",
   "tasks.result.mergeInto": "Merge into {{branch}}",
   "tasks.result.yourBranch": "your branch",
-
   "tasks.approval.riskLow": "Low risk",
   "tasks.approval.riskMedium": "Review first",
   "tasks.approval.riskHigh": "High risk",
@@ -300,7 +279,6 @@
   "tasks.approval.details": "Details…",
   "tasks.approval.deny": "Deny",
   "tasks.approval.allowOnce": "Allow once",
-
   "tasks.createPr.ghMissing": "The GitHub CLI (gh) isn't installed. Install it, then sign in from a terminal with `gh auth login`.",
   "tasks.createPr.ghSignedOut": "gh isn't signed in to {{host}}. Run `gh auth login --hostname {{host}}` in a terminal.",
   "tasks.createPr.noRemote": "This repository has no origin remote on GitHub, so there is nowhere to open a PR.",
@@ -318,7 +296,6 @@
   "tasks.createPr.titleField": "Title",
   "tasks.createPr.asDraft": "Open it as a draft",
   "tasks.createPr.body": "Body (from the contract and the evidence)",
-
   "tasks.deploy.title": "Deploy",
   "tasks.deploy.subtitle": "Previews of this task's branch, with the provider's own CLI.",
   "tasks.deploy.checkAgain": "Check again",
@@ -331,7 +308,6 @@
   "tasks.deploy.smokePassed": "Smoke test passed: {{detail}}",
   "tasks.deploy.smokeFailed": "Smoke test failed: {{detail}}",
   "tasks.deploy.open": "Open the deployment",
-
   "tasks.flow.ownFlow": "This task's own flow:",
   "tasks.flow.ownFlowNote": "It's approved with the contract, and the run follows it instead of the {{tier}} flow.",
   "tasks.flow.useTierFlow": "Use the {{tier}} flow",
@@ -347,10 +323,8 @@
   "tasks.flow.sourceProjectPlanned": "The project's {{workflow}}, as the run will follow it. Click a step to see it in the thread.",
   "tasks.flow.sourceApp": "The app's {{workflow}}. Click a step to see it in the thread.",
   "tasks.flow.sourceAppPlanned": "The app's {{workflow}}, as the run will follow it. Click a step to see it in the thread.",
-
   "tasks.home.title": "Tasks in this workspace",
   "tasks.home.subtitle": "Start one with Task in a chat's composer",
-
   "tasks.lessons.sourceGate": "gate",
   "tasks.lessons.sourceFormat": "formatter",
   "tasks.lessons.sourceReview": "review",
@@ -366,7 +340,6 @@
   "tasks.lessons.applyNote": "Added as a History run, so it can be rolled back. The ones not picked are dismissed.",
   "tasks.lessons.dismissAll": "Dismiss all",
   "tasks.lessons.add": "Add {{n}} to CLAUDE.md",
-
   "tasks.mergeGates.methodMerge": "Merge commit",
   "tasks.mergeGates.methodSquash": "Squash and merge",
   "tasks.mergeGates.methodRebase": "Rebase and merge",
@@ -394,7 +367,6 @@
   "tasks.mergeGates.notGreen": "Not green: {{gates}}",
   "tasks.mergeGates.why": "Why merge anyway?",
   "tasks.mergeGates.whyHelp": "Kept with the task and in its evidence report.",
-
   "tasks.prChecks.passed": "Passed",
   "tasks.prChecks.failed": "Failed",
   "tasks.prChecks.running": "Running",
@@ -416,9 +388,7 @@
   "tasks.prChecks.fixExplain": "Claude gets this log as data, with the contract and the task's diff, and fixes the code in the task's worktree with the same approvals as the run. The gates run again, and only when they pass is the branch pushed (never forced).",
   "tasks.prChecks.readingLog": "Reading the log…",
   "tasks.prChecks.emptyLog": "(The failed steps wrote nothing.)",
-
   "tasks.projectWorkflow.note": "Runs the project's {{tier}} workflow, <code>{{file}}</code>",
-
   "tasks.schedule.everyHour_one": "Every hour",
   "tasks.schedule.everyHour_other": "Every {{count}} hours",
   "tasks.schedule.sun": "Sun",
@@ -461,7 +431,6 @@
   "tasks.agents.codex": "Codex",
   "tasks.agents.agy": "Antigravity CLI (agy)",
   "tasks.agents.notSignedIn": "{{agent}} (not signed in)",
-
   "tasks.defaults.appDefault": "App default ({{value}})",
   "tasks.defaults.builtIn": "Built-in ({{value}})",
   "tasks.defaults.model": "Model",
@@ -477,5 +446,18 @@
   "tasks.defaults.budgetsHelpWorkspace": "Empty follows the app's default, shown greyed out. XL's applies to each sub-task.",
   "tasks.defaults.agentsGroup": "Who runs each step",
   "tasks.defaults.runGroup": "Model and permissions",
-  "tasks.defaults.tierLabel": "Tier {{tier}}"
+  "tasks.defaults.tierLabel": "Tier {{tier}}",
+  "tasks.runApp.title": "Run the app",
+  "tasks.runApp.run": "Run app",
+  "tasks.runApp.stop": "Stop",
+  "tasks.runApp.help": "Starts the project's run script in {{branch}}'s worktree, in a terminal you can see and stop.",
+  "tasks.runApp.running": "Running in {{branch}}'s worktree:",
+  "tasks.runApp.starting": "Starting the terminal…",
+  "tasks.runApp.preview": "Preview",
+  "tasks.runApp.hidePreview": "Hide preview",
+  "tasks.runApp.openBrowser": "Open in browser",
+  "tasks.runApp.allowTitle": "Run this command?",
+  "tasks.runApp.allowScript": "The project's run script (.agentchainer/worktree.json) runs with your permissions in the task's worktree. Allow it only if you trust what it does; it's remembered for this workspace.",
+  "tasks.runApp.allowDetected": "The project has no run script, so its detected dev command runs, with your permissions, in the task's worktree. It's remembered for this workspace.",
+  "tasks.runApp.allowAndRun": "Allow and run"
 }

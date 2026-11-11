@@ -1,0 +1,9 @@
+{
+  "worktree.config.invalid": ".agentchainer/worktree.json tidak valid, jadi skripnya diabaikan: {{error}}",
+  "worktree.run.none": "Tidak ada yang bisa dijalankan: tambahkan skrip run di Pengaturan workspace → Worktree, atau skrip dev di proyek.",
+  "worktree.run.noWorktree": "Task ini tidak punya worktree untuk menjalankan app.",
+  "worktree.save.oneLine": "Tulis skrip dalam satu baris; sambung perintah dengan &&.",
+  "worktree.save.secret": "Itu tampak seperti key atau token. File ini di-commit bersama repo: sebut key-nya lewat nama environment variable.",
+  "worktree.save.title": "Edit setup worktree",
+  "worktree.save.tooLong": "Skrip paling banyak {{max}} karakter."
+}

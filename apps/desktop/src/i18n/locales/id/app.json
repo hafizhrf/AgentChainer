@@ -95,6 +95,7 @@
   "app.palette.setupOverview": "Pengaturan workspace: Ringkasan",
   "app.palette.setupPlan": "Pengaturan workspace: Rencana setup",
   "app.palette.setupCommands": "Pengaturan workspace: Perintah",
+  "app.palette.setupWorktrees": "Pengaturan workspace: Worktree",
   "app.palette.setupAgents": "Pengaturan workspace: Agent",
   "app.palette.setupMemory": "Pengaturan workspace: CLAUDE.md",
   "app.palette.setupPlugins": "Pengaturan workspace: Plugin",

@@ -707,12 +707,18 @@
 
 /* ---------- The fleet view (M8-02) ---------- */
 
+/* Fleet, Usage and CLAUDE.md: one group, a row apart, under New. */
+.sidebar-pages {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
 .fleet-entry {
   width: 100%;
   min-height: 32px;
   justify-content: flex-start;
   gap: var(--space-2);
-  margin-top: var(--space-1);
   padding: 0 var(--space-2);
   border: none;
   background: transparent;

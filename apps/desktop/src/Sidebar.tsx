@@ -88,44 +88,47 @@ export function Sidebar({
           {t("shell.sidebar.newSession")}
           <kbd>{menuShortcut("new-session")}</kbd>
         </button>
-        <button
-          type="button"
-          className={`fleet-entry${active === FLEET ? " current" : ""}`}
-          aria-current={active === FLEET ? "page" : undefined}
-          onClick={() => onSelect(FLEET)}
-        >
-          <Radar size={15} aria-hidden />
-          {t("shell.sidebar.fleet")}
-          <span className="grow" />
-          {fleet.some((i) => i.status === "waiting") && (
-            <span className="fleet-count waiting" title={t("shell.sidebar.waitingTitle")}>
-              {t("shell.sidebar.waitingCount", { n: fleet.filter((i) => i.status === "waiting").length })}
-            </span>
-          )}
-          {fleet.some((i) => i.status === "working") && (
-            <span className="fleet-count" title={t("shell.sidebar.working")}>
-              {t("shell.sidebar.workingCount", { n: fleet.filter((i) => i.status === "working").length })}
-            </span>
-          )}
-        </button>
-        <button
-          type="button"
-          className={`fleet-entry${active === USAGE ? " current" : ""}`}
-          aria-current={active === USAGE ? "page" : undefined}
-          onClick={() => onSelect(USAGE)}
-        >
-          <BarChart3 size={15} aria-hidden />
-          {t("shell.sidebar.usage")}
-        </button>
-        <button
-          type="button"
-          className={`fleet-entry${active === MEMORY ? " current" : ""}`}
-          aria-current={active === MEMORY ? "page" : undefined}
-          onClick={() => onSelect(MEMORY)}
-        >
-          <FileText size={15} aria-hidden />
-          {t("shell.sidebar.memory")}
-        </button>
+        {/* The app-wide pages, close together: Fleet, Usage and CLAUDE.md. */}
+        <div className="sidebar-pages">
+          <button
+            type="button"
+            className={`fleet-entry${active === FLEET ? " current" : ""}`}
+            aria-current={active === FLEET ? "page" : undefined}
+            onClick={() => onSelect(FLEET)}
+          >
+            <Radar size={15} aria-hidden />
+            {t("shell.sidebar.fleet")}
+            <span className="grow" />
+            {fleet.some((i) => i.status === "waiting") && (
+              <span className="fleet-count waiting" title={t("shell.sidebar.waitingTitle")}>
+                {t("shell.sidebar.waitingCount", { n: fleet.filter((i) => i.status === "waiting").length })}
+              </span>
+            )}
+            {fleet.some((i) => i.status === "working") && (
+              <span className="fleet-count" title={t("shell.sidebar.working")}>
+                {t("shell.sidebar.workingCount", { n: fleet.filter((i) => i.status === "working").length })}
+              </span>
+            )}
+          </button>
+          <button
+            type="button"
+            className={`fleet-entry${active === USAGE ? " current" : ""}`}
+            aria-current={active === USAGE ? "page" : undefined}
+            onClick={() => onSelect(USAGE)}
+          >
+            <BarChart3 size={15} aria-hidden />
+            {t("shell.sidebar.usage")}
+          </button>
+          <button
+            type="button"
+            className={`fleet-entry${active === MEMORY ? " current" : ""}`}
+            aria-current={active === MEMORY ? "page" : undefined}
+            onClick={() => onSelect(MEMORY)}
+          >
+            <FileText size={15} aria-hidden />
+            {t("shell.sidebar.memory")}
+          </button>
+        </div>
       </div>
 
       <div className="sidebar-scroll">

@@ -4,6 +4,7 @@ import {
   inEnglish,
   type MessageRef,
   type ResultKey,
+  resultEnglish,
   resultRef,
   type StepRun,
   type Task,
@@ -21,13 +22,21 @@ import { result } from "./result.ts";
  * merge the task branch when they want it.
  */
 
-/** A setup command's run in a fresh worktree (the project's install command). */
+/**
+ * How a fresh worktree was set up: the setup command's run (the project's allowed script, or its install command;
+ * "" when there was none) and the gitignored files copied into it first (CP-04).
+ */
 export type SetupRun = {
   command: string;
   exitCode: number | null;
   timedOut: boolean;
   durationMs: number;
   tail: string;
+  copied?: string[];
+  /** The copy stopped at its caps. */
+  copyCapped?: boolean;
+  /** The project has a setup script the person hasn't allowed on this computer, so it didn't run. */
+  scriptNotAllowed?: boolean;
 };
 
 /** A sub-task's run in progress. */
@@ -540,12 +549,31 @@ export class XlOrchestrator {
 /** A sub-task's run that ended; `note` says why when it never got to run (its setup failed). */
 type Ended = { id: string; entry: string; child: Task; note?: Said };
 
-/** A setup command's run in a sentence, in English and as a ref (X-13 part 2b). */
+/** A setup in a sentence, in English and as a ref (X-13 part 2b): what was copied, then how its command went. */
 export function setupResult(s: SetupRun) {
   const seconds = (s.durationMs / 1000).toFixed(1);
-  return s.timedOut
-    ? result("xl.setup.timedOut", { command: s.command, seconds })
-    : result("xl.setup.exited", { command: s.command, code: String(s.exitCode), seconds });
+  const parts: MessageRef[] = [];
+  if (s.copied?.length) {
+    const files = s.copied.length > 5 ? `${s.copied.slice(0, 5).join(", ")}, …` : s.copied.join(", ");
+    parts.push(result("xl.setup.copied", { count: s.copied.length, files }).ref);
+  }
+  if (s.copyCapped) parts.push(result("xl.setup.copyCapped").ref);
+  if (s.scriptNotAllowed) parts.push(result("xl.setup.scriptNotAllowed").ref);
+  if (s.command) {
+    parts.push(
+      s.timedOut
+        ? result("xl.setup.timedOut", { command: s.command, seconds }).ref
+        : result("xl.setup.exited", { command: s.command, code: String(s.exitCode), seconds }).ref,
+    );
+  }
+  // "a; b; c" as a; (b; c), so it renders in one language.
+  const [first, ...rest] = parts;
+  if (!first) return result("xl.setup.nothing");
+  const tail = rest.reduceRight<MessageRef | null>(
+    (acc, head) => (acc ? resultRef("xl.setup.then", { first: head, rest: acc }) : head),
+    null,
+  );
+  return tail ? result("xl.setup.then", { first, rest: tail }) : { text: resultEnglish(first), ref: first };
 }
 
 export function setupNote(s: SetupRun): string {

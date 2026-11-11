@@ -29,6 +29,10 @@ and when a change touches these screens. None of them needs a Claude login or ma
 | 3e | Open **CLAUDE.md**. Type `# Check app` in the editor and press ⌘S. | The preview shows the heading as you type. After ⌘S, `/tmp/ac-check/CLAUDE.md` holds it, and History lists "Edit CLAUDE.md". |
 | 3f | Type another line, then click **Setup plan**. | A dialog asks before discarding the unsaved edit. Cancel keeps you in CLAUDE.md with the edit. |
 | 3g | Roll back the "Edit CLAUDE.md" run in **History**. Then click **CLAUDE.md** in the sidebar. | The file is gone again. The page lists `ac-check` as Missing, and clicking it opens its CLAUDE.md section. |
+| 3h | In `/tmp/ac-check`, run `echo A=1 > .env && echo .env >> .gitignore`. Open **Worktrees**, click **Use suggested**, type `node -e 0` as Setup and `npx http-server -p 4310` as Run, then **Save**. | The list shows `.env` would be copied. Both scripts say "Allowed on this computer". History lists "Edit worktree setup". |
+| 3i | Start a tier-S task (any small request) and let it finish. | Its "Task branch" step says it copied `.env` and ran `node -e 0`; the task's commit has no `.env`. |
+| 3j | On the task's page, click **Run app**. When the terminal prints `http://127.0.0.1:4310`, click **Preview**, then **Stop**. | The terminal runs the script in the task's worktree; the Preview shows the folder listing; Stop ends it. |
+| 3k | Look at the sidebar under New, and at a workflow in the editor. | Fleet, Usage and CLAUDE.md sit close together. The editor's "Valid" line has room on the left and says "a tier-M run". |
 | 4 | Press ⇧⌘P, type "Workspace settings: Commands", press Enter. | The Commands section opens. |
 | 5 | Open Settings (the gear at the bottom of the sidebar), set Theme to Dark, and click Save. | The app turns dark; `~/Library/Application Support/io.github.hafizhrf.agentchainer/settings.json` says `"theme": "dark"`. Set it back afterwards. |
 

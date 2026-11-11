@@ -1,6 +1,5 @@
 import { existsSync } from "node:fs";
 import type { Task } from "@agentchainer/protocol";
-import { installCommand } from "../bootstrap/plan.ts";
 import { runGuarded } from "../bootstrap/verify.ts";
 import { detectWorkspace } from "../detect/detect.ts";
 import { resolveGates, runGates } from "./gates.ts";
@@ -16,20 +15,34 @@ import {
   tipOf,
   worktreePath,
 } from "./worktree.ts";
+import { copyIncluded, mainCheckoutOf, setupCommand } from "./worktree-setup.ts";
 import type { ChildRun, SetupRun, XlWorld } from "./xl.ts";
 
 /** A dependency install can take a while on a cold cache. */
 const SETUP_TIMEOUT_MS = 900_000;
 
 /**
- * Runs the project's install command in a new worktree's code folder, under the workspace guard so a lockfile it
- * rewrites is put back. Null when the project has no install command.
+ * Gets a new worktree's code folder ready (CP-04): copies the gitignored files the project names in
+ * `.worktreeinclude` from the main checkout, then runs its setup script once the person allowed it, else the
+ * detected install command, under the workspace guard so a lockfile it rewrites is put back. Null when there's
+ * nothing to copy or run.
  */
 export async function setupWorktree(code: string, signal: AbortSignal): Promise<SetupRun | null> {
-  const command = installCommand(detectWorkspace(code));
-  if (!command) return null;
+  const source = mainCheckoutOf(code);
+  const copy = source ? copyIncluded(source, code) : { copied: [], capped: false };
+  const { command, scriptNotAllowed } = setupCommand(source ?? code, code);
+  const extra = {
+    ...(copy.copied.length ? { copied: copy.copied } : {}),
+    ...(copy.capped ? { copyCapped: true } : {}),
+    ...(scriptNotAllowed ? { scriptNotAllowed: true } : {}),
+  };
+  if (!command) {
+    return Object.keys(extra).length
+      ? { command: "", exitCode: 0, timedOut: false, durationMs: 0, tail: "", ...extra }
+      : null;
+  }
   const r = await runGuarded(code, command, code, SETUP_TIMEOUT_MS, {}, signal);
-  return { command, exitCode: r.exitCode, timedOut: r.timedOut, durationMs: r.ms, tail: r.tail };
+  return { command, exitCode: r.exitCode, timedOut: r.timedOut, durationMs: r.ms, tail: r.tail, ...extra };
 }
 
 /**

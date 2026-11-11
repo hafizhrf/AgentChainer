@@ -160,6 +160,8 @@ Planned surface (v0.1):
 | request | `bootstrap.apply` / `bootstrap.runs` / `bootstrap.rollback` | Apply selected actions after re-planning; list runs; roll back a run or one action, byte for byte (M2-13…M2-17). `install` lists actions whose install command the user allowed to run before verification (M2-23) |
 | request | `plugins.list` / `plugins.details` | The Plugins page (UX-10, ADR-0010): every plugin the user's CLI lists, with the catalog's reviews, and the installed ones with update notices; kept per app session unless `refresh`. Details are an installed plugin's inventory, from the CLI's text |
 | request | `plugins.install` / `plugins.update` / `plugins.uninstall` / `plugins.setEnabled` | Per-workspace plugin changes through the CLI (`project` or `local` scope). An install is a History run; install and update return `confirm` with the command when the marketplace declares one, and run again with `acceptCommand` |
+| request | `worktree.config` / `worktree.save` / `worktree.allow` | Worktree setup (CP-04): `.worktreeinclude` and the gitignored files it names (a draft shows what it would name; capped at 200 files and 20 MB), the setup and run scripts in `.agentchainer/worktree.json` and whether each is allowed on this computer, the detected install and dev commands. Save is one History run and allows the scripts it saved; allow records an approval in the app's data folder (`AGENTCHAINER_TRUST_FILE`), never in the repository |
+| request | `task.runCommand` | What Run app starts in a finished task's worktree: the run script, else the detected dev command, its folder, and whether it's allowed. The UI then runs it in a terminal (`pty_open`) the person sees and stops |
 | request | `memory.files` / `memory.read` | The CLAUDE.md editor (CP-03): the workspace's CLAUDE.md files (project, `CLAUDE.local.md`, folders from the git listing) and the user's own, with lines and bytes; one file's text and sha256. A file reached through a link, over 2 MB or not a regular file is listed with why it won't open |
 | request | `memory.save` | Writes a workspace CLAUDE.md as a History run (`applyFileEdits`), against the sha256 it was read with. Refuses a key or token shape, over 200 KB, and paths other than the CLAUDE.md files; warns over 300 lines, on a home-folder path or a password in a URL. The user's own file is never written (ADR-0013) |
 | request | `memory.scan` | The CLAUDE.md page: every known workspace's CLAUDE.md checked like the readiness audit (`ok`, `long`, `noTest`, `missing`, `gone`, `refused`), plus the user's own. Reads only |
@@ -297,7 +299,9 @@ sequenceDiagram
   - recursive deletes outside the workspace;
   - `git push --force` to protected branches;
   - `curl|wget … | sh`;
-  - credential file reads (`~/.ssh`, `~/.aws`, `.env*` outside the workspace);
+  - credential file reads in the home folder (`~/.ssh`, `~/.aws`, `~/.gnupg`, `~/.azure`, `~/.kube`, gcloud, Docker
+    and netrc credentials, the Claude and Codex logins: `SECRET_DIRS` in `guard.ts`). A project's own `.env` isn't
+    denied: the approval dialog rates commands that mention it, and edits to it, as needing review or high;
   - production deploy commands.
 - **The approval dialog** (UX-05, `apps/desktop/src/approval.ts`) explains a request before the user answers:
   - the command, with Claude's own `description`, or the file with a diff of the edit;

@@ -28,6 +28,7 @@ const OPEN_VIEWS = [
   "plugins",
   "mcp",
   "memory",
+  "worktrees",
   "claude-md",
   "fresh",
 ] as const;

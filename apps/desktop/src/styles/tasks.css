@@ -1945,3 +1945,64 @@ fieldset.schedule-days > legend {
   color: var(--muted);
   font-size: var(--text-sm);
 }
+
+/* ---------- A reviewer's verdict in its step (M9-05) ---------- */
+
+.review-summary {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
+  padding: var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface-2);
+}
+
+.review-verdict {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+  font-weight: 600;
+}
+
+.review-verdict.tone-ok {
+  color: var(--ok);
+}
+
+.review-verdict.tone-warn {
+  color: var(--warn);
+}
+
+.review-heading {
+  margin: var(--space-2) 0 0;
+  color: var(--muted);
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+
+.review-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.review-item {
+  display: grid;
+  grid-template-columns: minmax(6.5rem, max-content) minmax(0, 1fr);
+  gap: var(--space-2);
+  align-items: start;
+}
+
+.review-item > .badge {
+  justify-self: start;
+}
+
+.review-why {
+  margin: 2px 0 0;
+  overflow-wrap: anywhere;
+}

@@ -9,6 +9,8 @@ import {
   type GuardBlock,
   literalRef,
   type MessageRef,
+  type Review,
+  ReviewSchema,
   resultRef,
   type StepAgent,
   type StepRun,
@@ -17,7 +19,6 @@ import {
   type TaskRun,
   type TaskTag,
 } from "@agentchainer/protocol";
-import { z } from "zod";
 import type { AgentStep, GatesStep, ParallelStep, Role, Workflow } from "./library.ts";
 import { isGates, isParallel } from "./library.ts";
 import { result } from "./result.ts";
@@ -93,18 +94,7 @@ const INTRO: Record<Role, string> = {
   "docs-writer": "Update the documentation for this change.",
 };
 
-const ReviewSchema = z.object({
-  verdict: z.enum(["approve", "changes-requested"]),
-  findings: z.array(
-    z.object({
-      severity: z.enum(["must-fix", "should-fix", "note"]),
-      file: z.string().optional(),
-      text: z.string(),
-    }),
-  ),
-  criteria: z.array(z.object({ id: z.string(), met: z.enum(["yes", "no", "unclear"]), why: z.string() })),
-});
-export type Review = z.infer<typeof ReviewSchema>;
+export type { Review } from "@agentchainer/protocol";
 
 /** The reviewer's structured output. */
 export const REVIEW_JSON_SCHEMA = {

@@ -10,7 +10,7 @@ import { t } from "../i18n/index.ts";
 import { log } from "../rpc.ts";
 import type { SessionCallbacks, TurnResult } from "../session.ts";
 import { recordRun } from "../usage/ledger.ts";
-import { type AgyEvent, type AgyUsage, eventsOf, parseLine, usageOfResult, writesOf } from "./agy-events.ts";
+import { type AgyEvent, type AgyUsage, eventsOf, openTools, parseLine, usageOfResult, writesOf } from "./agy-events.ts";
 import { estimateUsd } from "./prices.ts";
 import type { ChatSession, LiveSession, StepBackend, StepOptions } from "./types.ts";
 
@@ -392,6 +392,11 @@ class AgySession implements ChatSession {
     };
     // A write the guard rules out fails the step, and its reason goes into the evidence as a guard block.
     const breaches = this.breaches(seen);
+    // A tool step agy never said ended is over with its process.
+    for (const toolUseId of openTools(seen)) {
+      if (breaches.has(toolUseId)) continue;
+      this.emit({ type: "tool.completed", toolUseId, isError: code !== 0, output: "", parentToolUseId: null });
+    }
     for (const [toolUseId, why] of breaches) {
       this.emit({
         type: "tool.completed",

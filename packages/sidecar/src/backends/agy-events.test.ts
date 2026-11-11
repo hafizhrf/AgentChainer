@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { asTool, eventsOf, parseLine, usageOfResult, writesOf } from "./agy-events.ts";
+import { asTool, eventsOf, openTools, parseLine, usageOfResult, writesOf } from "./agy-events.ts";
 
 // Lines shaped like the ones spike S8 recorded from `agy` 1.5.4 (paths shortened by hand).
 const lines = [
@@ -37,6 +37,8 @@ describe("agy's stream as the app's events (M9-05)", () => {
       input: { file_path: "c.ts" },
       writes: null,
     });
+    // agy 1.5.5 names it read_file.
+    assert.equal(asTool({ name: "read_file", parameters: { Path: "d.ts" } }).name, "Read");
     assert.deepEqual(asTool({ name: "run_command", parameters: { CommandLine: "npm test" } }).input, {
       command: "npm test",
     });
@@ -56,6 +58,23 @@ describe("agy's stream as the app's events (M9-05)", () => {
       ),
       ["start agy-2 Write", "end agy-2 ok", "start agy-4 Bash", "end agy-4 error", "text Done."],
     );
+  });
+
+  it("hides the step that hands in a structured answer, and closes a tool step agy never ended", () => {
+    // Shaped like agy 1.5.5's answer with --json-schema: the JSON as text, then `finish`, which ends as its own kind.
+    const finish = [
+      `{"event":"step_update","step_update":{"conversation_id":"c","step_index":2,"state":"ACTIVE","step_type":"tool","tool_name":"view_file","tool_info":{"name":"view_file","parameters":{"AbsolutePath":"/w/a.txt"}}}}`,
+      `{"event":"step_update","step_update":{"conversation_id":"c","step_index":3,"state":"DONE","step_type":"agent_response","text_delta":"{\\"verdict\\":\\"approve\\"}"}}`,
+      `{"event":"step_update","step_update":{"conversation_id":"c","step_index":4,"state":"ACTIVE","step_type":"tool","tool_name":"finish","tool_info":{"name":"finish","parameters":{"verdict":"approve"}}}}`,
+      `{"event":"step_update","step_update":{"conversation_id":"c","step_index":4,"state":"DONE","step_type":"finish","duration_seconds":0.025}}`,
+    ].flatMap((l) => parseLine(l) ?? []);
+    assert.deepEqual(
+      finish.flatMap(eventsOf).map((e) => (e.type === "tool.started" ? `start ${e.name}` : e.type)),
+      ["start Read", "text.delta"],
+    );
+    // The read never said it ended; the finish step isn't a tool the app shows.
+    assert.deepEqual(openTools(finish), ["agy-2"]);
+    assert.deepEqual(openTools(events), []);
   });
 
   it("lists the files a turn wrote, and reads its tokens from the result", () => {

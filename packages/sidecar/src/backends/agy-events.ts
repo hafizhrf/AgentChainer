@@ -46,7 +46,9 @@ export function asTool(info: ToolInfo): { name: string; input: Record<string, un
     if (name === "notebook_edit") return { name: "NotebookEdit", input: { notebook_path: file }, writes: file };
     return { name: /^write/.test(name) ? "Write" : "Edit", input: { file_path: file }, writes: file };
   }
-  if (name === "view_file") return { name: "Read", input: { file_path: pathOf(params) }, writes: null };
+  // `view_file` in agy 1.5.4, `read_file` in 1.5.5.
+  if (name === "view_file" || name === "read_file")
+    return { name: "Read", input: { file_path: pathOf(params) }, writes: null };
   if (name === "grep_search")
     return { name: "Grep", input: { pattern: String(params.Query ?? params.Pattern ?? "") }, writes: null };
   if (name === "list_dir" || name === "find_by_name")
@@ -56,13 +58,21 @@ export function asTool(info: ToolInfo): { name: string; input: Record<string, un
   return { name, input: params, writes: null };
 }
 
+/**
+ * agy's own step that hands in its answer, after the answer's text: it starts as a tool and ends as a step of its
+ * own kind (`step_type: "finish"`), so it would never end as a tool. It does nothing to the workspace: not shown.
+ */
+const FINISH = "finish";
+
+const toolNameOf = (e: AgyEvent) => ((e.tool_info ?? { name: e.tool_name }) as ToolInfo).name ?? "";
+
 /** The app's events for one agy event: tool starts and ends, streamed text. */
 export function eventsOf(e: AgyEvent): AgentEvent[] {
   if (e.kind !== "step_update") return [];
   if (e.step_type === "agent_response" && typeof e.text_delta === "string" && e.text_delta) {
     return [{ type: "text.delta", text: e.text_delta }];
   }
-  if (e.step_type !== "tool") return [];
+  if (e.step_type !== "tool" || toolNameOf(e) === FINISH) return [];
   const id = `agy-${String(e.step_index ?? "")}`;
   const info = (e.tool_info ?? { name: e.tool_name }) as ToolInfo;
   const tool = asTool(info);
@@ -79,6 +89,21 @@ export function eventsOf(e: AgyEvent): AgentEvent[] {
       parentToolUseId: null,
     },
   ];
+}
+
+/**
+ * The tool steps a turn started and never ended, as the app named them: when agy's process is gone, nothing runs
+ * any more, so the turn's end closes them rather than leaving them spinning.
+ */
+export function openTools(seen: readonly AgyEvent[]): string[] {
+  const open = new Set<string>();
+  for (const e of seen) {
+    if (e.kind !== "step_update" || e.step_index === undefined) continue;
+    const id = `agy-${String(e.step_index)}`;
+    if (e.step_type === "tool" && e.state === "ACTIVE" && toolNameOf(e) !== FINISH) open.add(id);
+    else if (e.state === "DONE" || e.state === "ERROR") open.delete(id);
+  }
+  return [...open];
 }
 
 /** The files a finished turn wrote, by tool step: what the guard checks afterwards. */

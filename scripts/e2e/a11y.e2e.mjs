@@ -97,6 +97,11 @@ describe("accessibility (X-12)", () => {
     await audit("setup-plan");
     await (await nav("Commands")).click();
     await audit("commands");
+    // CP-03: the CLAUDE.md editor (Monaco loads lazily) beside its preview.
+    await (await nav("CLAUDE.md")).click();
+    await app.find("//section[contains(@class, 'memory-detail')]", { timeout: 60_000 });
+    await new Promise((r) => setTimeout(r, 1500));
+    await audit("claude-md");
     await (await nav("Plugins")).click();
     await new Promise((r) => setTimeout(r, 1500));
     await audit("plugins");
@@ -129,6 +134,16 @@ describe("accessibility (X-12)", () => {
     await app.chord(KEY.escape);
   });
 
+  it("audits the CLAUDE.md page (CP-03)", async () => {
+    await (
+      await app.find(
+        "//nav[@aria-label='Sessions and workspaces']//button[contains(@class, 'fleet-entry')][contains(normalize-space(.), 'CLAUDE.md')]",
+      )
+    ).click();
+    await app.find("//section[contains(@class, 'memory-user')]", { timeout: 60_000 });
+    await audit("claude-md-page");
+  });
+
   it("opens the palette from the keyboard, and Escape gives focus back", async () => {
     const opener = await app.find(
       "//nav[@aria-label='Sessions and workspaces']//button[contains(normalize-space(.), 'New')]",
@@ -150,7 +165,7 @@ describe("accessibility (X-12)", () => {
       `document.querySelector("button, a[href], input, select, textarea, [tabindex]:not([tabindex='-1'])")?.focus();`,
     );
     const stops = [];
-    for (let i = 0; i < 25; i++) {
+    for (let i = 0; i < 30; i++) {
       await app.chord(KEY.tab);
       const f = await focused();
       if (f) stops.push(f);

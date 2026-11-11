@@ -26,6 +26,9 @@ and when a change touches these screens. None of them needs a Claude login or ma
 | 3b | Open **History**, click **Roll back run**, and confirm. | `.gitignore` is gone again; the run shows as rolled back or disappears. |
 | 3c | Open **MCP servers**, click **Add server…**. Name `check-echo`, Command `node -e "process.stdin.resume()"`, keep "This workspace, just me", click **Next**, then **Add server**. | The dialog showed `claude mcp add --scope local check-echo -- node -e 'process.stdin.resume()'` before it ran. The server is listed; opening it checks it (it fails: it's not a real MCP server). History lists "Add MCP server check-echo". |
 | 3d | Roll back that run in **History**. | `claude mcp list` in `/tmp/ac-check` no longer lists `check-echo`. |
+| 3e | Open **CLAUDE.md**. Type `# Check app` in the editor and press ⌘S. | The preview shows the heading as you type. After ⌘S, `/tmp/ac-check/CLAUDE.md` holds it, and History lists "Edit CLAUDE.md". |
+| 3f | Type another line, then click **Setup plan**. | A dialog asks before discarding the unsaved edit. Cancel keeps you in CLAUDE.md with the edit. |
+| 3g | Roll back the "Edit CLAUDE.md" run in **History**. Then click **CLAUDE.md** in the sidebar. | The file is gone again. The page lists `ac-check` as Missing, and clicking it opens its CLAUDE.md section. |
 | 4 | Press ⇧⌘P, type "Workspace settings: Commands", press Enter. | The Commands section opens. |
 | 5 | Open Settings (the gear at the bottom of the sidebar), set Theme to Dark, and click Save. | The app turns dark; `~/Library/Application Support/io.github.hafizhrf.agentchainer/settings.json` says `"theme": "dark"`. Set it back afterwards. |
 

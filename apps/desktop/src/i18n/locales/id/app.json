@@ -96,6 +96,7 @@
   "app.palette.setupPlan": "Pengaturan workspace: Rencana setup",
   "app.palette.setupCommands": "Pengaturan workspace: Perintah",
   "app.palette.setupAgents": "Pengaturan workspace: Agent",
+  "app.palette.setupMemory": "Pengaturan workspace: CLAUDE.md",
   "app.palette.setupPlugins": "Pengaturan workspace: Plugin",
   "app.palette.setupMcp": "Pengaturan workspace: MCP server",
   "app.palette.setupPermissions": "Pengaturan workspace: Izin",
@@ -115,5 +116,6 @@
   "app.palette.exportDiagnostics": "Ekspor diagnostik…",
   "app.palette.gettingStarted": "Panduan memulai",
   "app.palette.reportIssue": "Laporkan masalah",
-  "app.palette.usage": "Penggunaan: biaya dan token di semua sesi"
+  "app.palette.usage": "Penggunaan: biaya dan token di semua sesi",
+  "app.palette.memory": "CLAUDE.md di semua proyek"
 }

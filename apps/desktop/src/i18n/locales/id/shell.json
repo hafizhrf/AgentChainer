@@ -137,5 +137,6 @@
   "shell.treeRow.renamed": "diganti nama",
   "shell.treeRow.untracked": "tidak dilacak",
   "shell.treeRow.conflicted": "konflik",
-  "shell.sidebar.usage": "Penggunaan"
+  "shell.sidebar.usage": "Penggunaan",
+  "shell.sidebar.memory": "CLAUDE.md"
 }

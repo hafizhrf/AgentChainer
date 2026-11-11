@@ -4,6 +4,7 @@ import {
   CircleAlert,
   CircleCheck,
   ClipboardList,
+  FileText,
   Folder,
   Folders,
   Loader2,
@@ -25,6 +26,8 @@ import { menuShortcut } from "./useMenuCommands.ts";
 export const FLEET = "fleet";
 /** The usage page (CP-01), shown like the fleet view in the main area. */
 export const USAGE = "usage";
+/** Every project's CLAUDE.md (CP-03), shown like the usage page. */
+export const MEMORY = "memory";
 
 /**
  * The left column (UX-03): New, the open chats and tasks with their status (UX-13), recent workspaces, and at the
@@ -113,6 +116,15 @@ export function Sidebar({
         >
           <BarChart3 size={15} aria-hidden />
           {t("shell.sidebar.usage")}
+        </button>
+        <button
+          type="button"
+          className={`fleet-entry${active === MEMORY ? " current" : ""}`}
+          aria-current={active === MEMORY ? "page" : undefined}
+          onClick={() => onSelect(MEMORY)}
+        >
+          <FileText size={15} aria-hidden />
+          {t("shell.sidebar.memory")}
         </button>
       </div>
 

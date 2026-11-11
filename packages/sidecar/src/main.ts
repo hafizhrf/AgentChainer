@@ -1,6 +1,5 @@
 import { existsSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
-import { join } from "node:path";
 import {
   type AgentEvent,
   asLanguage,
@@ -76,8 +75,9 @@ import {
 } from "./installer.ts";
 import { liveResume } from "./live-resume.ts";
 import { addServer, listServers, removeServer, serverDetails } from "./mcp.ts";
+import { memoryFiles, readMemory, saveMemory, scanMemory } from "./memory.ts";
 import { normalize } from "./normalize.ts";
-import { addRule, listRules, removeRule } from "./permissions.ts";
+import { addRule, claudeConfigDir, listRules, removeRule } from "./permissions.ts";
 import { cliError, installListed, listPluginsFor, parseDetails, uninstallListed, updateListed } from "./plugins.ts";
 import { probe } from "./preview.ts";
 import { CHAT_TOOLS, loadProfile, type ProfileOptions, profileOptions, profileSummaries } from "./profiles.ts";
@@ -310,9 +310,6 @@ function newTeam(sdk: AgentSdkModule, capUsd: number, parentId: () => string, ba
   });
   return team;
 }
-
-/** The CLI's config folder, where the user's own agents live (`~/.claude`, or `CLAUDE_CONFIG_DIR`). */
-const claudeConfigDir = () => process.env.CLAUDE_CONFIG_DIR || join(homedir(), ".claude");
 
 /** Generators whose proposals include GitHub workflows, checked with actionlint (M2-24). */
 const WORKFLOW_GENERATORS = new Set(["generate-ci", "smoke-test"]);
@@ -978,6 +975,23 @@ serve(
       if (!res.ok) throw cliError(`claude plugin ${enabled ? "enable" : "disable"}`, res);
       return { ok: true as const };
     },
+    "memory.files": ({ cwd }) => {
+      requireFolder(cwd);
+      return { files: memoryFiles(cwd) };
+    },
+
+    "memory.read": (params) => {
+      requireFolder(params.cwd);
+      return readMemory(params.cwd, "user" in params ? { user: true } : { path: params.path });
+    },
+
+    "memory.save": ({ cwd, path, text, baseSha256 }) => {
+      requireFolder(cwd);
+      return saveMemory(cwd, path, text, baseSha256, catalog.version);
+    },
+
+    "memory.scan": ({ workspaces }) => scanMemory(workspaces),
+
     "mcp.list": ({ cwd, refresh }) => {
       requireFolder(cwd);
       return listServers(cwd, mcpServersCli(cwd), refresh ?? false);

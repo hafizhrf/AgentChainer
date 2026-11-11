@@ -6,6 +6,7 @@ import type { WorkspaceProfile } from "@agentchainer/protocol";
 import type { HookCallback } from "@anthropic-ai/claude-agent-sdk";
 import { parse as parseYaml } from "yaml";
 import type { Item } from "../catalog/schema.ts";
+import { HOME_PATH, LONG_CLAUDE_MD, lineCount } from "../claude-md-rules.ts";
 import { checkToolCall, readsInside } from "../guard.ts";
 import { t } from "../i18n/index.ts";
 import type { AgentSdkModule } from "../sdk-loader.ts";
@@ -352,14 +353,14 @@ function firstCommand(profile: WorkspaceProfile, kind: "test" | "lint"): string 
 
 function checkClaudeMd(root: string, files: ProposedFile[], profile: WorkspaceProfile): Check[] {
   const md = files.find((f) => CLAUDE_MD.test(f.path))?.after ?? "";
-  const lines = md.split("\n").length;
+  const lines = lineCount(md);
   const test = firstCommand(profile, "test");
   const agents = existsSync(path.join(root, "AGENTS.md"));
   return [
-    check("length", lines <= 300 && md.trim().length > 0, `${lines} lines (at most 300)`),
+    check("length", lines <= LONG_CLAUDE_MD && md.trim().length > 0, `${lines} lines (at most ${LONG_CLAUDE_MD})`),
     ...(test ? [check("test command", md.includes(test), `mentions \`${test}\``)] : []),
     ...(agents ? [check("AGENTS.md import", /^@AGENTS\.md\s*$/m.test(md), "imports AGENTS.md with @AGENTS.md")] : []),
-    check("no personal paths", !/(\/Users\/|\/home\/|[A-Z]:\\Users\\)\w/.test(md), "no home-folder paths"),
+    check("no personal paths", !HOME_PATH.test(md), "no home-folder paths"),
   ];
 }
 

@@ -2392,6 +2392,22 @@ with the OpenAI Codex CLI and Google's Antigravity CLI (`agy`), in both directio
     - **Known gap:** the status bar keeps the model the chat opened with after a switch; the turn runs on the new
       one.
 
+- [ ] **M9-10** (later) OpenCode as another backend, for task steps and chats. Owner request, 2026-11-11: "tambahin juga
+      opsi bisa pake opencode", for a future update.
+  - **Why:** OpenCode is open source (MIT), and one CLI reaches many model providers **(verify)**
+    ([site](https://opencode.ai/docs/cli/), [repo](https://github.com/sst/opencode)).
+  - **Spike first** (like S8, on a scratch folder with a cheap model), to answer:
+    - **Headless over stdio:** is there a mode without a network port? `opencode acp` (Agent Client Protocol) or
+      `opencode run` with JSON output are candidates **(verify)**. `opencode serve` opens an HTTP port, which
+      ADR-0003 and ADR-0012 rule out unless a new ADR allows it.
+    - **Permissions per run:** can its permission settings (ask, allow or deny for edits and commands) be set for one
+      run without touching the user's config **(verify)**? Every write must pass the guard (ADR-0012 §3).
+    - **Sessions:** resuming and listing a conversation, for chats; the model list and a pinned price table for cost
+      estimates.
+  - **Logins stay the user's** (ADR-0002): the app runs only its version and sign-in status commands.
+  - **Terms:** each provider's terms join R-19. In particular, may a Claude subscription be used through OpenCode
+    **(verify)**? Until that's answered, OpenCode steps are offered only with providers whose terms allow it.
+
 ### Exit criteria
 
 - [x] **M9-E1** On `fixtures/sample-app`, M tasks with two different mixes pass their gates:
@@ -2494,6 +2510,42 @@ Owner request, 2026-11-10: features that community tools for coding agents have 
   - `cli-contract.ts` passes against 2.1.293. Docs: ADR-0015, THREAT_MODEL T-22, PRIVACY, ARCHITECTURE §4 and
     MANUAL_CHECKS 3c–3d.
 - [ ] **CP-03** A CLAUDE.md editor with a live preview, and a scan across projects. — opcode.
+  - **Plan (2026-11-11):**
+    - **Editor:** a CLAUDE.md section in Workspace settings: the project's, the personal `CLAUDE.local.md`, the
+      folders' and the user's own, in Monaco beside a live preview.
+    - **Saving:** each save is a History run that Roll back undoes. The owner chose direct saves with History, no
+      diff step.
+    - **The user's file:** `~/.claude/CLAUDE.md` is only read and shown, with "Open in editor" (owner's choice;
+      ADR-0013 unchanged).
+    - **Scan:** a sidebar page next to Usage checks every known project's CLAUDE.md the way the readiness audit
+      does (owner's choice).
+  Progress (2026-11-11): built.
+  - **Sidecar:** `memory.ts` and the methods `memory.files`, `memory.read`, `memory.save` and `memory.scan`.
+    - **A save** is refused when the file changed since it was read (sha256), holds a key or token shape, is over
+      200 KB, or isn't one of the CLAUDE.md paths. It's never written through a link.
+    - **Only warnings:** over 300 lines, a home-folder path, a password in a URL.
+    - **`hasKeyShape`** (protocol): `hasSecret` flagged documentation such as ``set `API_KEY=` in .env``, which a
+      CLAUDE.md often has.
+    - **Shared rules:** `claude-md-rules.ts` (`LONG_CLAUDE_MD`, `HOME_PATH`, `lineCount`) is used by the audit,
+      lessons and the generators. The audit and lessons now read CLAUDE.md through `readWorkspaceText`, so they no
+      longer follow a link.
+  - **UI:**
+    - `setup/Memory.tsx`: Edit, Split and Preview; ⌘/Ctrl+S; Discard; Reload; Open in editor. It asks before
+      leaving with unsaved edits, whether to another section, a folder or Back. "Generate in Setup plan" handles a
+      missing file.
+    - `MarkdownEditor.tsx`: Monaco, editable, loaded lazily.
+    - `memory/MemoryPage.tsx`: the user's file, then the projects with problems first.
+    - Palette entries, en and id text.
+  - **Tests:** `memory.test.ts` (10), `memory/memory.test.ts` (3), `hasKeyShape`, and `MemoryPathSchema`. The
+    audit, lessons and generate tests and snapshots are unchanged.
+  - **Live** (stdio JSON-RPC on a fixture copy, no model calls):
+    - a stale sha, a key and `../CLAUDE.md` were refused;
+    - a save created CLAUDE.md, with the home-folder warning;
+    - `bootstrap.rollback` removed it again;
+    - the scan gave `missing` and `ok`.
+  - **In the app** (debug build, selftest views, no synthetic input, six haiku turns, about $0.011): the section and
+    the page in light, dark and Bahasa Indonesia. Still for the owner's click-through: typing, ⌘S and the
+    unsaved-edits prompt (MANUAL_CHECKS 3e–3g).
 - [ ] **CP-04** Worktree setup:
   - copy chosen gitignored files (`.env`) into a task's worktree;
   - per-project setup and run scripts.

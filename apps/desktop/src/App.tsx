@@ -32,13 +32,14 @@ import { joinPath } from "./files.ts";
 import { HomeView, pickFolder } from "./HomeView.tsx";
 import { approxUsd, count, usd as dollars } from "./i18n/format.ts";
 import { t } from "./i18n/index.ts";
+import { MemoryPage } from "./memory/MemoryPage.tsx";
 import { NewSessionDialog } from "./NewSessionDialog.tsx";
 import { agentModes, fitMode, MODE_NAMES, modelChoices, rememberModels, THEMES } from "./options.ts";
 import { type PermissionAnswer, PermissionDialog } from "./PermissionDialog.tsx";
 import { PANEL_TAB_LABEL, PANEL_TABS, type PanelTab, parseHidden, serializeHidden, toggleHidden } from "./panelTabs.ts";
 import { SessionView } from "./SessionView.tsx";
 import { SettingsDialog } from "./SettingsDialog.tsx";
-import { FLEET, Sidebar, USAGE } from "./Sidebar.tsx";
+import { FLEET, MEMORY, Sidebar, USAGE } from "./Sidebar.tsx";
 import { notify as notifyOs, scheduledRunEnded } from "./schedules.ts";
 import { quitApp, readSelftestConfig, runSelftest, type SelftestConfig } from "./selftest.ts";
 import {
@@ -279,6 +280,7 @@ export function App() {
         if (!cfg.stay) return quitApp();
         if (cfg.theme) applyTheme(cfg.theme);
         if (cfg.open === "home") setActive(null);
+        if (cfg.open === "claude-md") setActive(MEMORY);
         if (cfg.open === "settings") setSettingsOpen(true);
         const first = tabsRef.current[0];
         if (cfg.open === "terminal" && first) toggleTerminal(first.sessionId);
@@ -292,7 +294,8 @@ export function App() {
             cfg.open === "plan" ||
             cfg.open === "permissions" ||
             cfg.open === "plugins" ||
-            cfg.open === "mcp") &&
+            cfg.open === "mcp" ||
+            cfg.open === "memory") &&
           first
         )
           setSetup({
@@ -944,6 +947,12 @@ export function App() {
     }
   }
 
+  /** Opens an absolute path in the editor from settings; a failure is thrown for the caller to show (CP-03). */
+  const openFile = (file: string) =>
+    invoke<void>("open_in_editor", { file, line: null, editor: settings?.editor ?? "system" }).catch((err: unknown) => {
+      throw new Error(t("app.openFailed", { file, error: String(err) }));
+    });
+
   /** "Open in editor" (M1-28) with the editor from settings; relative paths are inside the tab's workspace. */
   async function openInEditor(sessionId: string, dir: string, file: string, line?: number) {
     const abs = file.startsWith("/") || /^[A-Za-z]:[\\/]/.test(file) ? file : joinPath(dir, file);
@@ -1209,6 +1218,7 @@ export function App() {
     });
     add(session, "fleet", t("app.palette.fleet"), () => show(FLEET));
     add(session, "usage", t("app.palette.usage"), () => show(USAGE));
+    add(session, "memory", t("app.palette.memory"), () => show(MEMORY));
     if (settings?.tasksPreview === true)
       add(session, "new-task", t("app.palette.newTask"), newTask, { shortcut: menuShortcut("new-task") });
     add(session, "open-folder", t("app.palette.openFolder"), () => void openFolder(), {
@@ -1272,6 +1282,7 @@ export function App() {
         ["plan", t("app.palette.setupPlan")],
         ["commands", t("app.palette.setupCommands")],
         ["agents", t("app.palette.setupAgents")],
+        ["memory", t("app.palette.setupMemory")],
         ["plugins", t("app.palette.setupPlugins")],
         ["mcp", t("app.palette.setupMcp")],
         ["permissions", t("app.palette.setupPermissions")],
@@ -1425,6 +1436,13 @@ export function App() {
                   />
                 )}
                 {active === USAGE && !setup && <UsagePage workspaces={knownWorkspaces} />}
+                {active === MEMORY && !setup && (
+                  <MemoryPage
+                    workspaces={knownWorkspaces}
+                    onOpen={(dir) => setSetup({ cwd: dir, model, back: null, view: "memory" })}
+                    onOpenFile={openFile}
+                  />
+                )}
                 {active === null && !setup && (
                   <HomeView
                     env={env}
@@ -1522,6 +1540,7 @@ export function App() {
                       folders={setup.folders ?? []}
                       onFolderChange={(dir) => setSetup({ ...setup, cwd: dir })}
                       workspaces={knownWorkspaces}
+                      onOpenFile={openFile}
                     />
                   </Suspense>
                 )}

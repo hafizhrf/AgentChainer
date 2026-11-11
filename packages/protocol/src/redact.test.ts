@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import vectors from "../test/redact-vectors.json" with { type: "json" };
-import { hasSecret, redactForLog, redactSecrets, redactValue } from "./redact.ts";
+import { hasKeyShape, hasSecret, redactForLog, redactSecrets, redactValue } from "./redact.ts";
 
 /** The shared redaction vectors (X-03); `diagnostics.rs` runs the same file. */
 describe("redaction", () => {
@@ -24,6 +24,16 @@ describe("redaction", () => {
     assert.equal(hasSecret("Run the tests before you push."), false);
     // The global patterns keep no state between calls.
     assert.equal(hasSecret("token ghp_0123456789abcdefghijABCD"), true);
+  });
+
+  it("finds keys by their shape, not documentation that names one (CP-03)", () => {
+    assert.equal(hasKeyShape("token ghp_0123456789abcdefghijABCD"), true);
+    assert.equal(hasKeyShape("ANTHROPIC_API_KEY=sk-ant-abcdefghijklmnop"), true);
+    assert.equal(hasKeyShape("-----BEGIN EC PRIVATE KEY-----"), true);
+    assert.equal(hasKeyShape("Set `ANTHROPIC_API_KEY=` in .env"), false);
+    assert.equal(hasKeyShape("ANTHROPIC_API_KEY=your-key-here"), false);
+    assert.equal(hasKeyShape("postgres://app:app@localhost:5432/app"), false);
+    assert.equal(hasKeyShape("Ask me@example.com"), false);
   });
 
   it("masks a tool's input for display and keeps its shape", () => {

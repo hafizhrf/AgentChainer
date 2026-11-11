@@ -5318,6 +5318,374 @@
         "additionalProperties": false
       }
     },
+    "memory.files": {
+      "params": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "cwd": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "cwd"
+        ],
+        "additionalProperties": false
+      },
+      "result": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "files": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "path": {
+                  "type": "string"
+                },
+                "kind": {
+                  "type": "string",
+                  "enum": [
+                    "project",
+                    "local",
+                    "folder",
+                    "user"
+                  ]
+                },
+                "exists": {
+                  "type": "boolean"
+                },
+                "lines": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                "bytes": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                "modifiedAt": {
+                  "type": "string"
+                },
+                "absolute": {
+                  "type": "string"
+                },
+                "refused": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "path",
+                "kind",
+                "exists",
+                "lines",
+                "bytes"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "files"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "memory.read": {
+      "params": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "anyOf": [
+          {
+            "type": "object",
+            "properties": {
+              "cwd": {
+                "type": "string",
+                "minLength": 1
+              },
+              "path": {
+                "type": "string",
+                "maxLength": 500,
+                "pattern": "^(?:CLAUDE\\.md|\\.claude\\/CLAUDE\\.md|CLAUDE\\.local\\.md|(?:[^/\\\\]+\\/)+CLAUDE\\.md)$"
+              }
+            },
+            "required": [
+              "cwd",
+              "path"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "cwd": {
+                "type": "string",
+                "minLength": 1
+              },
+              "user": {
+                "type": "boolean",
+                "const": true
+              }
+            },
+            "required": [
+              "cwd",
+              "user"
+            ],
+            "additionalProperties": false
+          }
+        ]
+      },
+      "result": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "text": {
+            "type": "string"
+          },
+          "sha256": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "text",
+          "sha256"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "memory.save": {
+      "params": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "cwd": {
+            "type": "string",
+            "minLength": 1
+          },
+          "path": {
+            "type": "string",
+            "maxLength": 500,
+            "pattern": "^(?:CLAUDE\\.md|\\.claude\\/CLAUDE\\.md|CLAUDE\\.local\\.md|(?:[^/\\\\]+\\/)+CLAUDE\\.md)$"
+          },
+          "text": {
+            "type": "string",
+            "maxLength": 400000
+          },
+          "baseSha256": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "cwd",
+          "path",
+          "text",
+          "baseSha256"
+        ],
+        "additionalProperties": false
+      },
+      "result": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "runId": {
+            "type": "string"
+          },
+          "sha256": {
+            "type": "string"
+          },
+          "warnings": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "runId",
+          "sha256",
+          "warnings"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "memory.scan": {
+      "params": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "workspaces": {
+            "maxItems": 500,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        "required": [
+          "workspaces"
+        ],
+        "additionalProperties": false
+      },
+      "result": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "user": {
+            "type": "object",
+            "properties": {
+              "path": {
+                "type": "string"
+              },
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "project",
+                  "local",
+                  "folder",
+                  "user"
+                ]
+              },
+              "exists": {
+                "type": "boolean"
+              },
+              "lines": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              "bytes": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              "modifiedAt": {
+                "type": "string"
+              },
+              "absolute": {
+                "type": "string"
+              },
+              "refused": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "path",
+              "kind",
+              "exists",
+              "lines",
+              "bytes"
+            ],
+            "additionalProperties": false
+          },
+          "projects": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "cwd": {
+                  "type": "string"
+                },
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "ok",
+                    "long",
+                    "noTest",
+                    "missing",
+                    "gone",
+                    "refused"
+                  ]
+                },
+                "file": {
+                  "type": "object",
+                  "properties": {
+                    "path": {
+                      "type": "string"
+                    },
+                    "kind": {
+                      "type": "string",
+                      "enum": [
+                        "project",
+                        "local",
+                        "folder",
+                        "user"
+                      ]
+                    },
+                    "exists": {
+                      "type": "boolean"
+                    },
+                    "lines": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "bytes": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "modifiedAt": {
+                      "type": "string"
+                    },
+                    "absolute": {
+                      "type": "string"
+                    },
+                    "refused": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "path",
+                    "kind",
+                    "exists",
+                    "lines",
+                    "bytes"
+                  ],
+                  "additionalProperties": false
+                },
+                "testCommand": {
+                  "type": "string"
+                },
+                "folders": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                "local": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "cwd",
+                "status",
+                "folders",
+                "local"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "user",
+          "projects"
+        ],
+        "additionalProperties": false
+      }
+    },
     "mcp.list": {
       "params": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",

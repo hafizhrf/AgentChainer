@@ -133,7 +133,8 @@ const GENERATED_BY = "agentchainer@0.1.0";
 const sha256 = (data: string | Buffer) => createHash("sha256").update(data).digest("hex");
 const abs = (root: string, rel: string) => path.join(root, ...rel.split("/"));
 
-function insideRoot(root: string, rel: string): string {
+/** `rel` as a path under `root`; throws for an empty, absolute or `..` path. */
+export function insideRoot(root: string, rel: string): string {
   const parts = rel.split(/[\\/]+/);
   if (!rel || path.isAbsolute(rel) || path.win32.isAbsolute(rel) || parts.includes("..")) {
     throw new Error(t("bootstrap.apply.outsideWorkspace", { path: rel }));

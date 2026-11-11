@@ -30,9 +30,9 @@ AgentChainer never signs you in, and never reads or stores your credentials ([AD
 | Crash logs | `sidecar-crash-*.log` in Logs | The last lines the agent runtime printed before it stopped, masked like the app log. |
 | Layout | The app's web storage | Panel sizes, and whether panels are open. |
 
-**In your project folder**, AgentChainer only writes when you apply a workspace setup, save the workspace profile, or
-work on a task (preview):
-- the files the plan showed you;
+**In your project folder**, AgentChainer only writes when you apply a workspace setup, save the workspace profile,
+save a CLAUDE.md you edited, or work on a task (preview):
+- the files the plan showed you, or the CLAUDE.md you saved;
 - `.agentchainer/`, which holds:
   - backups and run records, so you can roll back;
   - hook scripts;
@@ -51,6 +51,10 @@ your computer. It keeps no copy, and sends nothing. When Codex is installed, the
 for your account's daily tokens and plan limits (`account/usage/read`, `account/rateLimits/read`); Codex answers from
 OpenAI with your login, as its own `/status` does. The app keeps only the totals and percentages, not your account
 id. **Export** writes a `.csv` or `.json` file only where you choose.
+
+The **CLAUDE.md** page reads the CLAUDE.md files of the folders the app already knows, and your own
+`~/.claude/CLAUDE.md`, to show their size and whether they need a look. It sends nothing, and never writes your own
+file.
 
 To remove everything, uninstall the app and delete the three folders above, plus `.agentchainer/` in any project you
 set up.

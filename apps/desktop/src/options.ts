@@ -33,27 +33,32 @@ const fallbackModels = (): ModelOption[] => [
   { value: "sonnet", displayName: t("shell.options.modelSonnet"), description: t("shell.options.modelSonnetHint") },
   { value: "haiku", displayName: t("shell.options.modelHaiku"), description: t("shell.options.modelHaikuHint") },
 ];
-const MODELS_KEY = "agentchainer.models";
+/**
+ * Each agent's model list, by agent (UX-23). The first version kept one list for every agent, so a Codex or agy chat
+ * filled Claude's pickers with its own models; that key is no longer read.
+ */
+const modelsKey = (agent: StepAgent) => `agentchainer.models.v2.${agent}`;
 /** The device's storage, when there is one (not in unit tests). */
 const storage = () =>
   (globalThis as { localStorage?: { getItem(k: string): string | null; setItem(k: string, v: string): void } })
     .localStorage;
-let known: ModelOption[] | null = null;
+const known = new Map<StepAgent, ModelOption[]>();
 
 /**
  * The models the CLI offered in the last chat (UX-12), as its `/model` names them, kept on this device so the start
  * screen and Settings list them too. Storage can be missing or throw; then the CLI's aliases stand in.
  */
-export function knownModels(): ModelOption[] {
-  if (known) return known;
+export function knownModels(agent: StepAgent = "claude"): ModelOption[] {
+  const kept = known.get(agent);
+  if (kept) return kept;
   try {
-    const saved = JSON.parse(storage()?.getItem(MODELS_KEY) ?? "null");
+    const saved = JSON.parse(storage()?.getItem(modelsKey(agent)) ?? "null");
     if (
       Array.isArray(saved) &&
       saved.every((m) => typeof m?.value === "string" && typeof m?.displayName === "string")
     ) {
-      known = saved as ModelOption[];
-      return known;
+      known.set(agent, saved as ModelOption[]);
+      return saved as ModelOption[];
     }
   } catch {
     // Not available: use the aliases.
@@ -61,11 +66,12 @@ export function knownModels(): ModelOption[] {
   return fallbackModels();
 }
 
-export function rememberModels(models: ModelOption[]): void {
+/** Keeps the models a chat's agent offered, for that agent's pickers only. */
+export function rememberModels(models: ModelOption[], agent: StepAgent = "claude"): void {
   if (!models.length) return;
-  known = models;
+  known.set(agent, models);
   try {
-    storage()?.setItem(MODELS_KEY, JSON.stringify(models));
+    storage()?.setItem(modelsKey(agent), JSON.stringify(models));
   } catch {
     // Kept for this run only.
   }

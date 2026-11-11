@@ -3,6 +3,7 @@ import { openUrl } from "@tauri-apps/plugin-opener";
 import { CircleAlert, CircleCheck, CircleMinus, ExternalLink, KeyRound, Loader2, RefreshCw } from "lucide-react";
 import type { ReactNode } from "react";
 import { AGENT_LINKS, type AgentId, type AgentStatus, agentStatuses, installCommand, nextStep } from "./agentInfo.ts";
+import { AGENT_LOGOS } from "./agentLogos.ts";
 import { t } from "./i18n/index.ts";
 import { authLabel } from "./Readiness.tsx";
 import type { Settings } from "./settings.ts";
@@ -102,8 +103,8 @@ function AgentCard({
   return (
     <article className={`agent-card${s.installed ? "" : " missing"}`} aria-labelledby={`agent-${s.id}`}>
       <header className="agent-card-head">
-        <span className={`agent-mark agent-${s.id}`} aria-hidden>
-          {NAMES[s.id]().slice(0, 1)}
+        <span className="agent-mark" aria-hidden>
+          <img src={AGENT_LOGOS[s.id]} alt="" />
         </span>
         <div className="agent-card-title">
           <h4 id={`agent-${s.id}`}>{NAMES[s.id]()}</h4>
@@ -177,16 +178,18 @@ function AgentCard({
 
       <details className="agent-path" open={!!custom}>
         <summary>{t("home.agents.differentBinary")}</summary>
-        <input
-          value={custom}
-          onChange={(e) => onDraft({ ...draft, [key]: e.target.value || null })}
-          placeholder={t("home.agents.pathPlaceholder")}
-          spellCheck={false}
-          aria-label={t("home.agents.pathLabel", { name: NAMES[s.id]() })}
-        />
-        <span className="field-help">
-          {s.id === "claude" ? t("home.settings.claudePathHelp") : t("home.settings.agentPathHelp")}
-        </span>
+        <div className="agent-path-body">
+          <input
+            value={custom}
+            onChange={(e) => onDraft({ ...draft, [key]: e.target.value || null })}
+            placeholder={t("home.agents.pathPlaceholder")}
+            spellCheck={false}
+            aria-label={t("home.agents.pathLabel", { name: NAMES[s.id]() })}
+          />
+          <span className="field-help">
+            {s.id === "claude" ? t("home.settings.claudePathHelp") : t("home.settings.agentPathHelp")}
+          </span>
+        </div>
       </details>
     </article>
   );

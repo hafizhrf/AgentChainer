@@ -599,7 +599,7 @@
 .new-session-group {
   display: flex;
   flex-direction: column;
-  gap: var(--space-3);
+  gap: var(--space-4);
 }
 
 .new-session-group > .field-help,
@@ -660,8 +660,7 @@
 }
 
 .folder-recent {
-  flex: 1 1 200px;
-  min-width: 180px;
+  flex: 1 1 100%;
 }
 
 .new-folder {
@@ -696,7 +695,7 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
-  margin: 0;
+  margin: 0 0 var(--space-1);
   padding: 0;
   border: none;
 }
@@ -707,18 +706,30 @@
 
 .agent-options {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
   gap: var(--space-2);
 }
 
 .agent-option {
   display: flex;
   align-items: center;
-  gap: var(--space-2);
+  gap: var(--space-3);
+  min-height: 52px;
   padding: var(--space-2) var(--space-3);
   border: 1px solid var(--border);
   border-radius: var(--radius);
+  background: var(--surface);
   cursor: pointer;
+}
+
+.agent-option:hover:not(.disabled) {
+  border-color: var(--border-strong);
+}
+
+.agent-option-check {
+  flex-shrink: 0;
+  margin-left: auto;
+  color: var(--accent);
 }
 
 .agent-option input {
@@ -734,7 +745,7 @@
 
 .agent-option.active {
   border-color: var(--accent);
-  box-shadow: inset 0 0 0 1px var(--accent);
+  background: color-mix(in srgb, var(--accent) 8%, var(--surface));
 }
 
 .agent-option.disabled {
@@ -753,10 +764,14 @@
 }
 
 .agent-mark.small {
-  width: 26px;
-  height: 26px;
+  width: 28px;
+  height: 28px;
   border-radius: 7px;
-  font-size: var(--text-sm);
+}
+
+.agent-mark.small img {
+  width: 18px;
+  height: 18px;
 }
 
 .new-session-blocked {

@@ -1,6 +1,7 @@
 import { type AgentDefinition, agentProblems, type PermissionMode, type StepAgent } from "@agentchainer/protocol";
-import { Folder, FolderOpen, FolderPlus, Loader2, Play } from "lucide-react";
+import { Check, Folder, FolderOpen, FolderPlus, Loader2, Play, TextCursorInput } from "lucide-react";
 import { type FormEvent, useEffect, useState } from "react";
+import { AGENT_LOGOS } from "./agentLogos.ts";
 import { Modal } from "./Dialog.tsx";
 import { pickFolder } from "./HomeView.tsx";
 import { t } from "./i18n/index.ts";
@@ -206,7 +207,8 @@ export function NewSessionDialog({
                 <FolderPlus size={14} aria-hidden />
                 {t("home.newSession.newFolder")}
               </button>
-              <button type="button" className="link" onClick={() => setTyping(true)}>
+              <button type="button" className="ghost small" onClick={() => setTyping(true)}>
+                <TextCursorInput size={14} aria-hidden />
                 {t("home.newSession.typePath")}
               </button>
             </div>
@@ -254,15 +256,14 @@ export function NewSessionDialog({
                         disabled={!o.signedIn}
                         onChange={() => onAgentChange(o.id)}
                       />
-                      <span className={`agent-mark small agent-${o.id}`} aria-hidden>
-                        {t(`tasks.agents.${o.id}`).slice(0, 1)}
+                      <span className="agent-mark small" aria-hidden>
+                        <img src={AGENT_LOGOS[o.id]} alt="" />
                       </span>
                       <span className="agent-option-text">
                         <strong>{t(`tasks.agents.${o.id}`)}</strong>
-                        <span className="muted">
-                          {o.signedIn ? t("home.newSession.agentReady") : t("home.newSession.agentSignIn")}
-                        </span>
+                        {!o.signedIn && <span className="muted">{t("home.newSession.agentSignIn")}</span>}
                       </span>
+                      {agent === o.id && <Check size={15} className="agent-option-check" aria-hidden />}
                     </label>
                   ))}
               </div>

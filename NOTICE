@@ -10,3 +10,12 @@ The Claude Agent SDK and the Claude Code CLI are not part of this
 distribution. The SDK is downloaded from npm on first run and the CLI is the
 user's own installation; both are governed by Anthropic's terms
 (https://code.claude.com/docs/en/legal-and-compliance).
+
+Agent marks (apps/desktop/src/assets/agents/), shown only to name the agent
+tools the app works with; they don't imply any endorsement:
+- claude.svg and codex.svg: from LobeHub Icons, @lobehub/icons-static-svg
+  1.102.0, MIT License (https://github.com/lobehub/lobe-icons).
+- antigravity.svg: the Antigravity icon from Google's Antigravity press kit
+  (https://antigravity.google/press).
+Claude is a trademark of Anthropic, PBC. Codex and OpenAI are trademarks of
+OpenAI. Antigravity and Google are trademarks of Google LLC.

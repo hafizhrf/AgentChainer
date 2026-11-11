@@ -373,27 +373,21 @@
   display: grid;
   place-items: center;
   flex-shrink: 0;
-  width: 36px;
-  height: 36px;
+  width: 40px;
+  height: 40px;
+  border: 1px solid var(--border);
   border-radius: 10px;
-  color: #fff;
-  font-weight: 700;
+  background: #fff;
 }
 
-.agent-mark.agent-claude {
-  background: #b5654a;
-}
-
-.agent-mark.agent-codex {
-  background: #3d6e9c;
-}
-
-.agent-mark.agent-agy {
-  background: #7a5bb5;
+.agent-mark img {
+  width: 24px;
+  height: 24px;
 }
 
 .agent-card.missing .agent-mark {
   opacity: 0.55;
+  filter: grayscale(1);
 }
 
 .agent-card-title {
@@ -469,13 +463,15 @@
   cursor: pointer;
 }
 
-.agent-path[open] {
+.agent-path-body {
   display: flex;
   flex-direction: column;
   gap: var(--space-1);
+  margin-top: var(--space-2);
 }
 
-.agent-path input {
+.agent-path-body input {
+  width: 100%;
   font-family: var(--font-mono);
 }
 

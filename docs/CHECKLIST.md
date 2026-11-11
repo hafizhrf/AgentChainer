@@ -1478,7 +1478,22 @@ for the desktop shell, start screen and session view to be cleaned up (UX-02, UX
     with the folder card, its actions and the agent cards. Settings showed General, and Agents in light, dark and
     Bahasa Indonesia, with this computer's Claude Code 2.1.322 (claude.ai subscription), Codex 0.153.4 and
     Antigravity 1.5.5, all signed in.
-  - **Owner, same day:** "Antigravity", not "Antigravity CLI (agy)"; Codex likewise without "CLI".
+  - **Owner's follow-ups, same day:**
+    - **Names:** "Antigravity", not "Antigravity CLI (agy)", and Codex without "CLI".
+    - **Agent marks are the real logos:**
+      - Claude's and Codex's from LobeHub Icons (MIT);
+      - Antigravity's from Google's press kit (antigravity.google/press);
+      - recorded in `NOTICE` with the trademark owners, shown only to name the tools.
+
+      OpenAI's own brand page couldn't be fetched (403), and Simple Icons no longer carries OpenAI or Antigravity.
+    - **Tidier layout:**
+      - a different binary's path sits under its summary at full width;
+      - the agent cards are compact, show a check on the chosen one, and show a status only when one isn't signed in;
+      - Recent folders takes its own row, with Browse…, New folder… and Type a path… under it;
+      - more room between the groups.
+    - **Bug fixed, "pilihan model gak realtime":** the app kept one model list for every agent. A Codex or agy chat
+      filled Claude's pickers (New session, Settings, tasks) with its own models. Lists are now kept per agent, under a
+      new storage key, so the mixed list is dropped.
 - [ ] **UX-E1** All M1/M2 screens use the design system, in light and dark themes.
 - [ ] **UX-E2** Usability test participants complete the M1 exit scenarios without help.
 

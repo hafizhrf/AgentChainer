@@ -179,6 +179,5 @@
   "home.newSession.newFolderGit": "Initialize a git repository",
   "home.newSession.newFolderGitHint": "(tasks and the Changes panel need one)",
   "home.newSession.newFolderCreate": "Create folder",
-  "home.newSession.agentReady": "Ready",
   "home.newSession.agentSignIn": "Sign in from your terminal first"
 }

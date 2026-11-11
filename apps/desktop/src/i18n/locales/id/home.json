@@ -179,6 +179,5 @@
   "home.newSession.newFolderGit": "Inisialisasi repository git",
   "home.newSession.newFolderGitHint": "(task dan panel Perubahan membutuhkannya)",
   "home.newSession.newFolderCreate": "Buat folder",
-  "home.newSession.agentReady": "Siap",
   "home.newSession.agentSignIn": "Masuk dari terminal Anda dulu"
 }

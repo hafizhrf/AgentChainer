@@ -425,8 +425,9 @@ export function App() {
         turnWaiters.current.get(sessionId)?.(event);
         turnWaiters.current.delete(sessionId);
       }
-      // The CLI's model list, kept for the start screen and Settings too (UX-12).
-      if (event.type === "models.changed") rememberModels(event.models);
+      // The CLI's model list, kept for the start screen and Settings too (UX-12), as that chat's agent's own (UX-23).
+      if (event.type === "models.changed")
+        rememberModels(event.models, tabsRef.current.find((x) => x.sessionId === sessionId)?.agent ?? "claude");
       patchTab(sessionId, (tab) => tabEvent(tab, event, Date.now()));
     });
     const ping = setInterval(() => {

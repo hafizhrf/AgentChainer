@@ -67,6 +67,7 @@ import { LessonsCard } from "./LessonsCard.tsx";
 import { MergeGates } from "./MergeGates.tsx";
 import { PrChecks } from "./PrChecks.tsx";
 import { ProjectWorkflowNote } from "./ProjectWorkflowNote.tsx";
+import { RunApp } from "./RunApp.tsx";
 import {
   canAcceptRisk,
   canContinue,
@@ -699,6 +700,10 @@ export function TaskPage({
 
             {task.worktree && !task.parent && task.state !== "running" && (
               <ResultCard task={task} cwd={cwd} confirm={confirm} onChanged={(t) => show(t)} onError={setError} />
+            )}
+
+            {task.worktree && !task.worktree.removed && !task.parent && task.state !== "running" && (
+              <RunApp task={task} cwd={cwd} confirm={confirm} />
             )}
 
             {task.worktree &&

@@ -97,6 +97,10 @@ describe("accessibility (X-12)", () => {
     await audit("setup-plan");
     await (await nav("Commands")).click();
     await audit("commands");
+    // CP-04: what each task's worktree gets.
+    await (await nav("Worktrees")).click();
+    await app.find("//section[contains(@class, 'worktree-card')]", { timeout: 60_000 });
+    await audit("worktrees");
     // CP-03: the CLAUDE.md editor (Monaco loads lazily) beside its preview.
     await (await nav("CLAUDE.md")).click();
     await app.find("//section[contains(@class, 'memory-detail')]", { timeout: 60_000 });

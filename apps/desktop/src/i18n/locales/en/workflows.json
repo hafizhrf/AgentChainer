@@ -24,7 +24,7 @@
   "workflows.editor.resetToApps": "Reset to the app's",
   "workflows.editor.save": "Save",
   "workflows.editor.checking": "Checking…",
-  "workflows.editor.valid": "Valid: a {{tier}} run can use it as written.",
+  "workflows.editor.valid": "Valid: a tier-{{tier}} run can use it as written.",
   "workflows.editor.yamlError": "YAML: {{error}}",
   "workflows.editor.describeLabel": "Describe the flow you want",
   "workflows.editor.describeHelp": "Claude rewrites this workflow from your description, starting from what's in the editor. It's checked like one you write; nothing is saved until you keep it and Save.",

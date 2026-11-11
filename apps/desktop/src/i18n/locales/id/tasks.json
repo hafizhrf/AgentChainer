@@ -9,7 +9,6 @@
   "tasks.state.ready": "Siap",
   "tasks.state.draft": "Draf",
   "tasks.state.new": "Baru",
-
   "tasks.blocker.running": "Task sedang berjalan.",
   "tasks.blocker.interrupted": "Lanjutkan run yang terinterupsi, atau revisi task-nya.",
   "tasks.blocker.approveFirst": "Setujui kontrak dan tier dulu.",
@@ -20,7 +19,6 @@
   "tasks.blocker.parentRunning": "Task XL-nya sedang berjalan: sub-task dijalankan dari sana.",
   "tasks.blocker.runFromParent": "Sub-task dijalankan dari task XL-nya.",
   "tasks.blocker.childDone": "Selesai, dan akan di-merge pada Teruskan berikutnya di task XL-nya.",
-
   "tasks.form.tierHelpS": "Satu agent, lalu pemeriksaan proyek.",
   "tasks.form.tierHelpM": "Rencana, implementasi, pemeriksaan, lalu tinjauan.",
   "tasks.form.tierHelpL": "Perencanaan oleh spesialis, implementasi, pemeriksaan, lalu tinjauan independen.",
@@ -53,7 +51,6 @@
   "tasks.form.noBudget": "tanpa anggaran",
   "tasks.form.budget": "${{amount}}",
   "tasks.form.budgetPerSubtask": "${{amount}} per sub-task",
-
   "tasks.page.stoppedNothingChanged": "Dihentikan. Tidak ada yang diubah.",
   "tasks.page.stopTitle": "Hentikan run?",
   "tasks.page.stopBody": "Langkah yang sedang berjalan langsung dihentikan. File yang sudah diubahnya tetap seperti itu; git dan pengembalian file tetap berfungsi.",
@@ -109,11 +106,9 @@
   "tasks.page.acceptBody": "Task berakhir sebagai <strong>Diterima dengan risiko</strong>, bukan Selesai. Alasan Anda masuk ke laporan bukti. Tidak ada yang berubah di working tree.",
   "tasks.page.acceptReason": "Mengapa ini dapat diterima?",
   "tasks.page.acceptReasonPlaceholder": "mis. Test yang gagal adalah bug yang sudah diketahui dan dilacak terpisah.",
-
   "tasks.draftBlock.drafting": "Menyusun draf kontrak (hanya baca)",
   "tasks.draftBlock.drafted": "Draf kontrak selesai disusun",
   "tasks.draftBlock.toolCalls_other": "{{count}} panggilan tool",
-
   "tasks.contract.title": "Kontrak",
   "tasks.contract.objective": "Tujuan",
   "tasks.contract.acceptanceCriteria": "Kriteria penerimaan",
@@ -125,14 +120,12 @@
   "tasks.contract.tier": "Tier",
   "tasks.contract.tierValue": "{{tier}}: {{help}}",
   "tasks.contract.budget": "Anggaran",
-
   "tasks.contractCard.draft": "draf",
   "tasks.contractCard.doneEditing": "Selesai mengedit",
   "tasks.contractCard.edit": "Edit",
   "tasks.contractCard.noObjective": "Belum ada tujuan.",
   "tasks.contractCard.doneWhen": "Selesai jika",
   "tasks.contractCard.hint": "Balas di bawah untuk mengubahnya, atau edit di sini.",
-
   "tasks.facts.title": "Task",
   "tasks.facts.state": "Status",
   "tasks.facts.afterDrafting": "setelah draf disusun",
@@ -140,7 +133,6 @@
   "tasks.facts.branch": "Branch",
   "tasks.facts.worktreeRemoved": "(worktree dihapus)",
   "tasks.facts.savedIn": "Disimpan di",
-
   "tasks.composer.replyHint": "Enter menyusun ulang kontrak dengan balasan Anda",
   "tasks.composer.replyLabel": "Balas kontrak",
   "tasks.composer.messageLabel": "Kirim pesan ke langkah yang sedang berjalan",
@@ -148,9 +140,7 @@
   "tasks.composer.replyPlaceholder": "Balas untuk mengubah kontrak, mis. “jangan ubah applyDiscount” atau “tambahkan test untuk keranjang kosong”",
   "tasks.composer.sendReply": "Kirim balasan",
   "tasks.composer.sendMessage": "Kirim ke langkah yang sedang berjalan",
-
   "tasks.quote.request": "Permintaan",
-
   "tasks.contractForm.subtitle": "Disusun oleh Claude. Edit apa pun sebelum Anda menyetujuinya.",
   "tasks.contractForm.settleQuestions": "Selesaikan dengan mengedit kontrak, lalu hapus pertanyaannya.",
   "tasks.contractForm.openQuestion": "Pertanyaan terbuka",
@@ -165,7 +155,6 @@
   "tasks.contractForm.outOfScopeHelp": "Pekerjaan terkait yang tidak dikerjakan task ini.",
   "tasks.contractForm.risksHelp": "Apa yang bisa salah. Menjadi masukan untuk triase dan laporan.",
   "tasks.contractForm.none": "Tidak ada.",
-
   "tasks.triage.title": "Triase",
   "tasks.triage.proposedTier": "Tier yang diusulkan",
   "tasks.triage.stale": "Kontrak berubah sejak triase ini. Jalankan triase lagi untuk memperbarui usulan.",
@@ -185,7 +174,6 @@
   "tasks.triage.noBudgetHelp": "Tanpa batas pengeluaran: task berjalan sampai selesai atau Anda menghentikannya. Langkah hanya baca tetap memakai batas kecilnya sendiri.",
   "tasks.triage.budgetHelp": "Task berhenti saat anggaran habis.",
   "tasks.triage.noBudget": "Tanpa anggaran",
-
   "tasks.contractView.approved": "Disetujui {{date}}",
   "tasks.contractView.hide": "Sembunyikan",
   "tasks.contractView.show": "Tampilkan",
@@ -194,12 +182,10 @@
   "tasks.contractView.readyRun": "Jalankan dari bagian bawah: setiap langkah adalah session Claude yang dapat Anda pantau di sini, dan aplikasi menjalankan gate sendiri.",
   "tasks.contractView.savedIn": "Task disimpan di <code>{{path}}</code>.",
   "tasks.contractView.overridden": "Diusulkan {{tier}}; diubah karena: {{reason}}",
-
   "tasks.step.running": "Berjalan",
   "tasks.step.done": "Selesai",
   "tasks.step.failed": "Gagal",
   "tasks.step.stopped": "Dihentikan",
-
   "tasks.run.title": "Run",
   "tasks.run.costXl": "{{mode}} · {{cost}} di semua sub-task",
   "tasks.run.costNoBudget": "{{mode}} · {{cost}} · tanpa anggaran",
@@ -224,7 +210,6 @@
   "tasks.run.beforeTask": "Sebelum task",
   "tasks.run.round": "Putaran {{n}}",
   "tasks.run.notRun": "Tidak dijalankan, tidak ada perintah terdeteksi: {{gates}}. Gate ini tidak dihitung lulus.",
-
   "tasks.gateList.empty": "Tidak ada gate untuk dijalankan.",
   "tasks.gateList.passed": "Lulus",
   "tasks.gateList.failed": "Gagal",
@@ -235,7 +220,6 @@
   "tasks.gateList.formatted": "Diformat: {{files}}",
   "tasks.gateList.reverted": "Perubahan dikembalikan: {{files}}",
   "tasks.gateList.noOutput": "(tidak ada output)",
-
   "tasks.evidence.title": "Bukti",
   "tasks.evidence.subtitle": "Dari catatan run; pernyataan Claude sendiri diberi label tersendiri.",
   "tasks.evidence.copy": "Salin laporan sebagai markdown",
@@ -244,9 +228,7 @@
   "tasks.evidence.building": "Membuat laporan…",
   "tasks.evidence.hide": "Sembunyikan laporan",
   "tasks.evidence.show": "Tampilkan laporan",
-
   "tasks.runButton.profile": "Profil izin untuk langkah tulis run ini",
-
   "tasks.subtasks.title": "Sub-task",
   "tasks.subtasks.subtitle": "Sesuai urutan dependensi, dua sekaligus, masing-masing di worktree-nya sendiri.",
   "tasks.subtasks.splitAgain": "Pecah lagi",
@@ -258,9 +240,7 @@
   "tasks.subtasks.setupFirst": "Setiap worktree menjalankan <code>{{command}}</code> terlebih dulu.",
   "tasks.subtasks.loading": "Memuat…",
   "tasks.subtasks.after": "setelah {{numbers}}",
-
   "tasks.overlaps.alsoChanges": "<task>{{title}}</task> juga mengubah {{files}}. Jika keduanya di-merge, bisa terjadi konflik.",
-
   "tasks.result.mergeNotFinished": "Merge setelah run Selesai, atau terima risikonya dulu.",
   "tasks.result.mergeDirty": "Commit atau stash perubahan Anda dulu.",
   "tasks.result.removeTitle": "Hapus worktree task ini?",
@@ -287,7 +267,6 @@
   "tasks.result.cleanUp": "Bersihkan",
   "tasks.result.mergeInto": "Merge ke {{branch}}",
   "tasks.result.yourBranch": "branch Anda",
-
   "tasks.approval.riskLow": "Risiko rendah",
   "tasks.approval.riskMedium": "Tinjau dulu",
   "tasks.approval.riskHigh": "Risiko tinggi",
@@ -299,7 +278,6 @@
   "tasks.approval.details": "Detail…",
   "tasks.approval.deny": "Tolak",
   "tasks.approval.allowOnce": "Izinkan sekali",
-
   "tasks.createPr.ghMissing": "GitHub CLI (gh) belum terpasang. Pasang dulu, lalu masuk dari terminal dengan `gh auth login`.",
   "tasks.createPr.ghSignedOut": "gh belum masuk ke {{host}}. Jalankan `gh auth login --hostname {{host}}` di terminal.",
   "tasks.createPr.noRemote": "Repo ini tidak punya remote origin di GitHub, jadi tidak ada tempat untuk membuka PR.",
@@ -317,7 +295,6 @@
   "tasks.createPr.titleField": "Judul",
   "tasks.createPr.asDraft": "Buka sebagai draf",
   "tasks.createPr.body": "Isi (dari kontrak dan bukti)",
-
   "tasks.deploy.title": "Deploy",
   "tasks.deploy.subtitle": "Pratinjau branch task ini, dengan CLI milik penyedia.",
   "tasks.deploy.checkAgain": "Periksa lagi",
@@ -330,7 +307,6 @@
   "tasks.deploy.smokePassed": "Smoke test lulus: {{detail}}",
   "tasks.deploy.smokeFailed": "Smoke test gagal: {{detail}}",
   "tasks.deploy.open": "Buka deployment",
-
   "tasks.flow.ownFlow": "Alur khusus task ini:",
   "tasks.flow.ownFlowNote": "Alur ini disetujui bersama kontrak, dan run mengikutinya, bukan alur {{tier}}.",
   "tasks.flow.useTierFlow": "Pakai alur {{tier}}",
@@ -346,10 +322,8 @@
   "tasks.flow.sourceProjectPlanned": "{{workflow}} milik proyek, seperti yang akan diikuti run. Klik langkah untuk melihatnya di utas.",
   "tasks.flow.sourceApp": "{{workflow}} bawaan aplikasi. Klik langkah untuk melihatnya di utas.",
   "tasks.flow.sourceAppPlanned": "{{workflow}} bawaan aplikasi, seperti yang akan diikuti run. Klik langkah untuk melihatnya di utas.",
-
   "tasks.home.title": "Task di workspace ini",
   "tasks.home.subtitle": "Mulai dengan Task di kotak pesan chat",
-
   "tasks.lessons.sourceGate": "gate",
   "tasks.lessons.sourceFormat": "formatter",
   "tasks.lessons.sourceReview": "tinjauan",
@@ -365,7 +339,6 @@
   "tasks.lessons.applyNote": "Ditambahkan sebagai run di Riwayat, jadi dapat di-rollback. Yang tidak dipilih diabaikan.",
   "tasks.lessons.dismissAll": "Abaikan semua",
   "tasks.lessons.add": "Tambahkan {{n}} ke CLAUDE.md",
-
   "tasks.mergeGates.methodMerge": "Merge commit",
   "tasks.mergeGates.methodSquash": "Squash dan merge",
   "tasks.mergeGates.methodRebase": "Rebase dan merge",
@@ -393,7 +366,6 @@
   "tasks.mergeGates.notGreen": "Belum hijau: {{gates}}",
   "tasks.mergeGates.why": "Mengapa tetap merge?",
   "tasks.mergeGates.whyHelp": "Disimpan bersama task dan di laporan buktinya.",
-
   "tasks.prChecks.passed": "Lulus",
   "tasks.prChecks.failed": "Gagal",
   "tasks.prChecks.running": "Berjalan",
@@ -415,9 +387,7 @@
   "tasks.prChecks.fixExplain": "Claude menerima log ini sebagai data, bersama kontrak dan diff task, lalu memperbaiki kode di worktree task dengan persetujuan yang sama seperti run. Gate dijalankan lagi, dan branch hanya di-push jika semuanya lulus (tidak pernah dipaksa).",
   "tasks.prChecks.readingLog": "Membaca log…",
   "tasks.prChecks.emptyLog": "(Langkah yang gagal tidak menulis apa pun.)",
-
   "tasks.projectWorkflow.note": "Menjalankan workflow {{tier}} milik proyek, <code>{{file}}</code>",
-
   "tasks.schedule.everyHour_other": "Setiap {{count}} jam",
   "tasks.schedule.sun": "Min",
   "tasks.schedule.mon": "Sen",
@@ -459,7 +429,6 @@
   "tasks.agents.codex": "Codex",
   "tasks.agents.agy": "Antigravity CLI (agy)",
   "tasks.agents.notSignedIn": "{{agent}} (belum masuk)",
-
   "tasks.defaults.appDefault": "Default aplikasi ({{value}})",
   "tasks.defaults.builtIn": "Bawaan ({{value}})",
   "tasks.defaults.model": "Model",
@@ -475,5 +444,18 @@
   "tasks.defaults.budgetsHelpWorkspace": "Kosong mengikuti default aplikasi, yang tampil samar. Budget XL berlaku untuk tiap sub-task.",
   "tasks.defaults.agentsGroup": "Siapa menjalankan tiap langkah",
   "tasks.defaults.runGroup": "Model dan izin",
-  "tasks.defaults.tierLabel": "Tier {{tier}}"
+  "tasks.defaults.tierLabel": "Tier {{tier}}",
+  "tasks.runApp.title": "Jalankan app",
+  "tasks.runApp.run": "Jalankan app",
+  "tasks.runApp.stop": "Hentikan",
+  "tasks.runApp.help": "Menjalankan skrip run proyek di worktree {{branch}}, di terminal yang bisa Anda lihat dan hentikan.",
+  "tasks.runApp.running": "Berjalan di worktree {{branch}}:",
+  "tasks.runApp.starting": "Memulai terminal…",
+  "tasks.runApp.preview": "Pratinjau",
+  "tasks.runApp.hidePreview": "Sembunyikan pratinjau",
+  "tasks.runApp.openBrowser": "Buka di browser",
+  "tasks.runApp.allowTitle": "Jalankan perintah ini?",
+  "tasks.runApp.allowScript": "Skrip run proyek (.agentchainer/worktree.json) berjalan dengan izin Anda di worktree task. Izinkan hanya kalau Anda percaya apa yang dilakukannya; pilihan ini diingat untuk workspace ini.",
+  "tasks.runApp.allowDetected": "Proyek tidak punya skrip run, jadi perintah dev yang terdeteksi yang dijalankan, dengan izin Anda, di worktree task. Pilihan ini diingat untuk workspace ini.",
+  "tasks.runApp.allowAndRun": "Izinkan dan jalankan"
 }

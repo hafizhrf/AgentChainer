@@ -1,5 +1,6 @@
 import { existsSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
+import { join } from "node:path";
 import {
   type AgentEvent,
   asLanguage,
@@ -142,11 +143,22 @@ import {
   writeEvidence,
 } from "./tasks/service.ts";
 import { loadTask } from "./tasks/store.ts";
+import { codeRootIn } from "./tasks/worktree.ts";
+import {
+  allowScript,
+  INCLUDE_FILE,
+  includedFiles,
+  isAllowed,
+  readConfig,
+  runCommand,
+  saveWorktreeSetup,
+} from "./tasks/worktree-setup.ts";
 import { sessionWorkers, Team, teamTools, type WorkerBase } from "./team.ts";
 import { codexAccountUsage } from "./usage/codex-account.ts";
 import { readRuns } from "./usage/ledger.ts";
 import { allTasks, type UsageSources, usageFile, usageReport } from "./usage/report.ts";
 import { fileDiff, gitInit, listFiles, revert, workspaceImage } from "./workspace.ts";
+import { readWorkspaceText } from "./workspace-files.ts";
 
 /** The other agents' CLIs, as last probed (M9-06). */
 let agentsCache: { at: number; value: Awaited<ReturnType<typeof agentClis>> } | null = null;
@@ -975,6 +987,37 @@ serve(
       if (!res.ok) throw cliError(`claude plugin ${enabled ? "enable" : "disable"}`, res);
       return { ok: true as const };
     },
+    "worktree.config": ({ cwd, include }) => {
+      requireFolder(cwd);
+      const { config, problem } = readConfig(cwd);
+      const profile = detectWorkspace(cwd);
+      const saved = readWorkspaceText(cwd, INCLUDE_FILE);
+      const listed = includedFiles(cwd, include ?? saved);
+      const install = profile.packages.find((p) => p.commands.install)?.commands.install?.run;
+      const dev = profile.packages.find((p) => p.commands.dev)?.commands.dev?.run;
+      return {
+        include: { text: saved, exists: existsSync(join(cwd, INCLUDE_FILE)) },
+        ...listed,
+        ...(config.setup ? { setup: config.setup } : {}),
+        ...(config.run ? { run: config.run } : {}),
+        setupAllowed: !!config.setup && isAllowed(cwd, "setup", config.setup),
+        runAllowed: !!config.run && isAllowed(cwd, "run", config.run),
+        detected: { ...(install ? { install } : {}), ...(dev ? { dev } : {}) },
+        ...(problem ? { problem } : {}),
+      };
+    },
+
+    "worktree.save": ({ cwd, include, setup, run }) => {
+      requireFolder(cwd);
+      return { runId: saveWorktreeSetup(cwd, { include, setup, run }, catalog.version) };
+    },
+
+    "worktree.allow": ({ cwd, kind, command }) => {
+      requireFolder(cwd);
+      allowScript(cwd, kind, command);
+      return { ok: true as const };
+    },
+
     "memory.files": ({ cwd }) => {
       requireFolder(cwd);
       return { files: memoryFiles(cwd) };
@@ -1198,6 +1241,17 @@ serve(
       requireFolder(cwd);
       await settleRun(id);
       return mergeResult(cwd, id);
+    },
+
+    "task.runCommand": ({ cwd, id }) => {
+      requireFolder(cwd);
+      const wt = loadTask(cwd, id).worktree;
+      if (!wt || wt.removed || !existsSync(wt.path))
+        throw new RpcFailure(RpcErrorCode.invalidParams, t("worktree.run.noWorktree"));
+      const dir = codeRootIn(cwd, wt.path);
+      const run = runCommand(cwd, dir);
+      if (!run) throw new RpcFailure(RpcErrorCode.invalidParams, t("worktree.run.none"));
+      return { ...run, dir, allowed: isAllowed(cwd, "run", run.command) };
     },
 
     "task.cleanup": async ({ cwd, id, deleteBranches }) => {

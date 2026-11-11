@@ -96,6 +96,7 @@
   "app.palette.setupOverview": "Workspace settings: Overview",
   "app.palette.setupPlan": "Workspace settings: Setup plan",
   "app.palette.setupCommands": "Workspace settings: Commands",
+  "app.palette.setupWorktrees": "Workspace settings: Worktrees",
   "app.palette.setupAgents": "Workspace settings: Agents",
   "app.palette.setupMemory": "Workspace settings: CLAUDE.md",
   "app.palette.setupPlugins": "Workspace settings: Plugins",

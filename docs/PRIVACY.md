@@ -28,11 +28,14 @@ AgentChainer never signs you in, and never reads or stores your credentials ([AD
 | Tools | `tools/` in Data | Pinned tool binaries that setup installs, such as gitleaks. |
 | App log | `agentchainer.log` in Logs | App and agent-runtime messages, including errors. It doesn't log conversations, but an error message can quote a file path or command output. Each line is masked before it's written: your home folder becomes `~`, and keys, tokens, passwords and email addresses are masked. |
 | Crash logs | `sidecar-crash-*.log` in Logs | The last lines the agent runtime printed before it stopped, masked like the app log. |
+| Script approvals | `trusted-scripts.json` in Data | Which worktree setup and run scripts you allowed: each workspace's path, the kind, and the script's sha256. Not the scripts themselves. |
 | Layout | The app's web storage | Panel sizes, and whether panels are open. |
 
 **In your project folder**, AgentChainer only writes when you apply a workspace setup, save the workspace profile,
 save a CLAUDE.md you edited, or work on a task (preview):
 - the files the plan showed you, or the CLAUDE.md you saved;
+- `.worktreeinclude` and `.agentchainer/worktree.json` when you save them in Worktrees. Each task's worktree also gets
+  copies of the gitignored files `.worktreeinclude` names, such as `.env`; they stay in that worktree and go with it;
 - `.agentchainer/`, which holds:
   - backups and run records, so you can roll back;
   - hook scripts;

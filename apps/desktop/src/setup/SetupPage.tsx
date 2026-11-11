@@ -5,6 +5,7 @@ import {
   Bot,
   ClipboardList,
   FileText,
+  GitBranch,
   History as HistoryIcon,
   ListChecks,
   Puzzle,
@@ -36,12 +37,14 @@ import { PlanView } from "./PlanView.tsx";
 import { Plugins } from "./Plugins.tsx";
 import { useBootstrap } from "./useBootstrap.tsx";
 import { Workflows } from "./Workflows.tsx";
+import { Worktrees } from "./Worktrees.tsx";
 
 type Scan = Methods["workspace.scan"]["result"];
 export type SetupView =
   | "overview"
   | "plan"
   | "commands"
+  | "worktrees"
   | "agents"
   | "memory"
   | "plugins"
@@ -54,7 +57,7 @@ export type SetupView =
 
 /**
  * Workspace settings as a full page (UX-06), laid out like an IDE's project settings: what the workspace is made of at
- * the top, sections on the left (readiness, the setup plan, detected commands, agents, CLAUDE.md, plugins, MCP servers, saved permission
+ * the top, sections on the left (readiness, the setup plan, detected commands, worktree setup, agents, CLAUDE.md, plugins, MCP servers, saved permission
  * rules,
  * the tiers' workflows, deploys, task metrics, past runs), and the section's content on the right. Opens over the session or Home; Back returns there.
  */
@@ -152,6 +155,7 @@ export function SetupPage({
       count: bootstrap.selected.size || null,
     },
     { id: "commands", label: t("setup.page.navCommands"), icon: <Terminal size={16} className="nav-icon" /> },
+    { id: "worktrees", label: t("setup.page.navWorktrees"), icon: <GitBranch size={16} className="nav-icon" /> },
     { id: "agents", label: t("setup.page.navAgents"), icon: <Bot size={16} className="nav-icon" /> },
     { id: "memory", label: t("setup.page.navMemory"), icon: <FileText size={16} className="nav-icon" /> },
     {
@@ -257,6 +261,7 @@ export function SetupPage({
           )}
           {view === "plan" && <PlanView bootstrap={bootstrap} focus={focus} onFocus={setFocus} />}
           {scan && view === "commands" && <Commands profile={scan.profile} />}
+          {view === "worktrees" && <Worktrees cwd={cwd} confirm={confirm} onChanged={() => void bootstrap.load()} />}
           {view === "agents" && <Agents cwd={cwd} confirm={confirm} onChanged={() => void bootstrap.load()} />}
           {view === "memory" && (
             <Memory

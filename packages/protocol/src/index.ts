@@ -2126,6 +2126,46 @@ export const methodSchemas = {
     result: Ok,
   },
 
+  /* Worktree setup (CP-04): copies of gitignored files and the project's setup and run scripts. */
+  /**
+   * `.worktreeinclude` and the gitignored files it names (a draft `include` shows what it would name), the scripts in
+   * `.agentchainer/worktree.json` and whether each is allowed on this computer, and the detected install and dev commands.
+   */
+  "worktree.config": {
+    params: WorkspaceRef.extend({ include: z.string().max(20_000).optional() }),
+    result: z.object({
+      include: z.object({ text: z.string(), exists: z.boolean() }),
+      files: z.array(z.object({ path: z.string(), bytes: z.number().int() })),
+      bytes: z.number().int(),
+      /** The copy would stop at its caps (200 files, 20 MB). */
+      capped: z.boolean(),
+      setup: z.string().optional(),
+      run: z.string().optional(),
+      setupAllowed: z.boolean(),
+      runAllowed: z.boolean(),
+      detected: z.object({ install: z.string().optional(), dev: z.string().optional() }),
+      /** Why the scripts file was ignored, when it isn't valid. */
+      problem: z.string().optional(),
+    }),
+  },
+  /**
+   * Saves `.worktreeinclude` and the scripts as one History run (null when nothing changed); an empty one is removed.
+   * The scripts saved here are allowed at once.
+   */
+  "worktree.save": {
+    params: WorkspaceRef.extend({
+      include: z.string().max(20_000),
+      setup: z.string().max(2000),
+      run: z.string().max(2000),
+    }),
+    result: z.object({ runId: z.string().nullable() }),
+  },
+  /** Allows a script the person saw, for this workspace on this computer; recorded outside the repository. */
+  "worktree.allow": {
+    params: WorkspaceRef.extend({ kind: z.enum(["setup", "run"]), command: z.string().min(1).max(2000) }),
+    result: Ok,
+  },
+
   /* CLAUDE.md files (CP-03). */
   /** The workspace's CLAUDE.md files (project, personal, folders) and the user's own, with their sizes. */
   "memory.files": { params: WorkspaceRef, result: z.object({ files: z.array(MemoryFileSchema) }) },
@@ -2380,6 +2420,14 @@ export const methodSchemas = {
   },
   /** Removes a task's worktrees (an XL task's sub-tasks' too), and its branches when asked. */
   "task.cleanup": { params: TaskRef.extend({ deleteBranches: z.boolean() }), result: Ok },
+  /**
+   * What Run app starts in a finished task's worktree (CP-04): the project's run script, else its detected dev command,
+   * the folder it runs in, and whether the person allowed it here yet.
+   */
+  "task.runCommand": {
+    params: TaskRef,
+    result: z.object({ command: z.string(), dir: z.string(), script: z.boolean(), allowed: z.boolean() }),
+  },
   /** Whether pull requests can be made here through the user's `gh` (M5-02). */
   "github.status": { params: WorkspaceRef, result: GitHubStatusSchema },
   /**

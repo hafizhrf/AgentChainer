@@ -15,10 +15,23 @@ const termTheme = () => (isDark() ? THEMES.dark : THEMES.light);
 
 /**
  * Integrated terminal (M1-29): the user's own shell in the workspace folder, through a PTY in the Rust core.
- * Loaded lazily. What's typed here goes straight to the shell, not through the agent.
+ * Loaded lazily. What's typed here goes straight to the shell, not through the agent. Run app (CP-04) opens one with
+ * a `command` typed in once the shell starts, and reads what it prints through `onOutput`.
  */
-export default function TerminalPanel({ cwd }: { cwd: string }) {
+export default function TerminalPanel({
+  cwd,
+  command,
+  onOutput,
+}: {
+  cwd: string;
+  command?: string;
+  onOutput?: (text: string) => void;
+}) {
   const host = useRef<HTMLDivElement>(null);
+  // Read when the shell starts and as output comes; neither restarts the terminal.
+  const start = useRef(command);
+  const output = useRef(onOutput);
+  output.current = onOutput;
 
   useEffect(() => {
     const el = host.current;
@@ -42,8 +55,10 @@ export default function TerminalPanel({ cwd }: { cwd: string }) {
     // The shell prints its prompt before pty_open returns its id, so hold output for ids we don't know yet.
     const early = new Map<number, string[]>();
     const offData = listen<{ id: number; data: string }>("pty://data", (e) => {
-      if (e.payload.id === id) term.write(e.payload.data);
-      else if (id === null) early.set(e.payload.id, [...(early.get(e.payload.id) ?? []), e.payload.data]);
+      if (e.payload.id === id) {
+        term.write(e.payload.data);
+        output.current?.(e.payload.data);
+      } else if (id === null) early.set(e.payload.id, [...(early.get(e.payload.id) ?? []), e.payload.data]);
     });
     const offExit = listen<{ id: number }>("pty://exit", (e) => {
       if (e.payload.id === id) term.write(`\r\n${t("panel.terminal.exited")}\r\n`);
@@ -57,6 +72,7 @@ export default function TerminalPanel({ cwd }: { cwd: string }) {
         id = opened;
         for (const chunk of early.get(opened) ?? []) term.write(chunk);
         early.clear();
+        if (start.current) void invoke("pty_write", { id: opened, data: `${start.current}\r` });
       })
       .catch((err: unknown) => term.write(`${t("panel.terminal.startFailed", { error: String(err) })}\r\n`));
 

@@ -471,6 +471,13 @@ describe("evidence", () => {
     assert.match(md, /## Fix as commented\n\n- Round 1: 1 comment on `src\/cart\.js`: done\./);
     assert.match(md, /- Round 2: 3 comments on `src\/cart\.js`, `api:README\.md`: failed\./);
     assert.doesNotMatch(renderEvidence(evidence()), /Fix as commented/);
+    const github = [
+      { ...(feedback[0] as (typeof feedback)[0]), comments: 2, source: "github" as const, threads: ["a", "b"] },
+    ];
+    assert.match(
+      renderEvidence(evidence(task({ feedback: github }))),
+      /- Round 1, from the PR's review: 2 threads on `src\/cart\.js`: done\./,
+    );
   });
 });
 

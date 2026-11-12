@@ -1291,6 +1291,14 @@ for the desktop shell, start screen and session view to be cleaned up (UX-02, UX
     - the S and L workflows in the editor, dark and light;
     - an interrupted M task's Flow tab, where the two loops' labels no longer overlap and the controls cover no
       step.
+  - **Follow-up fix (2026-11-12, with CP-07's PR):** a running task's Flow tab lost the lines between steps (owner,
+    with a screenshot: "ada bug di flow kadang garisnya hilang").
+    - **Cause, read in `@xyflow/system` 0.0.83 (`adoptUserNodes`, `parseHandles`):** each run update rebuilt the
+      nodes without `measured`, so React Flow dropped the handles it had measured. Edges need those, and they come
+      back only when a node's size changes; ours have a fixed size.
+    - **Fix:** each node carries `measured`, its known size, so the handles stay. The same goes for the chat's
+      agent graph, whose nodes are rebuilt while a turn streams.
+    - **Still to check:** in the app, on a running task (MANUAL_CHECKS 3x).
 - [x] **UX-18** A clearer agent graph. Owner feedback, 2026-11-10: "rapihin tampilan graph, jadi agentnya lebih
       jelas pake model apa, dan kalo show tools jadi banyak banget terlalu lebar".
   - **Model:**
@@ -2864,6 +2872,38 @@ Owner request, 2026-11-10: features that community tools for coding agents have 
       - multi-folder and XL tasks.
 - [ ] **CP-07** A pull request's review comments from GitHub sent back to the agent (beyond Fix CI). — Conductor
       ([changelog](https://www.conductor.build/changelog)).
+  - **Plan (2026-11-11, owner's choices):** read-only on GitHub (no replies or resolving; the push is the only
+    write); unresolved threads shown and ticked, outdated ones unticked; no cap on rounds.
+  - **Built (2026-11-12):**
+    - **Reading:** `task.reviewThreads` reads the PR's review threads through the person's `gh`, with one fixed,
+      read-only GraphQL query (only GraphQL says resolved and outdated).
+      - The owner and name go as plain strings (`-f`) and the PR number typed (`-F`), on the origin's host.
+      - The answer is parsed with zod. Every comment is redacted.
+      - Paths are made relative to the workspace's folder in the repository; threads outside it are left out.
+      - Outdated threads keep their original lines. The quote is the commented side's lines from the diff hunk.
+      - It reads at most 100 threads and 50 comments a thread, and says when there were more.
+    - **The round:** `task.fixReviewComments` reads the picked threads again by id, so the text never comes from
+      the UI.
+      - Each thread maps to a comment, "author: body" as its text, and runs a `source: "github"` round.
+        `feedbackTask`'s body is now `startCommentsRound`, shared.
+      - It's recorded in `run.feedback` with `source` and `threads`. The evidence says "from the PR's review".
+      - The person's own note is kept as an instruction.
+    - **UI:** Review comments under the PR's checks.
+      - Unresolved threads, each with a tick box, `path:line`, "outdated", "Sent in round N", the first comment and
+        replies, and a link to GitHub.
+      - Refresh. **Fix N comments…** opens a dialog that says the words go as data and nothing is posted.
+    - **Tests:**
+      - `github.test.ts` (5): sides, ranges, file-level, outdated, prefix paths, redaction, caps, the `gh` arguments;
+      - service: reading and refusing, unknown ids, the comment a thread becomes, the round recorded as GitHub's;
+      - orchestrator: a reviewer's fenced words, and the note kept;
+      - evidence.
+    - **Live, read-only:** the query and parsing against GitHub's real schema on public PRs (cli/cli #15009, #14957,
+      #14956).
+      - It read 1, 3 and 4 threads: resolved, outdated and multi-line ranges (`status.go:401–403`).
+      - Quotes came from the hunks, with authors and reply counts.
+      - Nothing was written to GitHub.
+    - **For the owner:** a round on a real PR's comment (MANUAL_CHECKS 3w). Posting a test comment writes to GitHub
+      as the owner, so it waits for them.
 - [ ] **CP-08** Start a task from an issue: GitHub first, Linear later. — Conductor; Emdash
       ([repo](https://github.com/generalaction/emdash)); OpenHands ([repo](https://github.com/OpenHands/OpenHands)).
 - [ ] **CP-09** Restore the open tabs and running work after a crash or restart. — CCManager.

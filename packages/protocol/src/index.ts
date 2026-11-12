@@ -1070,7 +1070,30 @@ export const FeedbackRoundSchema = z.object({
   /** The files commented on, `folder:path` for another folder's. */
   files: z.array(z.string()),
   state: z.enum(["done", "failed", "cancelled"]),
+  /** Whose comments (CP-07): the person's own on the task's diff, or the PR's review threads on GitHub. */
+  source: z.enum(["person", "github"]).optional(),
+  /** The review threads a GitHub round sent, by their GitHub id: the page marks them sent. */
+  threads: z.array(z.string().max(200)).max(MAX_FEEDBACK_COMMENTS).optional(),
 });
+
+/**
+ * A review thread on the task's PR (CP-07), read through the person's `gh`: where it is (relative to the task's code
+ * folder), the lines it quotes, and its comments, redacted. Outdated threads point at an earlier commit's lines.
+ */
+export const ReviewThreadSchema = z.object({
+  id: z.string(),
+  path: z.string(),
+  side: z.enum(["new", "old"]),
+  start: z.number().int().optional(),
+  end: z.number().int().optional(),
+  resolved: z.boolean(),
+  outdated: z.boolean(),
+  /** A comment on the whole file, not on lines. */
+  fileLevel: z.boolean(),
+  quote: z.string(),
+  comments: z.array(z.object({ author: z.string(), body: z.string(), createdAt: z.string(), url: z.string() })),
+});
+export type ReviewThread = z.infer<typeof ReviewThreadSchema>;
 export type FeedbackRound = z.infer<typeof FeedbackRoundSchema>;
 
 /** A file a task changed since its base (CP-05), in its own worktree or another folder's (`folder`). */
@@ -2640,6 +2663,26 @@ export const methodSchemas = {
    * like a run; at most `MAX_CI_FIXES` rounds.
    */
   "task.fixCi": { params: TaskRef.extend({ link: z.string().min(1) }), result: TaskSchema },
+  /**
+   * The review threads on the task's PR (CP-07), through the person's own `gh` (a fixed, read-only GraphQL query):
+   * unresolved first. Nothing is ever posted to GitHub. `capped` when there were more than were read.
+   */
+  "task.reviewThreads": {
+    params: TaskRef,
+    result: z.object({ threads: z.array(ReviewThreadSchema), capped: z.boolean() }),
+  },
+  /**
+   * A round on the review threads the person picked (CP-07), built like Fix as commented: the sidecar reads them again
+   * by id, the implementer gets them as data with the contract and the diff, then the gates; when it ends Done, the
+   * change is committed and pushed to the PR (never forced). `note` is the person's own words.
+   */
+  "task.fixReviewComments": {
+    params: TaskRef.extend({
+      threads: z.array(z.string().min(1).max(200)).min(1).max(MAX_FEEDBACK_COMMENTS),
+      note: z.string().max(4000).optional(),
+    }),
+    result: TaskSchema,
+  },
   /**
    * The files a task changed since its base (CP-05 part 2): its worktree's and its other folders' worktrees', with
    * line counts. The same list as its evidence's.

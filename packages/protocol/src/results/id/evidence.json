@@ -139,6 +139,8 @@
   "evidence.feedback.heading": "## Perbaiki sesuai komentar",
   "evidence.feedback.round_one": "- Putaran {{n}}: {{count}} komentar pada {{files}}: {{state}}.",
   "evidence.feedback.round_other": "- Putaran {{n}}: {{count}} komentar pada {{files}}: {{state}}.",
+  "evidence.feedback.roundGithub_one": "- Putaran {{n}}, dari review PR: {{count}} thread pada {{files}}: {{state}}.",
+  "evidence.feedback.roundGithub_other": "- Putaran {{n}}, dari review PR: {{count}} thread pada {{files}}: {{state}}.",
   "evidence.bestOf.heading": "## Best of N",
   "evidence.bestOf.variant_one": "- Varian {{n}} ({{agent}}): {{state}}; gate {{passed}} lulus, {{failed}} gagal; {{count}} file berubah (+{{added}} −{{removed}}); {{cost}}.",
   "evidence.bestOf.variant_other": "- Varian {{n}} ({{agent}}): {{state}}; gate {{passed}} lulus, {{failed}} gagal; {{count}} file berubah (+{{added}} −{{removed}}); {{cost}}.",

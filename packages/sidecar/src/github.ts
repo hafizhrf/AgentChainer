@@ -1,7 +1,8 @@
 import { existsSync } from "node:fs";
 import { homedir } from "node:os";
 import path from "node:path";
-import { type GitHubStatus, type PrCheck, redactForLog } from "@agentchainer/protocol";
+import { type GitHubStatus, type PrCheck, type ReviewThread, redactForLog } from "@agentchainer/protocol";
+import { z } from "zod";
 import { t } from "./i18n/index.ts";
 import { runAsync } from "./run-async.ts";
 import { commandFailed, git } from "./workspace.ts";
@@ -225,4 +226,167 @@ export function ghCredentialConfig(root: string, binary = findGh()): string[] | 
   if (!remote) return null;
   const helper = `!"${binary.replace(/\\/g, "/")}" auth git-credential`;
   return ["credential.helper=", `credential.https://${remote.host}.helper=${helper}`];
+}
+
+/* ---------- A PR's review threads (CP-07) ---------- */
+
+/** How many review threads, and comments a thread, are read; the UI says when there were more. */
+export const MAX_REVIEW_THREADS = 100;
+export const MAX_THREAD_COMMENTS = 50;
+
+/**
+ * The PR's review threads, with whether each is resolved or outdated: only GraphQL tells those. A fixed query with
+ * typed variables, read-only (a GraphQL query is a POST, but this one changes nothing).
+ */
+const REVIEW_THREADS_QUERY = `query($owner: String!, $name: String!, $number: Int!) {
+  repository(owner: $owner, name: $name) {
+    pullRequest(number: $number) {
+      reviewThreads(first: ${MAX_REVIEW_THREADS}) {
+        totalCount
+        nodes {
+          id isResolved isOutdated path line startLine originalLine originalStartLine diffSide subjectType
+          comments(first: ${MAX_THREAD_COMMENTS}) {
+            totalCount
+            nodes { author { login } body createdAt url diffHunk }
+          }
+        }
+      }
+    }
+  }
+}`;
+
+const ThreadsAnswer = z.object({
+  data: z.object({
+    repository: z
+      .object({
+        pullRequest: z
+          .object({
+            reviewThreads: z.object({
+              totalCount: z.number(),
+              nodes: z.array(
+                z.object({
+                  id: z.string(),
+                  isResolved: z.boolean(),
+                  isOutdated: z.boolean(),
+                  path: z.string(),
+                  line: z.number().nullable(),
+                  startLine: z.number().nullable(),
+                  originalLine: z.number().nullable(),
+                  originalStartLine: z.number().nullable(),
+                  diffSide: z.enum(["LEFT", "RIGHT"]),
+                  subjectType: z.enum(["LINE", "FILE"]).nullable().optional(),
+                  comments: z.object({
+                    totalCount: z.number(),
+                    nodes: z.array(
+                      z.object({
+                        author: z.object({ login: z.string() }).nullable(),
+                        body: z.string(),
+                        createdAt: z.string(),
+                        url: z.string(),
+                        diffHunk: z.string(),
+                      }),
+                    ),
+                  }),
+                }),
+              ),
+            }),
+          })
+          .nullable(),
+      })
+      .nullable(),
+  }),
+});
+
+/**
+ * The last `count` lines of one side of a diff hunk (the commented ones; GitHub's hunk ends at the comment's line),
+ * without their +, − or space: the new side leaves the removed lines out, the old side the added ones.
+ */
+export function hunkTail(hunk: string, count: number, side: "new" | "old" = "new"): string {
+  const other = side === "new" ? "-" : "+";
+  const lines = hunk.split("\n").filter((l) => !l.startsWith("@@") && !l.startsWith(other));
+  return lines
+    .slice(-Math.max(1, count))
+    .map((l) => (/^[+\- ]/.test(l) ? l.slice(1) : l))
+    .join("\n");
+}
+
+/**
+ * GitHub's answer as review threads: paths made relative to the task's code folder (the repository's `prefix`), a
+ * thread outside it left out; outdated ones on their original lines; every comment redacted.
+ */
+export function threadsOf(json: unknown, prefix = "", home = homedir()): { threads: ReviewThread[]; capped: boolean } {
+  const parsed = ThreadsAnswer.safeParse(json);
+  const answer = parsed.success ? parsed.data.data.repository?.pullRequest?.reviewThreads : undefined;
+  if (!answer) throw new Error(t("git.review.unreadable"));
+  let capped = answer.totalCount > answer.nodes.length;
+  const threads: ReviewThread[] = [];
+  for (const n of answer.nodes) {
+    if (prefix && !n.path.startsWith(prefix)) continue;
+    capped ||= n.comments.totalCount > n.comments.nodes.length;
+    const end = n.line ?? n.originalLine ?? undefined;
+    const start = (n.line !== null ? n.startLine : n.originalStartLine) ?? end;
+    const fileLevel = n.subjectType === "FILE" || end === undefined;
+    const first = n.comments.nodes[0];
+    threads.push({
+      id: n.id,
+      path: n.path.slice(prefix.length),
+      side: n.diffSide === "LEFT" ? "old" : "new",
+      ...(fileLevel || start === undefined ? {} : { start, end }),
+      resolved: n.isResolved,
+      outdated: n.isOutdated,
+      fileLevel,
+      quote:
+        fileLevel || !first || start === undefined || end === undefined
+          ? ""
+          : hunkTail(first.diffHunk, end - start + 1, n.diffSide === "LEFT" ? "old" : "new"),
+      comments: n.comments.nodes.map((c) => ({
+        author: c.author?.login ?? "ghost",
+        body: redact(c.body, home),
+        createdAt: c.createdAt,
+        url: c.url,
+      })),
+    });
+  }
+  // Unresolved first, in GitHub's order.
+  threads.sort((a, b) => Number(a.resolved) - Number(b.resolved));
+  return { threads, capped };
+}
+
+/** The PR's review threads, through the person's `gh`, on the host and repository of `root`'s origin. */
+export async function reviewThreads(
+  gh: Gh,
+  root: string,
+  number: number,
+  prefix = "",
+): Promise<{ threads: ReviewThread[]; capped: boolean }> {
+  const url = git(["remote", "get-url", "origin"], root).stdout.trim();
+  const remote = url ? parseRemote(url) : null;
+  const [owner, name] = remote?.repo.split("/") ?? [];
+  if (!remote || !owner || !name) throw new Error(t("git.review.noRemote"));
+  // `-f` passes the names as plain strings (never read as a file or a number); `-F` types the PR number.
+  const r = await gh(
+    [
+      "api",
+      "graphql",
+      "--hostname",
+      remote.host,
+      "-f",
+      `owner=${owner}`,
+      "-f",
+      `name=${name}`,
+      "-F",
+      `number=${number}`,
+      "-f",
+      `query=${REVIEW_THREADS_QUERY}`,
+    ],
+    root,
+  );
+  if (r.status !== 0) throw commandFailed("gh api graphql", (r.stderr || r.stdout).trim() || `exit ${r.status}`);
+  let json: unknown;
+  try {
+    json = JSON.parse(r.stdout);
+  } catch {
+    throw new Error(t("git.review.unreadable"));
+  }
+  return threadsOf(json, prefix);
 }

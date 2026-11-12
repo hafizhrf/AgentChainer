@@ -7740,6 +7740,21 @@
                             "failed",
                             "cancelled"
                           ]
+                        },
+                        "source": {
+                          "type": "string",
+                          "enum": [
+                            "person",
+                            "github"
+                          ]
+                        },
+                        "threads": {
+                          "maxItems": 50,
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "maxLength": 200
+                          }
                         }
                       },
                       "required": [
@@ -9402,6 +9417,21 @@
                             "failed",
                             "cancelled"
                           ]
+                        },
+                        "source": {
+                          "type": "string",
+                          "enum": [
+                            "person",
+                            "github"
+                          ]
+                        },
+                        "threads": {
+                          "maxItems": 50,
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "maxLength": 200
+                          }
                         }
                       },
                       "required": [
@@ -11070,6 +11100,21 @@
                             "failed",
                             "cancelled"
                           ]
+                        },
+                        "source": {
+                          "type": "string",
+                          "enum": [
+                            "person",
+                            "github"
+                          ]
+                        },
+                        "threads": {
+                          "maxItems": 50,
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "maxLength": 200
+                          }
                         }
                       },
                       "required": [
@@ -12841,6 +12886,21 @@
                             "failed",
                             "cancelled"
                           ]
+                        },
+                        "source": {
+                          "type": "string",
+                          "enum": [
+                            "person",
+                            "github"
+                          ]
+                        },
+                        "threads": {
+                          "maxItems": 50,
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "maxLength": 200
+                          }
                         }
                       },
                       "required": [
@@ -14638,6 +14698,21 @@
                             "failed",
                             "cancelled"
                           ]
+                        },
+                        "source": {
+                          "type": "string",
+                          "enum": [
+                            "person",
+                            "github"
+                          ]
+                        },
+                        "threads": {
+                          "maxItems": 50,
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "maxLength": 200
+                          }
                         }
                       },
                       "required": [
@@ -16297,6 +16372,21 @@
                             "failed",
                             "cancelled"
                           ]
+                        },
+                        "source": {
+                          "type": "string",
+                          "enum": [
+                            "person",
+                            "github"
+                          ]
+                        },
+                        "threads": {
+                          "maxItems": 50,
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "maxLength": 200
+                          }
                         }
                       },
                       "required": [
@@ -17998,6 +18088,21 @@
                             "failed",
                             "cancelled"
                           ]
+                        },
+                        "source": {
+                          "type": "string",
+                          "enum": [
+                            "person",
+                            "github"
+                          ]
+                        },
+                        "threads": {
+                          "maxItems": 50,
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "maxLength": 200
+                          }
                         }
                       },
                       "required": [
@@ -19726,6 +19831,21 @@
                             "failed",
                             "cancelled"
                           ]
+                        },
+                        "source": {
+                          "type": "string",
+                          "enum": [
+                            "person",
+                            "github"
+                          ]
+                        },
+                        "threads": {
+                          "maxItems": 50,
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "maxLength": 200
+                          }
                         }
                       },
                       "required": [
@@ -21606,6 +21726,21 @@
                             "failed",
                             "cancelled"
                           ]
+                        },
+                        "source": {
+                          "type": "string",
+                          "enum": [
+                            "person",
+                            "github"
+                          ]
+                        },
+                        "threads": {
+                          "maxItems": 50,
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "maxLength": 200
+                          }
                         }
                       },
                       "required": [
@@ -23268,6 +23403,21 @@
                             "failed",
                             "cancelled"
                           ]
+                        },
+                        "source": {
+                          "type": "string",
+                          "enum": [
+                            "person",
+                            "github"
+                          ]
+                        },
+                        "threads": {
+                          "maxItems": 50,
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "maxLength": 200
+                          }
                         }
                       },
                       "required": [
@@ -24927,6 +25077,21 @@
                             "failed",
                             "cancelled"
                           ]
+                        },
+                        "source": {
+                          "type": "string",
+                          "enum": [
+                            "person",
+                            "github"
+                          ]
+                        },
+                        "threads": {
+                          "maxItems": 50,
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "maxLength": 200
+                          }
                         }
                       },
                       "required": [
@@ -26680,6 +26845,21 @@
                             "failed",
                             "cancelled"
                           ]
+                        },
+                        "source": {
+                          "type": "string",
+                          "enum": [
+                            "person",
+                            "github"
+                          ]
+                        },
+                        "threads": {
+                          "maxItems": 50,
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "maxLength": 200
+                          }
                         }
                       },
                       "required": [
@@ -28345,6 +28525,21 @@
                             "failed",
                             "cancelled"
                           ]
+                        },
+                        "source": {
+                          "type": "string",
+                          "enum": [
+                            "person",
+                            "github"
+                          ]
+                        },
+                        "threads": {
+                          "maxItems": 50,
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "maxLength": 200
+                          }
                         }
                       },
                       "required": [
@@ -30406,6 +30601,21 @@
                             "failed",
                             "cancelled"
                           ]
+                        },
+                        "source": {
+                          "type": "string",
+                          "enum": [
+                            "person",
+                            "github"
+                          ]
+                        },
+                        "threads": {
+                          "maxItems": 50,
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "maxLength": 200
+                          }
                         }
                       },
                       "required": [
@@ -32065,6 +32275,21 @@
                             "failed",
                             "cancelled"
                           ]
+                        },
+                        "source": {
+                          "type": "string",
+                          "enum": [
+                            "person",
+                            "github"
+                          ]
+                        },
+                        "threads": {
+                          "maxItems": 50,
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "maxLength": 200
+                          }
                         }
                       },
                       "required": [
@@ -33724,6 +33949,21 @@
                             "failed",
                             "cancelled"
                           ]
+                        },
+                        "source": {
+                          "type": "string",
+                          "enum": [
+                            "person",
+                            "github"
+                          ]
+                        },
+                        "threads": {
+                          "maxItems": 50,
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "maxLength": 200
+                          }
                         }
                       },
                       "required": [
@@ -35641,6 +35881,21 @@
                             "failed",
                             "cancelled"
                           ]
+                        },
+                        "source": {
+                          "type": "string",
+                          "enum": [
+                            "person",
+                            "github"
+                          ]
+                        },
+                        "threads": {
+                          "maxItems": 50,
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "maxLength": 200
+                          }
                         }
                       },
                       "required": [
@@ -37424,6 +37679,1826 @@
                             "failed",
                             "cancelled"
                           ]
+                        },
+                        "source": {
+                          "type": "string",
+                          "enum": [
+                            "person",
+                            "github"
+                          ]
+                        },
+                        "threads": {
+                          "maxItems": 50,
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "maxLength": 200
+                          }
+                        }
+                      },
+                      "required": [
+                        "at",
+                        "comments",
+                        "files",
+                        "state"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "models": {
+                    "type": "object",
+                    "properties": {
+                      "implement": {
+                        "type": "string",
+                        "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/[\\]-]{0,99}$"
+                      }
+                    },
+                    "additionalProperties": false
+                  },
+                  "bestOf": {
+                    "type": "object",
+                    "properties": {
+                      "chosen": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 9007199254740991
+                      },
+                      "compared": {
+                        "maxItems": 3,
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "index": {
+                              "type": "integer",
+                              "minimum": 1,
+                              "maximum": 9007199254740991
+                            },
+                            "taskId": {
+                              "type": "string",
+                              "pattern": "^\\d{4}-\\d{2}-\\d{2}-[0-9a-f]{8}$"
+                            },
+                            "agent": {
+                              "type": "string",
+                              "enum": [
+                                "claude",
+                                "codex",
+                                "agy"
+                              ]
+                            },
+                            "model": {
+                              "type": "string",
+                              "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/[\\]-]{0,99}$"
+                            },
+                            "state": {
+                              "type": "string",
+                              "enum": [
+                                "draft",
+                                "ready",
+                                "running",
+                                "done",
+                                "failed",
+                                "unverified",
+                                "cancelled",
+                                "interrupted",
+                                "accepted"
+                              ]
+                            },
+                            "outcome": {
+                              "type": "string"
+                            },
+                            "outcomeRef": {
+                              "$ref": "#/$defs/__schema0"
+                            },
+                            "costUsd": {
+                              "type": "number"
+                            },
+                            "estimate": {
+                              "type": "boolean"
+                            },
+                            "durationMs": {
+                              "type": "integer",
+                              "minimum": -9007199254740991,
+                              "maximum": 9007199254740991
+                            },
+                            "gates": {
+                              "type": "object",
+                              "properties": {
+                                "passed": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string"
+                                  }
+                                },
+                                "failed": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string"
+                                  }
+                                },
+                                "notRun": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string"
+                                  }
+                                }
+                              },
+                              "required": [
+                                "passed",
+                                "failed",
+                                "notRun"
+                              ],
+                              "additionalProperties": false
+                            },
+                            "review": {
+                              "type": "object",
+                              "properties": {
+                                "verdict": {
+                                  "type": "string",
+                                  "enum": [
+                                    "approve",
+                                    "changes-requested"
+                                  ]
+                                },
+                                "mustFix": {
+                                  "type": "integer",
+                                  "minimum": -9007199254740991,
+                                  "maximum": 9007199254740991
+                                }
+                              },
+                              "required": [
+                                "verdict",
+                                "mustFix"
+                              ],
+                              "additionalProperties": false
+                            },
+                            "files": {
+                              "type": "integer",
+                              "minimum": -9007199254740991,
+                              "maximum": 9007199254740991
+                            },
+                            "added": {
+                              "type": "integer",
+                              "minimum": -9007199254740991,
+                              "maximum": 9007199254740991
+                            },
+                            "removed": {
+                              "type": "integer",
+                              "minimum": -9007199254740991,
+                              "maximum": 9007199254740991
+                            },
+                            "guardBlocks": {
+                              "type": "integer",
+                              "minimum": -9007199254740991,
+                              "maximum": 9007199254740991
+                            }
+                          },
+                          "required": [
+                            "index",
+                            "taskId",
+                            "agent",
+                            "state",
+                            "costUsd",
+                            "estimate",
+                            "gates",
+                            "files",
+                            "added",
+                            "removed",
+                            "guardBlocks"
+                          ],
+                          "additionalProperties": false
+                        }
+                      }
+                    },
+                    "required": [
+                      "chosen",
+                      "compared"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "required": [
+                  "workflow",
+                  "permissionMode",
+                  "base",
+                  "untrackedAtStart",
+                  "startedAt",
+                  "position",
+                  "fixRounds",
+                  "steps",
+                  "gates",
+                  "notRun",
+                  "baseline",
+                  "approvals",
+                  "guardBlocks",
+                  "costUsd"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "runs": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "workflow": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "version": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "source": {
+                      "type": "string",
+                      "enum": [
+                        "project",
+                        "task"
+                      ]
+                    },
+                    "file": {
+                      "type": "string"
+                    },
+                    "hash": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "version"
+                  ],
+                  "additionalProperties": false
+                },
+                "model": {
+                  "type": "string"
+                },
+                "state": {
+                  "type": "string",
+                  "enum": [
+                    "draft",
+                    "ready",
+                    "running",
+                    "done",
+                    "failed",
+                    "unverified",
+                    "cancelled",
+                    "interrupted",
+                    "accepted"
+                  ]
+                },
+                "costUsd": {
+                  "type": "number"
+                },
+                "gateRounds": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                "gatesPassed": {
+                  "type": [
+                    "boolean",
+                    "null"
+                  ]
+                },
+                "fixRounds": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                "startedAt": {
+                  "type": "string"
+                },
+                "endedAt": {
+                  "type": "string"
+                },
+                "trigger": {
+                  "type": "string",
+                  "const": "schedule"
+                },
+                "evidence": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "workflow",
+                "state",
+                "costUsd",
+                "gateRounds",
+                "gatesPassed",
+                "fixRounds",
+                "startedAt"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "parent": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "pattern": "^\\d{4}-\\d{2}-\\d{2}-[0-9a-f]{8}$"
+              },
+              "index": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              }
+            },
+            "required": [
+              "id",
+              "index"
+            ],
+            "additionalProperties": false
+          },
+          "title": {
+            "type": "string"
+          },
+          "dependsOn": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}-[0-9a-f]{8}$"
+            }
+          },
+          "worktree": {
+            "type": "object",
+            "properties": {
+              "path": {
+                "type": "string"
+              },
+              "branch": {
+                "type": "string",
+                "pattern": "^[^-\\s][^\\s]*$"
+              },
+              "base": {
+                "type": "string",
+                "pattern": "^[^-\\s][^\\s]*$"
+              },
+              "from": {
+                "type": "string",
+                "pattern": "^[^-\\s][^\\s]*$"
+              },
+              "untracked": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "removed": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "path",
+              "branch",
+              "base",
+              "untracked"
+            ],
+            "additionalProperties": false
+          },
+          "folders": {
+            "maxItems": 16,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "path": {
+                  "type": "string"
+                },
+                "worktree": {
+                  "type": "object",
+                  "properties": {
+                    "path": {
+                      "type": "string"
+                    },
+                    "branch": {
+                      "type": "string",
+                      "pattern": "^[^-\\s][^\\s]*$"
+                    },
+                    "base": {
+                      "type": "string",
+                      "pattern": "^[^-\\s][^\\s]*$"
+                    },
+                    "from": {
+                      "type": "string",
+                      "pattern": "^[^-\\s][^\\s]*$"
+                    },
+                    "untracked": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "removed": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "path",
+                    "branch",
+                    "base",
+                    "untracked"
+                  ],
+                  "additionalProperties": false
+                },
+                "pr": {
+                  "type": "object",
+                  "properties": {
+                    "number": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "url": {
+                      "type": "string"
+                    },
+                    "base": {
+                      "type": "string",
+                      "pattern": "^[^-\\s][^\\s]*$"
+                    },
+                    "head": {
+                      "type": "string",
+                      "pattern": "^[^-\\s][^\\s]*$"
+                    }
+                  },
+                  "required": [
+                    "number",
+                    "url",
+                    "base",
+                    "head"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "required": [
+                "name",
+                "path"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "folder": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "path": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "name",
+              "path"
+            ],
+            "additionalProperties": false
+          },
+          "subtasks": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}-[0-9a-f]{8}$"
+            }
+          },
+          "variants": {
+            "maxItems": 3,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}-[0-9a-f]{8}$"
+            }
+          },
+          "variantOf": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "pattern": "^\\d{4}-\\d{2}-\\d{2}-[0-9a-f]{8}$"
+              },
+              "index": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 3
+              },
+              "agent": {
+                "type": "string",
+                "enum": [
+                  "claude",
+                  "codex",
+                  "agy"
+                ]
+              },
+              "model": {
+                "type": "string",
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/[\\]-]{0,99}$"
+              }
+            },
+            "required": [
+              "id",
+              "index",
+              "agent"
+            ],
+            "additionalProperties": false
+          },
+          "mergedInto": {
+            "type": "object",
+            "properties": {
+              "branch": {
+                "type": "string",
+                "pattern": "^[^-\\s][^\\s]*$"
+              },
+              "at": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "branch",
+              "at"
+            ],
+            "additionalProperties": false
+          },
+          "pr": {
+            "type": "object",
+            "properties": {
+              "number": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              "url": {
+                "type": "string"
+              },
+              "base": {
+                "type": "string",
+                "pattern": "^[^-\\s][^\\s]*$"
+              },
+              "head": {
+                "type": "string",
+                "pattern": "^[^-\\s][^\\s]*$"
+              },
+              "headSha": {
+                "type": "string"
+              },
+              "draft": {
+                "type": "boolean"
+              },
+              "createdAt": {
+                "type": "string"
+              },
+              "fixes": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "check": {
+                      "type": "string"
+                    },
+                    "at": {
+                      "type": "string"
+                    },
+                    "state": {
+                      "type": "string",
+                      "enum": [
+                        "done",
+                        "failed",
+                        "cancelled"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "check",
+                    "at",
+                    "state"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "review": {
+                "type": "object",
+                "properties": {
+                  "headSha": {
+                    "type": "string"
+                  },
+                  "verdict": {
+                    "type": "string",
+                    "enum": [
+                      "approve",
+                      "changes-requested",
+                      "unreadable"
+                    ]
+                  },
+                  "mustFix": {
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991
+                  },
+                  "at": {
+                    "type": "string"
+                  },
+                  "source": {
+                    "type": "string",
+                    "enum": [
+                      "run",
+                      "pr"
+                    ]
+                  }
+                },
+                "required": [
+                  "headSha",
+                  "verdict",
+                  "mustFix",
+                  "at",
+                  "source"
+                ],
+                "additionalProperties": false
+              },
+              "merged": {
+                "type": "object",
+                "properties": {
+                  "method": {
+                    "type": "string",
+                    "enum": [
+                      "merge",
+                      "squash",
+                      "rebase"
+                    ]
+                  },
+                  "sha": {
+                    "type": "string"
+                  },
+                  "at": {
+                    "type": "string"
+                  },
+                  "accepted": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "method",
+                  "sha",
+                  "at"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "number",
+              "url",
+              "base",
+              "head",
+              "headSha",
+              "draft",
+              "createdAt"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "id",
+          "request",
+          "state",
+          "createdAt",
+          "updatedAt",
+          "contract",
+          "triage",
+          "availableGates",
+          "costUsd",
+          "run"
+        ],
+        "additionalProperties": false,
+        "$defs": {
+          "__schema0": {
+            "type": "object",
+            "properties": {
+              "key": {
+                "type": "string"
+              },
+              "params": {
+                "type": "object",
+                "propertyNames": {
+                  "type": "string"
+                },
+                "additionalProperties": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "$ref": "#/$defs/__schema0"
+                    }
+                  ]
+                }
+              }
+            },
+            "required": [
+              "key"
+            ],
+            "additionalProperties": false
+          }
+        }
+      }
+    },
+    "task.reviewThreads": {
+      "params": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "cwd": {
+            "type": "string",
+            "minLength": 1
+          },
+          "id": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}-[0-9a-f]{8}$"
+          }
+        },
+        "required": [
+          "cwd",
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "result": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "threads": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "path": {
+                  "type": "string"
+                },
+                "side": {
+                  "type": "string",
+                  "enum": [
+                    "new",
+                    "old"
+                  ]
+                },
+                "start": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                "end": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                "resolved": {
+                  "type": "boolean"
+                },
+                "outdated": {
+                  "type": "boolean"
+                },
+                "fileLevel": {
+                  "type": "boolean"
+                },
+                "quote": {
+                  "type": "string"
+                },
+                "comments": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "author": {
+                        "type": "string"
+                      },
+                      "body": {
+                        "type": "string"
+                      },
+                      "createdAt": {
+                        "type": "string"
+                      },
+                      "url": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "author",
+                      "body",
+                      "createdAt",
+                      "url"
+                    ],
+                    "additionalProperties": false
+                  }
+                }
+              },
+              "required": [
+                "id",
+                "path",
+                "side",
+                "resolved",
+                "outdated",
+                "fileLevel",
+                "quote",
+                "comments"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "capped": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "threads",
+          "capped"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "task.fixReviewComments": {
+      "params": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "cwd": {
+            "type": "string",
+            "minLength": 1
+          },
+          "id": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}-[0-9a-f]{8}$"
+          },
+          "threads": {
+            "minItems": 1,
+            "maxItems": 50,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            }
+          },
+          "note": {
+            "type": "string",
+            "maxLength": 4000
+          }
+        },
+        "required": [
+          "cwd",
+          "id",
+          "threads"
+        ],
+        "additionalProperties": false
+      },
+      "result": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}-[0-9a-f]{8}$"
+          },
+          "request": {
+            "type": "string"
+          },
+          "flow": {
+            "type": "object",
+            "properties": {
+              "yaml": {
+                "type": "string",
+                "maxLength": 65536
+              },
+              "summary": {
+                "type": "string"
+              },
+              "hash": {
+                "type": "string"
+              },
+              "at": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "yaml",
+              "summary",
+              "hash",
+              "at"
+            ],
+            "additionalProperties": false
+          },
+          "chatContext": {
+            "type": "string",
+            "maxLength": 12000
+          },
+          "clarifications": {
+            "maxItems": 20,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "question": {
+                  "type": "string",
+                  "maxLength": 1000
+                },
+                "answer": {
+                  "type": "string",
+                  "maxLength": 2000
+                },
+                "at": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "question",
+                "answer",
+                "at"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "draft",
+              "ready",
+              "running",
+              "done",
+              "failed",
+              "unverified",
+              "cancelled",
+              "interrupted",
+              "accepted"
+            ]
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "type": "string"
+          },
+          "contract": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "task": {
+                    "type": "string"
+                  },
+                  "objective": {
+                    "type": "string",
+                    "maxLength": 4000
+                  },
+                  "acceptanceCriteria": {
+                    "maxItems": 30,
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 20
+                        },
+                        "text": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 2000
+                        },
+                        "check": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "enum": [
+                                "review",
+                                "manual"
+                              ]
+                            },
+                            {
+                              "type": "string",
+                              "pattern": "^gate:(format|lint|typecheck|test|build|smoke)$"
+                            }
+                          ]
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "text",
+                        "check"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "constraints": {
+                    "maxItems": 30,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 2000
+                    }
+                  },
+                  "outOfScope": {
+                    "maxItems": 30,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 2000
+                    }
+                  },
+                  "risks": {
+                    "maxItems": 30,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 2000
+                    }
+                  },
+                  "affectedAreas": {
+                    "maxItems": 50,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 500
+                    }
+                  },
+                  "openQuestions": {
+                    "maxItems": 20,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 2000
+                    }
+                  },
+                  "approvedAt": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "task",
+                  "objective",
+                  "acceptanceCriteria",
+                  "constraints",
+                  "outOfScope",
+                  "risks",
+                  "affectedAreas",
+                  "openQuestions"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "triage": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "signals": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "signal": {
+                          "type": "string"
+                        },
+                        "detail": {
+                          "type": "string"
+                        },
+                        "detailRef": {
+                          "$ref": "#/$defs/__schema0"
+                        },
+                        "floor": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "enum": [
+                                "S",
+                                "M",
+                                "L",
+                                "XL"
+                              ]
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        }
+                      },
+                      "required": [
+                        "signal",
+                        "detail",
+                        "floor"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "floor": {
+                    "type": "string",
+                    "enum": [
+                      "S",
+                      "M",
+                      "L",
+                      "XL"
+                    ]
+                  },
+                  "model": {
+                    "anyOf": [
+                      {
+                        "type": "object",
+                        "properties": {
+                          "tier": {
+                            "type": "string",
+                            "enum": [
+                              "S",
+                              "M",
+                              "L",
+                              "XL"
+                            ]
+                          },
+                          "rationale": {
+                            "type": "string"
+                          },
+                          "rationaleRef": {
+                            "$ref": "#/$defs/__schema0"
+                          },
+                          "confidence": {
+                            "type": "string",
+                            "enum": [
+                              "low",
+                              "medium",
+                              "high"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "tier",
+                          "rationale",
+                          "confidence"
+                        ],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "modelError": {
+                    "type": "string"
+                  },
+                  "modelErrorRef": {
+                    "$ref": "#/$defs/__schema0"
+                  },
+                  "proposed": {
+                    "type": "string",
+                    "enum": [
+                      "S",
+                      "M",
+                      "L",
+                      "XL"
+                    ]
+                  },
+                  "chosen": {
+                    "type": "string",
+                    "enum": [
+                      "S",
+                      "M",
+                      "L",
+                      "XL"
+                    ]
+                  },
+                  "override": {
+                    "type": "object",
+                    "properties": {
+                      "reason": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "reasonRef": {
+                        "$ref": "#/$defs/__schema0"
+                      }
+                    },
+                    "required": [
+                      "reason"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "budgetUsd": {
+                    "anyOf": [
+                      {
+                        "type": "number",
+                        "exclusiveMinimum": 0
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "at": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "signals",
+                  "floor",
+                  "model",
+                  "proposed",
+                  "chosen",
+                  "budgetUsd",
+                  "at"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "availableGates": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "format",
+                "lint",
+                "typecheck",
+                "test",
+                "build",
+                "smoke"
+              ]
+            }
+          },
+          "costUsd": {
+            "type": "number"
+          },
+          "run": {
+            "default": null,
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "workflow": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string"
+                      },
+                      "version": {
+                        "type": "integer",
+                        "minimum": -9007199254740991,
+                        "maximum": 9007199254740991
+                      },
+                      "source": {
+                        "type": "string",
+                        "enum": [
+                          "project",
+                          "task"
+                        ]
+                      },
+                      "file": {
+                        "type": "string"
+                      },
+                      "hash": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "version"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "permissionMode": {
+                    "type": "string",
+                    "enum": [
+                      "default",
+                      "acceptEdits",
+                      "auto",
+                      "plan"
+                    ]
+                  },
+                  "model": {
+                    "type": "string"
+                  },
+                  "agents": {
+                    "type": "object",
+                    "properties": {
+                      "plan": {
+                        "type": "string",
+                        "enum": [
+                          "claude",
+                          "codex",
+                          "agy"
+                        ]
+                      },
+                      "implement": {
+                        "type": "string",
+                        "enum": [
+                          "claude",
+                          "codex",
+                          "agy"
+                        ]
+                      },
+                      "review": {
+                        "type": "string",
+                        "enum": [
+                          "claude",
+                          "codex",
+                          "agy"
+                        ]
+                      }
+                    },
+                    "additionalProperties": false
+                  },
+                  "base": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "pattern": "^[^-\\s][^\\s]*$"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "untrackedAtStart": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "startedAt": {
+                    "type": "string"
+                  },
+                  "endedAt": {
+                    "type": "string"
+                  },
+                  "position": {
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991
+                  },
+                  "fixRounds": {
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991
+                  },
+                  "steps": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "step": {
+                          "type": "string"
+                        },
+                        "label": {
+                          "type": "string"
+                        },
+                        "labelRef": {
+                          "$ref": "#/$defs/__schema0"
+                        },
+                        "kind": {
+                          "type": "string",
+                          "enum": [
+                            "agent",
+                            "fix",
+                            "gates",
+                            "baseline",
+                            "setup",
+                            "subtask",
+                            "merge"
+                          ]
+                        },
+                        "taskId": {
+                          "type": "string"
+                        },
+                        "role": {
+                          "type": "string"
+                        },
+                        "group": {
+                          "type": "string"
+                        },
+                        "groupRef": {
+                          "$ref": "#/$defs/__schema0"
+                        },
+                        "status": {
+                          "type": "string",
+                          "enum": [
+                            "running",
+                            "done",
+                            "failed",
+                            "cancelled"
+                          ]
+                        },
+                        "sessionId": {
+                          "type": "string"
+                        },
+                        "startedAt": {
+                          "type": "string"
+                        },
+                        "endedAt": {
+                          "type": "string"
+                        },
+                        "costUsd": {
+                          "type": "number"
+                        },
+                        "agent": {
+                          "type": "string",
+                          "enum": [
+                            "claude",
+                            "codex",
+                            "agy"
+                          ]
+                        },
+                        "model": {
+                          "type": "string"
+                        },
+                        "costKind": {
+                          "type": "string",
+                          "enum": [
+                            "estimate",
+                            "unknown"
+                          ]
+                        },
+                        "tokens": {
+                          "type": "object",
+                          "properties": {
+                            "input": {
+                              "type": "number"
+                            },
+                            "output": {
+                              "type": "number"
+                            }
+                          },
+                          "required": [
+                            "input",
+                            "output"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "note": {
+                          "type": "string"
+                        },
+                        "noteRef": {
+                          "$ref": "#/$defs/__schema0"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "step",
+                        "label",
+                        "kind",
+                        "status",
+                        "startedAt",
+                        "costUsd"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "gates": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "kind": {
+                          "type": "string",
+                          "enum": [
+                            "format",
+                            "lint",
+                            "typecheck",
+                            "test",
+                            "build",
+                            "smoke"
+                          ]
+                        },
+                        "command": {
+                          "type": "string"
+                        },
+                        "package": {
+                          "type": "string"
+                        },
+                        "exitCode": {
+                          "anyOf": [
+                            {
+                              "type": "integer",
+                              "minimum": -9007199254740991,
+                              "maximum": 9007199254740991
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "timedOut": {
+                          "type": "boolean"
+                        },
+                        "durationMs": {
+                          "type": "number"
+                        },
+                        "tail": {
+                          "type": "string"
+                        },
+                        "round": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        "at": {
+                          "type": "string"
+                        },
+                        "changed": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "folder": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "kind",
+                        "command",
+                        "package",
+                        "exitCode",
+                        "timedOut",
+                        "durationMs",
+                        "tail",
+                        "round",
+                        "at"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "notRun": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "enum": [
+                        "format",
+                        "lint",
+                        "typecheck",
+                        "test",
+                        "build",
+                        "smoke"
+                      ]
+                    }
+                  },
+                  "baseline": {
+                    "default": [],
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "kind": {
+                          "type": "string",
+                          "enum": [
+                            "format",
+                            "lint",
+                            "typecheck",
+                            "test",
+                            "build",
+                            "smoke"
+                          ]
+                        },
+                        "command": {
+                          "type": "string"
+                        },
+                        "package": {
+                          "type": "string"
+                        },
+                        "exitCode": {
+                          "anyOf": [
+                            {
+                              "type": "integer",
+                              "minimum": -9007199254740991,
+                              "maximum": 9007199254740991
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "timedOut": {
+                          "type": "boolean"
+                        },
+                        "durationMs": {
+                          "type": "number"
+                        },
+                        "tail": {
+                          "type": "string"
+                        },
+                        "round": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        "at": {
+                          "type": "string"
+                        },
+                        "changed": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "folder": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "kind",
+                        "command",
+                        "package",
+                        "exitCode",
+                        "timedOut",
+                        "durationMs",
+                        "tail",
+                        "round",
+                        "at"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "approvals": {
+                    "default": [],
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "stepId": {
+                          "type": "string"
+                        },
+                        "label": {
+                          "type": "string"
+                        },
+                        "tool": {
+                          "type": "string"
+                        },
+                        "target": {
+                          "type": "string"
+                        },
+                        "risk": {
+                          "type": "string",
+                          "enum": [
+                            "low",
+                            "medium",
+                            "high"
+                          ]
+                        },
+                        "reasons": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "allowed": {
+                          "type": "boolean"
+                        },
+                        "always": {
+                          "type": "boolean"
+                        },
+                        "at": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "stepId",
+                        "label",
+                        "tool",
+                        "target",
+                        "risk",
+                        "reasons",
+                        "allowed",
+                        "always",
+                        "at"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "guardBlocks": {
+                    "default": [],
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "stepId": {
+                          "type": "string"
+                        },
+                        "tool": {
+                          "type": "string"
+                        },
+                        "target": {
+                          "type": "string"
+                        },
+                        "reason": {
+                          "type": "string"
+                        },
+                        "at": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "stepId",
+                        "tool",
+                        "target",
+                        "reason",
+                        "at"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "acceptance": {
+                    "type": "object",
+                    "properties": {
+                      "reason": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "at": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "reason",
+                      "at"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "costUsd": {
+                    "type": "number"
+                  },
+                  "outcome": {
+                    "type": "string"
+                  },
+                  "outcomeRef": {
+                    "$ref": "#/$defs/__schema0"
+                  },
+                  "trigger": {
+                    "type": "string",
+                    "const": "schedule"
+                  },
+                  "feedback": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "at": {
+                          "type": "string"
+                        },
+                        "comments": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        "files": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "state": {
+                          "type": "string",
+                          "enum": [
+                            "done",
+                            "failed",
+                            "cancelled"
+                          ]
+                        },
+                        "source": {
+                          "type": "string",
+                          "enum": [
+                            "person",
+                            "github"
+                          ]
+                        },
+                        "threads": {
+                          "maxItems": 50,
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "maxLength": 200
+                          }
                         }
                       },
                       "required": [
@@ -39346,6 +41421,21 @@
                             "failed",
                             "cancelled"
                           ]
+                        },
+                        "source": {
+                          "type": "string",
+                          "enum": [
+                            "person",
+                            "github"
+                          ]
+                        },
+                        "threads": {
+                          "maxItems": 50,
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "maxLength": 200
+                          }
                         }
                       },
                       "required": [
@@ -41107,6 +43197,21 @@
                             "failed",
                             "cancelled"
                           ]
+                        },
+                        "source": {
+                          "type": "string",
+                          "enum": [
+                            "person",
+                            "github"
+                          ]
+                        },
+                        "threads": {
+                          "maxItems": 50,
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "maxLength": 200
+                          }
                         }
                       },
                       "required": [
@@ -42785,6 +44890,21 @@
                             "failed",
                             "cancelled"
                           ]
+                        },
+                        "source": {
+                          "type": "string",
+                          "enum": [
+                            "person",
+                            "github"
+                          ]
+                        },
+                        "threads": {
+                          "maxItems": 50,
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "maxLength": 200
+                          }
                         }
                       },
                       "required": [
@@ -47688,6 +49808,21 @@
                             "failed",
                             "cancelled"
                           ]
+                        },
+                        "source": {
+                          "type": "string",
+                          "enum": [
+                            "person",
+                            "github"
+                          ]
+                        },
+                        "threads": {
+                          "maxItems": 50,
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "maxLength": 200
+                          }
                         }
                       },
                       "required": [
@@ -50240,6 +52375,21 @@
                               "failed",
                               "cancelled"
                             ]
+                          },
+                          "source": {
+                            "type": "string",
+                            "enum": [
+                              "person",
+                              "github"
+                            ]
+                          },
+                          "threads": {
+                            "maxItems": 50,
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "maxLength": 200
+                            }
                           }
                         },
                         "required": [

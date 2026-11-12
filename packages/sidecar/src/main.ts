@@ -120,6 +120,7 @@ import {
   evidenceOf,
   feedbackTask,
   fixCiTask,
+  fixReviewComments,
   keepVariant,
   listTasksLive,
   mergeGates,
@@ -131,6 +132,7 @@ import {
   present,
   proposeFlow,
   prPreview,
+  prReviewThreads,
   prStatus,
   resumeTask,
   retriageTask,
@@ -1364,6 +1366,24 @@ serve(
       requireFolder(cwd);
       await settleRun(id);
       return fixCiTask(cwd, id, link, sessionHost(await claude()), systemGh(), taskUpdated(cwd));
+    },
+
+    "task.reviewThreads": async ({ cwd, id }) => {
+      requireFolder(cwd);
+      return prReviewThreads(cwd, id, systemGh());
+    },
+
+    "task.fixReviewComments": async ({ cwd, id, threads, note }) => {
+      requireFolder(cwd);
+      await settleRun(id);
+      return fixReviewComments(
+        cwd,
+        id,
+        { threads, ...(note ? { note } : {}) },
+        sessionHost(await claude()),
+        systemGh(),
+        taskUpdated(cwd),
+      );
     },
 
     "task.changes": ({ cwd, id }) => {

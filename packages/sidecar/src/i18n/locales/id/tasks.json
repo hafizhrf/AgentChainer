@@ -84,6 +84,7 @@
   "tasks.service.notAVariant": "Itu bukan salah satu varian task ini.",
   "tasks.service.variantNotEnded": "Pertahankan varian setelah run-nya selesai.",
   "tasks.service.notAChange": "File itu tidak termasuk perubahan task: {{path}}",
+  "tasks.service.noSuchThreads": "Tidak satu pun thread review itu masih ada di PR. Muat ulang daftarnya.",
   "tasks.service.worktreeNotAtHead": "Worktree task ini tidak berada di head PR, jadi diff-nya tidak sama dengan isi PR.",
   "tasks.service.runningWait": "Task sedang berjalan. Tunggu sampai selesai.",
   "tasks.service.prMerged": "PR sudah di-merge.",

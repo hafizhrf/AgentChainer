@@ -39,6 +39,7 @@ import {
   dropFlow,
   feedbackTask,
   fixCiTask,
+  fixReviewComments,
   keepVariant,
   mergeGates,
   mergePrTask,
@@ -49,6 +50,7 @@ import {
   prBody,
   proposeFlow,
   prPreview,
+  prReviewThreads,
   prStatus,
   readyBranch,
   retriageTask,
@@ -64,6 +66,7 @@ import {
   taskEvidence,
   taskFileDiff,
   taskWorkflow,
+  threadComment,
   variantSummaries,
 } from "./service.ts";
 import { createTask, listTasks, loadTask, readTaskFile, saveTask, writeTaskFile } from "./store.ts";
@@ -647,6 +650,8 @@ describe("pull requests (M5-02)", () => {
     const prs = new Map<string, { number: number; base: string; title: string; body: string; draft: boolean }>();
     const calls: string[][] = [];
     const checks: { name: string; workflow: string; state: string; bucket: string; link: string }[] = [];
+    /** The PR's review threads, as GitHub's GraphQL answer lists them (CP-07). */
+    const threads: Record<string, unknown>[] = [];
     const out = (stdout: string, status = 0): GhResult => ({ status, stdout, stderr: "" });
     const gh: Gh = async (args) => {
       calls.push(args);
@@ -685,6 +690,10 @@ describe("pull requests (M5-02)", () => {
       if (cmd === "pr" && sub === "checks")
         return out(JSON.stringify(checks), checks.some((c) => c.bucket === "fail") ? 1 : 0);
       if (cmd === "run" && sub === "view") return out("test  ✖ total counts quantity\n");
+      if (cmd === "api" && sub === "graphql") {
+        const reviewThreads = { totalCount: threads.length, nodes: threads };
+        return out(JSON.stringify({ data: { repository: { pullRequest: { reviewThreads } } } }));
+      }
       if (cmd === "pr" && sub === "create") {
         const flag = (name: string) => args[args.indexOf(name) + 1] ?? "";
         prs.set(flag("--head"), {
@@ -698,7 +707,7 @@ describe("pull requests (M5-02)", () => {
       }
       return out("", 1);
     };
-    return { root, bare, gh, prs, calls, checks };
+    return { root, bare, gh, prs, calls, checks, threads };
   };
 
   /** A done M task with a change in its worktree. */
@@ -867,6 +876,72 @@ describe("pull requests (M5-02)", () => {
       pushed.run?.feedback?.map((f) => f.state),
       ["done", "failed", "done"],
     );
+  });
+
+  /** A review thread as GitHub's GraphQL answer has it (CP-07). */
+  const reviewThread = (id: string, over: Record<string, unknown> = {}) => ({
+    id,
+    isResolved: false,
+    isOutdated: false,
+    path: "coupon.js",
+    line: 1,
+    startLine: null,
+    originalLine: 1,
+    originalStartLine: null,
+    diffSide: "RIGHT",
+    subjectType: "LINE",
+    comments: {
+      totalCount: 1,
+      nodes: [
+        {
+          author: { login: "octocat" },
+          body: "Name it COUPON.",
+          createdAt: "2026-11-12T00:00:00Z",
+          url: `https://github.com/acme/app/pull/7#discussion_${id}`,
+          diffHunk: "@@ -0,0 +1 @@\n+export const coupon = 1;",
+        },
+      ],
+    },
+    ...over,
+  });
+
+  it("reads the PR's review threads, and sends the picked ones, read again by id, as data (CP-07)", async () => {
+    const { root, gh, threads } = world();
+    const { id } = doneWithChange(root);
+    const host = {} as Parameters<typeof fixReviewComments>[3];
+    await assert.rejects(prReviewThreads(root, id, gh), /no pull request/);
+    await createTaskPr(root, id, { title: "Add coupons", draft: true }, gh);
+    threads.push(reviewThread("PRRT_a"), reviewThread("PRRT_b", { isResolved: true }));
+    const read = await prReviewThreads(root, id, gh);
+    assert.deepEqual(
+      read.threads.map((t) => [t.id, t.resolved, t.path, t.start, t.quote]),
+      [
+        ["PRRT_a", false, "coupon.js", 1, "export const coupon = 1;"],
+        ["PRRT_b", true, "coupon.js", 1, "export const coupon = 1;"],
+      ],
+    );
+    assert.deepEqual(threadComment(read.threads[0] ?? (null as never)), {
+      path: "coupon.js",
+      side: "new",
+      start: 1,
+      end: 1,
+      quote: "export const coupon = 1;",
+      text: "octocat: Name it COUPON.",
+    });
+    await assert.rejects(
+      fixReviewComments(root, id, { threads: ["PRRT_gone"] }, host, gh, () => undefined),
+      /isn't on the PR any more|None of those review threads/,
+    );
+    // The round starts on the threads asked for; with no session host it ends at once, and is recorded.
+    const started = await fixReviewComments(root, id, { threads: ["PRRT_a"] }, host, gh, () => undefined);
+    assert.equal(started.state, "running");
+    let ended = loadTask(root, id);
+    for (let i = 0; i < 100 && !ended.run?.feedback?.length; i++) {
+      await new Promise((r) => setTimeout(r, 50));
+      ended = loadTask(root, id);
+    }
+    assert.deepEqual(ended.run?.feedback?.at(-1)?.source, "github");
+    assert.deepEqual(ended.run?.feedback?.at(-1)?.threads, ["PRRT_a"]);
   });
 
   it("works out the merge gates, and merges only with a person's reason while a gate holds it back (M5-04, M5-05)", async () => {

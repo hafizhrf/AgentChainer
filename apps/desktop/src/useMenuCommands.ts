@@ -6,6 +6,7 @@ import { isMac, shortcut } from "./options.ts";
 export const MENU_COMMANDS = [
   "new-session",
   "new-task",
+  "new-task-from-issue",
   "open-folder",
   "close-session",
   "settings",

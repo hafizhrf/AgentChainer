@@ -2906,6 +2906,36 @@ Owner request, 2026-11-10: features that community tools for coding agents have 
       as the owner, so it waits for them.
 - [ ] **CP-08** Start a task from an issue: GitHub first, Linear later. — Conductor; Emdash
       ([repo](https://github.com/generalaction/emdash)); OpenHands ([repo](https://github.com/OpenHands/OpenHands)).
+  - **Plan (2026-11-12, owner's choices):** the PR says "Closes #N"; the drafter reads the issue's body and its
+    latest comments (capped, redacted); entry points on Home's Tasks section, the command palette and the New task
+    menu (native and title bar). Linear is later.
+  - **Built (2026-11-12), GitHub:**
+    - **Reading:** `github.issues` lists the origin's open issues through the person's `gh` (`gh issue list -R
+      <host/owner/name>`, at most 50, with gh's own search), parsed with zod.
+    - **A task from one:** `task.createFromIssue` reads the issue by number itself (`gh issue view`), never from the
+      UI.
+      - The request is the person's own text, prefilled "Fix #N: title" and editable.
+      - The issue's body and newest comments are redacted, capped at 12,000 characters and kept apart
+        (`issueContext`). Only drafting reads them, fenced and marked as data written by others (T-25). Steps and
+        triage see the request and the approved contract only.
+      - The PR body ends with "Closes #N"; the evidence report links the issue.
+    - **UI:** the issue picker (search, open issues with labels and author, then the request), opened from Home's
+      Tasks section (**From a GitHub issue…**), the palette and **File → New Task from Issue…** (native and title
+      bar). The task page shows a "From issue #N" chip linking to it.
+    - **A clearer `gh` error:** when `gh` is refused for its credentials (401) while `GITHUB_TOKEN` or `GH_TOKEN` is
+      set in the app's environment (a shell profile can set it), every `gh` failure now says so. Found while
+      testing: a stale token in a shell profile overrides gh's own login.
+    - **Tests:**
+      - `github.test.ts`: the list's arguments with and without search, the cap, the view's arguments, a bad number
+        refused, redaction, the 12,000-character cap keeping the body and newest comments, the token hint;
+      - `contract.test.ts`: the issue fenced as data in the draft prompt;
+      - service: a task from an issue read by the sidecar, its fields saved, refused without `gh`, and "Closes #12" in
+        the PR body.
+    - **Live, read-only (cli/cli, through the owner's `gh`):** over JSON-RPC on a sample-app copy, `github.issues`
+      returned 50 (capped). A task from #15027 read 3,988 characters of issue text and drafted with haiku ($0.0097);
+      the drafter asked about the mismatch between the issue and the sample app. Screenshots of the picker with real
+      issues: light, dark and Indonesian. Nothing was written to GitHub.
+    - **For the owner:** create a task from a real issue and check the Create PR preview (MANUAL_CHECKS 3y).
 - [ ] **CP-09** Restore the open tabs and running work after a crash or restart. — CCManager.
 - [ ] **CP-10** A second opinion: another vendor's agent reviews a diff before merge. Builds on M9.
   - Sources: PAL `consensus` ([repo](https://github.com/BeehiveInnovations/pal-mcp-server)); codex-plugin-cc's review

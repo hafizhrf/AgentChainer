@@ -46,6 +46,7 @@ import {
   mergeResult,
   messageRun,
   newTask,
+  newTaskFromIssue,
   overlapsOf,
   prBody,
   proposeFlow,
@@ -690,6 +691,20 @@ describe("pull requests (M5-02)", () => {
       if (cmd === "pr" && sub === "checks")
         return out(JSON.stringify(checks), checks.some((c) => c.bucket === "fail") ? 1 : 0);
       if (cmd === "run" && sub === "view") return out("test  ✖ total counts quantity\n");
+      if (cmd === "issue" && sub === "view") {
+        return out(
+          JSON.stringify({
+            number: Number(args[2]),
+            title: "Coupons don't apply",
+            body: "Applying a coupon leaves the total as it was.",
+            url: `https://github.com/acme/app/issues/${args[2]}`,
+            state: "OPEN",
+            author: { login: "octocat" },
+            labels: [{ name: "bug" }],
+            comments: [{ author: { login: "maintainer" }, body: "Percent coupons only, please." }],
+          }),
+        );
+      }
       if (cmd === "api" && sub === "graphql") {
         const reviewThreads = { totalCount: threads.length, nodes: threads };
         return out(JSON.stringify({ data: { repository: { pullRequest: { reviewThreads } } } }));
@@ -766,6 +781,26 @@ describe("pull requests (M5-02)", () => {
     );
     assert.ok(long.length <= 72 && long.endsWith("…"), long);
     assert.equal(long, "Fix total() in src/cart.js so each item contributes price times…");
+  });
+
+  it("starts a task from an issue it reads itself, keeps its text for drafting only, and closes it from the PR (CP-08)", async () => {
+    const { root, gh } = world();
+    const task = await newTaskFromIssue(root, 12, "Fix #12: coupons", gh);
+    assert.equal(task.request, "Fix #12: coupons", "the person's own words are the request");
+    assert.deepEqual(task.issue, {
+      provider: "github",
+      number: 12,
+      title: "Coupons don't apply",
+      url: "https://github.com/acme/app/issues/12",
+    });
+    assert.match(task.issueContext ?? "", /Applying a coupon leaves the total[\s\S]*maintainer: Percent coupons only/);
+    assert.deepEqual(loadTask(root, task.id).issueContext, task.issueContext);
+    await assert.rejects(newTaskFromIssue(root, 12, "x", null), /gh/);
+    // The PR it opens closes the issue.
+    const { id } = doneWithChange(root);
+    const done = loadTask(root, id);
+    saveTask(root, { ...done, issue: task.issue });
+    assert.match(prBody(root, loadTask(root, id)), /---\nCloses #12\n\nOpened from AgentChainer task/);
   });
 
   it("reads only the PR's own checks' logs, and starts Fix CI only on a failing check, at most 3 times", async () => {

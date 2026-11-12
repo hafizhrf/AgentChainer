@@ -1407,6 +1407,20 @@ export const TaskSchema = z.object({
   flow: z.object({ yaml: z.string().max(65_536), summary: z.string(), hash: z.string(), at: z.string() }).optional(),
   /** The chat a task was made from (UX-13, "Make this a task"): its last messages, which drafting reads. */
   chatContext: z.string().max(12_000).optional(),
+  /** The GitHub issue a task was made from (CP-08): the PR it opens closes it. */
+  issue: z
+    .object({
+      provider: z.literal("github"),
+      number: z.number().int().positive(),
+      title: z.string().max(1000),
+      url: z.string().max(2000),
+    })
+    .optional(),
+  /**
+   * The issue's text and latest comments (CP-08), redacted and capped, read by the sidecar from GitHub. Only drafting
+   * reads it, fenced as data: it was written by people on GitHub, not by the person.
+   */
+  issueContext: z.string().max(12_000).optional(),
   /**
    * What the drafter asked before drafting and the person answered (UX-24): shown on the contract card, and read by a
    * redraft so it doesn't ask again.
@@ -1637,6 +1651,17 @@ export type PrCheck = z.infer<typeof PrCheckSchema>;
  * `gh` isn't installed, `signed-out` when it has no login for the remote's host, `no-remote` when the repository has
  * no `origin` on a GitHub host, `ready` otherwise. Never carries the account or a token.
  */
+/** An open issue of the workspace's GitHub repository, as the issue picker lists it (CP-08). */
+export const IssueSummarySchema = z.object({
+  number: z.number().int().positive(),
+  title: z.string(),
+  labels: z.array(z.string()),
+  author: z.string(),
+  updatedAt: z.string(),
+  url: z.string(),
+});
+export type IssueSummary = z.infer<typeof IssueSummarySchema>;
+
 export const GitHubStatusSchema = z.object({
   state: z.enum(["missing", "no-remote", "signed-out", "ready"]),
   version: z.string().optional(),
@@ -2467,6 +2492,18 @@ export const methodSchemas = {
     result: TaskSchema,
   },
   /**
+   * A task from one of the repository's GitHub issues (CP-08). The sidecar reads the issue itself, by number; the
+   * request is the person's own text (the issue's title, as they confirmed or changed it). The issue's text goes to
+   * drafting only, as data.
+   */
+  "task.createFromIssue": {
+    params: WorkspaceRef.extend({
+      number: z.number().int().positive(),
+      request: z.string().trim().min(1).max(20_000),
+    }),
+    result: TaskSchema,
+  },
+  /**
    * A read-only Claude session drafts the contract from the request and the repo, then triage runs on the draft
    * (signals and a haiku classification). Writes nothing but the task's own files. Costs model calls (`costUsd`).
    */
@@ -2619,6 +2656,14 @@ export const methodSchemas = {
   },
   /** Whether pull requests can be made here through the user's `gh` (M5-02). */
   "github.status": { params: WorkspaceRef, result: GitHubStatusSchema },
+  /**
+   * The open issues of the workspace's GitHub repository (CP-08), through the person's own `gh`: at most 50, the
+   * newest first, matching `search` when given. Read-only.
+   */
+  "github.issues": {
+    params: WorkspaceRef.extend({ search: z.string().max(200).optional() }),
+    result: z.object({ issues: z.array(IssueSummarySchema), capped: z.boolean() }),
+  },
   /**
    * What Create PR would send (M5-02): the `gh` status, the base branch, the title and the body built from the contract
    * and the evidence, and the task's PR when it has one already. Nothing is pushed or sent.

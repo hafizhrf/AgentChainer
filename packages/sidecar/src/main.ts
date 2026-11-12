@@ -63,7 +63,7 @@ import {
   switchBranch,
   unstage,
 } from "./git.ts";
-import { githubStatus, systemGh } from "./github.ts";
+import { githubStatus, openIssues, systemGh } from "./github.ts";
 import { t, useLanguage } from "./i18n/index.ts";
 import {
   addMcpServer,
@@ -128,6 +128,7 @@ import {
   mergeResult,
   messageRun,
   newTask,
+  newTaskFromIssue,
   overlapsOf,
   present,
   proposeFlow,
@@ -1167,6 +1168,11 @@ serve(
       return newTask(cwd, request, context, folders);
     },
 
+    "task.createFromIssue": async ({ cwd, number, request }) => {
+      requireFolder(cwd);
+      return newTaskFromIssue(cwd, number, request, systemGh());
+    },
+
     "task.draft": async ({ cwd, id, model }) => {
       requireFolder(cwd);
       return drafted(cwd, id, draftTask(cwd, id, await claude(), model, draftEvents(cwd, id)));
@@ -1338,6 +1344,13 @@ serve(
     "github.status": ({ cwd }) => {
       requireFolder(cwd);
       return githubStatus(cwd, systemGh());
+    },
+
+    "github.issues": async ({ cwd, search }) => {
+      requireFolder(cwd);
+      const gh = systemGh();
+      if (!gh) throw new RpcFailure(RpcErrorCode.invalidParams, t("tasks.service.ghMissing"));
+      return openIssues(gh, cwd, search);
     },
 
     "task.prPreview": async ({ cwd, id }) => {

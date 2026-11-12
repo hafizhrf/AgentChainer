@@ -109,6 +109,8 @@ export type Evidence = {
     approvedAt?: string;
     /** The workflow the run used, and the project's file when it replaced the app's (M6-04). */
     workflow?: TaskRun["workflow"];
+    /** The GitHub issue the task came from (CP-08). */
+    issue?: { number: number; url: string };
   };
   outcome: { state: Task["state"]; text: string; ref?: MessageRef; acceptance?: { reason: string; at: string } };
   files: (FileChange & { purpose: string | null })[];
@@ -304,6 +306,7 @@ export function buildEvidence({
       budgetUsd: triage ? triage.budgetUsd : 0,
       ...(contract?.approvedAt ? { approvedAt: contract.approvedAt } : {}),
       ...(run ? { workflow: run.workflow } : {}),
+      ...(task.issue ? { issue: { number: task.issue.number, url: task.issue.url } } : {}),
     },
     outcome: {
       state: task.state,
@@ -453,6 +456,7 @@ export function renderEvidence(e: Evidence, render: (ref: MessageRef) => string 
 
   add(r("evidence.report.title", { title: e.task.objective || e.task.request }), "");
   add(r("evidence.report.request", { request: e.task.request }));
+  if (e.task.issue) add(r("evidence.report.issue", { number: e.task.issue.number, url: e.task.issue.url }));
   const budget =
     e.task.budgetUsd === null
       ? resultRef("evidence.report.noBudget")

@@ -1,6 +1,7 @@
 {
   "evidence.report.title": "# Task evidence: {{title}}",
   "evidence.report.request": "- **Request:** {{request}}",
+  "evidence.report.issue": "- **Issue:** [#{{number}}]({{url}})",
   "evidence.report.tier": "- **Tier:** {{tier}}, {{budget}}",
   "evidence.report.tierChanged": "- **Tier:** {{tier}} (proposed {{proposed}}; changed because: {{reason}}), {{budget}}",
   "evidence.report.noReason": "no reason",

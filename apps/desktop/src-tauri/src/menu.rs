@@ -18,6 +18,7 @@ const REPO: &str = "https://github.com/hafizhrf/AgentChainer";
 pub const UI_COMMANDS: &[&str] = &[
     "new-session",
     "new-task",
+    "new-task-from-issue",
     "open-folder",
     "close-session",
     "settings",
@@ -61,12 +62,15 @@ pub fn build<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
     let new_session = item(app, "new-session", Some("CmdOrCtrl+N"))?;
     // Only acts when the Tasks preview is on (Settings); the UI ignores it otherwise.
     let new_task = item(app, "new-task", Some("CmdOrCtrl+Shift+N"))?;
+    // A task from one of the repository's GitHub issues (CP-08); also only with the Tasks preview.
+    let new_task_from_issue = item(app, "new-task-from-issue", None)?;
     let open_folder = item(app, "open-folder", Some("CmdOrCtrl+O"))?;
     let close_session = item(app, "close-session", Some("CmdOrCtrl+W"))?;
 
     let file = SubmenuBuilder::new(app, l("menu.file"))
         .item(&new_session)
         .item(&new_task)
+        .item(&new_task_from_issue)
         .item(&open_folder)
         .separator()
         .item(&close_session);

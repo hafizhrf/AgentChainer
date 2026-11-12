@@ -33,7 +33,7 @@ function menus(tasks: boolean): { label: string; items: Item[] }[] {
       label: t("menu.file"),
       items: [
         command("new-session"),
-        ...(tasks ? [command("new-task")] : []),
+        ...(tasks ? [command("new-task"), command("new-task-from-issue")] : []),
         command("open-folder"),
         sep,
         command("close-session"),

@@ -1,7 +1,13 @@
 import { existsSync } from "node:fs";
 import { homedir } from "node:os";
 import path from "node:path";
-import { type GitHubStatus, type PrCheck, type ReviewThread, redactForLog } from "@agentchainer/protocol";
+import {
+  type GitHubStatus,
+  type IssueSummary,
+  type PrCheck,
+  type ReviewThread,
+  redactForLog,
+} from "@agentchainer/protocol";
 import { z } from "zod";
 import { t } from "./i18n/index.ts";
 import { runAsync } from "./run-async.ts";
@@ -52,6 +58,18 @@ export function ghRunner(binary: string, timeoutMs = 60_000): Gh {
       timeoutMs,
       env: { GH_PROMPT_DISABLED: "1", NO_COLOR: "1", GH_NO_UPDATE_NOTIFIER: "1", GH_SPINNER_DISABLED: "1" },
     });
+}
+
+/**
+ * A `gh` call that failed, with what `gh` said. When it was refused for its credentials while `GITHUB_TOKEN` or
+ * `GH_TOKEN` is set (a shell profile can set it for the app too), it says so: gh uses that token before its own
+ * login. Only whether the variable is set is looked at, never its value.
+ */
+export function ghFailed(command: string, r: GhResult, env: NodeJS.ProcessEnv = process.env): Error {
+  const said = (r.stderr || r.stdout).trim() || `exit ${r.status}`;
+  const refused = /\b401\b|bad credentials|authentication/i.test(said);
+  const token = env.GH_TOKEN ? "GH_TOKEN" : env.GITHUB_TOKEN ? "GITHUB_TOKEN" : null;
+  return commandFailed(command, refused && token ? `${said} ${t("git.gh.envToken", { name: token })}` : said);
 }
 
 export function systemGh(): Gh | null {
@@ -113,7 +131,7 @@ export async function createPr(
 ): Promise<PrView> {
   const args = ["pr", "create", "--base", pr.base, "--head", pr.head, "--title", pr.title, "--body-file", pr.bodyFile];
   const r = await gh(pr.draft ? [...args, "--draft"] : args, root);
-  if (r.status !== 0) throw commandFailed("gh pr create", (r.stderr || r.stdout).trim() || `exit ${r.status}`);
+  if (r.status !== 0) throw ghFailed("gh pr create", r);
   const made = await findPr(gh, root, pr.head);
   if (!made) throw new Error(t("git.github.unreadablePr", { output: r.stdout.trim() }));
   return made;
@@ -131,7 +149,7 @@ export async function prChecks(gh: Gh, root: string, pr: number): Promise<PrChec
   const out = r.stdout.trim();
   if (out.startsWith("[")) return JSON.parse(out) as PrCheck[];
   if (/no checks reported/i.test(r.stderr)) return [];
-  throw commandFailed("gh pr checks", (r.stderr || r.stdout).trim() || `exit ${r.status}`);
+  throw ghFailed("gh pr checks", r);
 }
 
 /** The state of the PR on GitHub, and the commit its head points at. */
@@ -141,7 +159,7 @@ export async function prState(
   pr: number,
 ): Promise<{ state: string; draft: boolean; headSha: string }> {
   const r = await gh(["pr", "view", String(pr), "--json", "state,isDraft,headRefOid"], root);
-  if (r.status !== 0) throw commandFailed("gh pr view", (r.stderr || r.stdout).trim() || `exit ${r.status}`);
+  if (r.status !== 0) throw ghFailed("gh pr view", r);
   const v = JSON.parse(r.stdout) as { state: string; isDraft: boolean; headRefOid: string };
   return { state: v.state, draft: v.isDraft, headSha: v.headRefOid };
 }
@@ -163,7 +181,7 @@ export const MAX_LOG_CHARS = 32_000;
  */
 export async function failedJobLog(gh: Gh, root: string, job: string): Promise<string> {
   const r = await gh(["run", "view", "--job", job, "--log-failed"], root);
-  if (r.status !== 0) throw commandFailed("gh run view", (r.stderr || r.stdout).trim() || `exit ${r.status}`);
+  if (r.status !== 0) throw ghFailed("gh run view", r);
   const log = r.stdout.length > MAX_LOG_CHARS ? `…\n${r.stdout.slice(-MAX_LOG_CHARS)}` : r.stdout;
   return redact(log);
 }
@@ -176,7 +194,7 @@ export async function mergeMethods(gh: Gh, root: string): Promise<{ methods: Met
     ["repo", "view", "--json", "mergeCommitAllowed,squashMergeAllowed,rebaseMergeAllowed,viewerDefaultMergeMethod"],
     root,
   );
-  if (r.status !== 0) throw commandFailed("gh repo view", (r.stderr || r.stdout).trim() || `exit ${r.status}`);
+  if (r.status !== 0) throw ghFailed("gh repo view", r);
   const v = JSON.parse(r.stdout) as {
     mergeCommitAllowed: boolean;
     squashMergeAllowed: boolean;
@@ -207,10 +225,10 @@ export async function mergePullRequest(
 ): Promise<void> {
   if (draft) {
     const ready = await gh(["pr", "ready", String(pr)], root);
-    if (ready.status !== 0) throw commandFailed("gh pr ready", (ready.stderr || ready.stdout).trim());
+    if (ready.status !== 0) throw ghFailed("gh pr ready", ready);
   }
   const r = await gh(["pr", "merge", String(pr), `--${method}`, "--match-head-commit", headSha], root);
-  if (r.status !== 0) throw commandFailed("gh pr merge", (r.stderr || r.stdout).trim() || `exit ${r.status}`);
+  if (r.status !== 0) throw ghFailed("gh pr merge", r);
 }
 
 /**
@@ -381,7 +399,7 @@ export async function reviewThreads(
     ],
     root,
   );
-  if (r.status !== 0) throw commandFailed("gh api graphql", (r.stderr || r.stdout).trim() || `exit ${r.status}`);
+  if (r.status !== 0) throw ghFailed("gh api graphql", r);
   let json: unknown;
   try {
     json = JSON.parse(r.stdout);
@@ -389,4 +407,148 @@ export async function reviewThreads(
     throw new Error(t("git.review.unreadable"));
   }
   return threadsOf(json, prefix);
+}
+
+/* ---------- The repository's issues (CP-08) ---------- */
+
+/** How many open issues the picker lists, and how much of an issue's text drafting reads. */
+export const MAX_ISSUES = 50;
+export const MAX_ISSUE_CHARS = 12_000;
+
+/** The origin's repository as `gh -R` takes it: `host/owner/name`. */
+function originRepo(root: string): string {
+  const url = git(["remote", "get-url", "origin"], root).stdout.trim();
+  const remote = url ? parseRemote(url) : null;
+  if (!remote) throw new Error(t("git.review.noRemote"));
+  return `${remote.host}/${remote.repo}`;
+}
+
+const IssueList = z.array(
+  z.object({
+    number: z.number().int(),
+    title: z.string(),
+    labels: z.array(z.object({ name: z.string() })).default([]),
+    author: z.object({ login: z.string() }).nullable().optional(),
+    updatedAt: z.string(),
+    url: z.string(),
+  }),
+);
+
+/** The open issues of `root`'s origin repository, newest first, matching `search` when given (gh's own search). */
+export async function openIssues(
+  gh: Gh,
+  root: string,
+  search?: string,
+): Promise<{ issues: IssueSummary[]; capped: boolean }> {
+  const args = [
+    "issue",
+    "list",
+    "-R",
+    originRepo(root),
+    "--state",
+    "open",
+    // One more than shown tells whether there were more.
+    "--limit",
+    String(MAX_ISSUES + 1),
+    "--json",
+    "number,title,labels,author,updatedAt,url",
+    ...(search?.trim() ? ["--search", search.trim()] : []),
+  ];
+  const r = await gh(args, root);
+  if (r.status !== 0) throw ghFailed("gh issue list", r);
+  let json: unknown;
+  try {
+    json = JSON.parse(r.stdout);
+  } catch {
+    throw new Error(t("git.issues.unreadable"));
+  }
+  const parsed = IssueList.safeParse(json);
+  if (!parsed.success) throw new Error(t("git.issues.unreadable"));
+  const issues = parsed.data.slice(0, MAX_ISSUES).map((i) => ({
+    number: i.number,
+    title: i.title,
+    labels: i.labels.map((l) => l.name),
+    author: i.author?.login ?? "ghost",
+    updatedAt: i.updatedAt,
+    url: i.url,
+  }));
+  return { issues, capped: parsed.data.length > MAX_ISSUES };
+}
+
+const IssueView = z.object({
+  number: z.number().int(),
+  title: z.string(),
+  body: z.string().nullable().default(""),
+  url: z.string(),
+  state: z.string(),
+  author: z.object({ login: z.string() }).nullable().optional(),
+  labels: z.array(z.object({ name: z.string() })).default([]),
+  comments: z
+    .array(z.object({ author: z.object({ login: z.string() }).nullable().optional(), body: z.string() }))
+    .default([]),
+});
+
+/**
+ * One issue of `root`'s origin repository, for drafting (CP-08): its header, its body and its latest comments, all
+ * redacted, within `MAX_ISSUE_CHARS` (the body first, then comments from the newest back). Written by anyone who can
+ * open an issue, so it only ever reaches drafting, as data.
+ */
+export async function readIssue(
+  gh: Gh,
+  root: string,
+  number: number,
+  home = homedir(),
+): Promise<{ number: number; title: string; url: string; context: string; capped: boolean }> {
+  if (!Number.isInteger(number) || number <= 0) throw new Error(t("git.issues.badNumber"));
+  const r = await gh(
+    [
+      "issue",
+      "view",
+      String(number),
+      "-R",
+      originRepo(root),
+      "--json",
+      "number,title,body,url,state,author,labels,comments",
+    ],
+    root,
+  );
+  if (r.status !== 0) throw ghFailed("gh issue view", r);
+  let json: unknown;
+  try {
+    json = JSON.parse(r.stdout);
+  } catch {
+    throw new Error(t("git.issues.unreadable"));
+  }
+  const parsed = IssueView.safeParse(json);
+  if (!parsed.success) throw new Error(t("git.issues.unreadable"));
+  const i = parsed.data;
+  return { number: i.number, title: i.title, url: i.url, ...issueContext(i, home) };
+}
+
+/** An issue as drafting reads it: header, body, then as many of the newest comments as fit, in their order. */
+export function issueContext(i: z.infer<typeof IssueView>, home = homedir()): { context: string; capped: boolean } {
+  const labels = i.labels.map((l) => l.name);
+  const head = [
+    `Issue #${i.number}: ${i.title}`,
+    `State: ${i.state.toLowerCase()}${labels.length ? ` · Labels: ${labels.join(", ")}` : ""} · Opened by ${i.author?.login ?? "ghost"}`,
+  ].join("\n");
+  const body = redact((i.body ?? "").trim() || "(no description)", home);
+  // Room for the comments' heading, so the whole stays within the cap.
+  const limit = MAX_ISSUE_CHARS - 100;
+  let text = `${head}\n\n${body}`;
+  let capped = false;
+  if (text.length > limit) return { context: `${text.slice(0, limit - 1)}…`, capped: true };
+  const kept: string[] = [];
+  for (const c of [...i.comments].reverse()) {
+    const said = `${c.author?.login ?? "ghost"}: ${redact(c.body.trim(), home)}`;
+    const next = `\n\n---\n${said}`;
+    if (text.length + next.length + kept.join("").length > limit) {
+      capped = true;
+      break;
+    }
+    kept.unshift(next);
+  }
+  if (kept.length)
+    text += `\n\nComments (${kept.length < i.comments.length ? `the latest ${kept.length} of ${i.comments.length}` : kept.length}):${kept.join("")}`;
+  return { context: text, capped };
 }

@@ -11,11 +11,14 @@ import {
   type GhResult,
   ghCredentialConfig,
   githubStatus,
+  hunkTail,
   jobOf,
   MAX_LOG_CHARS,
   parseRemote,
   prChecks,
   redact,
+  reviewThreads,
+  threadsOf,
 } from "./github.ts";
 
 const dirs: string[] = [];
@@ -134,5 +137,125 @@ describe("CI status and logs (M5-03)", () => {
     const long = `${"x".repeat(MAX_LOG_CHARS)}FAILED here`;
     const log = await failedJobLog(answer(done(long)), ".", "2");
     assert.ok(log.length <= MAX_LOG_CHARS + 2 && log.endsWith("FAILED here") && log.startsWith("…"));
+  });
+});
+
+describe("a PR's review threads (CP-07)", () => {
+  const comment = (body: string, hunk = "@@ -1,3 +1,3 @@\n a\n-b\n+B\n c") => ({
+    author: { login: "octocat" },
+    body,
+    createdAt: "2026-11-12T00:00:00Z",
+    url: "https://github.com/acme/app/pull/7#discussion_r1",
+    diffHunk: hunk,
+  });
+  const thread = (over: Record<string, unknown>) => ({
+    id: "PRRT_1",
+    isResolved: false,
+    isOutdated: false,
+    path: "src/cart.js",
+    line: 2,
+    startLine: null,
+    originalLine: 2,
+    originalStartLine: null,
+    diffSide: "RIGHT",
+    subjectType: "LINE",
+    comments: { totalCount: 1, nodes: [comment("Use cents here.")] },
+    ...over,
+  });
+  // Shaped like GitHub's GraphQL answer for pullRequest.reviewThreads.
+  const answer = (nodes: unknown[], totalCount = nodes.length) => ({
+    data: { repository: { pullRequest: { reviewThreads: { totalCount, nodes } } } },
+  });
+
+  it("reads each thread's lines, side, quote and comments, unresolved first", () => {
+    const { threads, capped } = threadsOf(
+      answer([
+        thread({ id: "resolved", isResolved: true }),
+        thread({ id: "range", startLine: 1, line: 2 }),
+        thread({ id: "left", diffSide: "LEFT", line: 2 }),
+        thread({ id: "file", subjectType: "FILE", line: null, originalLine: null }),
+      ]),
+    );
+    assert.equal(capped, false);
+    assert.deepEqual(
+      threads.map((t) => [t.id, t.side, t.start, t.end, t.fileLevel, t.resolved]),
+      [
+        ["range", "new", 1, 2, false, false],
+        ["left", "old", 2, 2, false, false],
+        ["file", "new", undefined, undefined, true, false],
+        ["resolved", "new", 2, 2, false, true],
+      ],
+    );
+    assert.equal(threads[0]?.quote, "B\nc", "the new side's last lines, without the removed one");
+    assert.equal(threads[1]?.quote, "c", "the old side's last line");
+    assert.deepEqual(threads[0]?.comments[0], {
+      author: "octocat",
+      body: "Use cents here.",
+      createdAt: "2026-11-12T00:00:00Z",
+      url: "https://github.com/acme/app/pull/7#discussion_r1",
+    });
+  });
+
+  it("keeps an outdated thread on its original lines, and redacts what reviewers wrote", () => {
+    const [outdated] = threadsOf(
+      answer([
+        thread({
+          isOutdated: true,
+          line: null,
+          originalLine: 3,
+          comments: { totalCount: 1, nodes: [comment("Token ghp_0123456789abcdefghijABCD0123456789 leaked here")] },
+        }),
+      ]),
+      "",
+      "/Users/me",
+    ).threads;
+    assert.deepEqual([outdated?.outdated, outdated?.start, outdated?.end], [true, 3, 3]);
+    assert.doesNotMatch(outdated?.comments[0]?.body ?? "", /ghp_0123/);
+  });
+
+  it("makes paths relative to the workspace's folder in the repository, and leaves the rest out", () => {
+    const { threads } = threadsOf(
+      answer([thread({ id: "in", path: "apps/web/src/a.ts" }), thread({ id: "out", path: "api/b.ts" })]),
+      "apps/web/",
+    );
+    assert.deepEqual(
+      threads.map((t) => [t.id, t.path]),
+      [["in", "src/a.ts"]],
+    );
+  });
+
+  it("says when there were more threads or comments than it read, and refuses an answer it can't read", () => {
+    assert.equal(threadsOf(answer([thread({})], 101)).capped, true);
+    assert.equal(threadsOf(answer([thread({ comments: { totalCount: 60, nodes: [comment("x")] } })])).capped, true);
+    assert.throws(() => threadsOf({ data: { repository: null } }), /couldn't be read/);
+    assert.equal(hunkTail("@@ -1 +1 @@\n-old\n+new", 1), "new");
+    assert.equal(hunkTail("@@ -1 +1 @@\n-old\n+new", 1, "old"), "old");
+  });
+
+  it("asks gh with the names as plain strings and the number typed, on the origin's host", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "ac-review-"));
+    dirs.push(dir);
+    execFileSync("git", ["init", "-q"], { cwd: dir });
+    execFileSync("git", ["remote", "add", "origin", "https://github.com/acme/app.git"], { cwd: dir });
+    let asked: string[] = [];
+    const gh: Gh = async (args) => {
+      asked = args;
+      return { status: 0, stdout: JSON.stringify(answer([thread({})])), stderr: "" };
+    };
+    const { threads } = await reviewThreads(gh, dir, 7);
+    assert.equal(threads.length, 1);
+    assert.deepEqual(asked.slice(0, 10), [
+      "api",
+      "graphql",
+      "--hostname",
+      "github.com",
+      "-f",
+      "owner=acme",
+      "-f",
+      "name=app",
+      "-F",
+      "number=7",
+    ]);
+    assert.match(asked[11] ?? "", /^query=query\(\$owner: String!/);
   });
 });

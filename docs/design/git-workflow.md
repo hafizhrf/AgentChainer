@@ -80,7 +80,7 @@ current branch, now offered for every tier.
 - **When it's missing:** a guide, `docs/guides/GITHUB_SETUP.md`. It has copyable commands per OS (install `gh`, then
   `gh auth login` in the user's own terminal) and a **Re-check** button.
 - **One wrapper runs every call:**
-  - `spawnSync` with an argument array, never a shell;
+  - `runAsync` with an argument array, never a shell, so a call over the network doesn't block the sidecar;
   - `GH_PROMPT_DISABLED=1`, `NO_COLOR=1` and `GH_NO_UPDATE_NOTIFIER=1` set;
   - a timeout;
   - JSON output (`--json <fields>`) wherever `gh` offers it.
@@ -154,8 +154,17 @@ Each one takes the task, never a path or a `gh` argument from the UI.
     comments, then the gates once (`orchestrator.fixComments`, sharing `round()` with Fix CI);
   - when it ends Done on a task with an open PR, the service commits ("Address review comments") and pushes, never
     forced; without a PR the edits stay in the worktree for Merge or Create PR;
-  - each round is recorded in the run (`run.feedback`) and its evidence. CP-07 will send a PR's review comments from
-    GitHub through the same round, fenced as data.
+  - each round is recorded in the run (`run.feedback`) and its evidence.
+- **The PR's review comments (CP-07)** go through the same round:
+  - the PR area lists the unresolved review threads, read through `gh` with one fixed GraphQL query (resolved and
+    outdated come only from GraphQL), on open and on Refresh, with no polling;
+  - the person ticks which to send (outdated ones start unticked), and may add a note of their own;
+  - the sidecar reads them again by id, maps each to a comment (path relative to the code folder, lines, side, the
+    hunk's lines as the quote, "author: body" as the text) and runs a `source: "github"` round, which fences the
+    reviewers' words as data;
+  - when it ends Done, it's committed and pushed to the PR, never forced; the round is recorded with its threads, so
+    the list marks them sent;
+  - the app never replies to or resolves a thread: the person does, on GitHub (owner's choice).
 - **Limits:**
   - at most 3 rounds per PR;
   - every round counts against the task's budget cap (T-11);
@@ -243,7 +252,7 @@ As built (decided by the implementer, 2026-11-01):
 
 ## 12. Testing
 
-- **A fake `gh`:** a script put on PATH in tests, in the style of `bootstrap/fake-cli.ts`. It records its arguments and
+- **A fake `gh`:** an in-process stand-in (`Gh` is a function the service takes), which records its arguments and
   answers with fixed JSON. Tests cover:
   - detection and the missing or signed-out states;
   - create, including picking up an existing PR;

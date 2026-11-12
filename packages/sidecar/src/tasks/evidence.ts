@@ -663,7 +663,7 @@ export function renderEvidence(e: Evidence, render: (ref: MessageRef) => string 
     add("", r("evidence.feedback.heading"), "");
     for (const [i, f] of e.feedback.entries()) {
       add(
-        r("evidence.feedback.round", {
+        r(f.source === "github" ? "evidence.feedback.roundGithub" : "evidence.feedback.round", {
           n: i + 1,
           count: f.comments,
           files: f.files.map((x) => `\`${x}\``).join(", "),

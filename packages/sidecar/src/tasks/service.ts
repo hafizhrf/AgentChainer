@@ -14,6 +14,7 @@ import {
   type MessageRef,
   type PermissionMode,
   type ResultKey,
+  type ReviewThread,
   RpcErrorCode,
   resultEnglish,
   resultRef,
@@ -50,6 +51,7 @@ import {
   mergePullRequest,
   prChecks,
   prState,
+  reviewThreads,
 } from "../github.ts";
 import { t } from "../i18n/index.ts";
 import { log, RpcFailure } from "../rpc.ts";
@@ -1950,7 +1952,29 @@ export function feedbackTask(
   notify: (task: Task) => void,
   now = new Date(),
 ): Task {
-  const task = present(loadTask(root, id));
+  return startCommentsRound(root, present(loadTask(root, id)), { ...input, source: "person" }, host, notify, now);
+}
+
+/**
+ * A comments round on a finished task (CP-05, CP-07): the person's comments on its diff, or the PR's review threads.
+ * Refused for XL tasks, sub-tasks and variants, a running or unfinished task, one without a worktree, a merged one,
+ * and files that aren't among its changes. When it ends, `settleFeedback` pushes (an open PR, Done) and records it.
+ */
+function startCommentsRound(
+  root: string,
+  task: Task,
+  input: {
+    comments: FeedbackComment[];
+    note?: string | undefined;
+    source: "person" | "github";
+    /** The review threads a GitHub round sends, by id. */
+    threads?: string[];
+  },
+  host: SessionHost,
+  notify: (task: Task) => void,
+  now: Date,
+): Task {
+  const id = task.id;
   if (task.parent || task.subtasks?.length) throw invalid(t("tasks.service.feedbackXl"));
   requireOwnTask(task);
   if (runs.has(id)) throw invalid(t("tasks.service.runningStopFirst"));
@@ -1969,14 +1993,20 @@ export function feedbackTask(
   const orchestrator = orchestratorFor(root, running, host, notify);
   const note = input.note?.trim();
   const round = {
-    run: () => orchestrator.fixComments({ comments: input.comments, ...(note ? { note } : {}), source: "person" }),
+    run: () => orchestrator.fixComments({ comments: input.comments, ...(note ? { note } : {}), source: input.source }),
     cancel: () => orchestrator.cancel(),
     message: (text: string) => orchestrator.message(text),
     get current() {
       return orchestrator.current;
     },
   };
-  const record = { at: now.toISOString(), comments: input.comments.length, files };
+  const record = {
+    at: now.toISOString(),
+    comments: input.comments.length,
+    files,
+    ...(input.source === "github" ? { source: "github" as const } : {}),
+    ...(input.threads?.length ? { threads: input.threads } : {}),
+  };
   void track(root, id, round, notify)
     .then(async (ended) => notify(await settleFeedback(root, id, ended.state, record)))
     .catch((err: unknown) => log(`feedback round ${id}: ${err instanceof Error ? err.message : String(err)}`));
@@ -2025,6 +2055,67 @@ export async function settleFeedback(
   };
   saveTask(root, next);
   return present(next);
+}
+
+/* ---------- A PR's review comments back to the agent (CP-07) ---------- */
+
+/** The task's PR's review threads (CP-07), read through the person's `gh`; nothing is posted to GitHub. */
+export async function prReviewThreads(
+  root: string,
+  id: string,
+  gh: Gh | null,
+): Promise<{ threads: ReviewThread[]; capped: boolean }> {
+  const { task, pr, gh: run } = withPr(root, id, gh);
+  if (task.parent) throw invalid(t("tasks.service.subtaskBranch"));
+  requireOwnTask(task);
+  if (pr.merged) throw invalid(t("tasks.service.prMerged"));
+  return reviewThreads(run, root, pr.number, repoOf(root)?.prefix ?? "");
+}
+
+/** A review thread as a comment for the round: its lines and quote, and its comments as "author: body", as data. */
+export function threadComment(thread: ReviewThread): FeedbackComment {
+  const start = thread.start ?? 1;
+  const said = thread.comments.map((c) => `${c.author}: ${c.body.trim()}`).join("\n\n");
+  const text = `${thread.fileLevel ? "(on the whole file) " : ""}${thread.outdated ? "(on an earlier commit) " : ""}${said}`;
+  return {
+    path: thread.path,
+    side: thread.side,
+    start,
+    end: Math.max(start, thread.end ?? start),
+    quote: thread.quote.slice(0, 8000),
+    text: (text.trim() || "(no text)").slice(0, 4000),
+  };
+}
+
+/**
+ * A round on the review threads the person picked (CP-07). The threads are read again from GitHub by id, so their
+ * text never comes from the UI; the round then runs like Fix as commented, with the reviewers' words as data.
+ */
+export async function fixReviewComments(
+  root: string,
+  id: string,
+  input: { threads: string[]; note?: string | undefined },
+  host: SessionHost,
+  gh: Gh | null,
+  notify: (task: Task) => void,
+  now = new Date(),
+): Promise<Task> {
+  const { threads } = await prReviewThreads(root, id, gh);
+  const picked = threads.filter((th) => input.threads.includes(th.id));
+  if (!picked.length) throw invalid(t("tasks.service.noSuchThreads"));
+  return startCommentsRound(
+    root,
+    present(loadTask(root, id)),
+    {
+      comments: picked.map(threadComment),
+      ...(input.note?.trim() ? { note: input.note.trim() } : {}),
+      source: "github",
+      threads: picked.map((th) => th.id),
+    },
+    host,
+    notify,
+    now,
+  );
 }
 
 /* ---------- Merge gates and the human merge (M5-04, M5-05) ---------- */

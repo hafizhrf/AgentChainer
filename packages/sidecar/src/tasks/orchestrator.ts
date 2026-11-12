@@ -210,7 +210,8 @@ export function commentsText({ comments, note, source }: CommentsRound): string 
     const said = person ? c.text.trim() : fenced(c.text.trim(), "text");
     return `### ${i + 1}. \`${where}\`, ${lines}, ${side}\n\n${fenced(c.quote, fenceLanguage(c.path))}\n\n${said}`;
   });
-  const extra = person && note?.trim() ? [`## Anything else from the person\n\n${note.trim()}`] : [];
+  // The note is the person's own words in either round (CP-07): an instruction, unlike a reviewer's.
+  const extra = note?.trim() ? [`## Anything else from the person\n\n${note.trim()}`] : [];
   return [head, ...items, ...extra].join("\n\n");
 }
 

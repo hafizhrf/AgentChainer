@@ -244,6 +244,9 @@ export function WorkflowCanvas({
       position: { x: n.x, y: n.y },
       width: n.width,
       height: n.height,
+      // A node's size is known: with it, React Flow keeps the handles it measured when a run's update rebuilds the
+      // nodes. Without it, it drops them, and the edges vanish until the node's size changes, which it doesn't.
+      measured: { width: n.width, height: n.height },
       data: { node: n, selected: n.id === selected, ...(states?.[n.id] ? { state: states[n.id] } : {}) },
       ...(n.kind === "group" ? { zIndex: -1 } : {}),
     }));
@@ -255,6 +258,7 @@ export function WorkflowCanvas({
       position: { x, y: first.y },
       width: 1,
       height: 1,
+      measured: { width: 1, height: 1 },
       selectable: false,
       data: { node: first, selected: false },
     });

@@ -70,6 +70,7 @@ import { LessonsCard } from "./LessonsCard.tsx";
 import { MergeGates } from "./MergeGates.tsx";
 import { PrChecks } from "./PrChecks.tsx";
 import { ProjectWorkflowNote } from "./ProjectWorkflowNote.tsx";
+import { ReviewComments } from "./ReviewComments.tsx";
 import { ReviewSummary } from "./ReviewSummary.tsx";
 import { RunApp } from "./RunApp.tsx";
 import { reviewIn } from "./review.ts";
@@ -2371,6 +2372,7 @@ function ResultCard({
         )}
       </dl>
       {task.pr && <PrChecks task={task} cwd={cwd} onChanged={onChanged} />}
+      {task.pr && !task.pr.merged && <ReviewComments task={task} cwd={cwd} onChanged={onChanged} onError={onError} />}
       {task.pr && <MergeGates task={task} cwd={cwd} onChanged={onChanged} />}
       {conflicts.length > 0 && (
         <p className="callout">{t("tasks.result.conflicts", { files: conflicts.join(", ") })}</p>

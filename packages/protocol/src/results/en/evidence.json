@@ -143,6 +143,8 @@
   "evidence.feedback.heading": "## Fix as commented",
   "evidence.feedback.round_one": "- Round {{n}}: {{count}} comment on {{files}}: {{state}}.",
   "evidence.feedback.round_other": "- Round {{n}}: {{count}} comments on {{files}}: {{state}}.",
+  "evidence.feedback.roundGithub_one": "- Round {{n}}, from the PR's review: {{count}} thread on {{files}}: {{state}}.",
+  "evidence.feedback.roundGithub_other": "- Round {{n}}, from the PR's review: {{count}} threads on {{files}}: {{state}}.",
   "evidence.bestOf.heading": "## Best of N",
   "evidence.bestOf.variant_one": "- Variant {{n}} ({{agent}}): {{state}}; gates {{passed}} passed, {{failed}} failed; {{count}} file changed (+{{added}} −{{removed}}); {{cost}}.",
   "evidence.bestOf.variant_other": "- Variant {{n}} ({{agent}}): {{state}}; gates {{passed}} passed, {{failed}} failed; {{count}} files changed (+{{added}} −{{removed}}); {{cost}}.",

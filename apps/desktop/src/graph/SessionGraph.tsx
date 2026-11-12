@@ -94,6 +94,9 @@ export default function SessionGraph({
       type: n.kind,
       position: positions.get(n.id) ?? { x: 0, y: 0 },
       ...nodeSize(n),
+      // With its size, React Flow keeps the handles it measured when a streaming turn rebuilds the nodes; without
+      // it, it drops them and the edges vanish until the node's size changes.
+      measured: nodeSize(n),
       data: {
         node: n,
         focused: focused === n.id,

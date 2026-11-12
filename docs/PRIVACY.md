@@ -22,6 +22,7 @@ AgentChainer never signs you in, and never reads or stores your credentials ([AD
 | What | Where | What's in it |
 |---|---|---|
 | Settings | `settings.json` in Settings | Default model, mode, effort and editor; spend cap; theme; the Claude CLI path, if you set one; your recent folders; the multi-folder workspaces you named, with their folders' paths. |
+| Open tabs | `open-tabs.json` in Settings | The chats and tasks open when the app last closed, so they come back after a restart or crash (CP-09): session and task ids, folders, chat titles (a new chat is named after its first message), the model and agent each used, and whether a reply was still running. Turn off **Settings → General → Reopen tabs from last time** to stop it; that also deletes the file. |
 | Cost history | `agentchainer.db` in Data | Per turn: session id, folder, time, cost and token counts. No prompts or replies. |
 | Codex and agy runs | `usage/agent-runs.jsonl` in Data | Per turn the app ran on Codex or the Antigravity CLI: time, agent, model, token counts, the estimated cost, folder, session id and the task step's title. No prompts or replies. The Usage page reads it. |
 | Agent SDK | `sdk/` in Data | The pinned Claude Agent SDK, downloaded and verified on first run. |

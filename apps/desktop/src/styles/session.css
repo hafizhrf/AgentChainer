@@ -1525,6 +1525,17 @@
   font-size: var(--text-sm);
 }
 
+/* A turn the app's closing cut off (CP-09): the same bar, in the warning colours. */
+.cut-off {
+  border-color: color-mix(in srgb, var(--warn) 35%, var(--border));
+  background: var(--warn-bg);
+}
+
+.cut-off > svg {
+  flex: none;
+  color: var(--warn);
+}
+
 .preview-content[hidden] {
   display: none;
 }

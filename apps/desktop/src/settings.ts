@@ -25,6 +25,8 @@ export type Settings = {
   autoApply: boolean | null;
   /** Show "New task" (M3 contract and triage) before tasks can run; null means off. */
   tasksPreview: boolean | null;
+  /** Reopen the tabs open when the app last closed (CP-09); null means on. */
+  restoreTabs: boolean | null;
   recentWorkspaces: string[];
   /** Named multi-folder workspaces (M8-01), as the New workspace dialog saved them. */
   workspaces: WorkspaceDef[];

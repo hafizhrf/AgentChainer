@@ -34,6 +34,16 @@ import { approxUsd, count, usd as dollars } from "./i18n/format.ts";
 import { t } from "./i18n/index.ts";
 import { MemoryPage } from "./memory/MemoryPage.tsx";
 import { NewSessionDialog } from "./NewSessionDialog.tsx";
+import {
+  loadOpenTabs,
+  mergeOpen,
+  type OpenTabs,
+  restoredActive,
+  restoredTabs,
+  restoredTasks,
+  saveOpenTabs,
+  snapshot,
+} from "./openTabs.ts";
 import { agentModes, fitMode, MODE_NAMES, modelChoices, rememberModels, THEMES } from "./options.ts";
 import { type PermissionAnswer, PermissionDialog } from "./PermissionDialog.tsx";
 import { PANEL_TAB_LABEL, PANEL_TABS, type PanelTab, parseHidden, serializeHidden, toggleHidden } from "./panelTabs.ts";
@@ -168,6 +178,10 @@ export function App() {
   const [orphans, setOrphans] = useState<FleetItem[]>([]);
   /** Resumes in flight, so a second click doesn't start the same session twice (M1-36). */
   const resuming = useRef(new Set<string>());
+  /** The runtime answers (set by the handshake, cleared when it stops): restored chats resume only then (CP-09). */
+  const [live, setLive] = useState(false);
+  /** The tabs from last time were read (CP-09); until then the open tabs aren't written, so they can't be lost. */
+  const [restoreDone, setRestoreDone] = useState(false);
   /** Scheduled flows (M8-05), by `cwd|id`, and the one being edited. */
   const [schedules, setSchedules] = useState<Record<string, Schedule>>({});
   const [scheduleTarget, setScheduleTarget] = useState<ScheduleTarget | null>(null);
@@ -255,6 +269,9 @@ export function App() {
       .then(async ([loaded, checked]) => {
         applySettings(loaded);
         const cfg = await readSelftestConfig();
+        // The tabs open when the app last closed (CP-09); a self-test starts from none.
+        if (!cfg && loaded.restoreTabs !== false) await restoreOpenTabs(loaded).catch(() => undefined);
+        setRestoreDone(true);
         if (!cfg || selftestStarted) return;
         // Performance budgets (X-07): when Home is ready, how long that took, then idle for the memory sample. It
         // needs no CLI or login, so it runs whether or not the readiness check passed (CI runners have no CLI).
@@ -336,9 +353,11 @@ export function App() {
       })
       .catch((err: unknown) => setRuntimeNotice(String(err)));
 
-    // Supervisor events (M1-01): sessions die with the process. Their tabs stay, marked ended, and can be resumed.
+    // Supervisor events (M1-01): sessions die with the process. Their tabs stay, marked ended, and resume when next
+    // shown once the runtime is back (CP-09); a Team worker's doesn't, its Team is gone. A running turn was cut off.
     const offExit = onExit((exit) => {
       alive.current = false;
+      setLive(false);
       setTabs((ts) =>
         ts.map((tab) =>
           tab.ended
@@ -346,6 +365,8 @@ export function App() {
             : {
                 ...tab,
                 ended: true,
+                ...(tab.parentId ? {} : { restored: true }),
+                ...(!tab.parentId && (tab.running || tab.background.length > 0) ? { cutOff: true } : {}),
                 running: false,
                 permissions: [],
                 waits: closeWaits(tab.waits, Date.now()),
@@ -471,6 +492,7 @@ export function App() {
     }
     setHello(h);
     alive.current = true;
+    setLive(true);
     // The fleet as the runtime has it now; changes arrive as `fleet.changed`.
     void request("fleet.list", {}).then(
       ({ items }) => {
@@ -771,6 +793,62 @@ export function App() {
     })();
   }, [settings, orphans]);
 
+  /**
+   * Reopens the tabs open when the app last closed (CP-09): each chat ended until it's shown, then resumed; each task
+   * as it was. Tabs already open (a reload's live chats, M1-36) win. Runs the closing cut off are told once.
+   */
+  async function restoreOpenTabs(loaded: Settings) {
+    const saved = await loadOpenTabs();
+    const tasks = loaded.tasksPreview === true ? saved.tasks : [];
+    if (!saved.chats.length && !tasks.length) return;
+    const kept: OpenTabs = { ...saved, tasks };
+    setTabs((open) => mergeOpen(open, restoredTabs(kept, asMode(loaded.defaultMode)), (x) => x.sessionId));
+    setTaskTabs((open) => mergeOpen(open, restoredTasks(kept), (x) => x.id));
+    const back = restoredActive(kept, [FLEET, USAGE]);
+    setActive((now) => now ?? back);
+    const states = await Promise.all(
+      tasks.map((x) =>
+        request("task.get", { cwd: x.cwd, id: x.id }).then(
+          (task) => task.state,
+          () => null,
+        ),
+      ),
+    );
+    const cut = states.filter((state) => state === "interrupted").length;
+    if (cut) setRuntimeNotice(t("app.restore.interrupted", { count: cut }));
+  }
+
+  /**
+   * Resumes a chat into its tab, as it was: its model, folders and agent, and still `cutOff` if its turn was (CP-09).
+   * Tried once when a restored tab is shown; Resume tries again.
+   */
+  async function resumeTab(tab: Tab) {
+    patchTab(tab.sessionId, ({ restored: _restored, ...x }) => x);
+    await resume(tab.sessionId, tab.cwd, tab.title, tab.modelAlias, tab.folders, tab.agent ?? "claude");
+    patchTab(tab.sessionId, (x) =>
+      x.ended
+        ? { ...x, items: [...x.items, notice(t("app.restore.resumeFailed"))] }
+        : { ...x, ...(tab.kind ? { kind: tab.kind } : {}), ...(tab.cutOff ? { cutOff: true } : {}) },
+    );
+  }
+
+  // A restored chat resumes when it's shown, once the runtime answers (CP-09).
+  const toResume = tabs.find((x) => x.sessionId === active && x.restored && x.ended && setup === null)?.sessionId;
+  // biome-ignore lint/correctness/useExhaustiveDependencies: runs when the shown tab needs it; `resumeTab` reads this render's state.
+  useEffect(() => {
+    if (!live || !settings || !toResume) return;
+    const tab = tabsRef.current.find((x) => x.sessionId === toResume);
+    if (tab) void resumeTab(tab);
+  }, [live, settings, toResume]);
+
+  // The open tabs, written as they change (CP-09): ids, folders and titles only, so streaming doesn't rewrite them.
+  const openKey = restoreDone ? JSON.stringify(snapshot(tabs, taskTabs, active)) : null;
+  useEffect(() => {
+    if (openKey === null || settings?.restoreTabs === false) return;
+    const timer = setTimeout(() => void saveOpenTabs(JSON.parse(openKey) as OpenTabs).catch(() => undefined), 300);
+    return () => clearTimeout(timer);
+  }, [openKey, settings?.restoreTabs]);
+
   function openStored(s: SessionInfo) {
     const open = tabs.find((x) => x.sessionId === s.sessionId);
     if (open && !open.ended) setActive(s.sessionId);
@@ -780,7 +858,7 @@ export function App() {
   async function sendText(sessionId: string, text: string, images: Attachment[] = []) {
     const itemId = nextId();
     // A new chat is named by its first message; the flag goes with it.
-    patchTab(sessionId, ({ untitled, ...tab }) => ({
+    patchTab(sessionId, ({ untitled, cutOff: _cutOff, ...tab }) => ({
       ...tab,
       running: true,
       title: untitled ? text.slice(0, 60) : tab.title,
@@ -1556,7 +1634,8 @@ export function App() {
                     onModelChange={(alias) => void changeModel(tab.sessionId, alias)}
                     onEffortChange={(effort) => void changeEffort(tab.sessionId, effort)}
                     onRewind={(messageId) => void rewind(tab.sessionId, messageId)}
-                    onResume={() => void resume(tab.sessionId, tab.cwd, tab.title)}
+                    onResume={() => void resumeTab(tab)}
+                    onDismissCutOff={() => patchTab(tab.sessionId, ({ cutOff: _cutOff, ...x }) => x)}
                     onRename={(title) => void renameTab(tab.sessionId, title)}
                     onFork={() => void forkTab(tab.sessionId)}
                     onClose={() => closeTab(tab.sessionId)}

@@ -57,6 +57,13 @@ export type Tab = {
   lastSubtype: string | null;
   /** The live session is gone (runtime restart, or the CLI exited). The tab stays so it can be resumed. */
   ended: boolean;
+  /**
+   * Reopened from last time, or ended by a runtime restart (CP-09): resumed when it's next shown, rather than by
+   * Resume.
+   */
+  restored?: boolean;
+  /** Its turn was still running when the app or the runtime stopped (CP-09): the composer offers Continue. */
+  cutOff?: boolean;
   mode: PermissionMode;
   /** Pending tool approvals, oldest first. */
   permissions: PermissionRequest[];

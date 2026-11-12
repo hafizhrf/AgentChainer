@@ -219,5 +219,9 @@
   "session.composer.agentTitle": "This chat runs on {{agent}}.",
   "session.preview.offer": "A server is running at {{url}}",
   "session.preview.open": "Open preview",
-  "session.preview.dismiss": "Dismiss"
+  "session.preview.dismiss": "Dismiss",
+  "session.cutOff.text": "This chat stopped mid-reply when the app closed or its runtime restarted.",
+  "session.cutOff.continue": "Continue",
+  "session.cutOff.prompt": "Continue where you left off.",
+  "session.cutOff.dismiss": "Dismiss"
 }

@@ -68,6 +68,8 @@
   "home.settings.showThinking": "Show summaries of Claude's thinking <muted>(no extra cost)</muted>",
   "home.settings.autoApply": "Apply safe setup automatically before a new session",
   "home.settings.autoApplyHelp": "Only reviewed first-party and official catalog items, plus fixes that only add lines (env rules in .gitignore, importing AGENTS.md). Never generators, git changes, or vendor and community items. What was applied shows in the session, and Workspace settings → History can roll it back.",
+  "home.settings.restoreTabs": "Reopen tabs from last time",
+  "home.settings.restoreTabsHelp": "Chats and tasks open when the app closed, or crashed, come back. A chat resumes when you open it. Turning this off forgets them.",
   "home.settings.tasksPreview": "Tasks <muted>(preview)</muted>",
   "home.settings.tasksPreviewHelp": "Adds New task ({{keys}}): Claude drafts a contract for the work, triage proposes a tier, and you approve both before it runs. Your project's own checks then verify the result.",
   "home.settings.limits": "Limits",

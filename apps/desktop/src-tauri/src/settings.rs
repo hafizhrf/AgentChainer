@@ -113,6 +113,8 @@ pub struct Settings {
     pub auto_apply: Option<bool>,
     /// Show "New task" (M3, contract and triage) before tasks can run. Off unless set.
     pub tasks_preview: Option<bool>,
+    /// Reopen the tabs open when the app last closed (CP-09). `None` means on.
+    pub restore_tabs: Option<bool>,
     /// Most recent first.
     pub recent_workspaces: Vec<String>,
     /// Named multi-folder workspaces (M8-01), as the New workspace dialog saved them.
@@ -215,20 +217,25 @@ fn dir_key(dir: &str, windows: bool) -> String {
     }
 }
 
-fn path(app: &AppHandle) -> Result<PathBuf, String> {
+/// A file in the app's config folder (`settings.json`, `open-tabs.json`).
+pub fn config_file(app: &AppHandle, name: &str) -> Result<PathBuf, String> {
     // The end-to-end tests (X-06) keep their settings apart: on Windows the config folder comes from the system, not
     // from an environment variable a test could set. Debug builds only (X-02).
     if let Some(dir) = crate::dev_only(
         std::env::var_os("AGENTCHAINER_CONFIG_DIR"),
         cfg!(debug_assertions),
     ) {
-        return Ok(PathBuf::from(dir).join("settings.json"));
+        return Ok(PathBuf::from(dir).join(name));
     }
     let dir = app
         .path()
         .app_config_dir()
         .map_err(|e| crate::i18n::tr("native.noConfigDir", &[("error", &e.to_string())]))?;
-    Ok(dir.join("settings.json"))
+    Ok(dir.join(name))
+}
+
+fn path(app: &AppHandle) -> Result<PathBuf, String> {
+    config_file(app, "settings.json")
 }
 
 /// Missing or unreadable settings fall back to defaults rather than blocking the app.
@@ -241,7 +248,6 @@ pub fn load(app: &AppHandle) -> Settings {
         .normalized()
 }
 
-/// Writes atomically (temp file + rename), so a crash never leaves a half-written file.
 /// Why `path` can't be the `cli` (the Claude, Codex or Antigravity CLI), or `None`: it must be an absolute path to an
 /// existing file (X-02), since the app runs it as the user's own CLI.
 pub fn cli_path_problem(cli: &str, path: &str) -> Option<String> {
@@ -263,7 +269,13 @@ pub fn cli_path_problem(cli: &str, path: &str) -> Option<String> {
 
 pub fn save(app: &AppHandle, settings: Settings) -> Result<Settings, String> {
     let settings = settings.normalized();
-    let target = path(app)?;
+    let text = serde_json::to_string_pretty(&settings).map_err(|e| e.to_string())?;
+    write_atomic(&path(app)?, &text)?;
+    Ok(settings)
+}
+
+/// Writes atomically (temp file + rename), so a crash never leaves a half-written file.
+pub fn write_atomic(target: &std::path::Path, text: &str) -> Result<(), String> {
     if let Some(dir) = target.parent() {
         std::fs::create_dir_all(dir).map_err(|e| {
             crate::i18n::tr(
@@ -275,7 +287,6 @@ pub fn save(app: &AppHandle, settings: Settings) -> Result<Settings, String> {
             )
         })?;
     }
-    let text = serde_json::to_string_pretty(&settings).map_err(|e| e.to_string())?;
     let tmp = target.with_extension("json.tmp");
     std::fs::write(&tmp, text).map_err(|e| {
         crate::i18n::tr(
@@ -286,7 +297,7 @@ pub fn save(app: &AppHandle, settings: Settings) -> Result<Settings, String> {
             ],
         )
     })?;
-    std::fs::rename(&tmp, &target).map_err(|e| {
+    std::fs::rename(&tmp, target).map_err(|e| {
         crate::i18n::tr(
             "native.save",
             &[
@@ -294,8 +305,7 @@ pub fn save(app: &AppHandle, settings: Settings) -> Result<Settings, String> {
                 ("error", &e.to_string()),
             ],
         )
-    })?;
-    Ok(settings)
+    })
 }
 
 #[cfg(test)]
@@ -352,6 +362,7 @@ mod tests {
             language: Some(" id ".into()),
             auto_apply: None,
             tasks_preview: None,
+            restore_tabs: None,
             recent_workspaces: (0..12)
                 .map(|i| format!("/p/{}", i % 10))
                 .chain([" ".into()])
@@ -408,6 +419,7 @@ mod tests {
             "auto-apply is off unless the user turns it on"
         );
         assert_eq!(s.tasks_preview, None, "the tasks preview is off by default");
+        assert_eq!(s.restore_tabs, None, "tabs are reopened unless turned off");
     }
 
     #[test]

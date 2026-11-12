@@ -1,5 +1,5 @@
 import { type Effort, imageType, type PermissionMode, type PermissionRequest } from "@agentchainer/protocol";
-import { ArrowDown, ClipboardList, Globe, Loader2, X } from "lucide-react";
+import { ArrowDown, ClipboardList, Globe, Loader2, TriangleAlert, X } from "lucide-react";
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { Group, Panel, Separator, useDefaultLayout, usePanelRef } from "react-resizable-panels";
 import { type Attachment, Composer } from "./Composer.tsx";
@@ -66,6 +66,7 @@ export function SessionView({
   onEffortChange,
   onRewind,
   onResume,
+  onDismissCutOff,
   onRename,
   onFork,
   onClose,
@@ -100,6 +101,8 @@ export function SessionView({
   onEffortChange: (effort: Effort | null) => void;
   onRewind: (messageId: string) => void;
   onResume: () => void;
+  /** Hides the offer to continue a turn the app's closing cut off (CP-09). */
+  onDismissCutOff: () => void;
   onRename: (title: string) => void;
   onFork: () => void;
   onClose: () => void;
@@ -379,6 +382,25 @@ export function SessionView({
                           className="tiny"
                           onClick={() => setDismissed((d) => [...d, offer])}
                         >
+                          <X size={12} />
+                        </IconButton>
+                      </div>
+                    )}
+                    {tab.cutOff && !tab.ended && !tab.running && (
+                      <div className="preview-offer cut-off" role="status">
+                        <TriangleAlert size={13} aria-hidden />
+                        <span className="grow">{t("session.cutOff.text")}</span>
+                        <button
+                          type="button"
+                          className="small"
+                          onClick={() => {
+                            jumpToLatest();
+                            onSend(t("session.cutOff.prompt"), []);
+                          }}
+                        >
+                          {t("session.cutOff.continue")}
+                        </button>
+                        <IconButton label={t("session.cutOff.dismiss")} className="tiny" onClick={onDismissCutOff}>
                           <X size={12} />
                         </IconButton>
                       </div>

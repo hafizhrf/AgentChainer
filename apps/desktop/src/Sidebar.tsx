@@ -307,7 +307,15 @@ function SessionStatus({ tab }: { tab: Tab }) {
   if (tab.running) return <Loader2 className="nav-status spin" size={14} aria-label={t("shell.sidebar.working")} />;
   if (tab.background.length > 0)
     return <Loader2 className="nav-status spin" size={14} aria-label={t("shell.sidebar.workingBackground")} />;
-  if (tab.ended)
+  // Cut off mid-reply when the app or runtime stopped (CP-09): Continue is offered in the chat.
+  if (tab.cutOff)
+    return (
+      <span className="nav-status ended cut-off-status" title={t("shell.sidebar.cutOffTitle")}>
+        {t("shell.sidebar.cutOff")}
+      </span>
+    );
+  // A chat reopened from last time resumes when it's opened, so it isn't marked ended.
+  if (tab.ended && !tab.restored)
     return (
       <span className="nav-status ended" title={t("shell.sidebar.endedTitle")}>
         {t("shell.sidebar.ended")}

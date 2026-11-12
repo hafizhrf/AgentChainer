@@ -573,6 +573,16 @@ export function TaskPage({
           <div className="thread">
             <div className="msg user task-request-msg">
               {task.chatContext && <span className="chip">{t("tasks.page.fromChat")}</span>}
+              {task.issue && (
+                <button
+                  type="button"
+                  className="chip chip-link"
+                  title={task.issue.title}
+                  onClick={() => task.issue && void openUrl(task.issue.url)}
+                >
+                  {t("tasks.page.fromIssue", { number: task.issue.number })}
+                </button>
+              )}
               <p>{task.request}</p>
             </div>
 

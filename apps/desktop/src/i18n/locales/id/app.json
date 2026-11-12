@@ -84,6 +84,7 @@
   "app.palette.newSession": "Session baru",
   "app.palette.fleet": "Fleet: semua yang sedang berjalan",
   "app.palette.newTask": "Task baru (pratinjau)",
+  "app.palette.newTaskFromIssue": "Task baru dari issue GitHub…",
   "app.palette.openFolder": "Buka folder…",
   "app.palette.stop": "Hentikan giliran yang sedang berjalan",
   "app.palette.resume": "Lanjutkan session ini",

@@ -2146,3 +2146,80 @@ fieldset.schedule-days > legend {
   -webkit-line-clamp: 3;
   white-space: pre-wrap;
 }
+
+/* ---------- A task from a GitHub issue (CP-08) ---------- */
+
+.issue-list {
+  display: flex;
+  flex-direction: column;
+  max-height: 22rem;
+  margin: var(--space-2) 0 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.issue-list > li + li {
+  border-top: 1px solid var(--border);
+}
+
+.issue-row {
+  display: grid;
+  grid-template-columns: auto auto minmax(0, 1fr);
+  gap: var(--space-1) var(--space-2);
+  align-items: baseline;
+  width: 100%;
+  padding: var(--space-2) var(--space-3);
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--fg);
+  font: inherit;
+  text-align: left;
+}
+
+.issue-row:hover {
+  background: var(--surface-2);
+}
+
+.issue-open {
+  align-self: center;
+  color: var(--ok);
+}
+
+.issue-number {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.issue-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.issue-meta {
+  display: flex;
+  flex-wrap: wrap;
+  grid-column: 3;
+  gap: var(--space-1);
+  align-items: center;
+  font-size: var(--text-sm);
+}
+
+.issue-picked-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.issue-picked-title {
+  margin: var(--space-2) 0 var(--space-3);
+}
+
+.chip-link {
+  cursor: pointer;
+}

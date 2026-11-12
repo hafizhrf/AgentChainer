@@ -1,4 +1,5 @@
 import type { TaskSummary } from "@agentchainer/protocol";
+import { CircleDot } from "lucide-react";
 import { useEffect, useState } from "react";
 import { approxUsd, dateTime } from "../i18n/format.ts";
 import { t } from "../i18n/index.ts";
@@ -7,8 +8,19 @@ import { stateLabel } from "./run.ts";
 
 const usd = (n: number) => approxUsd(n, n < 0.1 ? 4 : 2);
 
-/** The workspace's tasks on Home (UX-13), newest first; one opens in its tab. New tasks start from the composer. */
-export function HomeTasks({ cwd, onOpen }: { cwd: string; onOpen: (id: string, title: string) => void }) {
+/**
+ * The workspace's tasks on Home (UX-13), newest first; one opens in its tab. New tasks start from the composer, or
+ * from one of the repository's GitHub issues (CP-08).
+ */
+export function HomeTasks({
+  cwd,
+  onOpen,
+  onFromIssue,
+}: {
+  cwd: string;
+  onOpen: (id: string, title: string) => void;
+  onFromIssue?: () => void;
+}) {
   const [tasks, setTasks] = useState<TaskSummary[] | null>(null);
   useEffect(() => {
     let live = true;
@@ -20,13 +32,21 @@ export function HomeTasks({ cwd, onOpen }: { cwd: string; onOpen: (id: string, t
       live = false;
     };
   }, [cwd]);
-  if (!tasks?.length) return null;
+  if (!tasks || (!tasks.length && !onFromIssue)) return null;
   return (
     <section className="card" aria-labelledby="home-tasks">
       <div className="card-title">
         <h2 id="home-tasks">{t("tasks.home.title")}</h2>
         <span className="muted">{t("tasks.home.subtitle")}</span>
+        <span className="grow" />
+        {onFromIssue && (
+          <button type="button" className="secondary small" onClick={onFromIssue}>
+            <CircleDot size={14} aria-hidden />
+            {t("tasks.home.fromIssue")}
+          </button>
+        )}
       </div>
+      {!tasks.length && <p className="muted">{t("tasks.home.none")}</p>}
       <ul className="task-list">
         {tasks.slice(0, 12).map((item) => (
           <li key={item.id} className="task-row">

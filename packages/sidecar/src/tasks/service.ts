@@ -51,6 +51,7 @@ import {
   mergePullRequest,
   prChecks,
   prState,
+  readIssue,
   reviewThreads,
 } from "../github.ts";
 import { t } from "../i18n/index.ts";
@@ -172,6 +173,24 @@ export function newTask(root: string, request: string, context?: string, folders
   return extra;
 }
 
+/**
+ * A task from one of the repository's GitHub issues (CP-08). The sidecar reads the issue itself, by number, through
+ * the person's `gh`; the request is the person's own text. The issue's text and latest comments are kept for drafting
+ * only, where they're read as data: whoever can open an issue wrote them.
+ */
+export async function newTaskFromIssue(root: string, number: number, request: string, gh: Gh | null): Promise<Task> {
+  if (!gh) throw invalid(t("tasks.service.ghMissing"));
+  const issue = await readIssue(gh, root, number);
+  const task = newTask(root, request);
+  const withIssue: Task = {
+    ...task,
+    issue: { provider: "github", number: issue.number, title: issue.title.slice(0, 1000), url: issue.url },
+    issueContext: issue.context,
+  };
+  saveTask(root, withIssue);
+  return withIssue;
+}
+
 /** Drafting's messages, so the thread shows what it reads (UX-13). */
 /** Drafting's messages for the thread (UX-13), and its questions to the person (UX-24). */
 export type DraftListener = { onMessage?: (m: SDKMessage) => void; ask?: AskQuestions };
@@ -226,6 +245,7 @@ export async function draftTask(
       abortController: controller,
       extra: {
         ...(task.chatContext ? { context: task.chatContext } : {}),
+        ...(task.issueContext ? { issue: task.issueContext } : {}),
         ...(feedback !== undefined && task.contract ? { current: task.contract, feedback } : {}),
         ...(task.folders?.length ? { folders: task.folders.map(({ name, path }) => ({ name, path })) } : {}),
         ...(settled.length ? { settled: settled.map(({ question, answer }) => ({ question, answer })) } : {}),
@@ -1608,7 +1628,10 @@ export function prBody(root: string, task: Task): string {
         ]
       : []),
   ];
-  const footer = [...elsewhere, "", "---", `Opened from AgentChainer task \`${task.id}\`.`];
+  // A task from one of the repository's issues closes it when the PR merges (CP-08): issues are read from the origin,
+  // the repository the PR is opened in.
+  const closes = task.issue ? [`Closes #${task.issue.number}`, ""] : [];
+  const footer = [...elsewhere, "", "---", ...closes, `Opened from AgentChainer task \`${task.id}\`.`];
   let body = [...contract, "## Evidence", "", evidence.trim(), ...footer].join("\n");
   if (body.length > MAX_PR_BODY) {
     body = `${body.slice(0, MAX_PR_BODY)}\n\n…the report goes on in \`.agentchainer/tasks/${task.id}/evidence.md\`.${footer.join("\n")}`;

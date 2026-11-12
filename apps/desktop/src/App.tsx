@@ -68,6 +68,7 @@ import {
   updateTab,
 } from "./tabs.ts";
 import { HomeTasks } from "./tasks/HomeTasks.tsx";
+import { IssuePicker } from "./tasks/IssuePicker.tsx";
 import { ScheduleDialog, type ScheduleTarget } from "./tasks/ScheduleDialog.tsx";
 import { type TaskTab, taskKey } from "./tasks/taskTabs.ts";
 import { TEAM_CAP_USD, usd } from "./team.ts";
@@ -155,6 +156,8 @@ export function App() {
   const [wsDialog, setWsDialog] = useState<WorkspaceDef | "new" | null>(null);
   /** The New session dialog (UX-20): New, Ctrl+N, the palette and the home page open it. */
   const [newSession, setNewSession] = useState(false);
+  /** The issue picker (CP-08), with the folder its task goes in. */
+  const [issueDir, setIssueDir] = useState<string | null>(null);
   // The page Settings opens on: General, unless a screenshot run asks for another (UX-23).
   const [settingsPage, setSettingsPage] = useState<SettingsPage | undefined>(undefined);
   /** The agent a new chat runs on (M9-09). */
@@ -289,6 +292,7 @@ export function App() {
           setSettingsOpen(true);
         }
         if (cfg.open === "new-session") setNewSession(true);
+        if (cfg.open === "issue-picker") setIssueDir(cfg.cwd);
         if (cfg.open === "task-changes" || cfg.open === "task-contract" || cfg.open === "task-variants") {
           const latest = (await request("task.list", { cwd: cfg.cwd })).tasks[0];
           if (latest) openTask(cfg.cwd, latest.id);
@@ -1195,12 +1199,22 @@ export function App() {
     if (id) patchTab(id, (x) => ({ ...x, kind: "task" }));
   }
 
+  /** A task from one of the folder's GitHub issues (CP-08): the active tab's folder, or Home's. Tasks preview only. */
+  function newTaskFromIssue() {
+    if (settings?.tasksPreview !== true) return;
+    const open = tabs.find((x) => x.sessionId === active) ?? taskTabs.find((x) => taskKey(x.id) === active);
+    const dir = open?.cwd ?? cwd.trim();
+    if (!dir) return show(null);
+    setIssueDir(dir);
+  }
+
   const toggleTerminal = (sessionId: string) =>
     setTerminals((open) => withToggled(open, sessionId, !open.has(sessionId)));
 
   const menuHandlers: Record<MenuCommand, () => void> = {
     "new-session": () => setNewSession(true),
     "new-task": newTask,
+    "new-task-from-issue": newTaskFromIssue,
     "open-folder": () => void openFolder(),
     "close-session": () => active && closeTab(active),
     settings: () => setSettingsOpen(true),
@@ -1245,6 +1259,8 @@ export function App() {
     add(session, "memory", t("app.palette.memory"), () => show(MEMORY));
     if (settings?.tasksPreview === true)
       add(session, "new-task", t("app.palette.newTask"), newTask, { shortcut: menuShortcut("new-task") });
+    if (settings?.tasksPreview === true)
+      add(session, "new-task-from-issue", t("app.palette.newTaskFromIssue"), newTaskFromIssue);
     add(session, "open-folder", t("app.palette.openFolder"), () => void openFolder(), {
       shortcut: menuShortcut("open-folder"),
     });
@@ -1506,7 +1522,11 @@ export function App() {
                     }
                   >
                     {settings?.tasksPreview === true && hello !== null && workspace && (
-                      <HomeTasks cwd={workspace} onOpen={(id, title) => openTask(workspace, id, { title })} />
+                      <HomeTasks
+                        cwd={workspace}
+                        onOpen={(id, title) => openTask(workspace, id, { title })}
+                        onFromIssue={() => setIssueDir(workspace)}
+                      />
                     )}
                   </HomeView>
                 )}
@@ -1606,6 +1626,17 @@ export function App() {
             </main>
           </Panel>
         </Group>
+
+        {issueDir !== null && (
+          <IssuePicker
+            open
+            cwd={issueDir}
+            onOpenChange={(open) => !open && setIssueDir(null)}
+            onCreated={(task) =>
+              openTask(issueDir, task.id, { autoDraft: true, model, title: task.request.slice(0, 60) })
+            }
+          />
+        )}
 
         {permission && activeTab && (
           <PermissionDialog

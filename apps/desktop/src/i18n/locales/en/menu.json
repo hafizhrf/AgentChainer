@@ -6,6 +6,7 @@
   "menu.help": "Help",
   "menu.new-session": "New Session",
   "menu.new-task": "New Task",
+  "menu.new-task-from-issue": "New Task from Issue…",
   "menu.open-folder": "Open Folder…",
   "menu.close-session": "Close Session",
   "menu.settings": "Settings…",

@@ -85,6 +85,7 @@
   "app.palette.newSession": "New session",
   "app.palette.fleet": "Fleet: everything running",
   "app.palette.newTask": "New task (preview)",
+  "app.palette.newTaskFromIssue": "New task from a GitHub issue…",
   "app.palette.openFolder": "Open folder…",
   "app.palette.stop": "Stop the running turn",
   "app.palette.resume": "Resume this session",

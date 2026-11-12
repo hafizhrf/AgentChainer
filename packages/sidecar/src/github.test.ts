@@ -10,12 +10,17 @@ import {
   type Gh,
   type GhResult,
   ghCredentialConfig,
+  ghFailed,
   githubStatus,
   hunkTail,
+  issueContext,
   jobOf,
+  MAX_ISSUE_CHARS,
   MAX_LOG_CHARS,
+  openIssues,
   parseRemote,
   prChecks,
+  readIssue,
   redact,
   reviewThreads,
   threadsOf,
@@ -257,5 +262,119 @@ describe("a PR's review threads (CP-07)", () => {
       "number=7",
     ]);
     assert.match(asked[11] ?? "", /^query=query\(\$owner: String!/);
+  });
+});
+
+describe("the repository's issues (CP-08)", () => {
+  /** A git folder whose origin is `acme/app` on GitHub. */
+  function repo() {
+    const dir = mkdtempSync(join(tmpdir(), "ac-issues-"));
+    dirs.push(dir);
+    execFileSync("git", ["init", "-q"], { cwd: dir });
+    execFileSync("git", ["remote", "add", "origin", "git@github.com:acme/app.git"], { cwd: dir });
+    return dir;
+  }
+  const issue = (number: number, over: Record<string, unknown> = {}) => ({
+    number,
+    title: `Issue ${number}`,
+    labels: [{ name: "bug" }],
+    author: { login: "octocat" },
+    updatedAt: "2026-11-12T00:00:00Z",
+    url: `https://github.com/acme/app/issues/${number}`,
+    ...over,
+  });
+
+  it("lists the origin's open issues, with gh's search, and says when there were more", async () => {
+    const dir = repo();
+    const asked: string[][] = [];
+    const gh: Gh = async (args) => {
+      asked.push(args);
+      return { status: 0, stdout: JSON.stringify(Array.from({ length: 51 }, (_, i) => issue(i + 1))), stderr: "" };
+    };
+    const { issues, capped } = await openIssues(gh, dir, " label:bug ");
+    assert.equal(issues.length, 50);
+    assert.equal(capped, true);
+    assert.deepEqual(issues[0], {
+      number: 1,
+      title: "Issue 1",
+      labels: ["bug"],
+      author: "octocat",
+      updatedAt: "2026-11-12T00:00:00Z",
+      url: "https://github.com/acme/app/issues/1",
+    });
+    assert.deepEqual(asked[0], [
+      "issue",
+      "list",
+      "-R",
+      "github.com/acme/app",
+      "--state",
+      "open",
+      "--limit",
+      "51",
+      "--json",
+      "number,title,labels,author,updatedAt,url",
+      "--search",
+      "label:bug",
+    ]);
+    await openIssues(gh, dir);
+    assert.ok(!asked[1]?.includes("--search"));
+  });
+
+  it("reads one issue by its number for drafting: header, body, the newest comments, redacted", async () => {
+    const dir = repo();
+    let asked: string[] = [];
+    const gh: Gh = async (args) => {
+      asked = args;
+      return {
+        status: 0,
+        stdout: JSON.stringify({
+          ...issue(7),
+          body: "Totals are wrong. My token is ghp_0123456789abcdefghijABCD0123456789.",
+          state: "OPEN",
+          comments: [
+            { author: { login: "a" }, body: "First." },
+            { author: { login: "b" }, body: "Use cents." },
+          ],
+        }),
+        stderr: "",
+      };
+    };
+    const read = await readIssue(gh, dir, 7, "/Users/me");
+    assert.deepEqual(asked.slice(0, 5), ["issue", "view", "7", "-R", "github.com/acme/app"]);
+    assert.equal(read.url, "https://github.com/acme/app/issues/7");
+    assert.match(read.context, /^Issue #7: Issue 7\nState: open · Labels: bug · Opened by octocat\n\nTotals are wrong/);
+    assert.doesNotMatch(read.context, /ghp_0123/);
+    assert.match(read.context, /Comments \(2\):\n\n---\na: First\.\n\n---\nb: Use cents\.$/);
+    await assert.rejects(readIssue(gh, dir, 0), /whole number/);
+    await assert.rejects(readIssue(gh, dir, 1.5), /whole number/);
+  });
+
+  it("keeps the body and as many of the newest comments as fit", () => {
+    const long = "x".repeat(4_000);
+    const { context, capped } = issueContext({
+      ...issue(7),
+      body: "Body.",
+      state: "OPEN",
+      comments: [1, 2, 3, 4].map((n) => ({ author: { login: `c${n}` }, body: `${n}${long}` })),
+    });
+    assert.ok(context.length <= MAX_ISSUE_CHARS);
+    assert.equal(capped, true);
+    assert.match(context, /Body\./);
+    assert.match(context, /the latest 2 of 4/);
+    assert.match(context, /c4: 4x/);
+    assert.doesNotMatch(context, /c1: 1x/);
+  });
+});
+
+describe("a gh call that failed", () => {
+  it("says a token in the environment overrides gh's login when gh was refused for its credentials", () => {
+    const refused = { status: 1, stdout: "", stderr: "HTTP 401: Bad credentials (https://api.github.com/graphql)" };
+    assert.match(
+      ghFailed("gh issue list", refused, { GITHUB_TOKEN: "x" }).message,
+      /GITHUB_TOKEN is set in the app's environment/,
+    );
+    assert.doesNotMatch(ghFailed("gh issue list", refused, {}).message, /environment/);
+    const other = { status: 1, stdout: "", stderr: "no pull requests found" };
+    assert.doesNotMatch(ghFailed("gh pr view", other, { GH_TOKEN: "x" }).message, /environment/);
   });
 });

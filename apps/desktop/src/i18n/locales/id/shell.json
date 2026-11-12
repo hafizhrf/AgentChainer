@@ -68,6 +68,8 @@
   "shell.sidebar.settings": "Pengaturan",
   "shell.sidebar.endedTitle": "Berakhir: buka untuk melanjutkan",
   "shell.sidebar.ended": "berakhir",
+  "shell.sidebar.cutOff": "terhenti",
+  "shell.sidebar.cutOffTitle": "Berhenti di tengah balasan saat aplikasi ditutup: buka untuk meneruskan",
   "shell.sessionList.title": "Session sebelumnya",
   "shell.sessionList.loading": "Memuat…",
   "shell.sessionList.empty": "Belum ada session di folder ini. Session yang dimulai di terminal juga muncul di sini.",

@@ -11,7 +11,7 @@
 | No credential handling | The app never implements login, never reads or stores credentials ([ADR-0002](adr/0002-auth-and-branding.md)) |
 | Transparency | Every agent action (text, tool call, subagent, permission, cost) is visible as it happens |
 | Responsiveness | Token deltas render < 100 ms p95 after the sidecar receives them; UI stays at 60 fps during streaming |
-| Resilience | A sidecar or UI crash never loses a session: sessions are persisted by the SDK and resumable |
+| Resilience | A sidecar or UI crash never loses a session: sessions are persisted by the SDK and resumable, and the open tabs come back after a restart or crash (CP-09) |
 | Safety | Least privilege by default, a hard denylist for destructive commands, preview before any bootstrap change |
 | Evolvability | SDK/CLI churn is absorbed by one normalization layer, covered by recorded-fixture contract tests |
 
@@ -188,6 +188,7 @@ Workspace paths are relative to `cwd`; the sidecar rejects absolute paths and `.
 | `reveal_in_folder` | Shows a file or folder selected in Explorer, Finder or the Linux file manager (UX-21), through the opener plugin |
 | `cost_record` / `cost_sessions` / `cost_summary` | Local cost history in SQLite (§7) |
 | `diagnostics_export` | Redacted diagnostics bundle (versions, settings, readiness, recent log, crash logs) to a user-picked file |
+| `open_tabs_get` / `open_tabs_set` | The tabs open when the app last closed (CP-09), as `open-tabs.json` beside `settings.json`: each chat's session id, folder(s), title, agent, profile and model alias, and whether its turn was running; each task's id, folder and title; the tab shown. Written atomically as the tabs change, so a crash leaves the last full list. On start each chat comes back ended and is resumed (`session.history` + `session.start`) only when it's shown; a chat whose turn was running offers **Continue**. Nothing is written while **Reopen tabs from last time** is off, and turning it off deletes the file |
 
 **Multi-session (protocol v2, M1-08):** live-session methods and both notifications carry the SDK session id, so one
 sidecar runs every tab's session. The sidecar picks the id of a new session itself (the SDK's `sessionId` option), so
@@ -352,7 +353,8 @@ sequenceDiagram
 | `session_meta` | sessionId ↔ workspace, created-in (app/cli), pinned | Planned |
 | `bootstrap_runs` | run ID, workspace, plan summary, result, lockfile hash | Planned (M2) |
 
-- Settings stay in `settings.json` (no secrets, atomic writes). A table adds nothing for a handful of values.
+- Settings stay in `settings.json` (no secrets, atomic writes). A table adds nothing for a handful of values. The
+  open tabs (CP-09) are `open-tabs.json`, written the same way.
 - A turn's own cost is the difference between consecutive running totals. When the UI doesn't know it (the first
   turn after a resume), the core takes it from the session's last recorded total. Turns of sessions first seen in
   the app after a resume from the terminal stay uncounted, and the UI says so.

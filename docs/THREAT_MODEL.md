@@ -98,7 +98,8 @@ Nothing else. In particular, there is no file-system or shell plugin.
 | `workspace_watch` | Folder | Watches only, without following links; emits change events. |
 | `diagnostics_export` | Path | Only a `.json` file in an existing folder, chosen in a save dialog. |
 | `settings_set` | Settings | Normalized on save; typed fields only. A new Claude, Codex or Antigravity CLI path must be an absolute path to an existing file. `language` keeps only a language the UI has (`id`). |
-| `settings_get`, `app_info`, `updater_ready` | — | Read only. |
+| `open_tabs_set` (CP-09) | `open-tabs.json` in the config folder | A typed struct that refuses unknown fields; ids, absolute folders, known agents and kinds only; at most 50 chats and 50 tasks, titles cut to 200 characters. It holds session and task ids, folder paths and chat titles, on this computer only. Ignored while the setting is off. |
+| `settings_get`, `open_tabs_get`, `app_info`, `updater_ready` | — | Read only. |
 | `sidecar_restart` | — | Restarts the app's own runtime. |
 | `workspace_unwatch` | Folder | Stops a watcher. |
 | `pty_resize` / `pty_close` | Terminal id | Only terminals this window opened. |

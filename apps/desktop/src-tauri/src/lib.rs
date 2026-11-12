@@ -4,6 +4,7 @@ mod editor;
 mod history;
 mod i18n;
 mod menu;
+mod open_tabs;
 mod pty;
 mod redact;
 mod settings;
@@ -73,7 +74,27 @@ fn settings_set(app: AppHandle, settings: Settings) -> Result<Settings, String> 
             return Err(problem);
         }
     }
-    settings::save(&app, settings)
+    let saved = settings::save(&app, settings)?;
+    // Turned off (CP-09): the tabs from last time are forgotten, not just left unread.
+    if saved.restore_tabs == Some(false) {
+        open_tabs::clear(&app);
+    }
+    Ok(saved)
+}
+
+/// The tabs open when the app last closed (CP-09); none when there's no file or it can't be read.
+#[tauri::command]
+fn open_tabs_get(app: AppHandle) -> open_tabs::OpenTabs {
+    open_tabs::load(&app)
+}
+
+/// Remembers the open tabs, as the UI's tabs change; written atomically, so a crash leaves the last full list.
+#[tauri::command]
+fn open_tabs_set(app: AppHandle, tabs: open_tabs::OpenTabs) -> Result<(), String> {
+    if settings::load(&app).restore_tabs == Some(false) {
+        return Ok(());
+    }
+    open_tabs::save(&app, tabs)
 }
 
 /// Opens the user's terminal, for the sign-in steps of the onboarding tutorial (M1-05).
@@ -347,6 +368,8 @@ pub fn run() {
             sidecar_restart,
             settings_get,
             settings_set,
+            open_tabs_get,
+            open_tabs_set,
             open_terminal,
             selftest_config,
             pseudo_locale,

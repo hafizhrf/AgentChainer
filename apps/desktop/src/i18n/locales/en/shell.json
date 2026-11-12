@@ -68,6 +68,8 @@
   "shell.sidebar.settings": "Settings",
   "shell.sidebar.endedTitle": "Ended: open it to resume",
   "shell.sidebar.ended": "ended",
+  "shell.sidebar.cutOff": "cut off",
+  "shell.sidebar.cutOffTitle": "Stopped mid-reply when the app closed: open it to continue",
   "shell.sessionList.title": "Previous sessions",
   "shell.sessionList.loading": "Loading…",
   "shell.sessionList.empty": "No sessions in this folder yet. Sessions started in the terminal show up here too.",

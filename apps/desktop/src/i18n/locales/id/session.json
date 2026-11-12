@@ -214,5 +214,9 @@
   "session.composer.agentTitle": "Chat ini berjalan di {{agent}}.",
   "session.preview.offer": "Ada server berjalan di {{url}}",
   "session.preview.open": "Buka pratinjau",
-  "session.preview.dismiss": "Tutup"
+  "session.preview.dismiss": "Tutup",
+  "session.cutOff.text": "Chat ini berhenti di tengah balasan saat aplikasi ditutup atau runtime-nya dimulai ulang.",
+  "session.cutOff.continue": "Teruskan",
+  "session.cutOff.prompt": "Teruskan dari bagian terakhir.",
+  "session.cutOff.dismiss": "Tutup"
 }

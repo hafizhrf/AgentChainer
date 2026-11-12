@@ -345,6 +345,10 @@
   font-size: var(--text-xs);
 }
 
+.cut-off-status {
+  color: var(--warn);
+}
+
 .sidebar-footer {
   display: flex;
   align-items: center;

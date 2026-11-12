@@ -235,6 +235,15 @@ export function SettingsDialog({
               <label className="check">
                 <input
                   type="checkbox"
+                  checked={draft.restoreTabs !== false}
+                  onChange={(e) => setDraft({ ...draft, restoreTabs: e.target.checked ? null : false })}
+                />
+                <span>{t("home.settings.restoreTabs")}</span>
+              </label>
+              <p className="field-help">{t("home.settings.restoreTabsHelp")}</p>
+              <label className="check">
+                <input
+                  type="checkbox"
                   checked={draft.tasksPreview === true}
                   onChange={(e) => setDraft({ ...draft, tasksPreview: e.target.checked || null })}
                 />

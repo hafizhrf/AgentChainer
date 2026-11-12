@@ -17,6 +17,7 @@ const base: Settings = {
   language: null,
   autoApply: null,
   tasksPreview: null,
+  restoreTabs: null,
   recentWorkspaces: [],
   workspaces: [{ id: "w", name: "Shop", primary: "D:\\work\\app", folders: ["D:\\work\\api"] }],
   sessionFolders: [],

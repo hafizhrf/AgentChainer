@@ -2937,6 +2937,45 @@ Owner request, 2026-11-10: features that community tools for coding agents have 
       issues: light, dark and Indonesian. Nothing was written to GitHub.
     - **For the owner:** create a task from a real issue and check the Create PR preview (MANUAL_CHECKS 3y).
 - [ ] **CP-09** Restore the open tabs and running work after a crash or restart. — CCManager.
+  - **Plan (2026-11-12, owner's choices):**
+    - Lazy: every tab comes back at once, and a chat is resumed only when it's opened.
+    - A chat cut off mid-reply gets a notice and a **Continue** button; nothing runs on its own.
+    - Interrupted task runs are resumed by hand, with a startup notice that counts them.
+    - **Reopen tabs from last time**, on by default.
+  - **Built (2026-11-12):**
+    - **Kept by the Rust core:** `open_tabs_get`/`open_tabs_set` write `open-tabs.json` beside `settings.json`,
+      atomically (temp file + rename, now shared with the settings).
+      - Each chat's session id, folder(s), title, agent, profile and model alias, and whether its turn was running;
+        each task's id, folder and title; the tab shown.
+      - A typed struct that refuses unknown fields. Ids, absolute folders, known agents and kinds only; at most 50
+        chats and 50 tasks, titles cut to 200 characters.
+      - A missing or broken file reads as no tabs. Nothing is written while the setting is off, and turning it off
+        deletes the file.
+    - **UI (`openTabs.ts`):**
+      - The snapshot is written as tabs change, from metadata only, so streaming doesn't rewrite it. It is never
+        written before the file was read at start.
+      - Chats with nothing sent and Team workers are left out; the supervisor comes back as its chat.
+      - At start each chat comes back ended and `restored`. When it's shown, it is resumed with the existing
+        `resume()` (its model, folders, profile and agent), once; Resume tries again.
+      - A chat whose turn was running comes back `cutOff`: a bar over the composer offers **Continue** ("Continue
+        where you left off.") or dismiss, and the sidebar marks it "cut off".
+      - Task tabs come back with the Tasks preview on. Interrupted runs are counted in a startup notice, and each
+        task page already offers Resume.
+      - A reload's live chats (M1-36) win over restored ones. A runtime crash (M1-01) now marks the tabs it ends the
+        same way, so the shown one resumes when the runtime is back.
+    - **Not restored:** terminals, the Workspace settings page and Settings dialog, Team workers and a Team chat's
+      cap, the window's size.
+    - **Tests:**
+      - `cargo test`: round trip; a missing, broken or unknown file read as none; caps, duplicates and relative
+        folders left out;
+      - `openTabs.test.ts` (4): what's kept, `wasRunning` (turn or background work), placeholders ended, restored and
+        cut off, the shown tab kept or Home, open tabs winning.
+    - **In the debug app (own config dirs, the self-test harness, haiku):**
+      1. A chat with one reply and a task tab, `kill -9`, then a plain launch: both came back, the task tab shown.
+      2. A long reply, `kill -9` once the file said `wasRunning: true`, then a plain launch: the chat resumed with its
+         history and showed the cut-off bar and the "cut off" label.
+      - Screenshots in light, dark and Indonesian. Clicking **Continue** sends a message through the normal send path
+        and is left to the owner (MANUAL_CHECKS 3z).
 - [ ] **CP-10** A second opinion: another vendor's agent reviews a diff before merge. Builds on M9.
   - Sources: PAL `consensus` ([repo](https://github.com/BeehiveInnovations/pal-mcp-server)); codex-plugin-cc's review
     gate ([repo](https://github.com/openai/codex-plugin-cc)).

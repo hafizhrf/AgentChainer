@@ -13,8 +13,8 @@ source:
   marketplace: claude-plugins-official
   repo: anthropics/claude-plugins-official
   plugin: security-guidance
-  reviewedVersion: "2.0.17"
-  reviewedRef: "f8c5e7a1dcb71b10cb74586224b5401f3de5db28"
+  reviewedVersion: "2.0.20"
+  reviewedRef: "b5b01ac4f889fec0c4c6bb89f27ca7c8574473f6"
 platforms: [darwin, linux, win32]
 requires:
   - tool: python3

@@ -12,8 +12,8 @@ why: >-
 source:
   type: npm
   name: "@playwright/mcp"
-  version: "0.0.83"
-  integrity: "sha512-oNcl+Ae2/IAjhfPeP46BfIkSakfmprY+aOtkv5MjrQ4lPav4/yNtPhL0iq8SlIM90oApWgBDUxaNKvktazUKOg=="
+  version: "0.0.84"
+  integrity: "sha512-weqLrA7/D8MJzNV9/t3Hnjp100tS2sxFXKeb2gH6Nhktqmdfvx5qRA9AZ5Mhjnre1jY0wltsrRK5VZS5NBgcvw=="
 platforms: [darwin, linux, win32]
 risk: high
 permissions:
@@ -31,18 +31,11 @@ install:
           mcpServers:
             playwright:
               command: npx
-              args: ["-y", "@playwright/mcp@0.0.83", "--isolated"]
-reviews:
-  - by: hafizhrf
-    date: "2026-10-30"
-    ref: "0.0.83"
-    notes: >-
-      The 0.0.83 tarball's sha512 matches the pin and the registry, published with npm provenance. Read package.json,
-      cli.js, index.js, README and LICENSE (Apache-2.0); dependencies are exact Playwright versions with no install
-      scripts; no telemetry. Uses the system Chrome; browser_run_code_unsafe is on by default. docs/catalog-reviews/2026-10-30.md
+              args: ["-y", "@playwright/mcp@0.0.84", "--isolated"]
+reviews: []
 notes: >-
   Pinned to an exact version, unlike the playwright plugin, which runs @playwright/mcp@latest. Claude Code asks
-  before using servers from a project's .mcp.json. Needs Google Chrome (or run npx @playwright/mcp@0.0.83
+  before using servers from a project's .mcp.json. Needs Google Chrome (or run npx @playwright/mcp@0.0.84
   install-browser chrome) and a display.
 i18n:
   id:
@@ -63,4 +56,4 @@ i18n:
     notes: >-
       Di-pin ke versi yang pasti, tidak seperti plugin playwright yang menjalankan @playwright/mcp@latest. Claude Code
       bertanya sebelum memakai server dari .mcp.json milik proyek. Membutuhkan Google Chrome (atau jalankan npx
-      @playwright/mcp@0.0.83 install-browser chrome) dan layar.
+      @playwright/mcp@0.0.84 install-browser chrome) dan layar.

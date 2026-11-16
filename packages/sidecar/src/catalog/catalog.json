@@ -1,5 +1,5 @@
 {
-  "version": "2026.10.30",
+  "version": "2026.11.16",
   "items": [
     {
       "id": "actionlint",
@@ -717,7 +717,7 @@
         "repo": "anthropics/claude-plugins-official",
         "plugin": "gopls-lsp",
         "reviewedVersion": "1.0.0",
-        "reviewedRef": "f8c5e7a1dcb71b10cb74586224b5401f3de5db28"
+        "reviewedRef": "b5b01ac4f889fec0c4c6bb89f27ca7c8574473f6"
       },
       "platforms": [
         "darwin",
@@ -766,14 +766,7 @@
           }
         ]
       },
-      "reviews": [
-        {
-          "by": "hafizhrf",
-          "date": "2026-10-30",
-          "ref": "f8c5e7a1dcb71b10cb74586224b5401f3de5db28",
-          "notes": "Read the marketplace entry, README and LICENSE at f8c5e7a (1.0.0, the whole folder): Apache-2.0; a config-only LSP plugin that starts gopls from PATH; no hooks, MCP servers, scripts or telemetry. gopls may download the modules go.mod lists. docs/catalog-reviews/2026-10-30.md"
-        }
-      ],
+      "reviews": [],
       "i18n": {
         "id": {
           "name": "Language server Go (gopls)",
@@ -800,8 +793,8 @@
       "source": {
         "type": "npm",
         "name": "@playwright/mcp",
-        "version": "0.0.83",
-        "integrity": "sha512-oNcl+Ae2/IAjhfPeP46BfIkSakfmprY+aOtkv5MjrQ4lPav4/yNtPhL0iq8SlIM90oApWgBDUxaNKvktazUKOg=="
+        "version": "0.0.84",
+        "integrity": "sha512-weqLrA7/D8MJzNV9/t3Hnjp100tS2sxFXKeb2gH6Nhktqmdfvx5qRA9AZ5Mhjnre1jY0wltsrRK5VZS5NBgcvw=="
       },
       "platforms": [
         "darwin",
@@ -829,7 +822,7 @@
                     "command": "npx",
                     "args": [
                       "-y",
-                      "@playwright/mcp@0.0.83",
+                      "@playwright/mcp@0.0.84",
                       "--isolated"
                     ]
                   }
@@ -839,15 +832,8 @@
           }
         ]
       },
-      "reviews": [
-        {
-          "by": "hafizhrf",
-          "date": "2026-10-30",
-          "ref": "0.0.83",
-          "notes": "The 0.0.83 tarball's sha512 matches the pin and the registry, published with npm provenance. Read package.json, cli.js, index.js, README and LICENSE (Apache-2.0); dependencies are exact Playwright versions with no install scripts; no telemetry. Uses the system Chrome; browser_run_code_unsafe is on by default. docs/catalog-reviews/2026-10-30.md"
-        }
-      ],
-      "notes": "Pinned to an exact version, unlike the playwright plugin, which runs @playwright/mcp@latest. Claude Code asks before using servers from a project's .mcp.json. Needs Google Chrome (or run npx @playwright/mcp@0.0.83 install-browser chrome) and a display.",
+      "reviews": [],
+      "notes": "Pinned to an exact version, unlike the playwright plugin, which runs @playwright/mcp@latest. Claude Code asks before using servers from a project's .mcp.json. Needs Google Chrome (or run npx @playwright/mcp@0.0.84 install-browser chrome) and a display.",
       "i18n": {
         "id": {
           "name": "Browser Playwright (MCP, di-pin)",
@@ -859,7 +845,7 @@
             "Memiliki tool yang menjalankan JavaScript apa pun di komputer Anda (browser_run_code_unsafe); Claude Code bertanya sebelum setiap pemakaian kecuali Anda mengizinkannya",
             "Memulai setiap session dengan profil browser baru (--isolated): tidak ada cookie atau login yang disimpan"
           ],
-          "notes": "Di-pin ke versi yang pasti, tidak seperti plugin playwright yang menjalankan @playwright/mcp@latest. Claude Code bertanya sebelum memakai server dari .mcp.json milik proyek. Membutuhkan Google Chrome (atau jalankan npx @playwright/mcp@0.0.83 install-browser chrome) dan layar."
+          "notes": "Di-pin ke versi yang pasti, tidak seperti plugin playwright yang menjalankan @playwright/mcp@latest. Claude Code bertanya sebelum memakai server dari .mcp.json milik proyek. Membutuhkan Google Chrome (atau jalankan npx @playwright/mcp@0.0.84 install-browser chrome) dan layar."
         }
       }
     },
@@ -963,7 +949,7 @@
         "repo": "anthropics/claude-plugins-official",
         "plugin": "pyright-lsp",
         "reviewedVersion": "1.0.0",
-        "reviewedRef": "f8c5e7a1dcb71b10cb74586224b5401f3de5db28"
+        "reviewedRef": "b5b01ac4f889fec0c4c6bb89f27ca7c8574473f6"
       },
       "platforms": [
         "darwin",
@@ -1012,14 +998,7 @@
           }
         ]
       },
-      "reviews": [
-        {
-          "by": "hafizhrf",
-          "date": "2026-10-30",
-          "ref": "f8c5e7a1dcb71b10cb74586224b5401f3de5db28",
-          "notes": "Read the marketplace entry, README and LICENSE at f8c5e7a (1.0.0, the whole folder): Apache-2.0; a config-only LSP plugin that starts pyright-langserver --stdio from PATH; no hooks, MCP servers, scripts or telemetry. docs/catalog-reviews/2026-10-30.md"
-        }
-      ],
+      "reviews": [],
       "i18n": {
         "id": {
           "name": "Language server Python (Pyright)",
@@ -1048,7 +1027,7 @@
         "repo": "anthropics/claude-plugins-official",
         "plugin": "rust-analyzer-lsp",
         "reviewedVersion": "1.0.0",
-        "reviewedRef": "f8c5e7a1dcb71b10cb74586224b5401f3de5db28"
+        "reviewedRef": "b5b01ac4f889fec0c4c6bb89f27ca7c8574473f6"
       },
       "platforms": [
         "darwin",
@@ -1097,14 +1076,7 @@
           }
         ]
       },
-      "reviews": [
-        {
-          "by": "hafizhrf",
-          "date": "2026-10-30",
-          "ref": "f8c5e7a1dcb71b10cb74586224b5401f3de5db28",
-          "notes": "Read the marketplace entry, README and LICENSE at f8c5e7a (1.0.0, the whole folder): Apache-2.0; a config-only LSP plugin that starts rust-analyzer from PATH; no hooks, MCP servers, scripts or telemetry. The server runs cargo build scripts and proc macros, as any Rust editor does. docs/catalog-reviews/2026-10-30.md"
-        }
-      ],
+      "reviews": [],
       "i18n": {
         "id": {
           "name": "Language server Rust (rust-analyzer)",
@@ -1132,8 +1104,8 @@
         "marketplace": "claude-plugins-official",
         "repo": "anthropics/claude-plugins-official",
         "plugin": "security-guidance",
-        "reviewedVersion": "2.0.17",
-        "reviewedRef": "f8c5e7a1dcb71b10cb74586224b5401f3de5db28"
+        "reviewedVersion": "2.0.20",
+        "reviewedRef": "b5b01ac4f889fec0c4c6bb89f27ca7c8574473f6"
       },
       "platforms": [
         "darwin",
@@ -1225,7 +1197,7 @@
         "repo": "anthropics/claude-plugins-official",
         "plugin": "typescript-lsp",
         "reviewedVersion": "1.0.0",
-        "reviewedRef": "f8c5e7a1dcb71b10cb74586224b5401f3de5db28"
+        "reviewedRef": "b5b01ac4f889fec0c4c6bb89f27ca7c8574473f6"
       },
       "platforms": [
         "darwin",
@@ -1274,14 +1246,7 @@
           }
         ]
       },
-      "reviews": [
-        {
-          "by": "hafizhrf",
-          "date": "2026-10-30",
-          "ref": "f8c5e7a1dcb71b10cb74586224b5401f3de5db28",
-          "notes": "Read the marketplace entry, README and LICENSE at f8c5e7a (1.0.0, the whole folder): Apache-2.0; a config-only LSP plugin that starts typescript-language-server --stdio from PATH; no hooks, MCP servers, scripts or telemetry. docs/catalog-reviews/2026-10-30.md"
-        }
-      ],
+      "reviews": [],
       "i18n": {
         "id": {
           "name": "Language server TypeScript",
